@@ -86,6 +86,24 @@
 - **实测结果**:八类全部捕获入库(逐字段核对明文/密文/key/IV/hex/堆栈);开关切换即时热推送到注入进程(关摘要后 MESSAGE_DIGEST 计数不再增长,其余类别继续);配置持久化(重启后开关状态保持);UI 三页+详情弹窗+调用堆栈(含源码行 `MainActivity.kt:156`)全部正常;无 `hook FAILED`/`crashed after proceed`/FATAL。5k+ 条 SHA-256 源自 PBKDF2WithHmacSHA256 1000 次迭代与签名内部摘要(真实行为,非缺陷)。
 - **遗留调试日志**:`HookEngine.hook` 失败、`ConfigChannel` 连接失败、`ConfigServer` 丢弃记录三条 W 级日志保留,便于排障;`emit` V 级与 `hook registered` I 级日志已移除。
 
+### T12 双框架兼容(现代 Vector + legacy LSPosed)✅ 已完成
+**验收**:同一 APK 同时支持 Vector(libxposed API 102,`java_init.list` 现代入口)与旧版 LSPosed/EdXposed(legacy API 82+,`assets/xposed_init` legacy 入口);两入口共用中性 Hook 引擎,行为零漂移。设计文档:`docs/DUAL_FRAMEWORK_SUPPORT.md`。
+**备注**:
+- **加载语义**:LSPosed 加载器 `PreLoadedApk.loadModule` 对 `META-INF/xposed/java_init.list` 存在与否互斥分流(有→现代模块,忽略 xposed_init;无→legacy 模块);Vector 双支持。故双入口天然互斥,不会重复注入。
+- **中性抽象**:`hook/Invocation.kt`(越界安全 getArg)、`hook/Platform.kt`(register/log)、`adapters/LibxposedPlatform.kt`(PROTECTIVE + intercept 内 before→proceed→after)、`adapters/LegacyPlatform.kt`(XC_MethodHook 映射,hasThrowable 跳过 after,按签名精确注册);HookEngine/HookManager/八类 Hooker/ConfigChannel 零框架 import。
+- **依赖**:`compileOnly de.robv.android.xposed:api:82`(仓库 `api.xposed.info`,白名单 group),与 libxposed 102 并存无冲突;APK 不含任何框架类。
+- **清单**:Manifest `xposedminversion=82` + `xposeddescription`(旧管理器识别必需);`module.prop` 保持 `minApiVersion=102` 不变;proguard 双入口 keep + 双框架 `-dontwarn`。
+- **对齐决策**:ADR-1(module.prop 102 不变)、ADR-2(xposedminversion=82)、ADR-3(两入口均以 processName 作包标识)、ADR-4(after 在 throwable 时跳过)、ADR-5(日志统一走 Platform.log);`StackTraceFilter` 增补 `de.robv.android.xposed` 前缀,双框架堆栈过滤一致。
+- **验证**:`testDebugUnitTest` 32 用例全绿(新增 InvocationTest 3 用例)、`lintDebug` 0 error、`assembleDebug` 成功;x86_64 APK 展开核验 `java_init.list`/`module.prop`/`assets/xposed_init` 三入口文件在位且无框架类打包。
+
+### T13 双框架实机验证(2026-08-15,x64 安卓 VM,Android 14)✅ 已完成
+**验收**:`docs/DUAL_FRAMEWORK_SUPPORT.md` §8 矩阵 T-01~T-07 双场景实测通过;实测发现回填 ADR-6 与风险册。
+**备注**:
+- **场景 A(Vector 2.2 现代,modern 变体)**:`VectorModuleManager: Loading class ModevModule`;八类捕获入库(摘要 5008 条/轮,七类分布 10/3/1/13/3/5008/12,BASE64 默认关);热推送(关摘要后计数停 5008、其余翻倍);重启持久化;无 crashed after proceed / hook FAILED / FATAL。
+- **场景 B 适配**:真 legacy(1.8.6/EdXposed)不支持 Android 14;LSPosed 1.10.2 实测为 API 100 现代加载器,存在 `java_init.list` 时不回落 `xposed_init`(API 102 模块 `NoSuchMethodException` 后整体不注入)→ 按用户决策新增 **legacy 构建变体**(flavor 去掉 java_init.list、`minApiVersion=82`),在 LSPosed 1.10.2 legacy 路径实测全通(`Loading legacy module … LegacyModuleEntry`,八类捕获/热推送/持久化均与 A 一致);**交叉验证**:legacy 变体在 Vector 2.2 legacy 路径亦加载成功并完整捕获。
+- **其他实测发现**:① 框架覆盖安装会重置模块 `enabled=0` 并级联删 scope(用 sqlite3 修复复验,已写入风险册与发布检查单);② Android 14 冻结后台宿主导致 46299 读超时丢记录,测试需保持宿主前台;③ 注入侧启动期 connect 重试为已知良性行为。
+- **产物**:双变体构建命令与测试命令已更新 README;`testModern/LegacyDebugUnitTest` 32 用例全绿、`lintModern/LegacyDebug` 0 error。
+
 ---
 
 ## 2. 目录结构(目标态)
@@ -96,15 +114,18 @@ modev/
 ├─ gradle/libs.versions.toml / wrapper/
 ├─ docs/DEVELOPMENT.md            ← 本文件
 ├─ README.md
-└─ app/src/main/
-   ├─ AndroidManifest.xml
-   ├─ resources/META-INF/xposed/{java_init.list, module.prop}
-   ├─ java/com/lioisme/modev/
-   │  ├─ ModevApp.kt               # Application + 手动 DI 容器
-   │  ├─ ModevModule.kt            # XposedModule 入口(注入进程)
-   │  ├─ core/                     # 纯 Kotlin:model/util/codec(可单测)
-   │  ├─ hook/                     # 注入进程:hook 引擎 + 八类 Hooker + 跟踪器 + 通道
-   │  ├─ data/                     # 宿主进程:Room + Repository
-   │  └─ ui/                       # 宿主进程:theme/nav/screens/viewmodels
+└─ app/src/
+   ├─ main/AndroidManifest.xml       # xposedminversion=82 + xposeddescription 元数据
+   ├─ main/assets/xposed_init        # legacy 入口注册(API 82+,legacy 变体)
+   ├─ modern/resources/META-INF/xposed/   # modern 变体:java_init.list + module.prop(minApiVersion=102)
+   ├─ legacy/resources/META-INF/xposed/   # legacy 变体:module.prop(minApiVersion=82),无 java_init.list
+   └─ main/java/com/lioisme/modev/
+      ├─ ModevApp.kt               # Application + 手动 DI 容器
+      ├─ ModevModule.kt            # XposedModule 现代入口(注入进程)
+      ├─ LegacyModuleEntry.kt      # IXposedHookLoadPackage legacy 入口(注入进程)
+      ├─ core/                     # 纯 Kotlin:model/util/codec(可单测)
+      ├─ hook/                     # 注入进程:hook 引擎 + 八类 Hooker + 跟踪器 + 通道
+      ├─ data/                     # 宿主进程:Room + Repository
+      └─ ui/                       # 宿主进程:theme/nav/screens/viewmodels
    └─ test/java/com/lioisme/modev/core/   # 单元测试
 ```

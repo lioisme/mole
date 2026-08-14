@@ -5,7 +5,7 @@ package com.lioisme.modev.core.util
  *
  * 过滤规则(按前缀剔除):
  *  - 模块自身帧(com.lioisme.modev)
- *  - Xposed 框架帧(io.github.libxposed)
+ *  - Xposed 框架帧(io.github.libxposed / de.robv.android.xposed,兼容双框架)
  *  - 反射与 JVM 内部帧(java.lang.reflect / jdk.internal / sun.reflect / dalvik.system)
  *  - 被 Hook 的 JDK 门面类自身(避免记录自身递归帧)
  */
@@ -14,6 +14,7 @@ object StackTraceFilter {
     private val DEFAULT_IGNORED_PREFIXES = listOf(
         "com.lioisme.modev",
         "io.github.libxposed",
+        "de.robv.android.xposed",
         "java.lang.reflect",
         "jdk.internal",
         "sun.reflect",

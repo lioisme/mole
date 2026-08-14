@@ -7,9 +7,10 @@ import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.hook.CryptoContext
 import com.lioisme.modev.hook.CryptoContextTracker
 import com.lioisme.modev.hook.HookEngine
+import com.lioisme.modev.hook.Invocation
+import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.MethodFinder
 import com.lioisme.modev.hook.RecordSink
-import io.github.libxposed.api.XposedInterface
 import java.security.Provider
 import java.security.MessageDigest
 
@@ -26,67 +27,67 @@ class MessageDigestHooker(
 
     override fun install() {
         val f = MethodFinder
-        hook(f.find(DIGEST, "getInstance", String::class.java)) { c, result -> afterGetInstance(c, result) }
-        hook(f.find(DIGEST, "getInstance", String::class.java, String::class.java)) { c, result -> afterGetInstance(c, result) }
-        hook(f.find(DIGEST, "getInstance", String::class.java, Provider::class.java)) { c, result -> afterGetInstance(c, result) }
-        hook(f.find(DIGEST, "update", ByteArray::class.java)) { c -> afterUpdate(c) }
-        hook(f.find(DIGEST, "update", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { c -> afterUpdate(c) }
-        hook(f.find(DIGEST, "update", java.nio.ByteBuffer::class.java)) { c -> afterUpdate(c) }
-        hook(f.find(DIGEST, "digest")) { c, result -> afterDigest(c, result) }
-        hook(f.find(DIGEST, "digest", ByteArray::class.java)) { c, result -> afterDigest(c, result) }
-        hook(f.find(DIGEST, "digest", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { c, result -> afterDigest(c, result) }
+        hook(f.find(DIGEST, "getInstance", String::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hook(f.find(DIGEST, "getInstance", String::class.java, String::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hook(f.find(DIGEST, "getInstance", String::class.java, Provider::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hook(f.find(DIGEST, "update", ByteArray::class.java)) { inv -> afterUpdate(inv) }
+        hook(f.find(DIGEST, "update", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv -> afterUpdate(inv) }
+        hook(f.find(DIGEST, "update", java.nio.ByteBuffer::class.java)) { inv -> afterUpdate(inv) }
+        hook(f.find(DIGEST, "digest")) { inv, result -> afterDigest(inv, result) }
+        hook(f.find(DIGEST, "digest", ByteArray::class.java)) { inv, result -> afterDigest(inv, result) }
+        hook(f.find(DIGEST, "digest", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, result -> afterDigest(inv, result) }
     }
 
-    private fun hook(method: java.lang.reflect.Method?, after: (XposedInterface.Chain) -> Unit) {
-        hook(method) { chain, _ -> after(chain) }
+    private fun hook(method: java.lang.reflect.Method?, after: (Invocation) -> Unit) {
+        hook(method) { inv, _ -> after(inv) }
     }
 
-    private fun hook(method: java.lang.reflect.Method?, after: (XposedInterface.Chain, Any?) -> Unit) {
+    private fun hook(method: java.lang.reflect.Method?, after: (Invocation, Any?) -> Unit) {
         if (method == null) return
-        engine.hook(method) { chain ->
-            val result = chain.proceed()
-            if (enabled()) {
-                after(chain, result)
+        engine.hook(method, object : MethodHook() {
+            override fun after(invocation: Invocation) {
+                if (enabled()) {
+                    after(invocation, invocation.result)
+                }
             }
-            result
-        }
+        })
     }
 
-    private fun afterGetInstance(chain: XposedInterface.Chain, result: Any?) {
+    private fun afterGetInstance(invocation: Invocation, result: Any?) {
         val target = result ?: return
-        tracker.contextFor(target).algorithm = chain.getArg(0) as? String ?: ""
+        tracker.contextFor(target).algorithm = invocation.getArg(0) as? String ?: ""
     }
 
-    private fun afterUpdate(chain: XposedInterface.Chain) {
-        val ctx = tracker.contextFor(chain.getThisObject())
-        val input = chain.getArg(0) as? ByteArray
+    private fun afterUpdate(invocation: Invocation) {
+        val instance = invocation.thisObject ?: return
+        val ctx = tracker.contextFor(instance)
+        val input = invocation.getArg(0) as? ByteArray
         val n = input?.size ?: 0
         ctx.inputTotal += n
         if (n > 0) {
             emit(
                 operation = CryptoOperation.UPDATE,
                 algorithm = ctx.algorithm,
-                contextId = CryptoContextTracker.identity(chain.getThisObject()),
+                contextId = CryptoContextTracker.identity(instance),
                 context = ctx,
                 input = BytesView.of(input),
             )
         }
     }
 
-    private fun afterDigest(chain: XposedInterface.Chain, result: Any?) {
-        val ctx = tracker.contextFor(chain.getThisObject())
-        val input = chain.getArgOrNull(0) as? ByteArray
+    private fun afterDigest(invocation: Invocation, result: Any?) {
+        val instance = invocation.thisObject ?: return
+        val ctx = tracker.contextFor(instance)
+        val input = invocation.getArg(0) as? ByteArray
         val output = result as? ByteArray
-        if (enabled()) {
-            emit(
-                operation = CryptoOperation.DIGEST,
-                algorithm = ctx.algorithm,
-                contextId = CryptoContextTracker.identity(chain.getThisObject()),
-                context = ctx,
-                input = BytesView.of(input),
-                output = BytesView.of(output),
-            )
-        }
+        emit(
+            operation = CryptoOperation.DIGEST,
+            algorithm = ctx.algorithm,
+            contextId = CryptoContextTracker.identity(instance),
+            context = ctx,
+            input = BytesView.of(input),
+            output = BytesView.of(output),
+        )
     }
 
     companion object {

@@ -10,10 +10,10 @@ import com.lioisme.modev.hook.hooks.KeyParamHooker
 import com.lioisme.modev.hook.hooks.MacHooker
 import com.lioisme.modev.hook.hooks.MessageDigestHooker
 import com.lioisme.modev.hook.hooks.SignatureHooker
-import io.github.libxposed.api.XposedInterface
 
 /**
  * Hook 引擎组装器:每个注入进程一次,装配引擎/跟踪器/通道/出口与八类 Hooker。
+ * 由入口(现代 libxposed 或 legacy Xposed)注入对应 [Platform] 适配器,业务层零框架依赖。
  */
 object HookManager {
 
@@ -28,13 +28,13 @@ object HookManager {
      * @param packageName 目标进程名(默认进程即包名;分离进程形如 pkg:sub)
      */
     @Synchronized
-    fun install(xposed: XposedInterface, packageName: String, processName: String) {
+    fun install(platform: Platform, packageName: String, processName: String) {
         if (installed) return
         installed = true
 
-        engine = HookEngine(xposed)
+        engine = HookEngine(platform)
         tracker = CryptoContextTracker()
-        channel = ConfigChannel(xposed, packageName, processName) { /* 配置变更即生效 */ }
+        channel = ConfigChannel(packageName, processName) { /* 配置变更即生效 */ }
         sink = RecordSink { record -> channel.sendRecordJson(WireCodec.record(record)) }
         channel.start()
         sink.start()

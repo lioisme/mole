@@ -62,6 +62,19 @@ android {
         }
     }
 
+    // 双框架构建变体:
+    //  - modern(默认):META-INF/xposed/java_init.list + module.prop(minApiVersion=102),供 Vector 现代加载
+    //  - legacy:仅 assets/xposed_init + module.prop(minApiVersion=82),供 LSPosed ≤93 / EdXposed / 1.10.x legacy 路径加载
+    flavorDimensions += "framework"
+    productFlavors {
+        create("modern") {
+            dimension = "framework"
+        }
+        create("legacy") {
+            dimension = "framework"
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -119,6 +132,8 @@ dependencies {
     implementation(libs.gson)
 
     compileOnly(libs.libxposed.api)
+    // legacy Xposed API 82(旧版 LSPosed ≤93 注入入口编译用,运行时由框架提供)
+    compileOnly(libs.xposed.api)
 
     testImplementation(libs.junit)
 }

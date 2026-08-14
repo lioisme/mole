@@ -12,6 +12,7 @@ room = "2.7.2"
 coroutines = "1.10.2"
 gson = "2.13.2"
 libxposed = "102.0.0"
+xposedApi = "82"
 junit = "4.13.2"
 robolectric = "4.14.1"
 
@@ -35,6 +36,7 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
 libxposed-api = { group = "io.github.libxposed", name = "api", version.ref = "libxposed" }
+xposed-api = { group = "de.robv.android.xposed", name = "api", version.ref = "xposedApi" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
 

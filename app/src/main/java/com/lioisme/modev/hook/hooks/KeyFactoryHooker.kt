@@ -6,9 +6,10 @@ import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.hook.CryptoContextTracker
 import com.lioisme.modev.hook.HookEngine
+import com.lioisme.modev.hook.Invocation
+import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.MethodFinder
 import com.lioisme.modev.hook.RecordSink
-import io.github.libxposed.api.XposedInterface
 import java.security.Provider
 
 /**
@@ -24,40 +25,41 @@ class KeyFactoryHooker(
 
     override fun install() {
         val f = MethodFinder
-        hook(f.find(KF, "getInstance", String::class.java)) { c, result -> afterGetInstance(c, result) }
-        hook(f.find(KF, "getInstance", String::class.java, String::class.java)) { c, result -> afterGetInstance(c, result) }
-        hook(f.find(KF, "getInstance", String::class.java, Provider::class.java)) { c, result -> afterGetInstance(c, result) }
-        hook(f.find(KF, "generatePrivate", java.security.spec.KeySpec::class.java)) { c, result -> afterGenerate(c, result, CryptoOperation.GENERATE_PRIVATE) }
-        hook(f.find(KF, "generatePublic", java.security.spec.KeySpec::class.java)) { c, result -> afterGenerate(c, result, CryptoOperation.GENERATE_PUBLIC) }
+        hook(f.find(KF, "getInstance", String::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hook(f.find(KF, "getInstance", String::class.java, String::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hook(f.find(KF, "getInstance", String::class.java, Provider::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hook(f.find(KF, "generatePrivate", java.security.spec.KeySpec::class.java)) { inv, result -> afterGenerate(inv, result, CryptoOperation.GENERATE_PRIVATE) }
+        hook(f.find(KF, "generatePublic", java.security.spec.KeySpec::class.java)) { inv, result -> afterGenerate(inv, result, CryptoOperation.GENERATE_PUBLIC) }
 
-        hook(f.find(SKF, "getInstance", String::class.java)) { c, result -> afterGetInstance(c, result) }
-        hook(f.find(SKF, "getInstance", String::class.java, String::class.java)) { c, result -> afterGetInstance(c, result) }
-        hook(f.find(SKF, "getInstance", String::class.java, Provider::class.java)) { c, result -> afterGetInstance(c, result) }
-        hook(f.find(SKF, "generateSecret", java.security.spec.KeySpec::class.java)) { c, result -> afterGenerate(c, result, CryptoOperation.GENERATE_SECRET) }
+        hook(f.find(SKF, "getInstance", String::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hook(f.find(SKF, "getInstance", String::class.java, String::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hook(f.find(SKF, "getInstance", String::class.java, Provider::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hook(f.find(SKF, "generateSecret", java.security.spec.KeySpec::class.java)) { inv, result -> afterGenerate(inv, result, CryptoOperation.GENERATE_SECRET) }
     }
 
-    private fun hook(method: java.lang.reflect.Method?, after: (XposedInterface.Chain) -> Unit) {
-        hook(method) { chain, _ -> after(chain) }
+    private fun hook(method: java.lang.reflect.Method?, after: (Invocation) -> Unit) {
+        hook(method) { inv, _ -> after(inv) }
     }
 
-    private fun hook(method: java.lang.reflect.Method?, after: (XposedInterface.Chain, Any?) -> Unit) {
+    private fun hook(method: java.lang.reflect.Method?, after: (Invocation, Any?) -> Unit) {
         if (method == null) return
-        engine.hook(method) { chain ->
-            val result = chain.proceed()
-            if (enabled()) {
-                after(chain, result)
+        engine.hook(method, object : MethodHook() {
+            override fun after(invocation: Invocation) {
+                if (enabled()) {
+                    after(invocation, invocation.result)
+                }
             }
-            result
-        }
+        })
     }
 
-    private fun afterGetInstance(chain: XposedInterface.Chain, result: Any?) {
+    private fun afterGetInstance(invocation: Invocation, result: Any?) {
         val target = result ?: return
-        tracker.contextFor(target).algorithm = chain.getArg(0) as? String ?: ""
+        tracker.contextFor(target).algorithm = invocation.getArg(0) as? String ?: ""
     }
 
-    private fun afterGenerate(chain: XposedInterface.Chain, result: Any?, operation: CryptoOperation) {
-        val ctx = tracker.contextFor(chain.getThisObject())
+    private fun afterGenerate(invocation: Invocation, result: Any?, operation: CryptoOperation) {
+        val instance = invocation.thisObject ?: return
+        val ctx = tracker.contextFor(instance)
         val keyBytes = when (result) {
             is java.security.PrivateKey, is javax.crypto.SecretKey ->
                 (result as? java.security.Key)?.encoded
@@ -68,7 +70,7 @@ class KeyFactoryHooker(
         emit(
             operation = operation,
             algorithm = ctx.algorithm,
-            contextId = CryptoContextTracker.identity(chain.getThisObject()),
+            contextId = CryptoContextTracker.identity(instance),
             context = ctx,
             key = BytesView.of(keyBytes),
         )

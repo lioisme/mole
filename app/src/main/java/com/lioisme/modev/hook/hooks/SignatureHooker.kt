@@ -6,9 +6,10 @@ import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.hook.CryptoContextTracker
 import com.lioisme.modev.hook.HookEngine
+import com.lioisme.modev.hook.Invocation
+import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.MethodFinder
 import com.lioisme.modev.hook.RecordSink
-import io.github.libxposed.api.XposedInterface
 import java.security.PrivateKey
 import java.security.Provider
 import java.security.PublicKey
@@ -28,101 +29,106 @@ class SignatureHooker(
 
     override fun install() {
         val f = MethodFinder
-        hook(f.find(SIG, "getInstance", String::class.java)) { c, result -> afterGetInstance(c, result) }
-        hook(f.find(SIG, "getInstance", String::class.java, String::class.java)) { c, result -> afterGetInstance(c, result) }
-        hook(f.find(SIG, "getInstance", String::class.java, Provider::class.java)) { c, result -> afterGetInstance(c, result) }
-        hook(f.find(SIG, "initSign", PrivateKey::class.java)) { c -> afterInitSign(c) }
-        hook(f.find(SIG, "initSign", PrivateKey::class.java, SecureRandom::class.java)) { c -> afterInitSign(c) }
-        hook(f.find(SIG, "initVerify", PublicKey::class.java)) { c -> afterInitVerify(c) }
-        hook(f.find(SIG, "initVerify", Certificate::class.java)) { c -> afterInitVerify(c) }
-        hook(f.find(SIG, "update", ByteArray::class.java)) { c -> afterUpdate(c) }
-        hook(f.find(SIG, "update", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { c -> afterUpdate(c) }
-        hook(f.find(SIG, "update", java.nio.ByteBuffer::class.java)) { c -> afterUpdate(c) }
-        hook(f.find(SIG, "sign")) { c, result -> afterSign(c, result) }
-        hook(f.find(SIG, "sign", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { c, result -> afterSign(c, result) }
-        hook(f.find(SIG, "verify", ByteArray::class.java)) { c, result -> afterVerify(c, result) }
-        hook(f.find(SIG, "verify", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { c, result -> afterVerify(c, result) }
+        hook(f.find(SIG, "getInstance", String::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hook(f.find(SIG, "getInstance", String::class.java, String::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hook(f.find(SIG, "getInstance", String::class.java, Provider::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hook(f.find(SIG, "initSign", PrivateKey::class.java)) { inv -> afterInitSign(inv) }
+        hook(f.find(SIG, "initSign", PrivateKey::class.java, SecureRandom::class.java)) { inv -> afterInitSign(inv) }
+        hook(f.find(SIG, "initVerify", PublicKey::class.java)) { inv -> afterInitVerify(inv) }
+        hook(f.find(SIG, "initVerify", Certificate::class.java)) { inv -> afterInitVerify(inv) }
+        hook(f.find(SIG, "update", ByteArray::class.java)) { inv -> afterUpdate(inv) }
+        hook(f.find(SIG, "update", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv -> afterUpdate(inv) }
+        hook(f.find(SIG, "update", java.nio.ByteBuffer::class.java)) { inv -> afterUpdate(inv) }
+        hook(f.find(SIG, "sign")) { inv, result -> afterSign(inv, result) }
+        hook(f.find(SIG, "sign", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, result -> afterSign(inv, result) }
+        hook(f.find(SIG, "verify", ByteArray::class.java)) { inv, result -> afterVerify(inv, result) }
+        hook(f.find(SIG, "verify", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, result -> afterVerify(inv, result) }
     }
 
-    private fun hook(method: java.lang.reflect.Method?, after: (XposedInterface.Chain) -> Unit) {
-        hook(method) { chain, _ -> after(chain) }
+    private fun hook(method: java.lang.reflect.Method?, after: (Invocation) -> Unit) {
+        hook(method) { inv, _ -> after(inv) }
     }
 
-    private fun hook(method: java.lang.reflect.Method?, after: (XposedInterface.Chain, Any?) -> Unit) {
+    private fun hook(method: java.lang.reflect.Method?, after: (Invocation, Any?) -> Unit) {
         if (method == null) return
-        engine.hook(method) { chain ->
-            val result = chain.proceed()
-            if (enabled()) {
-                after(chain, result)
+        engine.hook(method, object : MethodHook() {
+            override fun after(invocation: Invocation) {
+                if (enabled()) {
+                    after(invocation, invocation.result)
+                }
             }
-            result
-        }
+        })
     }
 
-    private fun afterGetInstance(chain: XposedInterface.Chain, result: Any?) {
+    private fun afterGetInstance(invocation: Invocation, result: Any?) {
         val target = result ?: return
-        tracker.contextFor(target).algorithm = chain.getArg(0) as? String ?: ""
+        tracker.contextFor(target).algorithm = invocation.getArg(0) as? String ?: ""
     }
 
-    private fun afterInitSign(chain: XposedInterface.Chain) {
-        val ctx = tracker.contextFor(chain.getThisObject())
-        CipherHooker.extractKey(chain.getArg(0) as? PrivateKey, ctx)
+    private fun afterInitSign(invocation: Invocation) {
+        val instance = invocation.thisObject ?: return
+        val ctx = tracker.contextFor(instance)
+        CipherHooker.extractKey(invocation.getArg(0) as? PrivateKey, ctx)
         emit(
             operation = CryptoOperation.INIT,
             algorithm = ctx.algorithm,
-            contextId = CryptoContextTracker.identity(chain.getThisObject()),
+            contextId = CryptoContextTracker.identity(instance),
             context = ctx,
         )
     }
 
-    private fun afterInitVerify(chain: XposedInterface.Chain) {
-        val ctx = tracker.contextFor(chain.getThisObject())
-        val key = chain.getArg(0) as? PublicKey
+    private fun afterInitVerify(invocation: Invocation) {
+        val instance = invocation.thisObject ?: return
+        val ctx = tracker.contextFor(instance)
+        val key = invocation.getArg(0) as? PublicKey
         CipherHooker.extractKey(key, ctx)
         emit(
             operation = CryptoOperation.INIT,
             algorithm = ctx.algorithm,
-            contextId = CryptoContextTracker.identity(chain.getThisObject()),
+            contextId = CryptoContextTracker.identity(instance),
             context = ctx,
         )
     }
 
-    private fun afterUpdate(chain: XposedInterface.Chain) {
-        val ctx = tracker.contextFor(chain.getThisObject())
-        val input = chain.getArg(0) as? ByteArray
+    private fun afterUpdate(invocation: Invocation) {
+        val instance = invocation.thisObject ?: return
+        val ctx = tracker.contextFor(instance)
+        val input = invocation.getArg(0) as? ByteArray
         val n = input?.size ?: 0
         ctx.inputTotal += n
         if (n > 0) {
             emit(
                 operation = CryptoOperation.UPDATE,
                 algorithm = ctx.algorithm,
-                contextId = CryptoContextTracker.identity(chain.getThisObject()),
+                contextId = CryptoContextTracker.identity(instance),
                 context = ctx,
                 input = BytesView.of(input),
             )
         }
     }
 
-    private fun afterSign(chain: XposedInterface.Chain, result: Any?) {
-        val ctx = tracker.contextFor(chain.getThisObject())
+    private fun afterSign(invocation: Invocation, result: Any?) {
+        val instance = invocation.thisObject ?: return
+        val ctx = tracker.contextFor(instance)
         val output = result as? ByteArray
         emit(
             operation = CryptoOperation.SIGN,
             algorithm = ctx.algorithm,
-            contextId = CryptoContextTracker.identity(chain.getThisObject()),
+            contextId = CryptoContextTracker.identity(instance),
             context = ctx,
             output = BytesView.of(output),
         )
     }
 
-    private fun afterVerify(chain: XposedInterface.Chain, result: Any?) {
-        val ctx = tracker.contextFor(chain.getThisObject())
-        val signature = chain.getArgOrNull(0) as? ByteArray
+    private fun afterVerify(invocation: Invocation, result: Any?) {
+        val instance = invocation.thisObject ?: return
+        val ctx = tracker.contextFor(instance)
+        val signature = invocation.getArg(0) as? ByteArray
         ctx.verified = result == true
         emit(
             operation = CryptoOperation.VERIFY,
             algorithm = ctx.algorithm,
-            contextId = CryptoContextTracker.identity(chain.getThisObject()),
+            contextId = CryptoContextTracker.identity(instance),
             context = ctx,
             input = BytesView.of(signature),
         )

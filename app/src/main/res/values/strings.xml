@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Modev</string>
+    <string name="app_description">抓取目标 App 全部算法调用(摘要/加解密/签名/MAC/密钥/编码)的 Xposed 模块,支持 Vector(libxposed 102)与旧版 LSPosed 双框架。</string>
 </resources>

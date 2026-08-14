@@ -7,9 +7,10 @@ import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.hook.CryptoContext
 import com.lioisme.modev.hook.CryptoContextTracker
 import com.lioisme.modev.hook.HookEngine
+import com.lioisme.modev.hook.Invocation
+import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.MethodFinder
 import com.lioisme.modev.hook.RecordSink
-import io.github.libxposed.api.XposedInterface
 import java.security.Key
 import java.security.Provider
 import java.security.spec.AlgorithmParameterSpec
@@ -33,108 +34,110 @@ class CipherHooker(
     override fun install() {
         val f = MethodFinder
         // 实例化
-        hookInstanceOf(f.find(CIPHER, "getInstance", String::class.java)) { c, result -> afterGetInstance(c, result) }
-        hookInstanceOf(f.find(CIPHER, "getInstance", String::class.java, String::class.java)) { c, result -> afterGetInstance(c, result) }
-        hookInstanceOf(f.find(CIPHER, "getInstance", String::class.java, Provider::class.java)) { c, result -> afterGetInstance(c, result) }
-        // 初始化
-        hookBefore(f.find(CIPHER, "init", Int::class.javaPrimitiveType, Key::class.java)) { c, ctx -> beforeInit(c, ctx) }
-        hookBefore(f.find(CIPHER, "init", Int::class.javaPrimitiveType, Key::class.java, AlgorithmParameterSpec::class.java)) { c, ctx -> beforeInit(c, ctx) }
-        hookBefore(f.find(CIPHER, "init", Int::class.javaPrimitiveType, Key::class.java, java.security.SecureRandom::class.java)) { c, ctx -> beforeInit(c, ctx) }
-        hookBefore(f.find(CIPHER, "init", Int::class.javaPrimitiveType, Key::class.java, AlgorithmParameterSpec::class.java, java.security.SecureRandom::class.java)) { c, ctx -> beforeInit(c, ctx) }
+        hookInstanceOf(f.find(CIPHER, "getInstance", String::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hookInstanceOf(f.find(CIPHER, "getInstance", String::class.java, String::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        hookInstanceOf(f.find(CIPHER, "getInstance", String::class.java, Provider::class.java)) { inv, result -> afterGetInstance(inv, result) }
+        // 初始化(在 proceed 前采集,参数形态安全)
+        hookBefore(f.find(CIPHER, "init", Int::class.javaPrimitiveType, Key::class.java)) { inv, ctx -> beforeInit(inv, ctx) }
+        hookBefore(f.find(CIPHER, "init", Int::class.javaPrimitiveType, Key::class.java, AlgorithmParameterSpec::class.java)) { inv, ctx -> beforeInit(inv, ctx) }
+        hookBefore(f.find(CIPHER, "init", Int::class.javaPrimitiveType, Key::class.java, java.security.SecureRandom::class.java)) { inv, ctx -> beforeInit(inv, ctx) }
+        hookBefore(f.find(CIPHER, "init", Int::class.javaPrimitiveType, Key::class.java, AlgorithmParameterSpec::class.java, java.security.SecureRandom::class.java)) { inv, ctx -> beforeInit(inv, ctx) }
         // 分块更新
-        hookAfter(f.find(CIPHER, "update", ByteArray::class.java)) { c, ctx, _ -> afterUpdate(c, ctx) }
-        hookAfter(f.find(CIPHER, "update", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { c, ctx, _ -> afterUpdate(c, ctx) }
-        hookAfter(f.find(CIPHER, "update", java.nio.ByteBuffer::class.java)) { c, ctx, _ -> afterUpdate(c, ctx) }
+        hookAfter(f.find(CIPHER, "update", ByteArray::class.java)) { inv, ctx, _ -> afterUpdate(inv, ctx) }
+        hookAfter(f.find(CIPHER, "update", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, ctx, _ -> afterUpdate(inv, ctx) }
+        hookAfter(f.find(CIPHER, "update", java.nio.ByteBuffer::class.java)) { inv, ctx, _ -> afterUpdate(inv, ctx) }
         // 收尾
-        hookAfter(f.find(CIPHER, "doFinal")) { c, ctx, result -> afterDoFinal(c, ctx, result) }
-        hookAfter(f.find(CIPHER, "doFinal", ByteArray::class.java)) { c, ctx, result -> afterDoFinal(c, ctx, result) }
-        hookAfter(f.find(CIPHER, "doFinal", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { c, ctx, result -> afterDoFinal(c, ctx, result) }
-        hookAfter(f.find(CIPHER, "doFinal", java.nio.ByteBuffer::class.java)) { c, ctx, result -> afterDoFinal(c, ctx, result) }
+        hookAfter(f.find(CIPHER, "doFinal")) { inv, ctx, result -> afterDoFinal(inv, ctx, result) }
+        hookAfter(f.find(CIPHER, "doFinal", ByteArray::class.java)) { inv, ctx, result -> afterDoFinal(inv, ctx, result) }
+        hookAfter(f.find(CIPHER, "doFinal", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, ctx, result -> afterDoFinal(inv, ctx, result) }
+        hookAfter(f.find(CIPHER, "doFinal", java.nio.ByteBuffer::class.java)) { inv, ctx, result -> afterDoFinal(inv, ctx, result) }
         // 动态 IV
-        hookAfter(f.find(CIPHER, "getIV")) { c, ctx, result -> afterGetIv(c, ctx, result) }
+        hookAfter(f.find(CIPHER, "getIV")) { inv, ctx, result -> afterGetIv(inv, ctx, result) }
     }
 
     private fun hookBefore(
         method: java.lang.reflect.Method?,
-        before: (XposedInterface.Chain, CryptoContext) -> Unit,
+        before: (Invocation, CryptoContext) -> Unit,
     ) {
         if (method == null) return
-        engine.hook(method) { chain ->
-            val instance = chain.getThisObject() ?: return@hook chain.proceed()
-            val ctx = tracker.contextFor(instance)
-            if (enabled()) {
-                before(chain, ctx)
+        engine.hook(method, object : MethodHook() {
+            override fun before(invocation: Invocation) {
+                val instance = invocation.thisObject ?: return
+                if (enabled()) {
+                    before(invocation, tracker.contextFor(instance))
+                }
             }
-            chain.proceed()
-        }
+        })
     }
 
     private fun hookAfter(
         method: java.lang.reflect.Method?,
-        after: (XposedInterface.Chain, CryptoContext, Any?) -> Unit,
+        after: (Invocation, CryptoContext, Any?) -> Unit,
     ) {
         if (method == null) return
-        engine.hook(method) { chain ->
-            val instance = chain.getThisObject() ?: return@hook chain.proceed()
-            val ctx = tracker.contextFor(instance)
-            val result = chain.proceed()
-            if (enabled()) {
-                after(chain, ctx, result)
+        engine.hook(method, object : MethodHook() {
+            override fun after(invocation: Invocation) {
+                val instance = invocation.thisObject ?: return
+                if (enabled()) {
+                    after(invocation, tracker.contextFor(instance), invocation.result)
+                }
             }
-            result
-        }
+        })
     }
 
     private fun hookInstanceOf(
         method: java.lang.reflect.Method?,
-        after: (XposedInterface.Chain, Any?) -> Unit,
+        after: (Invocation, Any?) -> Unit,
     ) {
         if (method == null) return
-        engine.hook(method) { chain ->
-            val result = chain.proceed()
-            if (enabled()) {
-                after(chain, result)
+        engine.hook(method, object : MethodHook() {
+            override fun after(invocation: Invocation) {
+                if (enabled()) {
+                    after(invocation, invocation.result)
+                }
             }
-            result
-        }
+        })
     }
 
-    private fun afterGetInstance(chain: XposedInterface.Chain, result: Any?) {
+    private fun afterGetInstance(invocation: Invocation, result: Any?) {
         val target = result ?: return
         val ctx = tracker.contextFor(target)
-        ctx.algorithm = chain.getArg(0) as? String ?: ""
-        ctx.provider = providerOf(chain)
+        ctx.algorithm = invocation.getArg(0) as? String ?: ""
+        ctx.provider = providerOf(invocation)
     }
 
-    private fun beforeInit(chain: XposedInterface.Chain, ctx: CryptoContext) {
-        ctx.direction = chain.getArg(0) as? Int
-        extractKey(chain.getArg(1) as? Key, ctx)
-        extractIv(chain.getArgOrNull(2) as? AlgorithmParameterSpec, ctx)
+    private fun beforeInit(invocation: Invocation, ctx: CryptoContext) {
+        val instance = invocation.thisObject ?: return
+        ctx.direction = invocation.getArg(0) as? Int
+        extractKey(invocation.getArg(1) as? Key, ctx)
+        extractIv(invocation.getArg(2) as? AlgorithmParameterSpec, ctx)
         emit(
             operation = CryptoOperation.INIT,
             algorithm = ctx.algorithm,
-            contextId = CryptoContextTracker.identity(chain.getThisObject()),
+            contextId = CryptoContextTracker.identity(instance),
             context = ctx,
         )
     }
 
-    private fun afterUpdate(chain: XposedInterface.Chain, ctx: CryptoContext) {
-        val input = chain.getArgOrNull(0) as? ByteArray
+    private fun afterUpdate(invocation: Invocation, ctx: CryptoContext) {
+        val instance = invocation.thisObject ?: return
+        val input = invocation.getArg(0) as? ByteArray
         val n = input?.size ?: 0
         ctx.inputTotal += n
         if (n > 0) {
             emit(
                 operation = CryptoOperation.UPDATE,
                 algorithm = ctx.algorithm,
-                contextId = CryptoContextTracker.identity(chain.getThisObject()),
+                contextId = CryptoContextTracker.identity(instance),
                 context = ctx,
                 input = BytesView.of(input),
             )
         }
     }
 
-    private fun afterDoFinal(chain: XposedInterface.Chain, ctx: CryptoContext, result: Any?) {
-        val arg = chain.getArgOrNull(0)
+    private fun afterDoFinal(invocation: Invocation, ctx: CryptoContext, result: Any?) {
+        val instance = invocation.thisObject ?: return
+        val arg = invocation.getArg(0)
         val input = when (arg) {
             is ByteArray -> arg
             is java.nio.ByteBuffer -> {
@@ -151,29 +154,30 @@ class CipherHooker(
         emit(
             operation = CryptoOperation.DO_FINAL,
             algorithm = ctx.algorithm,
-            contextId = CryptoContextTracker.identity(chain.getThisObject()),
+            contextId = CryptoContextTracker.identity(instance),
             context = ctx,
             input = BytesView.of(input),
             output = BytesView.of(output),
         )
     }
 
-    private fun afterGetIv(chain: XposedInterface.Chain, ctx: CryptoContext, result: Any?) {
+    private fun afterGetIv(invocation: Invocation, ctx: CryptoContext, result: Any?) {
+        val instance = invocation.thisObject ?: return
         val iv = result as? ByteArray
         ctx.iv = BytesView.of(iv)
         if (iv != null) {
             emit(
                 operation = CryptoOperation.GET_IV,
                 algorithm = ctx.algorithm,
-                contextId = CryptoContextTracker.identity(chain.getThisObject()),
+                contextId = CryptoContextTracker.identity(instance),
                 context = ctx,
                 iv = ctx.iv,
             )
         }
     }
 
-    private fun providerOf(chain: XposedInterface.Chain): String? {
-        return when (val p = chain.getArgOrNull(1)) {
+    private fun providerOf(invocation: Invocation): String? {
+        return when (val p = invocation.getArg(1)) {
             is String -> p
             is Provider -> p.name
             else -> null

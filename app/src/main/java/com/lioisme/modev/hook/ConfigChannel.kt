@@ -3,7 +3,6 @@ package com.lioisme.modev.hook
 import com.lioisme.modev.core.codec.WireCodec
 import com.lioisme.modev.core.codec.WireProtocol
 import com.lioisme.modev.core.model.HookSwitch
-import io.github.libxposed.api.XposedInterface
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.InputStreamReader
@@ -21,7 +20,6 @@ import java.nio.charset.StandardCharsets
  * - 断线后指数退避重连(上限 [MAX_RETRY_DELAY_MS]),不影响被 Hook 进程运行。
  */
 class ConfigChannel(
-    private val xposed: XposedInterface,
     private val packageName: String,
     private val processName: String,
     private val onConfig: (HookSwitch) -> Unit,

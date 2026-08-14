@@ -1,0 +1,7 @@
+id=com.lioisme.modev
+name=Modev
+version=0.1.0
+versionCode=1
+author=lioisme
+description=抓取目标 App 全部算法调用(摘要/加解密/签名/MAC/密钥/编码)的 Xposed 模块;legacy 构建变体,兼容 LSPosed ≤93/EdXposed 及含 legacy 路径的 1.10.x。
+minApiVersion=82

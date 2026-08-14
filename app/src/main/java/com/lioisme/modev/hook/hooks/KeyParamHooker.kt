@@ -6,9 +6,10 @@ import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.hook.CryptoContextTracker
 import com.lioisme.modev.hook.HookEngine
+import com.lioisme.modev.hook.Invocation
+import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.MethodFinder
 import com.lioisme.modev.hook.RecordSink
-import io.github.libxposed.api.XposedInterface
 
 /**
  * 密钥/参数对象构造捕获:
@@ -24,43 +25,43 @@ class KeyParamHooker(
 
     override fun install() {
         val f = MethodFinder
-        hookCtor(f.findCtor(SECRET_KEY_SPEC, ByteArray::class.java, String::class.java)) { c, r ->
-            record(c, r, CryptoOperation.CONSTRUCT, "SecretKeySpec", key = chainBytes(c, 0), alg = chainStr(c, 1))
+        hookCtor(f.findCtor(SECRET_KEY_SPEC, ByteArray::class.java, String::class.java)) { inv, r ->
+            record(inv, r, CryptoOperation.CONSTRUCT, "SecretKeySpec", key = bytes(inv, 0), alg = str(inv, 1))
         }
-        hookCtor(f.findCtor(SECRET_KEY_SPEC, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)) { c, r ->
-            record(c, r, CryptoOperation.CONSTRUCT, "SecretKeySpec", key = chainBytes(c, 0), alg = chainStr(c, 3))
+        hookCtor(f.findCtor(SECRET_KEY_SPEC, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)) { inv, r ->
+            record(inv, r, CryptoOperation.CONSTRUCT, "SecretKeySpec", key = bytes(inv, 0), alg = str(inv, 3))
         }
-        hookCtor(f.findCtor(IV_SPEC, ByteArray::class.java)) { c, r ->
-            record(c, r, CryptoOperation.CONSTRUCT, "IvParameterSpec", iv = chainBytes(c, 0))
+        hookCtor(f.findCtor(IV_SPEC, ByteArray::class.java)) { inv, r ->
+            record(inv, r, CryptoOperation.CONSTRUCT, "IvParameterSpec", iv = bytes(inv, 0))
         }
-        hookCtor(f.findCtor(IV_SPEC, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { c, r ->
-            record(c, r, CryptoOperation.CONSTRUCT, "IvParameterSpec", iv = chainBytes(c, 0))
+        hookCtor(f.findCtor(IV_SPEC, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, r ->
+            record(inv, r, CryptoOperation.CONSTRUCT, "IvParameterSpec", iv = bytes(inv, 0))
         }
-        hookCtor(f.findCtor(GCM_SPEC, Int::class.javaPrimitiveType, ByteArray::class.java)) { c, r ->
-            record(c, r, CryptoOperation.CONSTRUCT, "GCMParameterSpec", iv = chainBytes(c, 1))
+        hookCtor(f.findCtor(GCM_SPEC, Int::class.javaPrimitiveType, ByteArray::class.java)) { inv, r ->
+            record(inv, r, CryptoOperation.CONSTRUCT, "GCMParameterSpec", iv = bytes(inv, 1))
         }
-        hookCtor(f.findCtor(GCM_SPEC, Int::class.javaPrimitiveType, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { c, r ->
-            record(c, r, CryptoOperation.CONSTRUCT, "GCMParameterSpec", iv = chainBytes(c, 1))
+        hookCtor(f.findCtor(GCM_SPEC, Int::class.javaPrimitiveType, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, r ->
+            record(inv, r, CryptoOperation.CONSTRUCT, "GCMParameterSpec", iv = bytes(inv, 1))
         }
-        hookCtor(f.findCtor(PBE_SPEC, CharArray::class.java)) { c, r -> record(c, r, CryptoOperation.CONSTRUCT, "PBEKeySpec", key = chainChars(c, 0)) }
-        hookCtor(f.findCtor(PBE_SPEC, CharArray::class.java, ByteArray::class.java, Int::class.javaPrimitiveType)) { c, r -> record(c, r, CryptoOperation.CONSTRUCT, "PBEKeySpec", key = chainChars(c, 0), iv = chainBytes(c, 1)) }
-        hookCtor(f.findCtor(PBE_SPEC, CharArray::class.java, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { c, r -> record(c, r, CryptoOperation.CONSTRUCT, "PBEKeySpec", key = chainChars(c, 0), iv = chainBytes(c, 1)) }
-        hookCtor(f.findCtor(PBE_SPEC, CharArray::class.java, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { c, r -> record(c, r, CryptoOperation.CONSTRUCT, "PBEKeySpec", key = chainChars(c, 0), iv = chainBytes(c, 1)) }
+        hookCtor(f.findCtor(PBE_SPEC, CharArray::class.java)) { inv, r -> record(inv, r, CryptoOperation.CONSTRUCT, "PBEKeySpec", key = chars(inv, 0)) }
+        hookCtor(f.findCtor(PBE_SPEC, CharArray::class.java, ByteArray::class.java, Int::class.javaPrimitiveType)) { inv, r -> record(inv, r, CryptoOperation.CONSTRUCT, "PBEKeySpec", key = chars(inv, 0), iv = bytes(inv, 1)) }
+        hookCtor(f.findCtor(PBE_SPEC, CharArray::class.java, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, r -> record(inv, r, CryptoOperation.CONSTRUCT, "PBEKeySpec", key = chars(inv, 0), iv = bytes(inv, 1)) }
+        hookCtor(f.findCtor(PBE_SPEC, CharArray::class.java, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, r -> record(inv, r, CryptoOperation.CONSTRUCT, "PBEKeySpec", key = chars(inv, 0), iv = bytes(inv, 1)) }
     }
 
-    private fun hookCtor(ctor: java.lang.reflect.Constructor<*>?, after: (XposedInterface.Chain, Any?) -> Unit) {
+    private fun hookCtor(ctor: java.lang.reflect.Constructor<*>?, after: (Invocation, Any?) -> Unit) {
         if (ctor == null) return
-        engine.hook(ctor) { chain ->
-            val result = chain.proceed()
-            if (enabled()) {
-                after(chain, result)
+        engine.hook(ctor, object : MethodHook() {
+            override fun after(invocation: Invocation) {
+                if (enabled()) {
+                    after(invocation, invocation.result)
+                }
             }
-            result
-        }
+        })
     }
 
     private fun record(
-        chain: XposedInterface.Chain,
+        invocation: Invocation,
         result: Any?,
         operation: CryptoOperation,
         typeName: String,
@@ -77,16 +78,16 @@ class KeyParamHooker(
         )
     }
 
-    private fun chainBytes(chain: XposedInterface.Chain, index: Int): BytesView? =
-        (chain.getArgOrNull(index) as? ByteArray)?.let { BytesView.of(it) }
+    private fun bytes(invocation: Invocation, index: Int): BytesView? =
+        (invocation.getArg(index) as? ByteArray)?.let { BytesView.of(it) }
 
-    private fun chainChars(chain: XposedInterface.Chain, index: Int): BytesView? =
-        (chain.getArgOrNull(index) as? CharArray)?.let {
+    private fun chars(invocation: Invocation, index: Int): BytesView? =
+        (invocation.getArg(index) as? CharArray)?.let {
             BytesView.of(String(it).toByteArray(Charsets.UTF_8))
         }
 
-    private fun chainStr(chain: XposedInterface.Chain, index: Int): String? =
-        chain.getArgOrNull(index) as? String
+    private fun str(invocation: Invocation, index: Int): String? =
+        invocation.getArg(index) as? String
 
     companion object {
         private const val SECRET_KEY_SPEC = "javax.crypto.spec.SecretKeySpec"

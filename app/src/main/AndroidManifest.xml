@@ -11,6 +11,14 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Modev">
 
+        <!-- legacy Xposed 模块识别(旧版 LSPosed ≤93 管理器必需);现代管理器优先读 java_init.list -->
+        <meta-data
+            android:name="xposedminversion"
+            android:value="82" />
+        <meta-data
+            android:name="xposeddescription"
+            android:value="@string/app_description" />
+
         <activity
             android:name=".ui.MainActivity"
             android:exported="true"
