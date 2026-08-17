@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ Splash Screen(深色态,2026-08-15 UI 重构 Phase 0,对齐 LIDE) -->
+    <style name="Theme.Modev" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/modev_surface_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+    </style>
+</resources>

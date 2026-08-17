@@ -102,9 +102,10 @@ debugKeyPassword=$dbgPass
     }
 
     # ---------- 4. build (ABI splits produce 4 single-ABI APKs) ----------
-    Write-Host "[4/4] Building assembleRelease + assembleDebug (--no-daemon) ..."
+    # modern 为默认双框架变体;只构建 modern,避免 8 个 APK
+    Write-Host "[4/4] Building modern:assembleRelease + modern:assembleDebug (--no-daemon) ..."
     Push-Location $Root
-    & (Join-Path $Root "gradlew.bat") :app:assembleRelease :app:assembleDebug --no-daemon --console=plain
+    & (Join-Path $Root "gradlew.bat") :app:assembleModernRelease :app:assembleModernDebug --no-daemon --console=plain
     if ($LASTEXITCODE -ne 0) { throw "Gradle build failed (exit=$LASTEXITCODE)" }
     Pop-Location
 
@@ -116,10 +117,10 @@ debugKeyPassword=$dbgPass
 
     New-Item -ItemType Directory -Force -Path $Dist | Out-Null
     $map = [ordered]@{
-        "app\build\outputs\apk\release\app-arm64-v8a-release.apk" = "Modev-${ver}-release-arm64-v8a.apk"
-        "app\build\outputs\apk\release\app-x86_64-release.apk"    = "Modev-${ver}-release-x86_64.apk"
-        "app\build\outputs\apk\debug\app-arm64-v8a-debug.apk"     = "Modev-${ver}-debug-arm64-v8a.apk"
-        "app\build\outputs\apk\debug\app-x86_64-debug.apk"        = "Modev-${ver}-debug-x86_64.apk"
+        "app\build\outputs\apk\modern\release\app-modern-arm64-v8a-release.apk" = "Modev-${ver}-release-arm64-v8a.apk"
+        "app\build\outputs\apk\modern\release\app-modern-x86_64-release.apk"    = "Modev-${ver}-release-x86_64.apk"
+        "app\build\outputs\apk\modern\debug\app-modern-arm64-v8a-debug.apk"     = "Modev-${ver}-debug-arm64-v8a.apk"
+        "app\build\outputs\apk\modern\debug\app-modern-x86_64-debug.apk"        = "Modev-${ver}-debug-x86_64.apk"
     }
 
     $results = @()

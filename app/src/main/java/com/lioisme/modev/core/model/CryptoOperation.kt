@@ -39,6 +39,24 @@ enum class CryptoOperation {
     GENERATE_PUBLIC,
     GENERATE_SECRET,
 
+    /** 从密钥库取键(KeyStore.getKey / getEntry / getCertificateChain) */
+    GET_KEY,
+
+    /** 写入密钥库(KeyStore.setKeyEntry / setCertificateEntry) */
+    SET_KEY,
+
+    /** 删除密钥库条目(KeyStore.deleteEntry) */
+    DELETE_KEY,
+
+    /** 加载密钥库(KeyStore.load) */
+    LOAD,
+
+    /** 密钥协商阶段(KeyAgreement.doPhase) */
+    DO_PHASE,
+
+    /** 生成随机种子(SecureRandom.generateSeed) */
+    GENERATE_SEED,
+
     /** Base64 编码 / 解码 */
     ENCODE,
     DECODE,

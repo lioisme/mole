@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Modev</string>
+    <string name="app_description">抓取目标 App 全部算法调用(摘要/加解密/签名/MAC/密钥/编码)的 Xposed 模块,支持 Vector(libxposed 102)与旧版 LSPosed 双框架。</string>
+
+    <!-- 通用 -->
+    <string name="cd_back">返回</string>
+    <string name="cd_filter">筛选</string>
+    <string name="confirm">确定</string>
+    <string name="all">全部</string>
+    <string name="online">● 在线</string>
+    <string name="offline">○ 离线</string>
+    <string name="loading">加载中…</string>
+    <string name="retry">加载失败,点击重试</string>
+    <string name="unknown_error">未知错误</string>
+
+    <!-- 应用列表页 -->
+    <string name="apps_search">搜索应用名称 / 包名…</string>
+    <string name="apps_only_scoped">仅已作用域</string>
+    <string name="apps_system">系统应用</string>
+    <string name="apps_empty_no_match">没有匹配的应用</string>
+    <string name="apps_empty_no_apps">未发现应用</string>
+    <string name="apps_not_running">○ 未运行</string>
+    <string name="apps_launch">启动</string>
+    <string name="apps_scope_requested">已请求将 %1$s 加入作用域,请在系统通知中确认(目标进程重启后生效)</string>
+    <string name="apps_scope_removed">已将 %1$s 移出作用域,目标进程重启后生效</string>
+    <string name="apps_scope_failed">操作失败:%1$s %2$s</string>
+    <string name="apps_count_wan">%1$d万+</string>
+    <string name="apps_count_qian">%1$d千+</string>
+
+    <!-- 算法列表页 -->
+    <string name="detail_tab_settings">捕获设置</string>
+    <string name="detail_listening">已在作用域</string>
+    <string name="detail_not_listening">未在作用域</string>
+    <string name="detail_framework_no_service">框架服务未连接</string>
+    <string name="detail_framework_error">框架异常:%1$s</string>
+    <string name="detail_reading_scope">正在读取作用域…</string>
+    <string name="detail_search">搜索算法 / 密钥 / 数据…</string>
+    <string name="detail_empty">暂无记录</string>
+    <string name="section_algorithms">算法捕获</string>
+    <string name="section_record_options">记录选项</string>
+    <string name="switch_cipher">加解密 Cipher</string>
+    <string name="switch_message_digest">摘要 MessageDigest</string>
+    <string name="switch_mac">HMAC Mac</string>
+    <string name="switch_signature">签名 Signature</string>
+    <string name="switch_key_param">密钥参数构造</string>
+    <string name="switch_key_generation">密钥生成</string>
+    <string name="switch_key_factory">密钥还原</string>
+    <string name="switch_key_store">密钥库 KeyStore</string>
+    <string name="switch_key_agreement">密钥协商</string>
+    <string name="switch_random">安全随机数</string>
+    <string name="switch_base64">Base64 编码</string>
+    <string name="switch_log_stack">记录调用堆栈</string>
+    <string name="capture_max_bytes">单字段字节上限</string>
+    <string name="capture_max_bytes_hint">每字段字节数(0 = 不限制)</string>
+    <string name="capture_max_bytes_dialog_title">单字段字节上限</string>
+    <string name="capture_ignore_stack">忽略调用栈前缀</string>
+    <string name="capture_ignore_stack_hint">调用栈命中任一前缀即跳过该记录</string>
+    <string name="capture_ignore_stack_dialog_title">忽略调用栈前缀</string>
+    <string name="capture_ignore_stack_dialog_hint">每行一个类前缀,例如 com.google.gson</string>
+    <string name="detail_remove_scope">移出作用域</string>
+    <string name="detail_clear_logs">清空该应用的日志</string>
+
+    <!-- 危险操作确认 -->
+    <string name="danger_title">确认操作</string>
+    <string name="danger_remove_scope_msg">将「%1$s」移出作用域?目标进程重启后生效。</string>
+    <string name="danger_clear_logs_msg">清空「%1$s」的全部记录?此操作不可撤销。</string>
+    <string name="danger_clear_all_msg">清空全部记录?此操作不可撤销。</string>
+    <string name="cancel">取消</string>
+
+    <!-- 记录类别 / 操作标签 -->
+    <string name="kind_message_digest">摘要</string>
+    <string name="kind_cipher">加解密</string>
+    <string name="kind_mac">HMAC</string>
+    <string name="kind_signature">签名</string>
+    <string name="kind_key_param">密钥参数</string>
+    <string name="kind_key_generation">密钥生成</string>
+    <string name="kind_key_factory">密钥还原</string>
+    <string name="kind_key_store">密钥库</string>
+    <string name="kind_key_agreement">密钥协商</string>
+    <string name="kind_random">随机数</string>
+    <string name="kind_base64">Base64</string>
+    <string name="op_get_instance">获取实例</string>
+    <string name="op_init">初始化</string>
+    <string name="op_update">更新</string>
+    <string name="op_do_final">完成</string>
+    <string name="op_digest">摘要</string>
+    <string name="op_sign">签名</string>
+    <string name="op_verify">验签</string>
+    <string name="op_get_iv">获取 IV</string>
+    <string name="op_construct">构造</string>
+    <string name="op_generate">生成</string>
+    <string name="op_generate_private">生成私钥</string>
+    <string name="op_generate_public">生成公钥</string>
+    <string name="op_generate_secret">生成密钥</string>
+    <string name="op_get_key">取密钥</string>
+    <string name="op_set_key">写密钥</string>
+    <string name="op_delete_key">删密钥</string>
+    <string name="op_load">加载</string>
+    <string name="op_do_phase">协商阶段</string>
+    <string name="op_generate_seed">生成种子</string>
+    <string name="op_encode">编码</string>
+    <string name="op_decode">解码</string>
+    <string name="dir_encrypt">加密</string>
+    <string name="dir_decrypt">解密</string>
+    <string name="dir_wrap">密钥包装</string>
+    <string name="dir_unwrap">解包装</string>
+    <string name="dir_mode">模式 %1$d</string>
+
+    <!-- 记录详情页 -->
+    <string name="record_title">记录详情</string>
+    <string name="record_not_found">记录不存在或已被清理</string>
+    <string name="record_prev">上一条</string>
+    <string name="record_next">下一条</string>
+    <string name="record_more">更多</string>
+    <string name="record_export">导出 JSON</string>
+    <string name="export_ok">已导出</string>
+    <string name="meta_kind">类别</string>
+    <string name="meta_operation">操作</string>
+    <string name="meta_time">时间</string>
+    <string name="meta_context">上下文</string>
+    <string name="meta_direction">方向</string>
+    <string name="meta_provider">提供者</string>
+    <string name="meta_key_exportable">可导出</string>
+    <string name="meta_process">进程</string>
+    <string name="meta_verify">验签结果</string>
+    <string name="verify_ok">✓ 通过</string>
+    <string name="verify_fail">✗ 失败</string>
+    <string name="section_key">密钥</string>
+    <string name="section_key_alias">密钥别名(硬件密钥,不可导出)</string>
+    <string name="section_iv">IV</string>
+    <string name="section_input">输入数据</string>
+    <string name="section_output">输出数据</string>
+    <string name="section_salt">盐 Salt</string>
+    <string name="section_aad">附加数据 AAD</string>
+    <string name="section_public_key">公钥</string>
+    <string name="section_params">参数</string>
+    <string name="section_stack">调用堆栈</string>
+    <string name="bytes_count">共 %1$d 字节</string>
+    <string name="bytes_truncated">(已截断)</string>
+    <string name="key_not_exportable">密钥材料不可导出(硬件/KeyStore)</string>
+    <string name="section_expand">展开</string>
+    <string name="section_collapse">收起</string>
+    <string name="export_failed">导出失败</string>
+
+    <!-- 设置页 -->
+    <string name="settings_title">设置</string>
+    <string name="settings_framework_section">框架与作用域</string>
+    <string name="settings_framework_service">框架服务</string>
+    <string name="settings_connecting">连接中…</string>
+    <string name="settings_framework">框架</string>
+    <string name="settings_scoped_count">作用域应用数</string>
+    <string name="settings_scoped_count_value">%1$d 个</string>
+    <string name="settings_not_connected">未连接</string>
+    <string name="settings_framework_error">框架服务异常:%1$s</string>
+    <string name="settings_server_section">通信服务</string>
+    <string name="settings_port">监听端口</string>
+    <string name="settings_port_value">127.0.0.1:%1$d(仅本机)</string>
+    <string name="settings_online_targets">在线目标进程</string>
+    <string name="settings_online_targets_value">%1$d 个</string>
+    <string name="settings_data_section">数据治理</string>
+    <string name="settings_clear_all_logs">清空全部日志</string>
+    <string name="settings_stats_section">管道统计</string>
+    <string name="stats_received">已接收记录</string>
+    <string name="stats_dropped">队列溢出丢弃</string>
+    <string name="stats_write_failures">写库失败</string>
+    <string name="stats_trimmed">容量治理裁剪</string>
+    <string name="stats_rejected_hellos">拒绝握手</string>
+    <string name="stats_dropped_records">格式非法丢弃</string>
+    <string name="stats_rejected_records">包名不符拒绝</string>
+    <string name="settings_display_section">显示</string>
+    <string name="settings_apps_section">应用列表</string>
+    <string name="settings_pin_scoped">已作用域应用置顶</string>
+    <string name="settings_general_section">通用</string>
+    <string name="appearance">外观</string>
+    <string name="follow_system">跟随系统</string>
+    <string name="light_mode">浅色</string>
+    <string name="dark_mode">深色</string>
+    <string name="theme_color">主题色</string>
+    <string name="follow_wallpaper">跟随壁纸</string>
+    <string name="custom_accent">自定义主题色</string>
+    <string name="system_wallpaper">跟随系统壁纸</string>
+    <string name="pick_accent">自定义强调色</string>
+    <string name="language">语言</string>
+    <string name="system_default">跟随系统</string>
+    <string name="lang_en">English</string>
+    <string name="lang_zh">中文</string>
+    <string name="about">关于</string>
+    <string name="version">%1$s v%2$s</string>
+    <string name="clear_search">清除搜索</string>
+</resources>

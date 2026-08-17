@@ -1,121 +1,633 @@
 package com.lioisme.modev.ui.settings
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.os.Build
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Android
+import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Devices
+import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Wallpaper
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.lioisme.modev.core.codec.WireProtocol
 import com.lioisme.modev.BuildConfig
+import com.lioisme.modev.R
+import com.lioisme.modev.core.codec.WireProtocol
+import com.lioisme.modev.domain.scope.ScopeState
+import com.lioisme.modev.i18n.LocaleManager
+import com.lioisme.modev.ui.apps.AppListSettings
+import com.lioisme.modev.ui.components.ModevTopBar
+import com.lioisme.modev.ui.components.SettingsInfoItem
+import com.lioisme.modev.ui.components.SettingsItem
+import com.lioisme.modev.ui.components.SettingsSection
+import com.lioisme.modev.ui.components.SettingsToggleItem
+import com.lioisme.modev.ui.theme.AppearanceMode
+import com.lioisme.modev.ui.theme.LocalIsDarkTheme
+import com.lioisme.modev.ui.theme.ThemeConfig
+import com.lioisme.modev.ui.theme.ThemeSeeds
+import com.lioisme.modev.ui.theme.ThemeSettingsManager
+
+// 主题色预设单一事实源 = ThemeSeeds.OPTIONS(ui/theme)。
+private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
 
 /**
- * 设置页:服务状态 / 使用说明 / 数据治理 / 版本信息。
+ * 设置页(2026-08-16 V3,四界面重构:删工具区「算法日志」入口——全局日志页已移除,
+ * 日志查看收敛为「应用 → 算法列表」路径):
+ * 卡片式分区(SettingsSection = surfaceContainerLow 卡):
+ * - 显示:外观模式 sheet + 主题色 sheet(跟随壁纸 / 20 色预设网格);
+ * - 应用列表(2026-08-17 V7):已作用域应用置顶开关(AppListSettings 单一事实源);
+ * - 框架与作用域 / 通信服务 / 使用说明:只读信息(SettingsInfoItem);
+ * - 数据治理:清空全部日志(errorContainer 危险块);
+ * - 通用:语言 sheet(LocaleManager 双路径)+ 关于 Dialog。
+ * 本页经应用列表筛选菜单「设置」项进入(唯一入口),返回箭头常显。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: SettingsViewModel) {
+fun SettingsScreen(
+    viewModel: SettingsViewModel,
+    onBack: () -> Unit = {},
+) {
     val connectedCount by viewModel.connectedCount.collectAsStateWithLifecycle()
+    val frameworkState by viewModel.frameworkState.collectAsStateWithLifecycle()
+    val pipelineStats by viewModel.pipelineStats.collectAsStateWithLifecycle()
+    val pinScoped by AppListSettings.pinScoped.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+    val activity = context.resolveActivity()
+    val config by ThemeSettingsManager.themeConfig.collectAsState()
+
+    var showAppearanceSheet by remember { mutableStateOf(false) }
+    var showColorSheet by remember { mutableStateOf(false) }
+    var showLanguageSheet by remember { mutableStateOf(false) }
+    var showAboutDialog by remember { mutableStateOf(false) }
+    var showClearAllConfirm by remember { mutableStateOf(false) }
+
+    val currentLanguageTag = LocaleManager.currentLanguageTag
+    val languageSubtitle =
+        when (currentLanguageTag) {
+            LocaleManager.TAG_SYSTEM -> stringResource(R.string.system_default)
+            LocaleManager.TAG_EN -> stringResource(R.string.lang_en)
+            LocaleManager.TAG_ZH -> stringResource(R.string.lang_zh)
+            else -> currentLanguageTag
+        }
 
     Scaffold(
-        topBar = { TopAppBar(title = { Text("设置") }) },
+        topBar = {
+            ModevTopBar(
+                title = stringResource(R.string.settings_title),
+                onBack = onBack,
+            )
+        },
     ) { innerPadding ->
         Column(
             Modifier
-                .padding(innerPadding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .padding(innerPadding)
+                .padding(horizontal = 16.dp)
+                .verticalScroll(rememberScrollState()),
         ) {
-            SectionTitle("通信服务")
-            InfoRow("监听端口", "127.0.0.1:${WireProtocol.PORT}(仅本机)")
-            InfoRow("在线目标进程", "$connectedCount 个")
             Spacer(Modifier.height(8.dp))
-            HorizontalDivider()
+            SettingsSection(stringResource(R.string.settings_display_section)) {
+                SettingsItem(
+                    icon =
+                        when (config.appearanceMode) {
+                            AppearanceMode.SYSTEM -> Icons.Default.PhoneAndroid
+                            AppearanceMode.LIGHT -> Icons.Default.LightMode
+                            AppearanceMode.DARK -> Icons.Default.DarkMode
+                        },
+                    title = stringResource(R.string.appearance),
+                    subtitle =
+                        when (config.appearanceMode) {
+                            AppearanceMode.SYSTEM -> stringResource(R.string.follow_system)
+                            AppearanceMode.LIGHT -> stringResource(R.string.light_mode)
+                            AppearanceMode.DARK -> stringResource(R.string.dark_mode)
+                        },
+                    onClick = { showAppearanceSheet = true },
+                )
+                SettingsItem(
+                    icon = Icons.Default.Palette,
+                    title = stringResource(R.string.theme_color),
+                    subtitle = if (config.useWallpaper) stringResource(R.string.follow_wallpaper) else stringResource(R.string.custom_accent),
+                    onClick = { showColorSheet = true },
+                )
+            }
 
-            SectionTitle("使用说明")
-            Text(
-                "1. 安装并启用本模块(LSPosed 中勾选作用域);\n" +
-                    "2. 目标 App 进程启动后自动出现在\"应用\"页;\n" +
-                    "3. 进入目标应用,按需开启算法类别开关,修改即时生效;\n" +
-                    "4. \"日志\"页查看捕获记录(算法、密钥、堆栈)。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(8.dp))
-            HorizontalDivider()
+            Spacer(Modifier.height(24.dp))
+            SettingsSection(stringResource(R.string.settings_apps_section)) {
+                SettingsToggleItem(
+                    icon = Icons.Default.PushPin,
+                    title = stringResource(R.string.settings_pin_scoped),
+                    checked = pinScoped,
+                    onCheckedChange = { AppListSettings.setPinScoped(it, context) },
+                )
+            }
 
-            SectionTitle("数据治理")
-            Surface(
-                onClick = viewModel::clearAll,
-                shape = MaterialTheme.shapes.medium,
-                color = MaterialTheme.colorScheme.errorContainer,
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Row(
-                    Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
-                    Spacer(Modifier.width(12.dp))
-                    Text(
-                        "清空全部日志",
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+            Spacer(Modifier.height(24.dp))
+            SettingsSection(stringResource(R.string.settings_framework_section)) {
+                when (val framework = frameworkState) {
+                    is ScopeState.Connecting -> {
+                        SettingsInfoItem(
+                            icon = Icons.Default.Android,
+                            title = stringResource(R.string.settings_framework_service),
+                            value = stringResource(R.string.settings_connecting),
+                        )
+                    }
+                    is ScopeState.Ready -> {
+                        SettingsInfoItem(
+                            icon = Icons.Default.Android,
+                            title = stringResource(R.string.settings_framework),
+                            value = "${framework.frameworkName} ${framework.frameworkVersion}",
+                        )
+                        SettingsInfoItem(
+                            icon = Icons.Default.Apps,
+                            title = stringResource(R.string.settings_scoped_count),
+                            value = stringResource(R.string.settings_scoped_count_value, framework.scope.size),
+                        )
+                    }
+                    is ScopeState.Unavailable -> {
+                        SettingsInfoItem(
+                            icon = Icons.Default.Android,
+                            title = stringResource(R.string.settings_framework_service),
+                            value = stringResource(R.string.settings_not_connected),
+                        )
+                        if (framework.reason == ScopeState.UnavailableReason.SERVICE_ERROR) {
+                            Text(
+                                framework.message?.let { msg ->
+                                    stringResource(R.string.settings_framework_error, msg)
+                                } ?: stringResource(R.string.unknown_error),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                            )
+                        }
+                    }
                 }
             }
 
             Spacer(Modifier.height(24.dp))
-            Text(
-                "Modev v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})\n仅供安全研究/逆向分析使用",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            SettingsSection(stringResource(R.string.settings_server_section)) {
+                SettingsInfoItem(
+                    icon = Icons.Default.Dns,
+                    title = stringResource(R.string.settings_port),
+                    value = stringResource(R.string.settings_port_value, WireProtocol.PORT),
+                )
+                SettingsInfoItem(
+                    icon = Icons.Default.Devices,
+                    title = stringResource(R.string.settings_online_targets),
+                    value = stringResource(R.string.settings_online_targets_value, connectedCount),
+                )
+            }
+
             Spacer(Modifier.height(24.dp))
+            SettingsSection(stringResource(R.string.settings_data_section)) {
+                Surface(
+                    onClick = { showClearAllConfirm = true },
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            stringResource(R.string.settings_clear_all_logs),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            SettingsSection(stringResource(R.string.settings_stats_section)) {
+                SettingsInfoItem(
+                    icon = Icons.Default.Dns,
+                    title = stringResource(R.string.stats_received),
+                    value = pipelineStats.received.toString(),
+                )
+                SettingsInfoItem(
+                    icon = Icons.Default.Dns,
+                    title = stringResource(R.string.stats_dropped),
+                    value = pipelineStats.dropped.toString(),
+                )
+                SettingsInfoItem(
+                    icon = Icons.Default.Dns,
+                    title = stringResource(R.string.stats_write_failures),
+                    value = pipelineStats.writeFailures.toString(),
+                )
+                SettingsInfoItem(
+                    icon = Icons.Default.Dns,
+                    title = stringResource(R.string.stats_trimmed),
+                    value = pipelineStats.trimmed.toString(),
+                )
+                SettingsInfoItem(
+                    icon = Icons.Default.Dns,
+                    title = stringResource(R.string.stats_rejected_hellos),
+                    value = pipelineStats.channel.rejectedHellos.toString(),
+                )
+                SettingsInfoItem(
+                    icon = Icons.Default.Dns,
+                    title = stringResource(R.string.stats_dropped_records),
+                    value = pipelineStats.channel.droppedRecords.toString(),
+                )
+                SettingsInfoItem(
+                    icon = Icons.Default.Dns,
+                    title = stringResource(R.string.stats_rejected_records),
+                    value = pipelineStats.channel.rejectedRecords.toString(),
+                )
+            }
+
+            Spacer(Modifier.height(24.dp))
+            SettingsSection(stringResource(R.string.settings_general_section)) {
+                SettingsItem(
+                    icon = Icons.Default.Language,
+                    title = stringResource(R.string.language),
+                    subtitle = languageSubtitle,
+                    onClick = { showLanguageSheet = true },
+                )
+                SettingsItem(
+                    icon = Icons.Default.Info,
+                    title = stringResource(R.string.about),
+                    subtitle = stringResource(R.string.version, stringResource(R.string.app_name), BuildConfig.VERSION_NAME),
+                    onClick = { showAboutDialog = true },
+                )
+            }
+            Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    if (showAppearanceSheet) {
+        AppearanceSheet(
+            current = config.appearanceMode,
+            onSelect = { mode ->
+                ThemeSettingsManager.update(config.copy(appearanceMode = mode), context)
+                showAppearanceSheet = false
+            },
+            onDismiss = { showAppearanceSheet = false },
+        )
+    }
+
+    if (showColorSheet) {
+        ColorSheet(
+            useWallpaper = config.useWallpaper,
+            selectedColor = if (config.useWallpaper) null else Color(config.customSeedColor),
+            onSelectWallpaper = {
+                ThemeSettingsManager.update(config.copy(useWallpaper = true), context)
+            },
+            onSelectColor = { argb ->
+                ThemeSettingsManager.update(
+                    config.copy(useWallpaper = false, customSeedColor = argb),
+                    context,
+                )
+            },
+            onDismiss = { showColorSheet = false },
+        )
+    }
+
+    if (showLanguageSheet) {
+        LanguageSheet(
+            currentTag = currentLanguageTag,
+            onSelect = { tag ->
+                LocaleManager.setLanguage(context, tag)
+                showLanguageSheet = false
+                // API 33+ 由框架按 per-app locale 自动重建 Activity,
+                // 手动 recreate 会双重重建;<33 才手动(wrap 生效路径)。
+                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+                    activity?.recreate()
+                }
+            },
+            onDismiss = { showLanguageSheet = false },
+        )
+    }
+
+    if (showAboutDialog) {
+        AlertDialog(
+            onDismissRequest = { showAboutDialog = false },
+            icon = { Icon(Icons.Default.Info, null) },
+            title = { Text(stringResource(R.string.about)) },
+            text = {
+                Column {
+                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium)
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        stringResource(R.string.version, stringResource(R.string.app_name), BuildConfig.VERSION_NAME),
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showAboutDialog = false }) {
+                    Text(stringResource(R.string.confirm))
+                }
+            },
+        )
+    }
+
+    if (showClearAllConfirm) {
+        AlertDialog(
+            onDismissRequest = { showClearAllConfirm = false },
+            icon = { Icon(Icons.Default.Delete, null) },
+            title = { Text(stringResource(R.string.danger_title)) },
+            text = { Text(stringResource(R.string.danger_clear_all_msg)) },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.clearAll()
+                    showClearAllConfirm = false
+                }) {
+                    Text(stringResource(R.string.confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearAllConfirm = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LanguageSheet(
+    currentTag: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(bottom = 32.dp)) {
+            Text(
+                stringResource(R.string.language),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            Spacer(Modifier.height(8.dp))
+
+            val localeData =
+                listOf(
+                    Triple(LocaleManager.TAG_SYSTEM, Icons.Default.PhoneAndroid, R.string.system_default),
+                    Triple(LocaleManager.TAG_EN, Icons.Default.Language, R.string.lang_en),
+                    Triple(LocaleManager.TAG_ZH, Icons.Default.Language, R.string.lang_zh),
+                )
+
+            localeData.forEach { (tag, icon, labelRes) ->
+                val label = stringResource(labelRes)
+                val selected = tag == currentTag
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(tag) }
+                            .padding(horizontal = 24.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(
+                        icon,
+                        null,
+                        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp),
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (selected) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                }
+            }
         }
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun SectionTitle(text: String) {
-    Text(
-        text,
-        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp),
-        style = MaterialTheme.typography.titleSmall,
-        color = MaterialTheme.colorScheme.primary,
-    )
-}
-
-@Composable
-private fun InfoRow(label: String, value: String) {
-    Row(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-        Text(
-            label,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f),
-        )
-        Text(value, style = MaterialTheme.typography.bodyMedium)
+private fun AppearanceSheet(
+    current: AppearanceMode,
+    onSelect: (AppearanceMode) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(bottom = 32.dp)) {
+            Text(
+                stringResource(R.string.appearance),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            Spacer(Modifier.height(8.dp))
+            AppearanceMode.entries.forEach { mode ->
+                val icon =
+                    when (mode) {
+                        AppearanceMode.SYSTEM -> Icons.Default.PhoneAndroid
+                        AppearanceMode.LIGHT -> Icons.Default.LightMode
+                        AppearanceMode.DARK -> Icons.Default.DarkMode
+                    }
+                val label =
+                    when (mode) {
+                        AppearanceMode.SYSTEM -> stringResource(R.string.follow_system)
+                        AppearanceMode.LIGHT -> stringResource(R.string.light_mode)
+                        AppearanceMode.DARK -> stringResource(R.string.dark_mode)
+                    }
+                val selected = mode == current
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onSelect(mode) }
+                            .padding(horizontal = 24.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(icon, null, tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                    Spacer(Modifier.width(16.dp))
+                    Text(
+                        label,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.weight(1f),
+                    )
+                    if (selected) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ColorSheet(
+    useWallpaper: Boolean,
+    selectedColor: Color?,
+    onSelectWallpaper: () -> Unit,
+    onSelectColor: (Long) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(bottom = 32.dp)) {
+            Text(
+                stringResource(R.string.theme_color),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            Spacer(Modifier.height(8.dp))
+
+            Row(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clickable { onSelectWallpaper() }
+                        .padding(horizontal = 24.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(
+                    Icons.Default.Wallpaper,
+                    null,
+                    tint = if (useWallpaper) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp),
+                )
+                Spacer(Modifier.width(16.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        stringResource(R.string.system_wallpaper),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (useWallpaper) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (useWallpaper) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                if (useWallpaper) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Icon(Icons.Default.Palette, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                Spacer(Modifier.width(16.dp))
+                Text(
+                    stringResource(R.string.pick_accent),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+
+            LazyVerticalGrid(
+                columns = GridCells.Fixed(5),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp),
+            ) {
+                items(colorOptions) { argb ->
+                    val color = Color(argb)
+                    val isSelected = !useWallpaper && color == selectedColor
+                    // 选中标记色:暗色恒白、亮色恒黑(任意 seed 下清晰可见)。
+                    val markColor = selectedMarkColor(color, LocalIsDarkTheme.current)
+                    Box(
+                        modifier =
+                            Modifier
+                                .aspectRatio(1f)
+                                .clip(CircleShape)
+                                .background(color)
+                                .then(
+                                    if (isSelected) {
+                                        Modifier.border(3.dp, markColor, CircleShape)
+                                    } else {
+                                        Modifier.border(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), CircleShape)
+                                    },
+                                ).semantics { selected = isSelected }
+                                .clickable { onSelectColor(argb) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (isSelected) {
+                            Icon(
+                                Icons.Default.Check,
+                                null,
+                                tint = markColor,
+                                modifier = Modifier.size(20.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 选中标记色:暗色模式恒白、亮色模式恒黑(与 LIDE 同规,中灰 seed 下不消失)。 */
+private fun selectedMarkColor(
+    color: Color,
+    isDark: Boolean,
+): Color = if (isDark) Color.White else Color.Black
+
+private tailrec fun Context.resolveActivity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.resolveActivity()
+        else -> null
+    }

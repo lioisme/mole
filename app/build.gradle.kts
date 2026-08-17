@@ -99,12 +99,26 @@ android {
             isUniversalApk = false
         }
     }
+
+    testOptions {
+        unitTests {
+            // Robolectric:Room DAO / AppCatalog 映射测试需要 Android 框架影子实现
+            isIncludeAndroidResources = true
+            // 纯 JVM 单测中 android.util.Log 等桩调用返回默认值而非抛 Stub! 异常
+            isReturnDefaultValues = true
+        }
+    }
 }
 
 kotlin {
     compilerOptions {
         jvmTarget.set(JvmTarget.JVM_17)
     }
+}
+
+ksp {
+    // Room schema 基线导出,供迁移测试与审计比对
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {
@@ -120,20 +134,32 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
+    // HCT 色板算法(materialkolor,LIDE 同版本同源):主题引擎唯一色彩来源
+    implementation(libs.com.materialkolor)
     debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.paging.runtime)
+    implementation(libs.androidx.paging.compose)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.room.paging)
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.gson)
 
     compileOnly(libs.libxposed.api)
+    // 框架通信服务(现代入口宿主进程使用;legacy 变体仅编译期引用,运行时缺失→框架桥自然降级)
+    "modernImplementation"(libs.libxposed.service)
+    "legacyCompileOnly"(libs.libxposed.service)
     // legacy Xposed API 82(旧版 LSPosed ≤93 注入入口编译用,运行时由框架提供)
     compileOnly(libs.xposed.api)
 
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
+    testImplementation(libs.robolectric)
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

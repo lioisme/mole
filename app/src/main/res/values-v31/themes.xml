@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Android 12+ Splash Screen(浅色态,2026-08-15 UI 重构 Phase 0,对齐 LIDE):
+         背景 = 宿主浅色 surface,图标 = 自适应启动图标 @mipmap/ic_launcher;
+         同名 style 按配置限定覆盖,此处必须完整声明全部 item。 -->
+    <style name="Theme.Modev" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/modev_surface_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher</item>
+    </style>
+</resources>

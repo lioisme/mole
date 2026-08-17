@@ -248,7 +248,7 @@ Modev 是抓取目标 App 全部算法调用(JCA/JCE 门面类)的 Xposed 模块
 
 **实测发现(重要)**:
 1. LSPosed 1.9/1.10 加载器 **不回落 `xposed_init`**:存在 `java_init.list` 时按现代加载(期待 API ≤100 双参构造器),API 102 模块报 `NoSuchMethodException` 后模块整体不注入 → 单 APK 在此类框架上 legacy 入口不可达(已由 ADR-6 变体方案解决,并列入风险册)。
-2. 框架对模块重装(同包名覆盖安装)会重置 `enabled=0` 并级联删除 scope 行,需在管理器 UI 或 `modules_config.db` 重新启用(本次测试已用 sqlite3 修复并复验)。
+2. 框架对模块重装(同包名覆盖安装)会重置 `enabled=0` 并级联删除 scope 行,需在管理器 UI 或 `modules_config.db` 重新启用(本次测试已用 sqlite3 修复并复验)。**补充(2026-08-15 发布检查单复验)**:本机 Vector 构建对**同版本** `adb install -r` 覆盖安装**未自动重置** enabled(重启后 enabled 仍为 1、scope 保留、模块正常加载)——推测此前观察到的重置发生在版本变更或不同安装路径下;但重置与恢复链路均已按文档手段独立复验通过(见检查单)。
 3. Android 14 缓存进程冻结:宿主被冻结时 46299 监听不服务,注入侧读超时丢记录 → 测试需保持宿主在前台(产品行为不变:README 已注明宿主未运行时无日志)。
 
 ## 9. 风险登记册
@@ -271,7 +271,8 @@ Modev 是抓取目标 App 全部算法调用(JCA/JCE 门面类)的 Xposed 模块
 - [x] APK 内无 `io.github.libxposed.*` / `de.robv.android.xposed.*` 类
 - [x] 真机矩阵 T-01~T-07 双场景通过(Vector 2.2 现代 + LSPosed 1.10.2 legacy 路径;真 legacy 1.8.6 待 Android ≤13 设备抽测)
 - [x] README 与本文档状态一致
-- [ ] 覆盖安装后在框架管理器重新启用模块作用域(框架会重置 enabled)并重启验证
+- [x] 覆盖安装后在框架管理器重新启用模块作用域(框架会重置 enabled)并重启验证
+  - 备注(2026-08-15,`adb root` + `sqlite3 modules_config.db` 完成):1) 覆盖安装现代 debug 变体(`adb install -r`)→ 重启 → `VectorModuleManager: Loading module com.lioisme.modev → ModevModule → Loaded module successfully`;2) 本 Vector 构建同版本覆盖安装未自动重置 enabled(已记录见实测发现 #2),故按文档手段模拟重置(enabled=0 + 级联删 scope)→ 重启 → `verbose_*.log` 零 modev 行、模块不加载(重置生效);3) 按文档恢复手段 sqlite3 重启用(enabled=1 + 恢复 scope)→ 重启 → 模块重新加载成功;4) 功能复验:宿主前台 + 启动 modetester,12s 捕获 4426 条入库(七类分布:CIPHER 11 / KEY_FACTORY 3 / KEY_GENERATION 1 / KEY_PARAM 13 / MAC 3 / MESSAGE_DIGEST 4384 / SIGNATURE 12,BASE64 默认关,与 T-02 一致),宿主日志 `hello accepted without token`;5) 收尾将 scope 恢复为测试前基线 [com.lioisme.depan]。
 
 ---
 

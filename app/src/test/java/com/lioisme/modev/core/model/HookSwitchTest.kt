@@ -16,9 +16,17 @@ class HookSwitchTest {
     fun all_off_any_disabled() {
         val s = HookSwitch(
             messageDigest = false, cipher = false, mac = false, signature = false,
-            keyParam = false, keyGeneration = false, keyFactory = false, base64 = false,
+            keyParam = false, keyGeneration = false, keyFactory = false,
+            keyStore = false, keyAgreement = false, random = false, base64 = false,
         )
         assertFalse(s.anyEnabled)
+    }
+
+    @Test
+    fun new_domains_on_by_default() {
+        assertTrue(HookSwitch.DEFAULT.enabled(CryptoKind.KEY_STORE))
+        assertTrue(HookSwitch.DEFAULT.enabled(CryptoKind.KEY_AGREEMENT))
+        assertTrue(HookSwitch.DEFAULT.enabled(CryptoKind.RANDOM))
     }
 
     @Test

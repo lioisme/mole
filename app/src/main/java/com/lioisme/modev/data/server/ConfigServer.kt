@@ -31,9 +31,12 @@ class ConfigServer(
     private val port: Int = WireProtocol.PORT,
 ) : Closeable {
 
-    /** 记录回调,由 LogRepository 接线(可热替换)。 */
+    /**
+     * 记录回调,由 LogRepository 接线(可热替换)。
+     * 第二参数为该记录所属会话的 ACK 通道:宿主成功落库后回调以推进注入侧确认游标。
+     */
     @Volatile
-    var onRecord: (CryptoRecord) -> Unit = {}
+    var onRecord: (CryptoRecord, (Long) -> Unit) -> Unit = { _, _ -> }
 
     @Volatile
     private var running = false
@@ -53,6 +56,14 @@ class ConfigServer(
     /** 当前已连接(已握手)的包名集合快照。 */
     fun connectedPackages(): Set<String> = registeredPackages.keys.toSet()
 
+    /** 通道统计(拒绝/丢弃计数),供设置页展示。 */
+    private val _stats = MutableStateFlow(ChannelStats())
+    val statsFlow: StateFlow<ChannelStats> = _stats
+
+    private fun bumpStats(transform: (ChannelStats) -> ChannelStats) {
+        _stats.value = transform(_stats.value)
+    }
+
     /**
      * 新客户端握手时查询其持久化配置(由 SettingsRepository 注入)。
      * 为 null 表示尚无配置,注入侧继续使用内存默认值。
@@ -63,26 +74,47 @@ class ConfigServer(
     /** 最近一次推送的配置,供调试与热更新参考。 */
     private val lastConfig = ConcurrentHashMap<String, HookSwitch>()
 
+    /**
+     * 握手令牌要求:
+     * - null = 显式关闭鉴权(默认,Vector legacy 框架无法向注入进程提供令牌);
+     * - 非 null = 强制校验,hello 携带的 token 缺失或不匹配一律拒绝并断开。
+     */
+    @Volatile
+    var requireToken: String? = null
+
     fun start() {
         if (running) return
         running = true
         acceptThread = thread(name = "modev-config-server") {
-            try {
-                val ss = ServerSocket()
-                ss.reuseAddress = true
-                ss.bind(InetSocketAddress("127.0.0.1", port))
-                serverSocket = ss
-                while (running) {
-                    val socket = try {
-                        ss.accept()
-                    } catch (t: Throwable) {
-                        if (running) continue else break
+            var bindRetryMs = 2000L
+            while (running) {
+                try {
+                    val ss = ServerSocket()
+                    ss.reuseAddress = true
+                    ss.bind(InetSocketAddress("127.0.0.1", port))
+                    serverSocket = ss
+                    bindRetryMs = 2000L
+                    while (running) {
+                        val socket = try {
+                            ss.accept()
+                        } catch (t: Throwable) {
+                            if (running) continue else break
+                        }
+                        handleClient(socket)
                     }
-                    handleClient(socket)
+                } catch (t: Throwable) {
+                    if (!running) break
+                    // 端口 bind 失败:指数退避重试(2s→30s)
+                    android.util.Log.w("Modev", "config server bind failed, retry in ${bindRetryMs}ms: $t")
+                    try {
+                        Thread.sleep(bindRetryMs)
+                    } catch (ie: InterruptedException) {
+                        break
+                    }
+                    bindRetryMs = (bindRetryMs * 2).coerceAtMost(30000L)
                 }
-            } catch (t: Throwable) {
-                running = false
             }
+            running = false
         }
     }
 
@@ -99,13 +131,13 @@ class ConfigServer(
                     val msg = WireCodec.parse(line) ?: continue
                     when (msg.type) {
                         WireProtocol.TYPE_HELLO -> onHello(socket, session, msg)
-                        WireProtocol.TYPE_RECORD -> onRecordMessage(msg)
+                        WireProtocol.TYPE_RECORD -> onRecordMessage(session, msg)
                         WireProtocol.TYPE_PING -> sendPong(session)
                         WireProtocol.TYPE_PONG -> Unit
                     }
                 }
             } catch (t: Throwable) {
-                // 连接断开
+                // 连接断开(含鉴权拒绝,原因已在上层日志记录)
             } finally {
                 removeClient(socket)
             }
@@ -114,6 +146,36 @@ class ConfigServer(
 
     private fun onHello(socket: Socket, session: ClientSession, msg: WireMessage) {
         val payload = msg.payload
+        // ① 握手 magic/version 强校验:不匹配断开并记录原因
+        if (!WireCodec.isHelloCompatible(payload)) {
+            android.util.Log.w(
+                "Modev",
+                "rejected hello from ${socket.inetAddress}: protocol mismatch (magic=${WireCodec.magicOf(payload)} version=${WireCodec.versionOf(payload)})"
+            )
+            bumpStats { it.copy(rejectedHellos = it.rejectedHellos + 1) }
+            throw SecurityException("protocol mismatch")
+        }
+        // ② 令牌校验(无 null 放行):
+        // - token 缺失(null):放行并计数(LSPosed legacy / Vector 注入进程无框架令牌可携带),
+        //   此类连接信任注入侧包名自报;
+        // - token 携带但非空不匹配:拒绝并断开(防欺骗注入)。
+        requireToken?.let { required ->
+            val token = payload?.get(WireProtocol.KEY_TOKEN)?.asString
+            if (token == null) {
+                android.util.Log.w(
+                    "Modev",
+                    "hello from ${socket.inetAddress} allowed without token (legacy/vector path)"
+                )
+                bumpStats { it.copy(trustedNoToken = it.trustedNoToken + 1) }
+            } else if (token != required) {
+                android.util.Log.w(
+                    "Modev",
+                    "rejected hello from ${socket.inetAddress}: token mismatch (got=${token.take(8)}… expect=${required.take(8)}…)"
+                )
+                bumpStats { it.copy(rejectedHellos = it.rejectedHellos + 1) }
+                throw SecurityException("token mismatch")
+            }
+        }
         val packageName = WireCodec.packageNameOf(payload) ?: return
         val processName = payload?.get("processName")?.asString ?: packageName
         session.packageName = packageName
@@ -124,13 +186,24 @@ class ConfigServer(
         configProvider?.invoke(packageName)?.let { broadcastConfig(packageName, it) }
     }
 
-    private fun onRecordMessage(msg: WireMessage) {
+    private fun onRecordMessage(session: ClientSession, msg: WireMessage) {
         val record = WireCodec.recordOf(msg.payload)
         if (record == null) {
             android.util.Log.w("Modev", "server dropped record payload: ${msg.payload}")
+            bumpStats { it.copy(droppedRecords = it.droppedRecords + 1) }
             return
         }
-        runCatching { onRecord(record) }
+        // ③ 记录包名与会话包名一致性:不匹配丢弃并计数
+        val sessionPackage = session.packageName
+        if (sessionPackage != null && record.packageName != sessionPackage) {
+            android.util.Log.w(
+                "Modev",
+                "server dropped record: package mismatch (record=${record.packageName} session=$sessionPackage)"
+            )
+            bumpStats { it.copy(rejectedRecords = it.rejectedRecords + 1) }
+            return
+        }
+        runCatching { onRecord(record) { seq -> session.sendAck(seq) } }
     }
 
     private fun sendPong(session: ClientSession) {
@@ -192,9 +265,34 @@ class ConfigServer(
 
         @Volatile
         var processName: String? = null
+
+        /** 发送 ACK:通知注入侧该 seq(含)之前的记录已落库,可推进确认游标。 */
+        fun sendAck(seq: Long) {
+            synchronized(this) {
+                runCatching {
+                    writer?.apply {
+                        write(WireCodec.ack(seq))
+                        newLine()
+                        flush()
+                    }
+                }
+            }
+        }
     }
 
     companion object {
         private const val READ_TIMEOUT_MS = 120000
     }
 }
+
+/**
+ * 通道统计:拒绝/丢弃计数,供宿主设置页展示。
+ */
+data class ChannelStats(
+    val rejectedHellos: Long = 0L,
+    val droppedRecords: Long = 0L,
+    val rejectedRecords: Long = 0L,
+
+    /** 未携带令牌但被放行的握手数(LSPosed legacy / Vector 注入路径)。 */
+    val trustedNoToken: Long = 0L,
+)

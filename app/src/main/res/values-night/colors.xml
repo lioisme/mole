@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 宿主 surface 静态基线背景(深色档,2026-08-15 UI 重构 Phase 0):
+         深色 = M3 暗色 background token 标准值 #141218(HCT tone 6,与 Theme.kt 深色 scheme 同源) -->
+    <color name="modev_surface_background">#141218</color>
+</resources>

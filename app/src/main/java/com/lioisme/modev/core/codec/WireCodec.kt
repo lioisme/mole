@@ -20,18 +20,21 @@ object WireCodec {
         WireMessage(type, payload)
     }.getOrNull()
 
-    fun hello(packageName: String, processName: String): String {
+    fun hello(packageName: String, processName: String, token: String? = null): String {
         val payload = JsonObject().apply {
             addProperty("magic", WireProtocol.MAGIC)
             addProperty("version", WireProtocol.VERSION)
             addProperty("packageName", packageName)
             addProperty("processName", processName)
+            if (token != null) addProperty(WireProtocol.KEY_TOKEN, token)
         }
         return envelope(WireProtocol.TYPE_HELLO, payload)
     }
 
     fun config(packageName: String, switch: HookSwitch): String {
         val payload = JsonObject().apply {
+            addProperty("magic", WireProtocol.MAGIC)
+            addProperty("version", WireProtocol.VERSION)
             addProperty("packageName", packageName)
             add("switch", gson.toJsonTree(switch))
         }
@@ -41,6 +44,12 @@ object WireCodec {
     fun record(record: CryptoRecord): String =
         envelope(WireProtocol.TYPE_RECORD, gson.toJsonTree(record).asJsonObject)
 
+    /** 宿主 → 注入侧:批量落库确认,seq 及之前的记录已持久化。 */
+    fun ack(seq: Long): String = envelope(
+        WireProtocol.TYPE_ACK,
+        JsonObject().apply { addProperty(WireProtocol.KEY_SEQ, seq) },
+    )
+
     fun ping(): String = envelope(WireProtocol.TYPE_PING, null)
 
     fun pong(): String = envelope(WireProtocol.TYPE_PONG, null)
@@ -48,12 +57,30 @@ object WireCodec {
     fun configOf(payload: JsonObject?): HookSwitch? =
         payload?.get("switch")?.let { runCatching { gson.fromJson(it, HookSwitch::class.java) }.getOrNull() }
 
+    /** 读取 ack 载荷中的确认游标;缺失或非法时返回 null。 */
+    fun seqOf(payload: JsonObject?): Long? =
+        payload?.get(WireProtocol.KEY_SEQ)
+            ?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isNumber }
+            ?.asLong
+
     fun packageNameOf(payload: JsonObject?): String? = payload?.get("packageName")?.asString
+
+    /** 解析 hello 中的协议版本;缺失或非法时返回 null。 */
+    fun versionOf(payload: JsonObject?): Int? = payload?.get(WireProtocol.KEY_VERSION)?.takeIf { it.isJsonPrimitive }?.asInt
+
+    /** 解析 hello 中的协议魔数;缺失时返回 null。 */
+    fun magicOf(payload: JsonObject?): String? = payload?.get(WireProtocol.KEY_MAGIC)?.asString
+
+    /** 校验握手载荷的 magic/version 是否与协议定义一致。 */
+    fun isHelloCompatible(payload: JsonObject?): Boolean =
+        magicOf(payload) == WireProtocol.MAGIC && versionOf(payload) == WireProtocol.VERSION
 
     fun recordOf(payload: JsonObject?): CryptoRecord? {
         if (payload == null) return null
         val record = runCatching { gson.fromJson(payload, CryptoRecord::class.java) }.getOrNull() ?: return null
-        if (record.packageName == null || record.kind == null || record.operation == null) return null
+        if (record.kind == null || record.operation == null) return null
+        if (record.packageName.isBlank()) return null
+        // algorithm 允许为空:SecureRandom/内部随机源等合法记录没有算法名
         return record
     }
 

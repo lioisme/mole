@@ -13,6 +13,8 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["packageName", "timestamp"]),
         Index(value = ["packageName", "kind"]),
+        // v3:注入侧进程级单调序号,唯一约束 = 断线重放幂等(REPLACE 吸收重复)
+        Index(value = ["packageName", "processName", "seq"], unique = true),
     ],
 )
 data class CryptoRecordEntity(
@@ -50,8 +52,30 @@ data class CryptoRecordEntity(
     @ColumnInfo(name = "outputLength") val outputLength: Int? = null,
     @ColumnInfo(name = "outputTruncated") val outputTruncated: Boolean = false,
 
+    @ColumnInfo(name = "saltHex") val saltHex: String? = null,
+    @ColumnInfo(name = "saltText") val saltText: String? = null,
+    @ColumnInfo(name = "saltLength") val saltLength: Int? = null,
+    @ColumnInfo(name = "saltTruncated") val saltTruncated: Boolean = false,
+
+    @ColumnInfo(name = "aadHex") val aadHex: String? = null,
+    @ColumnInfo(name = "aadText") val aadText: String? = null,
+    @ColumnInfo(name = "aadLength") val aadLength: Int? = null,
+    @ColumnInfo(name = "aadTruncated") val aadTruncated: Boolean = false,
+
+    @ColumnInfo(name = "publicKeyHex") val publicKeyHex: String? = null,
+    @ColumnInfo(name = "publicKeyText") val publicKeyText: String? = null,
+    @ColumnInfo(name = "publicKeyLength") val publicKeyLength: Int? = null,
+    @ColumnInfo(name = "publicKeyTruncated") val publicKeyTruncated: Boolean = false,
+
+    @ColumnInfo(name = "paramsJson") val paramsJson: String? = null,
+    @ColumnInfo(name = "verifyResult") val verifyResult: Boolean? = null,
+    @ColumnInfo(name = "processName") val processName: String? = null,
+
     @ColumnInfo(name = "contextId") val contextId: Long = 0L,
     @ColumnInfo(name = "threadName") val threadName: String,
     @ColumnInfo(name = "stack") val stackJson: String? = null,
     @ColumnInfo(name = "timestamp") val timestamp: Long = System.currentTimeMillis(),
+
+    /** 注入侧进程级单调序号(重放幂等键的一部分);v2 及更早的行无此列,迁移后为 NULL。 */
+    @ColumnInfo(name = "seq") val seq: Long? = null,
 )

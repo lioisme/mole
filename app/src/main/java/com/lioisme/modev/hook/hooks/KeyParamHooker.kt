@@ -3,17 +3,23 @@ package com.lioisme.modev.hook.hooks
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.HookSwitch
-import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.hook.CryptoContextTracker
 import com.lioisme.modev.hook.HookEngine
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.MethodFinder
 import com.lioisme.modev.hook.RecordSink
+import java.math.BigInteger
+import java.security.spec.AlgorithmParameterSpec
+import java.security.spec.ECField
+import java.security.spec.ECPoint
+import java.security.spec.EllipticCurve
+import javax.crypto.spec.PSource
 
 /**
- * 密钥/参数对象构造捕获:
- * SecretKeySpec(密钥明文)、IvParameterSpec(IV)、GCMParameterSpec(IV+tag)、PBEKeySpec(口令)。
+ * 密钥/参数对象构造捕获。
+ * 注册表驱动:每个 Spec 类 + 构造器签名注册一次,构造完成后经 [SpecExtractor] 提取
+ * 密钥/IV/盐/标量参数(含 PBE 迭代次数、GCM tag 长度、RSA CRT 系数、EC 曲线等)。
  */
 class KeyParamHooker(
     engine: HookEngine,
@@ -25,28 +31,9 @@ class KeyParamHooker(
 
     override fun install() {
         val f = MethodFinder
-        hookCtor(f.findCtor(SECRET_KEY_SPEC, ByteArray::class.java, String::class.java)) { inv, r ->
-            record(inv, r, CryptoOperation.CONSTRUCT, "SecretKeySpec", key = bytes(inv, 0), alg = str(inv, 1))
+        for (d in CTOR_DESCRIPTORS) {
+            hookCtor(f.findCtor(d.className, *d.paramTypes)) { inv, result -> afterConstruct(inv, result) }
         }
-        hookCtor(f.findCtor(SECRET_KEY_SPEC, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, String::class.java)) { inv, r ->
-            record(inv, r, CryptoOperation.CONSTRUCT, "SecretKeySpec", key = bytes(inv, 0), alg = str(inv, 3))
-        }
-        hookCtor(f.findCtor(IV_SPEC, ByteArray::class.java)) { inv, r ->
-            record(inv, r, CryptoOperation.CONSTRUCT, "IvParameterSpec", iv = bytes(inv, 0))
-        }
-        hookCtor(f.findCtor(IV_SPEC, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, r ->
-            record(inv, r, CryptoOperation.CONSTRUCT, "IvParameterSpec", iv = bytes(inv, 0))
-        }
-        hookCtor(f.findCtor(GCM_SPEC, Int::class.javaPrimitiveType, ByteArray::class.java)) { inv, r ->
-            record(inv, r, CryptoOperation.CONSTRUCT, "GCMParameterSpec", iv = bytes(inv, 1))
-        }
-        hookCtor(f.findCtor(GCM_SPEC, Int::class.javaPrimitiveType, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, r ->
-            record(inv, r, CryptoOperation.CONSTRUCT, "GCMParameterSpec", iv = bytes(inv, 1))
-        }
-        hookCtor(f.findCtor(PBE_SPEC, CharArray::class.java)) { inv, r -> record(inv, r, CryptoOperation.CONSTRUCT, "PBEKeySpec", key = chars(inv, 0)) }
-        hookCtor(f.findCtor(PBE_SPEC, CharArray::class.java, ByteArray::class.java, Int::class.javaPrimitiveType)) { inv, r -> record(inv, r, CryptoOperation.CONSTRUCT, "PBEKeySpec", key = chars(inv, 0), iv = bytes(inv, 1)) }
-        hookCtor(f.findCtor(PBE_SPEC, CharArray::class.java, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, r -> record(inv, r, CryptoOperation.CONSTRUCT, "PBEKeySpec", key = chars(inv, 0), iv = bytes(inv, 1)) }
-        hookCtor(f.findCtor(PBE_SPEC, CharArray::class.java, ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, r -> record(inv, r, CryptoOperation.CONSTRUCT, "PBEKeySpec", key = chars(inv, 0), iv = bytes(inv, 1)) }
     }
 
     private fun hookCtor(ctor: java.lang.reflect.Constructor<*>?, after: (Invocation, Any?) -> Unit) {
@@ -60,39 +47,65 @@ class KeyParamHooker(
         })
     }
 
-    private fun record(
-        invocation: Invocation,
-        result: Any?,
-        operation: CryptoOperation,
-        typeName: String,
-        key: BytesView? = null,
-        iv: BytesView? = null,
-        alg: String? = null,
-    ) {
+    private fun afterConstruct(invocation: Invocation, result: Any?) {
+        val target = result ?: return
+        val ext = SpecExtractor.extractKeystoreSpec(target) ?: SpecExtractor.extract(target)
         emit(
-            operation = operation,
-            algorithm = alg ?: typeName,
-            contextId = result?.let { CryptoContextTracker.identity(it) } ?: 0L,
-            key = key,
-            iv = iv,
+            operation = CryptoOperation.CONSTRUCT,
+            algorithm = ext.algorithm ?: ext.typeName,
+            contextId = CryptoContextTracker.identity(target),
+            key = ext.key,
+            iv = ext.iv,
+            salt = ext.salt,
+            params = ext.params.takeIf { it.isNotEmpty() },
         )
     }
 
-    private fun bytes(invocation: Invocation, index: Int): BytesView? =
-        (invocation.getArg(index) as? ByteArray)?.let { BytesView.of(it) }
+    private data class CtorDescriptor(val className: String, val paramTypes: Array<Class<*>>)
 
-    private fun chars(invocation: Invocation, index: Int): BytesView? =
-        (invocation.getArg(index) as? CharArray)?.let {
-            BytesView.of(String(it).toByteArray(Charsets.UTF_8))
-        }
+    private companion object {
+        const val SECRET_KEY_SPEC = "javax.crypto.spec.SecretKeySpec"
+        const val IV_SPEC = "javax.crypto.spec.IvParameterSpec"
+        const val GCM_SPEC = "javax.crypto.spec.GCMParameterSpec"
+        const val PBE_KEY_SPEC = "javax.crypto.spec.PBEKeySpec"
+        const val PBE_PARAM_SPEC = "javax.crypto.spec.PBEParameterSpec"
+        const val DH_PARAM_SPEC = "javax.crypto.spec.DHParameterSpec"
+        const val DH_GEN_SPEC = "javax.crypto.spec.DHGenParameterSpec"
+        const val EC_GEN_SPEC = "java.security.spec.ECGenParameterSpec"
+        const val EC_PARAM_SPEC = "java.security.spec.ECParameterSpec"
+        const val DSA_PARAM_SPEC = "java.security.spec.DSAParameterSpec"
+        const val OAEP_SPEC = "java.security.spec.OAEPParameterSpec"
+        const val MGF1_SPEC = "java.security.spec.MGF1ParameterSpec"
+        const val PSS_SPEC = "java.security.spec.PSSParameterSpec"
+        const val RSA_CRT_SPEC = "java.security.spec.RSAPrivateCrtKeySpec"
+        const val RSA_KEYGEN_SPEC = "java.security.spec.RSAKeyGenParameterSpec"
 
-    private fun str(invocation: Invocation, index: Int): String? =
-        invocation.getArg(index) as? String
+        /** int 原始类型(构造器签名用)。 */
+        private val INT_TYPE: Class<*> = Int::class.javaPrimitiveType!!
 
-    companion object {
-        private const val SECRET_KEY_SPEC = "javax.crypto.spec.SecretKeySpec"
-        private const val IV_SPEC = "javax.crypto.spec.IvParameterSpec"
-        private const val GCM_SPEC = "javax.crypto.spec.GCMParameterSpec"
-        private const val PBE_SPEC = "javax.crypto.spec.PBEKeySpec"
+        val CTOR_DESCRIPTORS = listOf(
+            CtorDescriptor(SECRET_KEY_SPEC, arrayOf<Class<*>>(ByteArray::class.java, String::class.java)),
+            CtorDescriptor(SECRET_KEY_SPEC, arrayOf<Class<*>>(ByteArray::class.java, INT_TYPE, INT_TYPE, String::class.java)),
+            CtorDescriptor(IV_SPEC, arrayOf<Class<*>>(ByteArray::class.java)),
+            CtorDescriptor(IV_SPEC, arrayOf<Class<*>>(ByteArray::class.java, INT_TYPE, INT_TYPE)),
+            CtorDescriptor(GCM_SPEC, arrayOf<Class<*>>(INT_TYPE, ByteArray::class.java)),
+            CtorDescriptor(GCM_SPEC, arrayOf<Class<*>>(INT_TYPE, ByteArray::class.java, INT_TYPE, INT_TYPE)),
+            CtorDescriptor(PBE_KEY_SPEC, arrayOf<Class<*>>(CharArray::class.java)),
+            CtorDescriptor(PBE_KEY_SPEC, arrayOf<Class<*>>(CharArray::class.java, ByteArray::class.java, INT_TYPE)),
+            CtorDescriptor(PBE_KEY_SPEC, arrayOf<Class<*>>(CharArray::class.java, ByteArray::class.java, INT_TYPE, INT_TYPE)),
+            CtorDescriptor(PBE_KEY_SPEC, arrayOf<Class<*>>(CharArray::class.java, ByteArray::class.java, INT_TYPE, INT_TYPE, INT_TYPE)),
+            CtorDescriptor(PBE_PARAM_SPEC, arrayOf<Class<*>>(ByteArray::class.java, INT_TYPE)),
+            CtorDescriptor(DH_PARAM_SPEC, arrayOf<Class<*>>(BigInteger::class.java, BigInteger::class.java, INT_TYPE)),
+            CtorDescriptor(DH_GEN_SPEC, arrayOf<Class<*>>(INT_TYPE, INT_TYPE)),
+            CtorDescriptor(EC_GEN_SPEC, arrayOf<Class<*>>(String::class.java)),
+            CtorDescriptor(EC_PARAM_SPEC, arrayOf<Class<*>>(ECField::class.java, EllipticCurve::class.java, ECPoint::class.java, BigInteger::class.java, INT_TYPE)),
+            CtorDescriptor(DSA_PARAM_SPEC, arrayOf<Class<*>>(BigInteger::class.java, BigInteger::class.java, BigInteger::class.java)),
+            CtorDescriptor(OAEP_SPEC, arrayOf<Class<*>>(String::class.java, String::class.java, AlgorithmParameterSpec::class.java, PSource::class.java)),
+            CtorDescriptor(MGF1_SPEC, arrayOf<Class<*>>(String::class.java)),
+            CtorDescriptor(PSS_SPEC, arrayOf<Class<*>>(String::class.java, String::class.java, AlgorithmParameterSpec::class.java, INT_TYPE, INT_TYPE)),
+            CtorDescriptor(PSS_SPEC, arrayOf<Class<*>>(INT_TYPE)),
+            CtorDescriptor(RSA_CRT_SPEC, arrayOf<Class<*>>(BigInteger::class.java, BigInteger::class.java, BigInteger::class.java, BigInteger::class.java, BigInteger::class.java, BigInteger::class.java, BigInteger::class.java, BigInteger::class.java, BigInteger::class.java)),
+            CtorDescriptor(RSA_KEYGEN_SPEC, arrayOf<Class<*>>(INT_TYPE, BigInteger::class.java)),
+        )
     }
 }

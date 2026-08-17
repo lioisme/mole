@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="ic_launcher_background">#0B1929</color>
+    <!-- 宿主 surface 静态基线背景(splash/冷启动帧用,与 ui/theme/Theme.kt 浅色 scheme 同源) -->
+    <color name="modev_surface_background">#FDFCFF</color>
 </resources>

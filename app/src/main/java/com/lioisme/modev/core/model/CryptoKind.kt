@@ -25,6 +25,15 @@ enum class CryptoKind {
     /** 密钥还原:KeyFactory / SecretKeyFactory */
     KEY_FACTORY,
 
-    /** 编码转换:Base64(android.util.Base64) */
+    /** 密钥库:KeyStore(别名/加载/取键/证书链) */
+    KEY_STORE,
+
+    /** 密钥协商:KeyAgreement(ECDH/DH 共享密钥) */
+    KEY_AGREEMENT,
+
+    /** 随机数:SecureRandom(种子/随机字节/IV 来源) */
+    RANDOM,
+
+    /** 编码转换:Base64(android.util.Base64 / java.util.Base64) */
     BASE64,
 }

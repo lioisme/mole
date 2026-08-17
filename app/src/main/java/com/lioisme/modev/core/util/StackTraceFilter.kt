@@ -36,13 +36,29 @@ object StackTraceFilter {
 
     /**
      * 从调用栈中提取应用帧,返回"调用方在上"的顺序(与 [Thread.getStackTrace] 一致,从最内层开始)。
+     *
+     * @param denyPrefixes 调用栈 denylist:任一帧命中即整条跳过(调用方按需启用,默认空)
      */
     fun capture(
         maxDepth: Int = 24,
         ignoredPrefixes: List<String> = DEFAULT_IGNORED_PREFIXES,
+        denyPrefixes: List<String> = emptyList(),
     ): List<String> {
         val elements = Thread.currentThread().stackTrace
+        if (denyPrefixes.isNotEmpty() && isDenied(elements, denyPrefixes)) return emptyList()
         return filter(elements, maxDepth, ignoredPrefixes)
+    }
+
+    /** 调用栈中是否存在命中 denylist 前缀的帧(框架自触发噪声治理)。 */
+    fun isDenied(elements: Array<StackTraceElement>, denyPrefixes: List<String>): Boolean {
+        if (denyPrefixes.isEmpty()) return false
+        for (element in elements) {
+            val className = element.className
+            for (prefix in denyPrefixes) {
+                if (className.startsWith(prefix)) return true
+            }
+        }
+        return false
     }
 
     /**

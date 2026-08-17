@@ -48,4 +48,30 @@ class StackTraceFilterTest {
     fun filter_empty() {
         assertEquals(0, StackTraceFilter.filter(arrayOf()).size)
     }
+
+    @Test
+    fun capture_deny_prefixes_returns_empty_when_hit() {
+        val frames = arrayOf(
+            element("com.google.gson.internal.ConstructorConstructor", "newDefaultConstructor"),
+            element("com.example.app.Main", "onCreate"),
+        )
+        assertTrue(StackTraceFilter.isDenied(frames, listOf("com.google.gson")))
+        // 全量 denylist 命中 → 捕获结果为空(emit 侧据此跳过整条记录);
+        // capture 基于真实线程栈,测试线程栈含 org.junit 帧 → 命中 org.junit 前缀为空
+        assertEquals(0, StackTraceFilter.capture(denyPrefixes = listOf("org.junit")).size)
+        assertTrue(StackTraceFilter.capture(denyPrefixes = listOf("com.google.gson")).isNotEmpty())
+    }
+
+    @Test
+    fun capture_deny_prefixes_unaffected_when_no_match() {
+        val frames = arrayOf(
+            element("com.example.app.Main", "onCreate"),
+        )
+        assertTrue(!StackTraceFilter.isDenied(frames, listOf("com.google.gson")))
+    }
+
+    @Test
+    fun is_denied_short_circuits_on_empty_list() {
+        assertTrue(!StackTraceFilter.isDenied(arrayOf(element("a.b", "c")), emptyList()))
+    }
 }

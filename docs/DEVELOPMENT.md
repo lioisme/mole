@@ -42,7 +42,7 @@
 - `CryptoKind`(MESSAGE_DIGEST/CIPHER/MAC/SIGNATURE/KEY/KEY_PARAM/KEY_AGREEMENT/BASE64)、`CryptoOperation`、不可变 `CryptoRecord`(含 key/iv/input/output 的 hex+text、方向、上下文 id、线程名、堆栈、时间戳);
 - `Hex`(字节↔hex)、`BytesView`(hex+text 双态、超限截断、可打印判定)、`StackTraceFilter`(剔除模块自身/框架帧、限深)、`HookSwitch` 配置模型 + JSON 编解码(协议 v1)、`RecordCodec`(JSON 行协议)。
 - 覆盖单测:hex 往返、截断边界、可打印判定、堆栈过滤、配置编解码、协议码编解码。
-**备注**:最终模型:`CryptoKind` 8 类(去掉了 KEY_AGREEMENT,新增 KEY_PARAM/KEY_GENERATION/KEY_FACTORY/BASE64);`WireProtocol`(PORT=46299、MAGIC=MDEV、VERSION=1、类型 hello/config/record/ping/pong、顶层字段 t/p)+ `WireCodec`(Gson JSON 行);`BytesView` 双态视图含截断与可打印判定(TextUtil 自实现 UTF-8 校验);`StackTraceFilter` 前缀剔除(模块/框架/反射/被 Hook 门面类)。单测留待 T9 补齐。
+**备注**:最终模型:`CryptoKind` 8 类(去掉了 KEY_AGREEMENT,新增 KEY_PARAM/KEY_GENERATION/KEY_FACTORY/BASE64);`WireProtocol`(PORT=46299、MAGIC=MDEV、VERSION=1、类型 hello/config/record/ping/pong、顶层字段 t/p)+ `WireCodec`(Gson JSON 行);`BytesView` 双态视图含截断与可打印判定(TextUtil 自实现 UTF-8 校验);`StackTraceFilter` 前缀剔除(模块/框架/反射/被 Hook 门面类)。单测已由 T9 补齐并通过(`HexTest/BytesViewTest/StackTraceFilterTest/WireCodecTest/WireCodecAuthTest/HookSwitchTest`,后续扩展至全量 69 例单元 + 15 例插桩全绿)。
 
 ### T5 hook 引擎 ✅ 已完成
 **验收**:
@@ -103,6 +103,15 @@
 - **场景 B 适配**:真 legacy(1.8.6/EdXposed)不支持 Android 14;LSPosed 1.10.2 实测为 API 100 现代加载器,存在 `java_init.list` 时不回落 `xposed_init`(API 102 模块 `NoSuchMethodException` 后整体不注入)→ 按用户决策新增 **legacy 构建变体**(flavor 去掉 java_init.list、`minApiVersion=82`),在 LSPosed 1.10.2 legacy 路径实测全通(`Loading legacy module … LegacyModuleEntry`,八类捕获/热推送/持久化均与 A 一致);**交叉验证**:legacy 变体在 Vector 2.2 legacy 路径亦加载成功并完整捕获。
 - **其他实测发现**:① 框架覆盖安装会重置模块 `enabled=0` 并级联删 scope(用 sqlite3 修复复验,已写入风险册与发布检查单);② Android 14 冻结后台宿主导致 46299 读超时丢记录,测试需保持宿主前台;③ 注入侧启动期 connect 重试为已知良性行为。
 - **产物**:双变体构建命令与测试命令已更新 README;`testModern/LegacyDebugUnitTest` 32 用例全绿、`lintModern/LegacyDebug` 0 error。
+
+### T14 V7 五需求重构(2026-08-17)✅ 已完成
+**任务书**:`docs/v7-five-req-refactor-task.md`(需求条款/决策/违规清单/变更清单全量勾选)。
+**备注**:
+- **R1 详情页 AppBar 规范化**:顶栏收敛为返回/标题/上一条/下一条/更多(MoreVert);**更多菜单唯一功能 = 导出 JSON**(SAF `ACTION_CREATE_DOCUMENT`、文件名 `modev-record-{id}.json`、Default 后台构建 + IO 写流、成功/失败 snackbar);复制/分享全链删除(copyQuick/copyBuilt/share/toShareText/shareIntent/SHARE_DIRECT_MAX_CHARS/SHARE_DIR/copyToClipboard)+ FileProvider 清理;`toJson/toJsonObject` 提级 internal 供导出复用。
+- **R2 应用行重构**:Checkbox 移行尾;删除 PlayArrow 运行按钮与 onLaunch 参数链(启动入口仅保留算法列表页头部,`AppInfo.launchable` 保留供其使用)。
+- **R3 排序与置顶**:新增 `AppSort`(Collator PRIMARY 强度,大小写/声调不敏感,相等回退包名,全序稳定);终态排序唯一在 AppsViewModel;新增 `AppListSettings`(置顶开关持久化 + StateFlow,设置页直连、未动 SettingsViewModel);repository 内排序删除。
+- **R5 捕获设置入口**:移入算法列表页 KindFilterMenu 底部(分隔线 + Settings 项,与主界面「设置」项同范式),内容区入口行删除。
+- **测试**:`AppSortTest` 5 例(JVM);`FourScreensNavTest`/`ModevTopBarTest`/`ByteSectionTest` 同步新契约;质量门禁 G1-G5 全绿(compile ×3 变体/单测全绿/lint 0 error/en-zh 对等/死资源 grep 零残留)。
 
 ---
 

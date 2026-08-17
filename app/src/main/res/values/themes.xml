@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Modev" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- 宿主浅色基线主题(2026-08-15 UI 重构 Phase 0,对齐 LIDE):
+         原生 Activity 骨架恒浅色,Android 12+ Splash 由 values-v31 档接管;
+         冷启动帧(API 24-30)以 windowBackground 绘制,浅色档 = modev_surface_background。 -->
+    <style name="Theme.Modev" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/modev_surface_background</item>
+    </style>
 </resources>

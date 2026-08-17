@@ -74,4 +74,37 @@ class BytesViewTest {
         assertFalse(TextUtil.isPrintable(byteArrayOf(0xE0.toByte(), 0x80.toByte(), 0xBF.toByte())))
         assertFalse(TextUtil.isPrintable(byteArrayOf(0xF4.toByte(), 0x90.toByte(), 0x80.toByte(), 0x80.toByte())))
     }
+
+    @Test
+    fun preview_returns_full_hex_when_within_limit() {
+        val view = BytesView.of("hello".toByteArray(Charsets.UTF_8))
+        assertEquals("68656c6c6f", view!!.preview(maxChars = 64))
+    }
+
+    @Test
+    fun preview_truncates_with_byte_count_suffix() {
+        val bytes = ByteArray(100) { 0x41 } // hex 200 字符
+        val view = BytesView.of(bytes)
+        val preview = view!!.preview(maxChars = 32)
+        assertEquals(32, preview.length - "…(+${100 - 16} bytes)".length)
+        assertTrue(preview.endsWith("…(+84 bytes)"))
+        assertEquals("41414141414141414141414141414141…(+84 bytes)", preview)
+    }
+
+    @Test
+    fun preview_floors_illegal_small_limit() {
+        val view = BytesView.of("abcdef".toByteArray(Charsets.UTF_8))
+        // maxChars 过小被下限兜底,仍返回完整 hex(不产生空预览)
+        assertEquals("616263646566", view!!.preview(maxChars = 1))
+    }
+
+    @Test
+    fun preview_collaborates_with_capture_truncation() {
+        // 捕获侧已截断(hex 本身带标记):预览仅做展示裁剪,不叠加语义
+        val bytes = ByteArray(200) { 0x41 }
+        val view = BytesView.of(bytes, maxHexChars = 64)
+        val preview = view!!.preview(maxChars = 32)
+        assertTrue(preview.endsWith("…(+184 bytes)"))
+        assertEquals(32, preview.length - "…(+184 bytes)".length)
+    }
 }
