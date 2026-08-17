@@ -7,6 +7,7 @@ import com.lioisme.modev.hook.HookManager
 import com.lioisme.modev.hook.adapters.LibxposedPlatform
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
+import io.github.libxposed.service.XposedService
 
 /**
  * 现代 Xposed 入口(注册于 META-INF/xposed/java_init.list),基于 libxposed API 102。
@@ -24,9 +25,13 @@ class ModevModule : XposedModule() {
         FrameworkBridge.ensureRegistered()
         val remotePrefsProvider: (() -> SharedPreferences?)? = if (modulePackage != null) {
             {
-                FrameworkBridge.serviceFlow.value
-                    ?.let { svc -> runCatching { svc.getRemotePreferences(RemotePrefsBridge.PREFS_KEY) }.getOrNull() }
-                    ?: runCatching { getRemotePreferences(modulePackage) }.getOrNull()
+                val svc = FrameworkBridge.serviceFlow.value
+                if (svc != null) {
+                    // 本类仅在现代框架(含 service 库)加载,转型安全
+                    runCatching { (svc as XposedService).getRemotePreferences(RemotePrefsBridge.PREFS_KEY) }.getOrNull()
+                } else {
+                    runCatching { getRemotePreferences(modulePackage) }.getOrNull()
+                }
             }
         } else {
             null

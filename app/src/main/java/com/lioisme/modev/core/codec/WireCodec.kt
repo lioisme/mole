@@ -81,6 +81,8 @@ object WireCodec {
         if (record.kind == null || record.operation == null) return null
         if (record.packageName.isBlank()) return null
         // algorithm 允许为空:SecureRandom/内部随机源等合法记录没有算法名
+        // V10 前瞻:非 crypto 记录(未来能力)无法映射为 CryptoRecord,此处按非法丢弃,
+        // 待对应能力实现后由类型化分发接管(RecordTypes)。
         return record
     }
 

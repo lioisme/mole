@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Modev</string>
-    <string name="app_description">抓取目标 App 全部算法调用(摘要/加解密/签名/MAC/密钥/编码)的 Xposed 模块,支持 Vector(libxposed 102)与旧版 LSPosed 双框架。</string>
+    <string name="app_description">通过作用域注入监听目标 App 行为的 Xposed 模块:当前能力为算法捕获(摘要/加解密/签名/MAC/密钥/编码),更多监听能力开发中。支持 Vector(libxposed 102)与旧版 LSPosed 双框架。</string>
 
     <!-- 通用 -->
     <string name="cd_back">返回</string>
@@ -27,15 +27,15 @@
     <string name="apps_scope_failed">操作失败:%1$s %2$s</string>
     <string name="apps_count_wan">%1$d万+</string>
     <string name="apps_count_qian">%1$d千+</string>
+    <string name="apps_logs_cleared">已清空 %1$s 的日志</string>
 
-    <!-- 算法列表页 -->
-    <string name="detail_tab_settings">捕获设置</string>
+    <!-- 应用记录页 -->
     <string name="detail_listening">已在作用域</string>
     <string name="detail_not_listening">未在作用域</string>
     <string name="detail_framework_no_service">框架服务未连接</string>
     <string name="detail_framework_error">框架异常:%1$s</string>
     <string name="detail_reading_scope">正在读取作用域…</string>
-    <string name="detail_search">搜索算法 / 密钥 / 数据…</string>
+    <string name="detail_search">搜索记录…</string>
     <string name="detail_empty">暂无记录</string>
     <string name="section_algorithms">算法捕获</string>
     <string name="section_record_options">记录选项</string>
@@ -50,6 +50,7 @@
     <string name="switch_key_agreement">密钥协商</string>
     <string name="switch_random">安全随机数</string>
     <string name="switch_base64">Base64 编码</string>
+    <string name="switch_webview">网页加解密 WebView</string>
     <string name="switch_log_stack">记录调用堆栈</string>
     <string name="capture_max_bytes">单字段字节上限</string>
     <string name="capture_max_bytes_hint">每字段字节数(0 = 不限制)</string>
@@ -80,6 +81,7 @@
     <string name="kind_key_agreement">密钥协商</string>
     <string name="kind_random">随机数</string>
     <string name="kind_base64">Base64</string>
+    <string name="kind_webview">网页</string>
     <string name="op_get_instance">获取实例</string>
     <string name="op_init">初始化</string>
     <string name="op_update">更新</string>
@@ -101,6 +103,8 @@
     <string name="op_generate_seed">生成种子</string>
     <string name="op_encode">编码</string>
     <string name="op_decode">解码</string>
+    <string name="op_encrypt">加密</string>
+    <string name="op_decrypt">解密</string>
     <string name="dir_encrypt">加密</string>
     <string name="dir_decrypt">解密</string>
     <string name="dir_wrap">密钥包装</string>
@@ -144,7 +148,6 @@
     <string name="section_stack">调用堆栈</string>
     <string name="bytes_count">共 %1$d 字节</string>
     <string name="bytes_truncated">(已截断)</string>
-    <string name="key_not_exportable">密钥材料不可导出(硬件/KeyStore)</string>
     <string name="section_expand">展开</string>
     <string name="section_collapse">收起</string>
     <string name="export_failed">导出失败</string>
@@ -153,10 +156,13 @@
     <string name="settings_title">设置</string>
     <string name="settings_display_section">显示</string>
     <string name="settings_language_section">语言与地区</string>
-    <string name="settings_apps_section">应用列表</string>
+    <string name="settings_features_section">功能</string>
     <string name="settings_data_section">数据</string>
     <string name="settings_service_section">服务与诊断</string>
     <string name="settings_about_section">关于</string>
+    <string name="capture_settings_title">捕获设置</string>
+    <string name="data_settings_title">数据管理</string>
+    <string name="diagnostics_settings_title">服务与诊断</string>
     <string name="settings_framework_service">框架服务</string>
     <string name="settings_connecting">连接中…</string>
     <string name="settings_framework">框架</string>

@@ -1,5 +1,6 @@
 package com.lioisme.modev.core.util
 
+import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
 import org.junit.Test
@@ -39,5 +40,30 @@ class HexTest {
         assertEquals(512, hex.length)
         assertEquals("000102", hex.substring(0, 6))
         assertEquals("ff", hex.substring(hex.length - 2))
+    }
+
+    @Test
+    fun decode_roundtrip() {
+        val bytes = byteArrayOf(0x00, 0x01, 0x02, -1, 0xCA.toByte(), 0xFE.toByte())
+        val hex = Hex.encode(bytes)
+        assertArrayEquals(bytes, Hex.decode(hex)!!)
+    }
+
+    @Test
+    fun decode_empty_and_odd() {
+        assertArrayEquals(byteArrayOf(), Hex.decode("")!!)
+        assertEquals(null, Hex.decode("0"))
+        assertEquals(null, Hex.decode("123"))
+        assertEquals(null, Hex.decode("zz"))
+        assertEquals(null, Hex.decode("0g"))
+        assertEquals(null, Hex.decode("g0"))
+        assertEquals(null, Hex.decode(" 12"))
+        assertEquals(null, Hex.decode("12 "))
+    }
+
+    @Test
+    fun decode_case_insensitive() {
+        assertArrayEquals(byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte()), Hex.decode("deadBEEF")!!)
+        assertArrayEquals(byteArrayOf(0xDE.toByte(), 0xAD.toByte(), 0xBE.toByte(), 0xEF.toByte()), Hex.decode("DEADBEEF")!!)
     }
 }

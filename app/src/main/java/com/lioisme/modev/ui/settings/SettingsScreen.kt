@@ -1,6 +1,5 @@
 package com.lioisme.modev.ui.settings
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -23,23 +22,16 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Insights
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -49,7 +41,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -59,7 +50,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -75,15 +65,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.BuildConfig
 import com.lioisme.modev.R
-import com.lioisme.modev.core.codec.WireProtocol
-import com.lioisme.modev.domain.scope.ScopeState
+import com.lioisme.modev.domain.capability.CapabilityKind
 import com.lioisme.modev.i18n.LocaleManager
-import com.lioisme.modev.ui.apps.AppListSettings
 import com.lioisme.modev.ui.components.ModevTopBar
-import com.lioisme.modev.ui.components.SettingsInfoItem
 import com.lioisme.modev.ui.components.SettingsItem
 import com.lioisme.modev.ui.components.SettingsSection
-import com.lioisme.modev.ui.components.SettingsToggleItem
 import com.lioisme.modev.ui.theme.AppearanceMode
 import com.lioisme.modev.ui.theme.LocalIsDarkTheme
 import com.lioisme.modev.ui.theme.ThemeConfig
@@ -95,14 +81,14 @@ import kotlinx.coroutines.launch
 private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
 
 /**
- * 设置页(2026-08-17 V9 六分区重组):
- * 卡片式分区(SettingsSection = surfaceContainerLow 卡),按功能域分层:
+ * 设置页(V10 设置分级,通用设置收敛本页):
+ * 卡片式分区(SettingsSection = surfaceContainerLow 卡),仅通用设置 + 入口:
  * - 显示:外观模式 sheet + 主题色 sheet(跟随壁纸 / 20 色预设网格);
  * - 语言与地区:语言 sheet(LocaleManager 热切换,零重建);
- * - 应用列表:已作用域应用置顶开关(AppListSettings 单一事实源);
- * - 数据:总记录数只读行 + 清空全部日志(errorContainer 危险块);
- * - 服务与诊断:框架与作用域 + 通信服务只读信息(SettingsInfoItem)+
- *   管道统计折叠卡(默认收起,AnimatedVisibility,状态 rememberSaveable);
+ * - 功能:能力注册表驱动(CapabilityRegistry 单一事实源),当前为「捕获设置」
+ *   (全局算法捕获,自注册的 CryptoCaptureCapability),新增能力自动出现入口;
+ * - 数据与服务:数据管理(记录总量 / 清空全部)、服务与诊断(框架/端口/统计)
+ *   ——两者为二级设置页入口(V10 分级,配置/数据/诊断类均不直占主设置页);
  * - 关于:版本 + 关于 Dialog。
  * 本页经应用列表筛选菜单「设置」项进入(唯一入口),返回箭头常显。
  */
@@ -111,12 +97,10 @@ private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit = {},
+    onOpenCaptureSettings: () -> Unit = {},
+    onOpenDataSettings: () -> Unit = {},
+    onOpenDiagnostics: () -> Unit = {},
 ) {
-    val connectedCount by viewModel.connectedCount.collectAsStateWithLifecycle()
-    val totalRecords by viewModel.totalRecords.collectAsStateWithLifecycle()
-    val frameworkState by viewModel.frameworkState.collectAsStateWithLifecycle()
-    val pipelineStats by viewModel.pipelineStats.collectAsStateWithLifecycle()
-    val pinScoped by AppListSettings.pinScoped.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val config by ThemeSettingsManager.themeConfig.collectAsState()
 
@@ -124,15 +108,11 @@ fun SettingsScreen(
     var showColorSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
     var showAboutDialog by remember { mutableStateOf(false) }
-    var showClearAllConfirm by remember { mutableStateOf(false) }
 
     // 语言 sheet 状态(V9.1):点选语言先播退场动画再切换,动画期间语言不变,
     // 避免「sheet 瞬时消失 + 全屏文本同帧切换」叠影闪烁。
     val scope = rememberCoroutineScope()
     val languageSheetState = rememberModalBottomSheetState()
-
-    // 管道统计折叠态(跨重建存活:展开/收起不因重组复位)。
-    var statsExpanded by rememberSaveable { mutableStateOf(false) }
 
     // 语言标签收集 localeFlow(V9 热切换:切换即时刷新,零重建)。
     val currentLanguageTag by LocaleManager.localeFlow.collectAsStateWithLifecycle()
@@ -195,136 +175,31 @@ fun SettingsScreen(
                 )
             }
 
+            // V10 能力注册表驱动:「功能」区 = 已注册监听能力,新增能力自动出现入口。
             Spacer(Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_apps_section)) {
-                SettingsToggleItem(
-                    icon = Icons.Default.PushPin,
-                    title = stringResource(R.string.settings_pin_scoped),
-                    checked = pinScoped,
-                    onCheckedChange = { AppListSettings.setPinScoped(it, context) },
-                )
-            }
-
-            Spacer(Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_data_section)) {
-                SettingsInfoItem(
-                    icon = Icons.Default.Storage,
-                    title = stringResource(R.string.settings_total_records),
-                    value = stringResource(R.string.settings_total_records_value, totalRecords),
-                )
-                Surface(
-                    onClick = { showClearAllConfirm = true },
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            stringResource(R.string.settings_clear_all_logs),
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            style = MaterialTheme.typography.bodyLarge,
-                        )
-                    }
+            SettingsSection(stringResource(R.string.settings_features_section)) {
+                viewModel.capabilities.forEach { capability ->
+                    SettingsItem(
+                        icon = capabilityIcon(capability.kind),
+                        title = stringResource(capabilityTitleRes(capability.kind)),
+                        onClick = {
+                            when (capability.kind) {
+                                CapabilityKind.CRYPTO_CAPTURE -> onOpenCaptureSettings()
+                            }
+                        },
+                    )
                 }
-            }
-
-            Spacer(Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_service_section)) {
-                when (val framework = frameworkState) {
-                    is ScopeState.Connecting -> {
-                        SettingsInfoItem(
-                            icon = Icons.Default.Android,
-                            title = stringResource(R.string.settings_framework_service),
-                            value = stringResource(R.string.settings_connecting),
-                        )
-                    }
-                    is ScopeState.Ready -> {
-                        SettingsInfoItem(
-                            icon = Icons.Default.Android,
-                            title = stringResource(R.string.settings_framework),
-                            value = "${framework.frameworkName} ${framework.frameworkVersion}",
-                        )
-                        SettingsInfoItem(
-                            icon = Icons.Default.Apps,
-                            title = stringResource(R.string.settings_scoped_count),
-                            value = stringResource(R.string.settings_scoped_count_value, framework.scope.size),
-                        )
-                    }
-                    is ScopeState.Unavailable -> {
-                        SettingsInfoItem(
-                            icon = Icons.Default.Android,
-                            title = stringResource(R.string.settings_framework_service),
-                            value = stringResource(R.string.settings_not_connected),
-                        )
-                        if (framework.reason == ScopeState.UnavailableReason.SERVICE_ERROR) {
-                            Text(
-                                framework.message?.let { msg ->
-                                    stringResource(R.string.settings_framework_error, msg)
-                                } ?: stringResource(R.string.unknown_error),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                            )
-                        }
-                    }
-                }
-                SettingsInfoItem(
-                    icon = Icons.Default.Dns,
-                    title = stringResource(R.string.settings_port),
-                    value = stringResource(R.string.settings_port_value, WireProtocol.PORT),
-                )
-                SettingsInfoItem(
-                    icon = Icons.Default.Devices,
-                    title = stringResource(R.string.settings_online_targets),
-                    value = stringResource(R.string.settings_online_targets_value, connectedCount),
-                )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                StatsToggleRow(expanded = statsExpanded, onClick = { statsExpanded = !statsExpanded })
-                AnimatedVisibility(visible = statsExpanded) {
-                    Column {
-                        SettingsInfoItem(
-                            icon = Icons.Default.Dns,
-                            title = stringResource(R.string.stats_received),
-                            value = pipelineStats.received.toString(),
-                        )
-                        SettingsInfoItem(
-                            icon = Icons.Default.Dns,
-                            title = stringResource(R.string.stats_dropped),
-                            value = pipelineStats.dropped.toString(),
-                        )
-                        SettingsInfoItem(
-                            icon = Icons.Default.Dns,
-                            title = stringResource(R.string.stats_write_failures),
-                            value = pipelineStats.writeFailures.toString(),
-                        )
-                        SettingsInfoItem(
-                            icon = Icons.Default.Dns,
-                            title = stringResource(R.string.stats_trimmed),
-                            value = pipelineStats.trimmed.toString(),
-                        )
-                        SettingsInfoItem(
-                            icon = Icons.Default.Dns,
-                            title = stringResource(R.string.stats_rejected_hellos),
-                            value = pipelineStats.channel.rejectedHellos.toString(),
-                        )
-                        SettingsInfoItem(
-                            icon = Icons.Default.Dns,
-                            title = stringResource(R.string.stats_dropped_records),
-                            value = pipelineStats.channel.droppedRecords.toString(),
-                        )
-                        SettingsInfoItem(
-                            icon = Icons.Default.Dns,
-                            title = stringResource(R.string.stats_rejected_records),
-                            value = pipelineStats.channel.rejectedRecords.toString(),
-                        )
-                    }
-                }
+                SettingsItem(
+                    icon = Icons.Default.Storage,
+                    title = stringResource(R.string.data_settings_title),
+                    onClick = onOpenDataSettings,
+                )
+                SettingsItem(
+                    icon = Icons.Default.Dns,
+                    title = stringResource(R.string.diagnostics_settings_title),
+                    onClick = onOpenDiagnostics,
+                )
             }
 
             Spacer(Modifier.height(24.dp))
@@ -409,28 +284,16 @@ fun SettingsScreen(
             },
         )
     }
+}
 
-    if (showClearAllConfirm) {
-        AlertDialog(
-            onDismissRequest = { showClearAllConfirm = false },
-            icon = { Icon(Icons.Default.Delete, null) },
-            title = { Text(stringResource(R.string.danger_title)) },
-            text = { Text(stringResource(R.string.danger_clear_all_msg)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.clearAll()
-                    showClearAllConfirm = false
-                }) {
-                    Text(stringResource(R.string.confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showClearAllConfirm = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
-    }
+/** 能力图标呈现(未来新能力在此追加映射)。 */
+private fun capabilityIcon(kind: CapabilityKind): ImageVector = when (kind) {
+    CapabilityKind.CRYPTO_CAPTURE -> Icons.Default.Tune
+}
+
+/** 能力标题呈现。 */
+private fun capabilityTitleRes(kind: CapabilityKind): Int = when (kind) {
+    CapabilityKind.CRYPTO_CAPTURE -> R.string.capture_settings_title
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -651,37 +514,3 @@ private fun selectedMarkColor(
     color: Color,
     isDark: Boolean,
 ): Color = if (isDark) Color.White else Color.Black
-
-/**
- * 管道统计折叠头行(V9):图标 + 标题 + 方向指示图标(展开↑/收起↓),
- * 与详情页字节区块「展开/收起」文案同语义(contentDescription 复用)。
- */
-@Composable
-private fun StatsToggleRow(
-    expanded: Boolean,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Default.Insights, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-        Spacer(Modifier.width(16.dp))
-        Text(
-            stringResource(R.string.settings_stats_section),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.weight(1f),
-        )
-        Icon(
-            if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-            contentDescription = stringResource(if (expanded) R.string.section_collapse else R.string.section_expand),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(20.dp),
-        )
-    }
-}

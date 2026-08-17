@@ -155,7 +155,9 @@ fun SettingsInfoItem(
         Spacer(Modifier.width(16.dp))
         Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(8.dp))
-        // 值允许最多两行(如「框架名 + 版本号」),避免窄屏一刀切截断破坏阅读。
+        // V11 修复:值必须有界测量(weight(1f, fill=false),上限 50% 行宽)——无界
+        // 时 Row 按内容全宽测量长值,标题被挤压逐字折行(如「框架」竖排错位)。
+        // 值允许最多两行(如「框架名 + 版本号」),超界省略,Key 位置恒定。
         Text(
             value,
             style = MaterialTheme.typography.bodyMedium,
@@ -163,6 +165,7 @@ fun SettingsInfoItem(
             textAlign = TextAlign.End,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false),
         )
     }
 }

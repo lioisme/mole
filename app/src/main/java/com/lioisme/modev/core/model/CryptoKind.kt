@@ -36,4 +36,7 @@ enum class CryptoKind {
 
     /** 编码转换:Base64(android.util.Base64 / java.util.Base64) */
     BASE64,
+
+    /** WebView JS 加解密(WebCrypto / CryptoJS / JSEncrypt,经探针注入捕获) */
+    WEB_CRYPTO,
 }

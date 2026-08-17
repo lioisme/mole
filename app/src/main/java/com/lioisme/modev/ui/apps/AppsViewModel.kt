@@ -1,6 +1,5 @@
 package com.lioisme.modev.ui.apps
 
-import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -9,15 +8,14 @@ import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoRecord
-import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.data.repo.AppCatalogRepository
 import com.lioisme.modev.data.repo.LogRepository
-import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.data.server.ConfigServer
 import com.lioisme.modev.domain.scope.ScopeChangeResult
 import com.lioisme.modev.domain.scope.ScopeRepository
 import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.i18n.LocaleManager
+import com.lioisme.modev.ui.common.UiMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -25,16 +23,11 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-
-/** 跨层消息:资源 id + 格式化参数,由 UI 解析(便于 i18n)。 */
-data class UiMessage(
-    @StringRes val resId: Int,
-    val args: List<String> = emptyList(),
-)
 
 /**
  * 应用列表:全量已安装应用 × 作用域(LSPosed,单一事实源)× 连接状态 × 记录数。
@@ -149,7 +142,8 @@ class AppsViewModel(
             onlyScoped = prefs.onlyScoped,
             showSystem = prefs.showSystem,
         )
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
+        // V10 稳态状态流:内容未变(行/筛选/连接/作用域一致)不发射 → 列表零无谓重组。
+    }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
 
     fun setQuery(value: String) {
         query.value = value
@@ -195,17 +189,16 @@ class AppsViewModel(
 }
 
 /**
- * 算法列表页(2026-08-16 V3 更名,四界面重构):单一职责 = 某应用的算法记录列表。
+ * 应用记录页(2026-08-16 V3 四界面重构;2026-08-17 V10 更名,去算法中心化):
+ * 单一职责 = 某应用的记录列表。
  * 数据流:分页记录(时间倒序,随搜索词/类别重建)+ 应用信息/连接状态/作用域状态
- * + 每应用捕获配置(8 类开关 + 记录堆栈)+ 移出作用域 + 清空日志。
- * 2026-08-16 V2 的 LOGS/CAPTURE 双 Tab 机制已删除(信息架构收敛为 4 界面,
- * 捕获配置改为列表页内容区折叠区块)。
+ * + 应用级操作(移出作用域 + 清空该应用日志)。
+ * 捕获配置(V10 全局化)不再属于本页,见设置页「捕获设置」。
  */
-class AlgorithmListViewModel(
+class AppRecordsViewModel(
     val packageName: String,
     private val catalog: AppCatalogRepository,
     server: ConfigServer,
-    private val settings: SettingsRepository,
     private val logs: LogRepository,
     private val scopeRepository: ScopeRepository,
 ) : ViewModel() {
@@ -217,8 +210,6 @@ class AlgorithmListViewModel(
     val appInfo: StateFlow<AppCatalogRepository.AppInfo?> = catalog.apps
         .map { list -> list.firstOrNull { it.packageName == packageName } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    val switchState: StateFlow<HookSwitch> = settings.flowFor(packageName)
 
     val connected: StateFlow<Boolean> = server.connectedPackagesFlow
         .map { set -> packageName in set }
@@ -234,7 +225,7 @@ class AlgorithmListViewModel(
     val records: Flow<PagingData<CryptoRecord>> = combine(query, kind) { q, k -> q to k }
         .flatMapLatest { (q, k) -> logs.pagedRecords(packageName, k, q) }
 
-    /** 一次性提示(移出作用域结果),由 UI 收集为 Snackbar。 */
+    /** 一次性提示(移出作用域 / 清空日志结果),由 UI 收集为 Snackbar。 */
     val messages = MutableSharedFlow<UiMessage>(extraBufferCapacity = 8)
 
     fun setQuery(value: String) {
@@ -245,12 +236,11 @@ class AlgorithmListViewModel(
         kind.value = value
     }
 
-    fun setSwitch(transform: (HookSwitch) -> HookSwitch) {
-        settings.set(packageName, transform(switchState.value))
-    }
-
     fun clearLogs() {
-        viewModelScope.launch { logs.clear(packageName) }
+        viewModelScope.launch {
+            logs.clear(packageName)
+            messages.emit(UiMessage(R.string.apps_logs_cleared, listOf(packageName)))
+        }
     }
 
     /** 移出作用域(等价于 LSPosed 作用域取消勾选)。 */
@@ -286,17 +276,16 @@ class AppsViewModelFactory(
 }
 
 /** 简单工厂,避免在 Compose 中手动拼参。 */
-class AlgorithmListViewModelFactory(
+class AppRecordsViewModelFactory(
     private val packageName: String,
     private val container: AppContainer,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return AlgorithmListViewModel(
+        return AppRecordsViewModel(
             packageName = packageName,
             catalog = container.catalog,
             server = container.server,
-            settings = container.settings,
             logs = container.logs,
             scopeRepository = container.scopeRepository,
         ) as T

@@ -14,7 +14,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 
 /*
- * 搜索状态机共享封装(2026-08-16 V3,四界面重构,收敛 AppsScreen/AlgorithmListScreen 共用)。
+ * 搜索状态机共享封装(2026-08-16 V3,四界面重构,收敛 AppsScreen/AppRecordsScreen 共用)。
  * 状态机红线(2026-08-15 Phase 4 确立)全守:
  *  1. rememberSearchBarState 必须无参调用,禁止显式传动画 spec;
  *  2. searchActive 独立意图(rememberSaveable),与动画进度解耦;

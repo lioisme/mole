@@ -65,14 +65,11 @@ class ConfigServer(
     }
 
     /**
-     * 新客户端握手时查询其持久化配置(由 SettingsRepository 注入)。
+     * 新客户端握手时查询其全局配置(由 SettingsRepository 注入,V10:与包名解耦)。
      * 为 null 表示尚无配置,注入侧继续使用内存默认值。
      */
     @Volatile
-    var configProvider: ((String) -> HookSwitch?)? = null
-
-    /** 最近一次推送的配置,供调试与热更新参考。 */
-    private val lastConfig = ConcurrentHashMap<String, HookSwitch>()
+    var configProvider: (() -> HookSwitch?)? = null
 
     /**
      * 握手令牌要求:
@@ -182,8 +179,8 @@ class ConfigServer(
         session.processName = processName
         registeredPackages[packageName] = (registeredPackages[packageName] ?: 0) + 1
         _connectedPackages.value = connectedPackages()
-        // 握手后立即推送持久化配置;未配置过的包由注入侧使用默认值
-        configProvider?.invoke(packageName)?.let { broadcastConfig(packageName, it) }
+        // 握手后立即推送全局配置;未配置时由注入侧使用默认值
+        configProvider?.invoke()?.let { broadcastConfig(it) }
     }
 
     private fun onRecordMessage(session: ClientSession, msg: WireMessage) {
@@ -218,11 +215,13 @@ class ConfigServer(
         }
     }
 
-    /** 向指定包名的全部连接广播配置。 */
-    fun broadcastConfig(packageName: String, switch: HookSwitch) {
-        lastConfig[packageName] = switch
+    /**
+     * 向全部已注册客户端广播全局配置(V10:配置全局唯一,不再按包过滤)。
+     * 载荷仍携带会话包名(协议兼容,注入侧只读 switch 字段)。
+     */
+    fun broadcastConfig(switch: HookSwitch) {
         for ((socket, session) in clients) {
-            if (session.packageName != packageName) continue
+            val packageName = session.packageName ?: continue
             synchronized(session) {
                 runCatching {
                     session.writer?.apply {

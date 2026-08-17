@@ -13,6 +13,8 @@ import com.lioisme.modev.data.repo.LogRepository
 import com.lioisme.modev.data.repo.MirroredConfigWriter
 import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.data.server.ConfigServer
+import com.lioisme.modev.domain.capability.CapabilityRegistry
+import com.lioisme.modev.domain.capability.CryptoCaptureCapability
 import com.lioisme.modev.domain.scope.ScopeGateway
 import com.lioisme.modev.domain.scope.ScopeRepository
 import com.lioisme.modev.domain.scope.ScopeService
@@ -22,6 +24,7 @@ import com.lioisme.modev.framework.XposedScopeService
 import com.lioisme.modev.i18n.LocaleManager
 import com.lioisme.modev.ui.apps.AppListSettings
 import com.lioisme.modev.ui.theme.ThemeSettingsManager
+import io.github.libxposed.service.XposedService
 import java.util.UUID
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -81,21 +84,34 @@ class AppContainer(private val context: Context) {
                 gson = Gson(),
                 remotePrefs = { RemotePrefsBridge.prefs() },
             ),
-        ).also { server.configProvider = { pkg -> it.get(pkg) } }
+        ).also { server.configProvider = { it.switch } }
     }
 
     val logs: LogRepository by lazy {
         LogRepository(dao = dao, server = server)
     }
 
-    /** 框架作用域网关:现代框架服务 → 领域抽象。 */
+    /** 框架作用域网关:现代框架服务 → 领域抽象。
+     *  map 参数为 Any?(见 FrameworkBridge),转型在非空分支内,legacy 安全。 */
     val scopeGateway: ScopeGateway = object : ScopeGateway {
         override fun serviceFlow(): Flow<ScopeService?> =
-            FrameworkBridge.serviceFlow.map { service -> service?.let { XposedScopeService(it) } }
+            FrameworkBridge.serviceFlow.map { service ->
+                if (service == null) null else XposedScopeService(service as XposedService)
+            }
     }
 
     val scopeRepository: ScopeRepository by lazy {
         ScopeRepository(scopeGateway)
+    }
+
+    /**
+     * 监听能力注册表(V10 能力化架构):设置页「功能」区与能力设置路由的驱动源。
+     * 新增能力 = 实现 [Capability] + 在此注册,不改动导航/设置/通道主链路。
+     */
+    val capabilityRegistry: CapabilityRegistry by lazy {
+        CapabilityRegistry().apply {
+            register(CryptoCaptureCapability(settings.globalSwitch, appScope))
+        }
     }
 
     private val packageReceiver = object : BroadcastReceiver() {
@@ -108,12 +124,15 @@ class AppContainer(private val context: Context) {
         // 进程启动即接线记录回调(并启动服务器),避免 UI 未访问日志页时记录被丢弃
         logs
         // M3-2: 框架服务就绪后生成并持久化握手令牌,ConfigServer 启用认证
+        // serviceFlow 公开为 Any?(见 FrameworkBridge),转型发生在非空分支内,
+        // legacy 变体(运行时缺 service 库)空值路径零类解析,自然降级不启用认证。
         appScope.launch {
             RemotePrefsBridge.serviceFlow.collect { service ->
                 if (service == null) {
                     server.requireToken = null
                 } else {
-                    val prefs = runCatching { service.getRemotePreferences(RemotePrefsBridge.PREFS_KEY) }.getOrNull()
+                    val svc = service as XposedService
+                    val prefs = runCatching { svc.getRemotePreferences(RemotePrefsBridge.PREFS_KEY) }.getOrNull()
                     if (prefs == null) {
                         server.requireToken = null
                     } else {

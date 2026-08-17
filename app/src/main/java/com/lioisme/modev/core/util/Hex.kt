@@ -18,4 +18,26 @@ object Hex {
         }
         return sb.toString()
     }
+
+    /**
+     * 解码 hex 字符串(大小写均接受);空串返回空数组,非法字符或奇数长度返回 null。
+     * 用于 WebView 探针回传的 hex 数据落地([com.lioisme.modev.hook.webview.WebViewEventMapper])。
+     */
+    fun decode(hex: String): ByteArray? {
+        if (hex.length % 2 != 0) return null
+        val out = ByteArray(hex.length / 2)
+        for (i in out.indices) {
+            val hi = digitOf(hex[i * 2]) ?: return null
+            val lo = digitOf(hex[i * 2 + 1]) ?: return null
+            out[i] = ((hi shl 4) or lo).toByte()
+        }
+        return out
+    }
+
+    private fun digitOf(c: Char): Int? = when (c) {
+        in '0'..'9' -> c - '0'
+        in 'a'..'f' -> c - 'a' + 10
+        in 'A'..'F' -> c - 'A' + 10
+        else -> null
+    }
 }

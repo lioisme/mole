@@ -216,6 +216,7 @@ class LogRepository(
         "%" + raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
     private fun CryptoRecord.toEntity(gson: Gson) = CryptoRecordEntity(
+        recordType = recordType,
         packageName = packageName,
         kind = kind.name,
         operation = operation.name,
@@ -264,6 +265,7 @@ class LogRepository(
 
     private fun CryptoRecordEntity.toModel(gson: Gson) = CryptoRecord(
         id = id,
+        recordType = recordType,
         packageName = packageName,
         kind = enumOf(CryptoKind::class.java, kind),
         operation = enumOf(CryptoOperation::class.java, operation),

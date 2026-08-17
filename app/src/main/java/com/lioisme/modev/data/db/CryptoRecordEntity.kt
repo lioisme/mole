@@ -4,6 +4,7 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import com.lioisme.modev.core.model.RecordTypes
 
 /**
  * 算法记录实体。BytesView 双态视图展开为独立列,枚举以名称字符串存储,堆栈以 JSON 存储。
@@ -21,6 +22,8 @@ data class CryptoRecordEntity(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "id") val id: Long = 0L,
 
+    /** 记录类型(V10,默认 crypto;未来多能力记录按此分流)。 */
+    @ColumnInfo(name = "recordType") val recordType: String = RecordTypes.CRYPTO,
     @ColumnInfo(name = "packageName") val packageName: String,
     @ColumnInfo(name = "kind") val kind: String,
     @ColumnInfo(name = "operation") val operation: String,

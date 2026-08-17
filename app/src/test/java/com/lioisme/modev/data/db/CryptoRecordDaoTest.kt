@@ -307,7 +307,11 @@ class CryptoRecordDaoTest {
             RuntimeEnvironment.getApplication(),
             ModevDatabase::class.java,
             "mig-v1.db",
-        ).addMigrations(ModevDatabase.MIGRATION_1_2, ModevDatabase.MIGRATION_2_3).build()
+        ).addMigrations(
+            ModevDatabase.MIGRATION_1_2,
+            ModevDatabase.MIGRATION_2_3,
+            ModevDatabase.MIGRATION_3_4,
+        ).build()
         val migratedDao = migrated.cryptoRecordDao()
 
         // v1 数据完整保留
@@ -373,11 +377,15 @@ class CryptoRecordDaoTest {
                 RuntimeEnvironment.getApplication(),
                 ModevDatabase::class.java,
                 "mig-v2.db",
-            ).addMigrations(ModevDatabase.MIGRATION_1_2, ModevDatabase.MIGRATION_2_3).build()
-            val migratedDao = migrated.cryptoRecordDao()
+).addMigrations(
+            ModevDatabase.MIGRATION_1_2,
+            ModevDatabase.MIGRATION_2_3,
+            ModevDatabase.MIGRATION_3_4,
+        ).build()
+        val migratedDao = migrated.cryptoRecordDao()
 
-            // v2 存量数据保留,seq 列新增且存量行为 NULL
-            val row = migratedDao.observeById(1).first()
+        // v2 存量数据保留,seq 列新增且存量行为 NULL
+        val row = migratedDao.observeById(1).first()
             assertNotNull(row)
             assertEquals("pkg.v2", row!!.packageName)
             assertEquals(null, row.seq)

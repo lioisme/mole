@@ -7,6 +7,7 @@ import com.lioisme.modev.core.util.BytesView
  *
  * @param id 宿主侧数据库主键;0 表示尚未持久化
  * @param seq 注入侧进程级单调序号(协议 v3 可靠性:宿主 ACK 与幂等去重依据;0 = 无)
+ * @param recordType 记录类型([RecordTypes],V10 起;默认 crypto,向后兼容)
  * @param packageName 目标包名
  * @param kind 算法类别
  * @param operation 操作阶段
@@ -33,6 +34,7 @@ import com.lioisme.modev.core.util.BytesView
 data class CryptoRecord(
     val id: Long = 0L,
     val seq: Long = 0L,
+    val recordType: String = RecordTypes.CRYPTO,
     val packageName: String,
     val kind: CryptoKind,
     val operation: CryptoOperation,

@@ -18,6 +18,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -95,6 +96,10 @@ fun AppsScreen(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
 
+    // 已作用域应用置顶(V10 自设置页迁入筛选菜单):AppListSettings 单一事实源,
+    // 变更即重排,跨页返回不滞留旧序。
+    val pinScoped by AppListSettings.pinScoped.collectAsStateWithLifecycle()
+
     // 搜索状态机共享封装(无参 rememberSearchBarState / 独立意图 / 唯一动画驱动 /
     // 收起后导航 / snapTo 兜底,红线全守)。T = 导航目标(应用详情 / 设置)。
     val search = rememberSearchController<AppsNavTarget>(
@@ -155,6 +160,8 @@ CollapsedSearchInput(
                                         onOnlyScopedChange = viewModel::setOnlyScoped,
                                         showSystem = state.showSystem,
                                         onShowSystemChange = viewModel::setShowSystem,
+                                        pinScoped = pinScoped,
+                                        onPinScopedChange = { AppListSettings.setPinScoped(it, context) },
                                         onOpenSettings = openSettings,
                                     )
                                 },
@@ -244,6 +251,8 @@ SearchInputField(
                             onOnlyScopedChange = viewModel::setOnlyScoped,
                             showSystem = state.showSystem,
                             onShowSystemChange = viewModel::setShowSystem,
+                            pinScoped = pinScoped,
+                            onPinScopedChange = { AppListSettings.setPinScoped(it, context) },
                             onOpenSettings = openSettings,
                         )
                     },
@@ -289,8 +298,10 @@ items(state.rows, key = { it.packageName }) { row ->
 }
 
 /**
- * 作用域筛选菜单(2026-08-16 V3):SearchBar trailingIcon 槽内,
- * 「仅已作用域」/「系统应用」Checkbox 复选 + 底部「设置」项(全局设置页唯一规范入口)。
+ * 作用域筛选菜单(2026-08-16 V3;2026-08-17 V10 置顶入菜单):
+ * SearchBar trailingIcon 槽内,
+ * 「仅已作用域」/「系统应用」Checkbox 复选 + 「已作用域应用置顶」Checkbox
+ * (V10 自设置页迁入,应用列表语境就近摆放)+ 底部「设置」项(全局设置页唯一规范入口)。
  * 有激活条件时筛选按钮 primary 着色(筛选启用指示)。
  */
 @Composable
@@ -301,6 +312,8 @@ private fun ScopeFilterMenu(
     onOnlyScopedChange: (Boolean) -> Unit,
     showSystem: Boolean,
     onShowSystemChange: (Boolean) -> Unit,
+    pinScoped: Boolean,
+    onPinScopedChange: (Boolean) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     Box {
@@ -330,6 +343,21 @@ private fun ScopeFilterMenu(
                 leadingIcon = { Checkbox(checked = showSystem, onCheckedChange = null) },
                 onClick = {
                     onShowSystemChange(!showSystem)
+                    onExpandedChange(false)
+                },
+            )
+            HorizontalDivider()
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.settings_pin_scoped), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Default.PushPin,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                },
+                onClick = {
+                    onPinScopedChange(!pinScoped)
                     onExpandedChange(false)
                 },
             )

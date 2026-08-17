@@ -1,7 +1,8 @@
 package com.lioisme.modev.core.model
 
 /**
- * 算法捕获配置。注入进程按包名持有各自配置,宿主 App 通过通道推送更新。
+ * 全局算法捕获配置(V10:全应用共享一份,与包名解耦)。
+ * 宿主 App 持久化于 `switch_global` 并经通道推送,注入进程实时读取更新。
  */
 data class HookSwitch(
     val messageDigest: Boolean = true,
@@ -15,6 +16,8 @@ data class HookSwitch(
     val keyAgreement: Boolean = true,
     val random: Boolean = true,
     val base64: Boolean = false,
+    /** WebView JS 加解密监听(WebCrypto / CryptoJS / JSEncrypt,V12 起;默认关,同 base64 先例)。 */
+    val webView: Boolean = false,
     val logStack: Boolean = true,
     val maxStackDepth: Int = 24,
     /** 单字段字节上限(全量捕获保险丝);0 表示无限。 */
@@ -29,7 +32,7 @@ data class HookSwitch(
     /** 是否存在任何需要 Hook 的类别。 */
     val anyEnabled: Boolean
         get() = messageDigest || cipher || mac || signature || keyParam || keyGeneration ||
-            keyFactory || keyStore || keyAgreement || random || base64
+            keyFactory || keyStore || keyAgreement || random || base64 || webView
 
     fun enabled(kind: CryptoKind): Boolean = when (kind) {
         CryptoKind.MESSAGE_DIGEST -> messageDigest
@@ -43,6 +46,7 @@ data class HookSwitch(
         CryptoKind.KEY_AGREEMENT -> keyAgreement
         CryptoKind.RANDOM -> random
         CryptoKind.BASE64 -> base64
+        CryptoKind.WEB_CRYPTO -> webView
     }
 
     companion object {

@@ -19,21 +19,21 @@ object RemotePrefsBridge {
     const val TOKEN_KEY = "token"
     const val KEY_SWITCH_PREFIX = "switch_"
 
-    /** ��ǰ���õĿ�ܷ���(�ɿ� = ���ִ���ܷ���)�� */
-    val serviceFlow: StateFlow<XposedService?> = FrameworkBridge.serviceFlow
+    /** 当前可用的框架服务(可空 = 无现代框架服务;公开为 Any? 防 legacy 类解析,见 FrameworkBridge)。 */
+    val serviceFlow: StateFlow<Any?> = FrameworkBridge.serviceFlow
 
     private val registered = AtomicBoolean(false)
 
-    /** �ݵ�ע��(�ظ����ð�ȫ,���״���Ч)�� */
+    /** 幂等注册(重复调用安全,仅首次生效)。 */
     fun ensureRegistered() {
-        // ͳһ�� FrameworkBridge ע�� XposedServiceHelper ������
-        // (libxposed-service ���������� 1 �� listener,�����˸��ŵ��)
+        // 统一走 FrameworkBridge 注册 XposedServiceHelper 监听
+        // (libxposed-service 库内限制每进程 1 个 listener,避免重复注册)
         if (registered.getAndSet(true)) return
         FrameworkBridge.ensureRegistered()
     }
 
-    /** ��ǰ���̵Ŀ�ܷ���(�ɿ�)�� */
-    fun currentService(): XposedService? = FrameworkBridge.serviceFlow.value
+    /** 当前进程的框架服务(可空);as? 对缺失类返回 null,legacy 安全。 */
+    fun currentService(): XposedService? = FrameworkBridge.serviceFlow.value as? XposedService
 
     /** 当前进程可用的远程偏好;无服务或访问失败时返回 null。 */
     fun prefs(): SharedPreferences? =
@@ -42,6 +42,6 @@ object RemotePrefsBridge {
     /** 握手令牌(host 生成写入;无服务时 null)。 */
     fun token(): String? = prefs()?.getString(TOKEN_KEY, null)
 
-    /** 包名 → 远程配置 key。 */
-    fun switchKey(packageName: String): String = KEY_SWITCH_PREFIX + packageName
+    /** 全局捕获配置键(V10):配置与包名解耦,全应用共享一份。 */
+    const val GLOBAL_SWITCH_KEY = KEY_SWITCH_PREFIX + "global"
 }

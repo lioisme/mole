@@ -1,4 +1,4 @@
-package com.lioisme.modev.ui.apps
+package com.lioisme.modev.ui.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,12 +12,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.GppBad
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TextFields
@@ -30,13 +31,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,60 +41,42 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoKind
-import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.components.SettingsToggleItem
 
 /**
- * 捕获设置页(2026-08-17 V9 分组,全量捕获对齐):
- * 从算法记录列表页的「捕获设置」入口进入,单一职责 = 该应用的算法捕获开关
- * (11 类算法 + 记录堆栈 + 单字段上限 + 忽略栈前缀)+ 危险操作(移出作用域 / 清空该应用日志,均带确认)。
- * 卡片按功能域分组(SettingsSection 标题):「算法捕获」11 类开关 /
- * 「记录选项」堆栈开关 + 上限 + 忽略前缀 / 危险区(errorContainer 块,默认全显示)。
- * 与算法记录列表页共享同一 [AlgorithmListViewModel] 实例(ModevNav 同 key),
- * 开关状态 / 作用域 / 操作消息单一数据源;返回 = 弹栈(过导航门控)。
+ * 捕获设置页(V10 全局化,自设置页「功能」区入口):
+ * 全局算法捕获开关(11 类)+ 记录选项(记录堆栈 / 单字段字节上限 / 忽略栈前缀)。
+ * 单一事实源 = SettingsRepository.globalSwitch(镜像 switch_global,
+ * 读优先已注入作用域客户端,无则回退本地;变更经 ConfigServer 广播全部客户端,
+ * 载荷带会话包名、协议兼容)。
+ * 应用级危险操作(移出作用域 / 清空该应用日志)已归位应用记录页(V10)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CaptureSettingsScreen(
-    viewModel: AlgorithmListViewModel,
+    viewModel: CaptureSettingsViewModel,
     onBack: () -> Unit,
 ) {
-    val snackbarHostState = remember { SnackbarHostState() }
-    val context = LocalContext.current
-    val scopeState by viewModel.scopeState.collectAsStateWithLifecycle()
     val switch by viewModel.switchState.collectAsStateWithLifecycle()
-    val scoped = (scopeState as? ScopeState.Ready)?.isScoped(viewModel.packageName) == true
 
     var showMaxBytesDialog by remember { mutableStateOf(false) }
     var showIgnoreStackDialog by remember { mutableStateOf(false) }
-    var pendingDanger by remember { mutableStateOf<DangerAction?>(null) }
-
-    LaunchedEffect(viewModel.messages) {
-        viewModel.messages.collect { message ->
-            snackbarHostState.showSnackbar(
-                context.getString(message.resId, *message.args.toTypedArray())
-            )
-        }
-    }
 
     Scaffold(
         topBar = {
             ModevTopBar(
-                title = stringResource(R.string.detail_tab_settings),
+                title = stringResource(R.string.capture_settings_title),
                 onBack = onBack,
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
@@ -172,6 +151,12 @@ fun CaptureSettingsScreen(
                         checked = switch.enabled(CryptoKind.BASE64),
                         onCheckedChange = { on -> viewModel.setSwitch { it.copy(base64 = on) } },
                     )
+                    SwitchRowItem(
+                        icon = Icons.Filled.Public,
+                        title = stringResource(R.string.switch_webview),
+                        checked = switch.enabled(CryptoKind.WEB_CRYPTO),
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(webView = on) } },
+                    )
                 }
             }
             item(key = "record-options") {
@@ -199,22 +184,6 @@ fun CaptureSettingsScreen(
                     )
                 }
             }
-            if (scoped) {
-                item(key = "remove-scope") {
-                    DangerBlock(
-                        icon = Icons.Filled.GppBad,
-                        text = stringResource(R.string.detail_remove_scope),
-                        onClick = { pendingDanger = DangerAction.REMOVE_SCOPE },
-                    )
-                }
-            }
-            item(key = "clear-logs") {
-                DangerBlock(
-                    icon = Icons.Filled.Delete,
-                    text = stringResource(R.string.detail_clear_logs),
-                    onClick = { pendingDanger = DangerAction.CLEAR_LOGS },
-                )
-            }
         }
     }
 
@@ -239,44 +208,7 @@ fun CaptureSettingsScreen(
             onDismiss = { showIgnoreStackDialog = false },
         )
     }
-
-    pendingDanger?.let { danger ->
-        AlertDialog(
-            onDismissRequest = { pendingDanger = null },
-            icon = { Icon(Icons.Filled.GppBad, null) },
-            title = { Text(stringResource(R.string.danger_title)) },
-            text = {
-                Text(
-                    stringResource(
-                        when (danger) {
-                            DangerAction.REMOVE_SCOPE -> R.string.danger_remove_scope_msg
-                            DangerAction.CLEAR_LOGS -> R.string.danger_clear_logs_msg
-                        },
-                        viewModel.packageName,
-                    )
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    when (danger) {
-                        DangerAction.REMOVE_SCOPE -> viewModel.removeScope()
-                        DangerAction.CLEAR_LOGS -> viewModel.clearLogs()
-                    }
-                    pendingDanger = null
-                }) {
-                    Text(stringResource(R.string.confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingDanger = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
-        )
-    }
 }
-
-private enum class DangerAction { REMOVE_SCOPE, CLEAR_LOGS }
 
 /** 单字段字节上限编辑(数字键盘,非负整数,0=无限)。 */
 @Composable
@@ -397,33 +329,5 @@ private fun OptionRowItem(
             style = MaterialTheme.typography.titleMedium,
             color = MaterialTheme.colorScheme.primary,
         )
-    }
-}
-
-/** 危险操作块(errorContainer 底 + onErrorContainer 文字,清空/移出作用域惯例)。 */
-@Composable
-private fun DangerBlock(
-    icon: ImageVector,
-    text: String,
-    onClick: () -> Unit,
-) {
-    Surface(
-        onClick = onClick,
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
-            Text(
-                text,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                style = MaterialTheme.typography.bodyLarge,
-            )
-        }
     }
 }

@@ -53,6 +53,26 @@ class HookSwitchTest {
     }
 
     @Test
+    fun webview_off_by_default() {
+        assertFalse(HookSwitch.DEFAULT.enabled(CryptoKind.WEB_CRYPTO))
+        assertFalse(HookSwitch.DEFAULT.webView)
+    }
+
+    @Test
+    fun webview_enabled_maps_kind_and_any() {
+        val s = HookSwitch(webView = true)
+        assertTrue(s.enabled(CryptoKind.WEB_CRYPTO))
+        assertTrue(s.anyEnabled)
+        val allOff = HookSwitch(
+            messageDigest = false, cipher = false, mac = false, signature = false,
+            keyParam = false, keyGeneration = false, keyFactory = false,
+            keyStore = false, keyAgreement = false, random = false, base64 = false,
+            webView = false,
+        )
+        assertFalse(allOff.anyEnabled)
+    }
+
+    @Test
     fun copy_preserves_unknown() {
         val s = HookSwitch(maxStackDepth = 5).copy(cipher = false)
         assertEquals(5, s.maxStackDepth)

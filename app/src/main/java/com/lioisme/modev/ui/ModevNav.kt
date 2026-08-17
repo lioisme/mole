@@ -14,11 +14,10 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.navArgument
-import com.lioisme.modev.ui.apps.AlgorithmListScreen
-import com.lioisme.modev.ui.apps.AlgorithmListViewModelFactory
+import com.lioisme.modev.ui.apps.AppRecordsScreen
+import com.lioisme.modev.ui.apps.AppRecordsViewModelFactory
 import com.lioisme.modev.ui.apps.AppsScreen
 import com.lioisme.modev.ui.apps.AppsViewModelFactory
-import com.lioisme.modev.ui.apps.CaptureSettingsScreen
 import com.lioisme.modev.ui.logs.RecordDetailScreen
 import com.lioisme.modev.ui.logs.RecordDetailViewModelFactory
 import com.lioisme.modev.ui.navigation.ModevRoutes
@@ -28,14 +27,20 @@ import com.lioisme.modev.ui.navigation.navigateGuarded
 import com.lioisme.modev.ui.navigation.popGuarded
 import com.lioisme.modev.ui.navigation.popWhenReady
 import com.lioisme.modev.ui.navigation.slideComposable
+import com.lioisme.modev.ui.settings.CaptureSettingsScreen
+import com.lioisme.modev.ui.settings.CaptureSettingsViewModelFactory
+import com.lioisme.modev.ui.settings.DataSettingsScreen
+import com.lioisme.modev.ui.settings.DataSettingsViewModelFactory
+import com.lioisme.modev.ui.settings.DiagnosticsScreen
+import com.lioisme.modev.ui.settings.DiagnosticsViewModelFactory
 import com.lioisme.modev.ui.settings.SettingsScreen
 import com.lioisme.modev.ui.settings.SettingsViewModelFactory
-import kotlinx.coroutines.delay
 
 /**
- * 单栈导航宿主(2026-08-16 V4,五界面收敛):
- * 信息架构 = 应用列表(根页) → 算法记录列表 → 算法详情 + 捕获设置(每应用,
- * 记录列表入口进入)+ 全局设置(设置入口 = 应用列表筛选菜单底部,见 AppsScreen)。
+ * 单栈导航宿主(2026-08-16 V4,五界面收敛;2026-08-17 V10 设置分级):
+ * 信息架构 = 应用列表(根页) → 应用记录(每应用,含应用级危险操作)→ 记录详情;
+ * 设置页 = 通用设置,入口 = 应用列表筛选菜单底部;二级设置页(捕获设置 / 数据管理 /
+ * 服务与诊断)经设置页进入(捕获设置 V10 全局化)。
  * 全部目的地 slideComposable(编译器层杜绝 fade)+ 返回键统一过门控。
  * 根页(APPS)空闲返回抛回系统退出;次级页返回一律 popGuarded 回退上级。
  */
@@ -58,16 +63,13 @@ fun ModevNavHost(navController: NavHostController) {
         navController.drainNavigationQueue()
     }
 
-    // 作用域前台同步:进入 RESUMED 立即刷新 + 每 5s 轮询,
-    // 覆盖框架侧(LSPosed/Vector 管理器)勾选变化,UI 勾选态始终与框架一致;
-    // 退后台自动取消,无后台开销。
+    // 作用域前台同步(V10 稳态状态流):进入 RESUMED 立即刷新 + 低频静默兜底。
+    // 刷新经内容判等:无变化不发射、不产生 Connecting 中间态 → UI 零闪烁零重组;
+    // 退后台自动取消,无后台开销。同步策略封装于 ScopeRepository.syncForeground。
     val lifecycleOwner = LocalLifecycleOwner.current
     LaunchedEffect(lifecycleOwner) {
         lifecycleOwner.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            while (true) {
-                app.container.scopeRepository.refresh()
-                delay(SCOPE_POLL_INTERVAL_MS)
-            }
+            app.container.scopeRepository.syncForeground()
         }
     }
 
@@ -86,7 +88,7 @@ fun ModevNavHost(navController: NavHostController) {
             AppsScreen(
                 viewModel = viewModel(factory = AppsViewModelFactory(app.container)),
                 onOpen = { pkg ->
-                    navController.navigateGuarded(ModevRoutes.algorithmList(pkg))
+                    navController.navigateGuarded(ModevRoutes.appRecords(pkg))
                 },
                 onOpenSettings = {
                     navController.navigateGuarded(ModevRoutes.SETTINGS)
@@ -94,7 +96,7 @@ fun ModevNavHost(navController: NavHostController) {
             )
         }
         slideComposable(
-            route = ModevRoutes.ALGORITHM_LIST,
+            route = ModevRoutes.APP_RECORDS,
             arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
         ) { entry ->
             val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
@@ -103,40 +105,16 @@ fun ModevNavHost(navController: NavHostController) {
                 return@slideComposable
             }
             BackGuarded(navController) {
-                AlgorithmListScreen(
+                AppRecordsScreen(
                     viewModel = viewModel(
-                        key = "algo-list-$pkg",
-                        factory = AlgorithmListViewModelFactory(pkg, app.container),
+                        key = "records-$pkg",
+                        factory = AppRecordsViewModelFactory(pkg, app.container),
                     ),
                     onBack = { navController.popGuarded() },
-                    onOpenCaptureSettings = {
-                        navController.navigateGuarded(ModevRoutes.captureSettings(pkg))
-                    },
                     onOpenRecord = { id ->
                         navController.navigateGuarded(ModevRoutes.recordDetail(id))
                     },
                     onLaunch = launchApp,
-                )
-            }
-        }
-        slideComposable(
-            route = ModevRoutes.CAPTURE_SETTINGS,
-            arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
-        ) { entry ->
-            val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
-            if (pkg.isBlank()) {
-                LaunchedEffect(Unit) { navController.popWhenReady() }
-                return@slideComposable
-            }
-            BackGuarded(navController) {
-                CaptureSettingsScreen(
-                    // 与算法记录列表页共享同一 ViewModel 实例(同 key):
-                    // 开关状态/作用域/操作消息单一数据源,两页同步。
-                    viewModel = viewModel(
-                        key = "algo-list-$pkg",
-                        factory = AlgorithmListViewModelFactory(pkg, app.container),
-                    ),
-                    onBack = { navController.popGuarded() },
                 )
             }
         }
@@ -160,6 +138,39 @@ fun ModevNavHost(navController: NavHostController) {
                 SettingsScreen(
                     viewModel = viewModel(factory = SettingsViewModelFactory(app.container)),
                     onBack = { navController.popGuarded() },
+                    onOpenCaptureSettings = {
+                        navController.navigateGuarded(ModevRoutes.CAPTURE_SETTINGS)
+                    },
+                    onOpenDataSettings = {
+                        navController.navigateGuarded(ModevRoutes.DATA_SETTINGS)
+                    },
+                    onOpenDiagnostics = {
+                        navController.navigateGuarded(ModevRoutes.DIAGNOSTICS_SETTINGS)
+                    },
+                )
+            }
+        }
+        slideComposable(route = ModevRoutes.CAPTURE_SETTINGS) {
+            BackGuarded(navController) {
+                CaptureSettingsScreen(
+                    viewModel = viewModel(factory = CaptureSettingsViewModelFactory(app.container)),
+                    onBack = { navController.popGuarded() },
+                )
+            }
+        }
+        slideComposable(route = ModevRoutes.DATA_SETTINGS) {
+            BackGuarded(navController) {
+                DataSettingsScreen(
+                    viewModel = viewModel(factory = DataSettingsViewModelFactory(app.container)),
+                    onBack = { navController.popGuarded() },
+                )
+            }
+        }
+        slideComposable(route = ModevRoutes.DIAGNOSTICS_SETTINGS) {
+            BackGuarded(navController) {
+                DiagnosticsScreen(
+                    viewModel = viewModel(factory = DiagnosticsViewModelFactory(app.container)),
+                    onBack = { navController.popGuarded() },
                 )
             }
         }
@@ -179,6 +190,3 @@ private fun BackGuarded(
     BackHandler(enabled = true) { navController.popGuarded() }
     content()
 }
-
-/** 作用域前台轮询间隔:5s(与框架侧变更感知的时效性折中,退后台即停)。 */
-private const val SCOPE_POLL_INTERVAL_MS = 5_000L

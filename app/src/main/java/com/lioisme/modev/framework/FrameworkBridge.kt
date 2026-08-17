@@ -16,8 +16,14 @@ object FrameworkBridge {
 
     private val _service = MutableStateFlow<XposedService?>(null)
 
-    /** 当前可用的框架服务(可空 = 无现代框架服务)。 */
-    val serviceFlow: StateFlow<XposedService?> = _service
+    /**
+     * 当前可用的框架服务。
+     * 公开类型收敛为 [Any?]:调用方 lambda 若在签名中携带 `XposedService?`,
+     * 生成的 checkcast 会在 legacy 变体(运行时缺 service 库)首次发射即抛
+     * NoClassDefFoundError——即使值为 null。消费方必须在非空分支内自行
+     * `as XposedService` 转型,保证 legacy 空值路径零类解析。
+     */
+    val serviceFlow: StateFlow<Any?> = _service
 
     @Volatile
     private var registered = false

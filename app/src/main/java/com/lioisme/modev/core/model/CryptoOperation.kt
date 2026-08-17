@@ -60,4 +60,10 @@ enum class CryptoOperation {
     /** Base64 编码 / 解码 */
     ENCODE,
     DECODE,
+
+    /** WebView JS 侧加密(WebCrypto encrypt / CryptoJS encrypt / JSEncrypt encrypt) */
+    ENCRYPT,
+
+    /** WebView JS 侧解密(WebCrypto decrypt / CryptoJS decrypt / JSEncrypt decrypt) */
+    DECRYPT,
 }

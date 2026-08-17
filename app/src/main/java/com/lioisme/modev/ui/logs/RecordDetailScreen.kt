@@ -2,6 +2,13 @@ package com.lioisme.modev.ui.logs
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -44,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -58,6 +66,8 @@ import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.util.BytesView
+import com.lioisme.modev.core.util.ChunkedText
+import com.lioisme.modev.core.util.LineEstimate
 import com.lioisme.modev.data.repo.LogRepository
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.TipIconButton
@@ -78,7 +88,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * 记录详情页(2026-08-17 V7 信息架构收敛,对齐 LIDE LogcatDetailScreen 三态范式):
+ * 记录详情页(2026-08-17 V7 信息架构收敛,对齐 LIDE LogcatDetailScreen 三态范式;
+ * V11 折叠语义 + 性能): 
  * - 顶栏 = ModevTopBar(返回 + 标题=算法名,标题恒单行省略)+ 上一条/下一条/更多
  *   三个 TipIconButton(长按 tooltip);「更多」菜单唯一功能 = 导出 JSON
  *   (SAF CreateDocument 落盘,专业文件格式,后台构建 + 写流,失败 snackbar 兜底);
@@ -86,10 +97,11 @@ import kotlinx.coroutines.withContext
  * - 三态契约:Loading 转圈 / Loaded 内容 / Failed(记录被容量清理或参数非法)
  *   error 文案 + 重试 Button,禁止误用「无结果」或无限转圈;
  * - 元数据 MetadataRow(label 定宽 + Monospace 值,类别行带语义色);
- * - 字节区块:预览 + 渐进披露(展开/收起),展开受屏幕渲染上限约束,
- *   超出提示「已省略 N 字节,导出获取完整数据」——大数据不闪退的核心;
- * - 列表虚拟化:LazyColumn 逐 Section item,仅组合可视区块;
- * - 密钥不可导出提示走主题 tertiary token。
+ * - 字节区块(V11):仅超出行数阈值默认收起(≤ 阈值行数全量展示),折叠预览与
+ *   判定共用同一行数阈值;按钮恒显——折叠「展开」/ 未折叠「收起」;展开态
+ *   hex 与 text 均按 4K 字符/块惰性组合([ChunkedText]),无巨型单 Text、无
+ *   主线程 chunk 物化——大数据不闪退、滚动不卡顿的核心;
+ * - 列表虚拟化:LazyColumn 逐 Section item,仅组合可视区块。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -243,6 +255,9 @@ private fun FailedState(innerPadding: PaddingValues, onRetry: () -> Unit) {
  * 详情内容:LazyColumn 逐区块虚拟化(元数据/分隔线/各字节区块/堆栈),
  * 仅组合可视区块;字节区块展开态由宿主持有,展开数据按块惰性组合
  * ([byteSectionItems])——大数据记录不闪退、不冻结主线程。
+ * V11 折叠语义:仅超出行数阈值([LineEstimate])的区块默认收起,否则全量展示;
+ * 折叠态预览与判定共用同一行数阈值;用户显式折叠/展开经 userToggledFold
+ * (XOR 反转生效态),key=record.id 切记录自动重置。
  * 完整数据获取统一走顶栏「更多 → 导出 JSON」(复制能力已收敛)。
  */
 @Composable
@@ -250,11 +265,16 @@ private fun LoadedContent(
     record: CryptoRecord,
     innerPadding: PaddingValues,
 ) {
-    // 各字节区块展开态(LazyColumn 分块条目需在此读取;List<String> 可 saveable)。
-    var expandedSections by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
-    fun toggleSection(key: String) {
-        expandedSections = if (key in expandedSections) expandedSections - key else expandedSections + key
+    // V11 折叠状态机:用户显式反转默认态的单列表(XOR 语义),List<String> 可 saveable;
+    // key=record.id —— 上/下条导航后旧记录的折叠态不复用(缺口 3 修复)。
+    var userToggledFold by rememberSaveable(record.id) { mutableStateOf<List<String>>(emptyList()) }
+    fun toggleFold(key: String) {
+        userToggledFold = if (key in userToggledFold) userToggledFold - key else userToggledFold + key
     }
+
+    // 行数阈值估算(字体/屏宽驱动,与 preview 截断同源,remember 缓存)。
+    val metrics = rememberFoldMetrics()
+
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
@@ -270,9 +290,9 @@ private fun LoadedContent(
                 sectionKey = "key",
                 titleRes = R.string.section_key,
                 view = key,
-                exportableNote = record.keyExportable,
-                expanded = "key" in expandedSections,
-                onToggleExpanded = { toggleSection("key") },
+                metrics = metrics,
+                folded = needsFold(key, metrics) xor ("key" in userToggledFold),
+                onToggleFolded = { toggleFold("key") },
             )
         }
         record.keyAlias?.let { alias ->
@@ -285,9 +305,9 @@ private fun LoadedContent(
                 sectionKey = "iv",
                 titleRes = R.string.section_iv,
                 view = iv,
-                exportableNote = false,
-                expanded = "iv" in expandedSections,
-                onToggleExpanded = { toggleSection("iv") },
+                metrics = metrics,
+                folded = needsFold(iv, metrics) xor ("iv" in userToggledFold),
+                onToggleFolded = { toggleFold("iv") },
             )
         }
         record.salt?.let { salt ->
@@ -295,9 +315,9 @@ private fun LoadedContent(
                 sectionKey = "salt",
                 titleRes = R.string.section_salt,
                 view = salt,
-                exportableNote = false,
-                expanded = "salt" in expandedSections,
-                onToggleExpanded = { toggleSection("salt") },
+                metrics = metrics,
+                folded = needsFold(salt, metrics) xor ("salt" in userToggledFold),
+                onToggleFolded = { toggleFold("salt") },
             )
         }
         record.aad?.let { aad ->
@@ -305,9 +325,9 @@ private fun LoadedContent(
                 sectionKey = "aad",
                 titleRes = R.string.section_aad,
                 view = aad,
-                exportableNote = false,
-                expanded = "aad" in expandedSections,
-                onToggleExpanded = { toggleSection("aad") },
+                metrics = metrics,
+                folded = needsFold(aad, metrics) xor ("aad" in userToggledFold),
+                onToggleFolded = { toggleFold("aad") },
             )
         }
         record.publicKey?.let { pk ->
@@ -315,9 +335,9 @@ private fun LoadedContent(
                 sectionKey = "publicKey",
                 titleRes = R.string.section_public_key,
                 view = pk,
-                exportableNote = false,
-                expanded = "publicKey" in expandedSections,
-                onToggleExpanded = { toggleSection("publicKey") },
+                metrics = metrics,
+                folded = needsFold(pk, metrics) xor ("publicKey" in userToggledFold),
+                onToggleFolded = { toggleFold("publicKey") },
             )
         }
         record.input?.let { input ->
@@ -325,9 +345,9 @@ private fun LoadedContent(
                 sectionKey = "input",
                 titleRes = R.string.section_input,
                 view = input,
-                exportableNote = false,
-                expanded = "input" in expandedSections,
-                onToggleExpanded = { toggleSection("input") },
+                metrics = metrics,
+                folded = needsFold(input, metrics) xor ("input" in userToggledFold),
+                onToggleFolded = { toggleFold("input") },
             )
         }
         record.output?.let { output ->
@@ -335,9 +355,9 @@ private fun LoadedContent(
                 sectionKey = "output",
                 titleRes = R.string.section_output,
                 view = output,
-                exportableNote = false,
-                expanded = "output" in expandedSections,
-                onToggleExpanded = { toggleSection("output") },
+                metrics = metrics,
+                folded = needsFold(output, metrics) xor ("output" in userToggledFold),
+                onToggleFolded = { toggleFold("output") },
             )
         }
         record.params?.takeIf { it.isNotEmpty() }?.let { params ->
@@ -360,51 +380,55 @@ private fun LoadedContent(
                 )
             }
             items(record.stack.size, key = { index -> "stack-frame-$index" }) { index ->
-                Text(
-                    record.stack[index],
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                SelectionContainer {
+                    Text(
+                        record.stack[index],
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
         item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
     }
 }
 
-/** 元数据块:类别/操作/时间/上下文/方向/提供者/进程/验签/密钥可导出。 */
+/** 元数据块:类别/操作/时间/上下文/方向/提供者/进程/验签/密钥可导出(V12 起整块可长按复制)。 */
 @Composable
 private fun MetadataBlock(record: CryptoRecord) {
-    Column {
-        Spacer(Modifier.height(8.dp))
-        MetadataRow(
-            stringResource(R.string.meta_kind),
-            stringResource(kindLabelRes(record.kind)),
-            valueColor = kindColor(record.kind),
-        )
-        MetadataRow(stringResource(R.string.meta_operation), operationLabel(record.operation))
-        MetadataRow(stringResource(R.string.meta_time), detailTimeFmt().format(Date(record.timestamp)))
-        MetadataRow(stringResource(R.string.meta_context), "#${record.contextId}")
-        record.direction?.let {
-            MetadataRow(stringResource(R.string.meta_direction), directionLabel(it))
-        }
-        record.provider?.let {
-            MetadataRow(stringResource(R.string.meta_provider), it)
-        }
-        record.processName?.let {
-            MetadataRow(stringResource(R.string.meta_process), it)
-        }
-        record.verifyResult?.let {
+    SelectionContainer {
+        Column {
+            Spacer(Modifier.height(8.dp))
             MetadataRow(
-                stringResource(R.string.meta_verify),
-                stringResource(if (it) R.string.verify_ok else R.string.verify_fail),
-                valueColor = if (it) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                stringResource(R.string.meta_kind),
+                stringResource(kindLabelRes(record.kind)),
+                valueColor = kindColor(record.kind),
             )
+            MetadataRow(stringResource(R.string.meta_operation), operationLabel(record.operation))
+            MetadataRow(stringResource(R.string.meta_time), detailTimeFmt().format(Date(record.timestamp)))
+            MetadataRow(stringResource(R.string.meta_context), "#${record.contextId}")
+            record.direction?.let {
+                MetadataRow(stringResource(R.string.meta_direction), directionLabel(it))
+            }
+            record.provider?.let {
+                MetadataRow(stringResource(R.string.meta_provider), it)
+            }
+            record.processName?.let {
+                MetadataRow(stringResource(R.string.meta_process), it)
+            }
+            record.verifyResult?.let {
+                MetadataRow(
+                    stringResource(R.string.meta_verify),
+                    stringResource(if (it) R.string.verify_ok else R.string.verify_fail),
+                    valueColor = if (it) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                )
+            }
+            if (record.keyExportable) {
+                MetadataRow(stringResource(R.string.meta_key_exportable), stringResource(R.string.confirm))
+            }
+            Spacer(Modifier.height(12.dp))
         }
-        if (record.keyExportable) {
-            MetadataRow(stringResource(R.string.meta_key_exportable), stringResource(R.string.confirm))
-        }
-        Spacer(Modifier.height(12.dp))
     }
 }
 
@@ -434,19 +458,27 @@ private fun MetadataRow(
 }
 
 /**
- * 字节区块(2026-08-18 V7 惰性分块;V7 复制收敛):本组件只渲染区块头部
- * (标题)与底部(字节数/展开收起/导出提示);展开态数据由宿主 LazyColumn
- * 经 [byteSectionItems] 按块惰性组合——消灭巨型 Text,修复实机展开
- * 100K 字符主线程 26s 冻结(ANR)问题。
- * 展开状态由宿主持有([LoadedContent]),跨重建经 rememberSaveable 存活。
+ * 字节区块头部(2026-08-18 V7 惰性分块;2026-08-17 V11 折叠语义 + text 治理;
+ * 2026-08-17 V12 动效 + 复制):
+ * - 折叠态:预览(文本截断 + hex 截断,均 ≤ 行数阈值字符)包于 SelectionContainer;
+ * - 未折叠小数据(未超行数阈值):全量直接渲染于头部(≤ 阈值行数,布局安全);
+ * - 折叠预览与内联全量互斥包于 AnimatedVisibility(V12):展开/收起为高度连续动画,
+ *   footer 与下方区块平滑随动——无瞬时跳位、无错位;按钮文案为状态即时翻转;
+ * - 未折叠大数据:头部无内容,全量由宿主 LazyColumn 经 [byteSectionItems]
+ *   按 [ChunkedText] 惰性组合(hex 与 text 双路,逐块 SelectionContainer 可长按复制);
+ * - footer:字节数(含捕获侧截断标记)+ 折叠切换按钮(折叠→「展开」/ 展开→「收起」)。
+ * V11 起移除 key_not_exportable 提示(语义错误 + 冗余,导出性由元数据行承载)。
+ * 折叠状态由宿主持有([LoadedContent]),跨重建经 rememberSaveable 存活。
  */
 @Composable
-internal fun ByteSection(
+internal fun ByteSectionHeader(
     title: String,
     view: BytesView,
-    exportableNote: Boolean,
-    expanded: Boolean,
-    onToggleExpanded: () -> Unit,
+    folded: Boolean,
+    inlineContent: Boolean,
+    onToggleFolded: () -> Unit,
+    previewHexChars: Int,
+    previewTextChars: Int,
 ) {
     Spacer(Modifier.height(12.dp))
     Text(
@@ -456,15 +488,42 @@ internal fun ByteSection(
         color = MaterialTheme.colorScheme.primary,
     )
     Spacer(Modifier.height(4.dp))
-    SelectionContainer {
-        Column {
-            view.text?.let { text ->
-                Text(text, style = MaterialTheme.typography.bodyMedium)
-                Spacer(Modifier.height(4.dp))
-            }
-            if (!expanded) {
+    // V12 动效:折叠预览 ↔ 内联全量互斥可见,高度连续过渡(规格 D2,单一事实源常量)。
+    AnimatedVisibility(
+        visible = folded,
+        enter = SectionEnter,
+        exit = SectionExit,
+    ) {
+        // 折叠预览:文本 + hex 均截断至行数阈值(渐进披露,滚动零负担)。
+        SelectionContainer {
+            Column {
+                view.text?.let { text ->
+                    Text(textPreviewOf(text, previewTextChars), style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(4.dp))
+                }
                 Text(
-                    view.preview(),
+                    view.preview(previewHexChars),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+    AnimatedVisibility(
+        visible = !folded && inlineContent,
+        enter = SectionEnter,
+        exit = SectionExit,
+    ) {
+        // 未折叠小数据(未超行数阈值):全量展示,单节点布局安全。
+        SelectionContainer {
+            Column {
+                view.text?.let { text ->
+                    Text(text, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(4.dp))
+                }
+                Text(
+                    view.hex,
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -480,55 +539,119 @@ internal fun ByteSection(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f, fill = false),
         )
-        TextButton(onClick = onToggleExpanded) {
-            Text(stringResource(if (expanded) R.string.section_collapse else R.string.section_expand))
+        TextButton(onClick = onToggleFolded) {
+            Text(stringResource(if (folded) R.string.section_expand else R.string.section_collapse))
         }
-    }
-    if (!exportableNote) {
-        Text(
-            stringResource(R.string.key_not_exportable),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.tertiary,
-        )
     }
 }
 
-/** 展开态 hex 单块字符数(4K ≈ 96 行,单块布局/绘制毫秒级,与折叠预览上限同值)。 */
-internal const val EXPAND_CHUNK_CHARS = 4096
+/** 文本折叠预览:超限截断加省略号,不超全量原样返回。 */
+internal fun textPreviewOf(text: String, maxChars: Int): String =
+    if (text.length <= maxChars) text else text.take(maxChars) + "…"
 
 /**
  * 在宿主 LazyColumn 中组合字节区块全部条目:头部单条 + 展开态分块条目。
- * 分块惰性:仅可视块被组合,滚动按需创建——无巨型 Text、无长帧。
+ * 分块惰性:仅可视块被组合,滚动按需创建([ChunkedText] O(1) 取块,零物化)
+ * ——无巨型 Text、无长帧、无主线程 chunk 列表重复分配(修 V11 根因 A/B)。
+ * V12 动效:分块逐块 [Modifier.animateItem()](出现淡入 + 位移 spring)——插入/移除
+ * 平滑位移、滚动锚点稳定,无瞬时跳位;逐块 SelectionContainer 支持长按复制。
  */
 internal fun LazyListScope.byteSectionItems(
     sectionKey: String,
     titleRes: Int,
     view: BytesView,
-    exportableNote: Boolean,
-    expanded: Boolean,
-    onToggleExpanded: () -> Unit,
+    metrics: FoldMetrics,
+    folded: Boolean,
+    onToggleFolded: () -> Unit,
 ) {
     item(key = "section-$sectionKey-header") {
-        ByteSection(
+        ByteSectionHeader(
             title = stringResource(titleRes),
             view = view,
-            exportableNote = exportableNote,
-            expanded = expanded,
-            onToggleExpanded = onToggleExpanded,
+            folded = folded,
+            inlineContent = !needsFold(view, metrics),
+            onToggleFolded = onToggleFolded,
+            previewHexChars = LineEstimate.collapsedPreviewChars(view.hex.length, metrics.charsPerLineHex),
+            previewTextChars = LineEstimate.collapsedPreviewChars(view.text?.length ?: 0, metrics.charsPerLineText),
         )
     }
-    if (expanded) {
-        val chunks = view.hex.chunked(EXPAND_CHUNK_CHARS)
-        items(chunks.size, key = { i -> "section-$sectionKey-chunk-$i" }) { i ->
-            Text(
-                chunks[i],
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+    if (!folded && needsFold(view, metrics)) {
+        view.text?.let { text ->
+            val textChunks = ChunkedText(text)
+            items(textChunks.size, key = { i -> "section-$sectionKey-text-chunk-$i" }) { i ->
+                SelectionContainer {
+                    Text(
+                        textChunks[i],
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.animateItem(),
+                    )
+                }
+            }
+        }
+        val hexChunks = ChunkedText(view.hex)
+        items(hexChunks.size, key = { i -> "section-$sectionKey-hex-chunk-$i" }) { i ->
+            SelectionContainer {
+                Text(
+                    hexChunks[i],
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.animateItem(),
+                )
+            }
         }
     }
 }
+
+/**
+ * 行数阈值估算结果(单一事实源,一次组合计算,全区块共用):
+ * 每行字符数按容器宽度(屏宽 − 详情页水平内边距)与字号估算,mono/常规分系数。
+ */
+internal data class FoldMetrics(
+    val charsPerLineHex: Int,
+    val charsPerLineText: Int,
+)
+
+/** 是否超出行数阈值(hex 驱动;text ≤ bytes ≤ hex/2,hex 不超则 text 必不超)。 */
+internal fun needsFold(view: BytesView, metrics: FoldMetrics): Boolean =
+    LineEstimate.needsFold(view.hex.length, metrics.charsPerLineHex)
+
+/** 组合期估算(字体字号 + 屏宽,remember 缓存,fontScale=1 时 sp≈dp)。 */
+@Composable
+internal fun rememberFoldMetrics(): FoldMetrics {
+    val config = LocalConfiguration.current
+    val containerWidth =
+        (config.screenWidthDp - DETAIL_HORIZONTAL_PADDING_DP * 2).coerceAtLeast(MIN_CONTAINER_WIDTH_DP)
+    val hexFontSp = MaterialTheme.typography.bodySmall.fontSize.value
+    val textFontSp = MaterialTheme.typography.bodyMedium.fontSize.value
+    return remember(config.screenWidthDp, hexFontSp, textFontSp) {
+        FoldMetrics(
+            charsPerLineHex = LineEstimate.charsPerLine(containerWidth.toFloat(), hexFontSp, monospace = true),
+            charsPerLineText = LineEstimate.charsPerLine(containerWidth.toFloat(), textFontSp, monospace = false),
+        )
+    }
+}
+
+/** 详情页水平内边距(与 LazyColumn contentPadding 同源)。 */
+private const val DETAIL_HORIZONTAL_PADDING_DP = 16
+
+/** 容器宽度下限兜底(极端分屏/横屏下估算不失真)。 */
+private const val MIN_CONTAINER_WIDTH_DP = 160
+
+/**
+ * 展开/收起动画规格(V12,单一事实源,插桩测试同源引用):
+ * 头部高度过渡 = [EXPAND_ANIM_MS] + FastOutSlowInEasing(Material Motion 标准曲线);
+ * 分块出现/位移 = animateItem 默认 spring(MediumLow 无回弹)。
+ */
+private const val EXPAND_ANIM_MS = 220
+
+private val SectionEnter = expandVertically(
+    animationSpec = tween(EXPAND_ANIM_MS, easing = FastOutSlowInEasing),
+) + fadeIn(tween(EXPAND_ANIM_MS))
+
+private val SectionExit = shrinkVertically(
+    animationSpec = tween(EXPAND_ANIM_MS, easing = FastOutSlowInEasing),
+) + fadeOut(tween(EXPAND_ANIM_MS))
 
 @Composable
 private fun SectionText(title: String, value: String, monospace: Boolean = false) {

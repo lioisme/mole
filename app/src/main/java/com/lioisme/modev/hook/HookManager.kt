@@ -17,6 +17,7 @@ import com.lioisme.modev.hook.hooks.MacHooker
 import com.lioisme.modev.hook.hooks.MessageDigestHooker
 import com.lioisme.modev.hook.hooks.SecureRandomHooker
 import com.lioisme.modev.hook.hooks.SignatureHooker
+import com.lioisme.modev.hook.hooks.WebViewHooker
 import java.io.File
 
 /**
@@ -80,8 +81,9 @@ object HookManager {
 
         // M3-1/M3-4: 现代变体默认配置兜底 = RemotePreferences 直读(无宿主也可用),
         // 并注册变更监听即时生效;TCP 推送仍可用(与远程值一致,且是 legacy 唯一路径)
+        // V10:配置全局唯一(switch_global),与包名解耦
         remotePrefsProvider?.invoke()?.let { remote ->
-            val key = RemotePrefsBridge.switchKey(packageName)
+            val key = RemotePrefsBridge.GLOBAL_SWITCH_KEY
             parseSwitch(remote.getString(key, null))?.let { channel.updateConfig(it) }
             runCatching {
                 remote.registerOnSharedPreferenceChangeListener { prefs, changedKey ->
@@ -108,6 +110,7 @@ object HookManager {
             KeyAgreementHooker(engine, config, tracker, sink, packageName),
             SecureRandomHooker(engine, config, tracker, sink, packageName),
             Base64Hooker(engine, config, tracker, sink, packageName),
+            WebViewHooker(engine, config, tracker, sink, packageName),
         )
         for (registrar in registrars) {
             registrar.install()

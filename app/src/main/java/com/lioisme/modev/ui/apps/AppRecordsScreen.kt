@@ -12,13 +12,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.GppBad
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -36,6 +40,7 @@ import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -70,24 +75,24 @@ import com.lioisme.modev.ui.components.kindLabelRes
 import com.lioisme.modev.ui.components.rememberSearchController
 
 /**
- * 算法记录列表页(2026-08-16 V4,五界面收敛;2026-08-17 V7 捕获设置入口入筛选菜单):
- * 点击应用进入,单一职责 = 该应用的算法记录列表。
+ * 应用记录页(2026-08-16 V3 五界面收敛;2026-08-17 V7 捕获设置入筛选菜单;
+ * V10 更名 AppRecords + 捕获设置全局化 + 应用级危险操作归位):
+ * 点击应用进入,单一职责 = 该应用的记录列表。
  * - 顶栏:CenterAlignedTopAppBar + SearchBar(折叠条,单击展开全屏 SearchView);
  *   AppBar 内仅此一个元素(硬性规范);
- * - 搜索条内仅筛选按钮(类别单选 9 项 + 底部「捕获设置」入口,KindFilterMenu,
- *   与主界面筛选菜单「设置」项同范式;有激活条件时按钮着色);
+ * - 搜索条内仅筛选按钮(类别单选 9 项,KindFilterMenu;有激活条件时按钮着色);
  * - 内容区(自顶向下,头部固定不滚动):
- *   应用头部(AppIcon 40dp + 应用名 + 状态 chips:在线/监听)+ 分页记录列表
+ *   应用头部(AppIcon 40dp + 应用名 + 状态 chips:在线/监听 + 「启动」按钮 +
+ *   「更多」菜单 = 移出作用域 / 清空该应用日志,均带确认)+ 分页记录列表
  *   (Paging + 类别筛选 + 搜索,空态/加载/重试);
  * - 返回语义:仅弹栈(过导航门控)。
  * 搜索状态机由共享封装 [rememberSearchController] 提供(红线全守)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AlgorithmListScreen(
-    viewModel: AlgorithmListViewModel,
+fun AppRecordsScreen(
+    viewModel: AppRecordsViewModel,
     onBack: () -> Unit,
-    onOpenCaptureSettings: () -> Unit,
     onOpenRecord: (Long) -> Unit,
     onLaunch: (String) -> Unit = {},
 ) {
@@ -101,6 +106,9 @@ fun AlgorithmListScreen(
     val search = rememberSearchController<Long>(onNavigate = onOpenRecord)
     var selectedKind by rememberSaveable { mutableStateOf<CryptoKind?>(null) }
     var filterMenuOpen by remember { mutableStateOf(false) }
+
+    // 应用级危险操作(移出作用域 / 清空该应用日志)确认状态
+    var pendingDanger by remember { mutableStateOf<DangerAction?>(null) }
 
     // 过滤条件变化 → ViewModel 重建 Paging 流(SQL 过滤)。
     LaunchedEffect(search.queryText, selectedKind) {
@@ -135,7 +143,6 @@ fun AlgorithmListScreen(
                                         onExpandedChange = { filterMenuOpen = it },
                                         selectedKind = selectedKind,
                                         onKindSelect = { selectedKind = it },
-                                        onOpenCaptureSettings = onOpenCaptureSettings,
                                     )
                                 },
                             )
@@ -153,10 +160,12 @@ fun AlgorithmListScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            AlgorithmListContent(
+            AppRecordsContent(
                 viewModel = viewModel,
                 records = records,
                 onLaunch = onLaunch,
+                onRemoveScope = { pendingDanger = DangerAction.REMOVE_SCOPE },
+                onClearLogs = { pendingDanger = DangerAction.CLEAR_LOGS },
                 onOpenRecord = { id ->
                     // 交互统一(折叠态直接导航——无 Dialog 可收起;
                     // 展开态先收起,导航由动画唯一驱动协程在收起完成后执行)。
@@ -196,7 +205,6 @@ fun AlgorithmListScreen(
                             onExpandedChange = { filterMenuOpen = it },
                             selectedKind = selectedKind,
                             onKindSelect = { selectedKind = it },
-                            onOpenCaptureSettings = onOpenCaptureSettings,
                         )
                     },
                 )
@@ -207,29 +215,69 @@ fun AlgorithmListScreen(
                 search.collapse()
                 focusManager.clearFocus()
             }
-            AlgorithmListContent(
+            AppRecordsContent(
                 viewModel = viewModel,
                 records = records,
                 onLaunch = onLaunch,
+                onRemoveScope = { pendingDanger = DangerAction.REMOVE_SCOPE },
+                onClearLogs = { pendingDanger = DangerAction.CLEAR_LOGS },
                 onOpenRecord = { id ->
                     search.collapseWithNavigation(id)
                 },
             )
         }
     }
+
+    pendingDanger?.let { danger ->
+        AlertDialog(
+            onDismissRequest = { pendingDanger = null },
+            icon = { Icon(Icons.Filled.GppBad, null) },
+            title = { Text(stringResource(R.string.danger_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        when (danger) {
+                            DangerAction.REMOVE_SCOPE -> R.string.danger_remove_scope_msg
+                            DangerAction.CLEAR_LOGS -> R.string.danger_clear_logs_msg
+                        },
+                        viewModel.packageName,
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    when (danger) {
+                        DangerAction.REMOVE_SCOPE -> viewModel.removeScope()
+                        DangerAction.CLEAR_LOGS -> viewModel.clearLogs()
+                    }
+                    pendingDanger = null
+                }) {
+                    Text(stringResource(R.string.confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDanger = null }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
 }
 
+private enum class DangerAction { REMOVE_SCOPE, CLEAR_LOGS }
+
 /**
- * 算法记录列表主体:固定头部(应用信息)+ 分页记录列表。
+ * 应用记录主体:固定头部(应用信息)+ 分页记录列表。
  * 头部固定不随列表滚动——AppBar 仅 SearchBar 无应用名,头部承担「当前应用」语境。
- * 捕获设置入口位于筛选菜单底部(2026-08-17 V7,与主界面「设置」项同范式)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AlgorithmListContent(
-    viewModel: AlgorithmListViewModel,
+private fun AppRecordsContent(
+    viewModel: AppRecordsViewModel,
     records: LazyPagingItems<CryptoRecord>,
     onLaunch: (String) -> Unit,
+    onRemoveScope: () -> Unit,
+    onClearLogs: () -> Unit,
     onOpenRecord: (Long) -> Unit,
 ) {
     val connected by viewModel.connected.collectAsStateWithLifecycle()
@@ -252,6 +300,9 @@ private fun AlgorithmListContent(
                 } else {
                     null
                 },
+            // 应用级危险操作(V10 从捕获设置页归位本页语境)
+            onRemoveScope = if (scoped) onRemoveScope else null,
+            onClearLogs = onClearLogs,
         )
         HorizontalDivider()
         Box(Modifier.weight(1f)) {
@@ -323,7 +374,10 @@ private fun AlgorithmListContent(
     }
 }
 
-/** 固定头部:AppIcon 40dp + 应用名(titleMedium)+ 在线/监听 chips + 「启动」按钮。 */
+/**
+ * 固定头部:AppIcon 40dp + 应用名(titleMedium)+ 在线/监听 chips + 「启动」按钮
+ * + 「更多」菜单(移出作用域 / 清空该应用日志,V10 自捕获设置页归位)。
+ */
 @Composable
 private fun AppHeaderRow(
     label: String,
@@ -332,13 +386,15 @@ private fun AppHeaderRow(
     scopeState: ScopeState,
     scoped: Boolean,
     onLaunch: (() -> Unit)? = null,
+    onRemoveScope: (() -> Unit)? = null,
+    onClearLogs: (() -> Unit)? = null,
 ) {
     Row(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         AppIcon(packageName = packageName, size = 40.dp)
         Column(Modifier.weight(1f)) {
@@ -388,12 +444,54 @@ private fun AppHeaderRow(
                 )
             }
         }
+        if (onRemoveScope != null || onClearLogs != null) {
+            var menuOpen by remember { mutableStateOf(false) }
+            Box {
+                TipIconButton(tooltip = stringResource(R.string.record_more), onClick = { menuOpen = true }) {
+                    Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.record_more))
+                }
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    if (onRemoveScope != null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.detail_remove_scope), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Filled.GppBad,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                onRemoveScope()
+                            },
+                        )
+                    }
+                    if (onClearLogs != null) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.detail_clear_logs), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Filled.Delete,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            },
+                            onClick = {
+                                menuOpen = false
+                                onClearLogs()
+                            },
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 
 /**
- * 类别筛选菜单(9 项 RadioButton 单选 + 底部「捕获设置」入口,SearchBar
- * trailingIcon 槽内使用;入口范式对齐主界面 ScopeFilterMenu「设置」项)。
+ * 类别筛选菜单(9 项 RadioButton 单选,SearchBar trailingIcon 槽内使用)。
+ * V10:底部「捕获设置」入口移除(捕获配置已全局化,入口收敛至设置页)。
  */
 @Composable
 private fun KindFilterMenu(
@@ -401,7 +499,6 @@ private fun KindFilterMenu(
     onExpandedChange: (Boolean) -> Unit,
     selectedKind: CryptoKind?,
     onKindSelect: (CryptoKind?) -> Unit,
-    onOpenCaptureSettings: () -> Unit,
 ) {
     Box {
         TipIconButton(tooltip = stringResource(R.string.cd_filter), onClick = { onExpandedChange(true) }) {
@@ -436,26 +533,11 @@ private fun KindFilterMenu(
                     },
                 )
             }
-            HorizontalDivider()
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.detail_tab_settings), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Filled.Settings,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
-                onClick = {
-                    onExpandedChange(false)
-                    onOpenCaptureSettings()
-                },
-            )
         }
     }
 }
 
-/** 状态 chip(在线/监听语义色)。 */
+/** 状态 chip(在线/监听语义色);宽度受限防长文字挤出操作按钮(V12 修复)。 */
 @Composable
 private fun StatusChip(text: String, active: Boolean) {
     Surface(
@@ -469,7 +551,12 @@ private fun StatusChip(text: String, active: Boolean) {
     ) {
         Text(
             text,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+            modifier =
+                Modifier
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+                    .widthIn(max = 110.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.labelMedium,
             color =
                 if (active) {

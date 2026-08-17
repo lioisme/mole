@@ -36,22 +36,23 @@ import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.ui.theme.kindColor
+import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Locale
 
 /**
- * 记录行(2026-08-17 V8,算法列表 item 重设计——卡片化 + 信息收敛):
+ * 记录行(2026-08-17 V8 卡片化;2026-08-17 V12 秒级时间 + 参数独立成行):
  * 每行 = 圆角卡片(16dp, surfaceContainerLow 浮于 surface),行间留白 8dp,
  * 取代旧版「细分隔线 + 六段拼接摘要」的拥挤版式:
  * - 左:类别徽章 28dp 圆角方块(类别色 15% alpha 淡底 + 类别色字母,竖直居中,
  *   列锚点恒定);徽章与内容间距 14dp;
- * - 主体 Column(weight 1f):
- *   行1 算法(等宽 bodyLarge,超长省略)+ 操作阶段(labelMedium 类别色,
- *   与徽章同色系,取代旧 primary 色);
- *   行2(仅当有方向或数据)方向胶囊(类别色 15% alpha 淡底小字)+
- *   唯一最有价值数据段(等宽 labelMedium,优先级 key > alias > out > in,
- *   单段展示不堆叠,取代旧版包名·线程·方向·key·in·out 六段拼接);
- * - 右:时间(系统时制,labelSmall onSurfaceVariant),垂直居中;
- * - 行高 minHeight 68dp;
+ * - 主体 Column(weight 1f),除徽章外每参数独立成行(V12 语义):
+ *   行1 算法(等宽 bodyLarge,超长省略);
+ *   行2 操作阶段(labelMedium 类别色,与徽章同色系);
+ *   行3(仅当有方向)方向胶囊(类别色 15% alpha 淡底小字);
+ *   行4(仅当有数据)唯一最有价值数据段(等宽 labelMedium,优先级 key > alias > out > in);
+ *   行5 时间(秒级精度,labelSmall onSurfaceVariant,尊重系统 12/24h 时制);
+ * - 行高 minHeight 68dp(内容自适应加高,空段行高一致);
  * - 单击进详情;长按复制记录文本(涟漪随卡片圆角裁剪)。
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -64,7 +65,10 @@ fun RecordRow(
 ) {
     val haptics = LocalHapticFeedback.current
     val context = LocalContext.current
-    val timeFormat = remember(context) { DateFormat.getTimeFormat(context) }
+    val timeFormat = remember(context) {
+        val pattern = if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a"
+        SimpleDateFormat(pattern, Locale.getDefault())
+    }
     val dataSnippet = record.valuableDataSnippet()
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -89,55 +93,48 @@ fun RecordRow(
             // 左列:类别徽章(固定尺寸;右侧内容左缘全列表恒定锚点)。
             KindBadge(kind = record.kind)
             Spacer(Modifier.width(BADGE_TO_CONTENT_GAP))
-            // 主体:算法 + 操作独占首行,方向/关键数据收敛为次行单段。
+            // 主体:每参数独立成行(V12;徽章为唯一同行豁免元素)。
             Column(Modifier.weight(1f)) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = record.algorithm,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = operationLabel(record.operation),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = kindColor(record.kind),
+                    maxLines = 1,
+                )
+                record.direction?.let { direction ->
+                    Spacer(Modifier.height(4.dp))
+                    DirectionChip(
+                        text = directionLabel(direction),
+                        kind = record.kind,
+                    )
+                }
+                if (dataSnippet != null) {
+                    Spacer(Modifier.height(4.dp))
                     Text(
-                        text = record.algorithm,
-                        style = MaterialTheme.typography.bodyLarge,
+                        text = dataSnippet,
+                        style = MaterialTheme.typography.labelMedium,
                         fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false),
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        text = operationLabel(record.operation),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = kindColor(record.kind),
-                        maxLines = 1,
                     )
                 }
-                if (record.direction != null || dataSnippet != null) {
-                    Spacer(Modifier.height(4.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        record.direction?.let { direction ->
-                            DirectionChip(
-                                text = directionLabel(direction),
-                                kind = record.kind,
-                            )
-                            Spacer(Modifier.width(8.dp))
-                        }
-                        if (dataSnippet != null) {
-                            Text(
-                                text = dataSnippet,
-                                style = MaterialTheme.typography.labelMedium,
-                                fontFamily = FontFamily.Monospace,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = timeFormat.format(Date(record.timestamp)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text = timeFormat.format(Date(record.timestamp)),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
         }
     }
 }
@@ -223,6 +220,7 @@ private fun kindSymbol(kind: CryptoKind): Char = when (kind) {
     CryptoKind.KEY_AGREEMENT -> 'A'
     CryptoKind.RANDOM -> 'R'
     CryptoKind.BASE64 -> 'B'
+    CryptoKind.WEB_CRYPTO -> 'W'
 }
 
 /** 类别显示名资源(筛选菜单 / 详情页元数据共用)。 */
@@ -239,6 +237,7 @@ fun kindLabelRes(kind: CryptoKind): Int = when (kind) {
     CryptoKind.KEY_AGREEMENT -> R.string.kind_key_agreement
     CryptoKind.RANDOM -> R.string.kind_random
     CryptoKind.BASE64 -> R.string.kind_base64
+    CryptoKind.WEB_CRYPTO -> R.string.kind_webview
 }
 
 /** 操作标签(2026-08-16 V3 起走资源,消除硬编码英文;i18n 双语言)。 */
@@ -266,6 +265,8 @@ fun operationLabel(operation: CryptoOperation): String = stringResource(
         CryptoOperation.GENERATE_SEED -> R.string.op_generate_seed
         CryptoOperation.ENCODE -> R.string.op_encode
         CryptoOperation.DECODE -> R.string.op_decode
+        CryptoOperation.ENCRYPT -> R.string.op_encrypt
+        CryptoOperation.DECRYPT -> R.string.op_decrypt
     },
 )
 

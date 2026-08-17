@@ -161,5 +161,6 @@ dependencies {
     testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.robolectric)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+      androidTestImplementation(libs.uiautomator)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

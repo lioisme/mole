@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Modev</string>
-    <string name="app_description">An Xposed module that captures all crypto operations (digest/encryption/signature/MAC/keys/encoding) of target apps, supporting both Vector (libxposed 102) and legacy LSPosed.</string>
+    <string name="app_description">An Xposed module that monitors target apps through scoped instrumentation: algorithm capture (digest/encryption/signature/MAC/keys/encoding), with more capabilities in development. Supports both Vector (libxposed 102) and legacy LSPosed.</string>
 
     <!-- Common -->
     <string name="cd_back">Back</string>
@@ -27,15 +27,15 @@
     <string name="apps_scope_failed">Operation failed: %1$s %2$s</string>
     <string name="apps_count_wan">%1$dK+</string>
     <string name="apps_count_qian">%1$d+</string>
+    <string name="apps_logs_cleared">Cleared logs for %1$s</string>
 
-    <!-- Algorithm list -->
-    <string name="detail_tab_settings">Capture Settings</string>
+    <!-- App records -->
     <string name="detail_listening">In scope</string>
     <string name="detail_not_listening">Out of scope</string>
     <string name="detail_framework_no_service">Framework service not connected</string>
     <string name="detail_framework_error">Framework error: %1$s</string>
     <string name="detail_reading_scope">Reading scope…</string>
-    <string name="detail_search">Search algorithm / key / data…</string>
+    <string name="detail_search">Search records…</string>
     <string name="detail_empty">No records yet</string>
     <string name="section_algorithms">Algorithm Capture</string>
     <string name="section_record_options">Record Options</string>
@@ -50,6 +50,7 @@
     <string name="switch_key_agreement">Key Agreement</string>
     <string name="switch_random">SecureRandom</string>
     <string name="switch_base64">Base64</string>
+    <string name="switch_webview">WebView JS Crypto</string>
     <string name="switch_log_stack">Record Call Stack</string>
     <string name="capture_max_bytes">Max bytes per field</string>
     <string name="capture_max_bytes_hint">Bytes per field (0 = unlimited)</string>
@@ -80,6 +81,7 @@
     <string name="kind_key_agreement">Key Agreement</string>
     <string name="kind_random">Random</string>
     <string name="kind_base64">Base64</string>
+    <string name="kind_webview">WebView</string>
     <string name="op_get_instance">Get instance</string>
     <string name="op_init">Init</string>
     <string name="op_update">Update</string>
@@ -101,6 +103,8 @@
     <string name="op_generate_seed">Gen seed</string>
     <string name="op_encode">Encode</string>
     <string name="op_decode">Decode</string>
+    <string name="op_encrypt">Encrypt</string>
+    <string name="op_decrypt">Decrypt</string>
     <string name="dir_encrypt">Encrypt</string>
     <string name="dir_decrypt">Decrypt</string>
     <string name="dir_wrap">Wrap</string>
@@ -143,7 +147,6 @@
     <string name="section_stack">Call Stack</string>
     <string name="bytes_count">%1$d bytes</string>
     <string name="bytes_truncated">(truncated)</string>
-    <string name="key_not_exportable">Key material not exportable (hardware/KeyStore)</string>
     <string name="section_expand">Expand</string>
     <string name="section_collapse">Collapse</string>
     <string name="export_failed">Export failed</string>
@@ -152,10 +155,13 @@
     <string name="settings_title">Settings</string>
     <string name="settings_display_section">Display</string>
     <string name="settings_language_section">Language &amp; Region</string>
-    <string name="settings_apps_section">Apps List</string>
+    <string name="settings_features_section">Capabilities</string>
     <string name="settings_data_section">Data</string>
     <string name="settings_service_section">Service &amp; Diagnostics</string>
     <string name="settings_about_section">About</string>
+    <string name="capture_settings_title">Capture Settings</string>
+    <string name="data_settings_title">Data Management</string>
+    <string name="diagnostics_settings_title">Service &amp; Diagnostics</string>
     <string name="settings_framework_service">Framework service</string>
     <string name="settings_connecting">Connecting…</string>
     <string name="settings_framework">Framework</string>

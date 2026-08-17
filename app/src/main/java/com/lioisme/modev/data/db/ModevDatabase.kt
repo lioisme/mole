@@ -13,10 +13,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * v1 → v2:新增 salt/aad/publicKey 双态视图四元组(各 4 列)、paramsJson、verifyResult、processName。
  * v2 → v3:新增 seq 列(注入侧进程级单调序号)与 (packageName, processName, seq) 唯一索引,
  *   断线重放幂等(REPLACE 吸收重复);存量行 seq 为 NULL,不参与唯一性冲突。
+ * v3 → v4:新增 recordType 列(记录类型维度,默认 crypto),存量行迁移后为 'crypto'。
  */
 @Database(
     entities = [CryptoRecordEntity::class],
-    version = 3,
+    version = 4,
     exportSchema = true,
 )
 abstract class ModevDatabase : RoomDatabase() {
@@ -58,6 +59,15 @@ abstract class ModevDatabase : RoomDatabase() {
             }
         }
 
+        /** v3 → v4:新增 recordType 列(记录类型维度);存量行默认 'crypto',与模型默认值一致。 */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `crypto_records` ADD COLUMN `recordType` TEXT NOT NULL DEFAULT 'crypto'"
+                )
+            }
+        }
+
         @Volatile
         private var instance: ModevDatabase? = null
 
@@ -68,7 +78,7 @@ abstract class ModevDatabase : RoomDatabase() {
                     ModevDatabase::class.java,
                     "modev.db",
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                     .fallbackToDestructiveMigration(false)
                     .build()
                     .also { instance = it }

@@ -6,11 +6,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.test.assertHeightIsEqualTo
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsNotEnabled
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.lioisme.modev.R
@@ -108,5 +110,24 @@ class SettingsComponentsTest {
         }
         rule.onNodeWithText(targetContext.getString(R.string.settings_display_section)).assertIsDisplayed()
         rule.onNodeWithText("Info Value").assertIsDisplayed()
+    }
+
+    @Test
+    fun infoItem_longValue_doesNotSqueezeTitle() {
+        // V11 回归:长 Value 曾按内容全宽测量,把标题挤压成逐字折行(「框架」竖排错位)。
+        // 修复后 Value 有界测量(≤50% 行宽省略),标题恒保持单行(bodyLarge lineHeight=24dp)。
+        val longValue = "V".repeat(200)
+        rule.setContent {
+            MaterialTheme {
+                SettingsInfoItem(
+                    icon = Icons.Default.Settings,
+                    title = "框架",
+                    value = longValue,
+                )
+            }
+        }
+        // 标题单行完整显示(折行则为 48dp,断言失败);长值以两行省略呈现
+        rule.onNodeWithText("框架").assertHeightIsEqualTo(24.dp)
+        rule.onNodeWithText(longValue).assertIsDisplayed()
     }
 }
