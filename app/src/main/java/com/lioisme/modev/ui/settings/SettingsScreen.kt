@@ -1,9 +1,6 @@
 package com.lioisme.modev.ui.settings
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
-import android.os.Build
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -34,11 +31,15 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -47,14 +48,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -84,19 +89,21 @@ import com.lioisme.modev.ui.theme.LocalIsDarkTheme
 import com.lioisme.modev.ui.theme.ThemeConfig
 import com.lioisme.modev.ui.theme.ThemeSeeds
 import com.lioisme.modev.ui.theme.ThemeSettingsManager
+import kotlinx.coroutines.launch
 
 // 主题色预设单一事实源 = ThemeSeeds.OPTIONS(ui/theme)。
 private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
 
 /**
- * 设置页(2026-08-16 V3,四界面重构:删工具区「算法日志」入口——全局日志页已移除,
- * 日志查看收敛为「应用 → 算法列表」路径):
- * 卡片式分区(SettingsSection = surfaceContainerLow 卡):
+ * 设置页(2026-08-17 V9 六分区重组):
+ * 卡片式分区(SettingsSection = surfaceContainerLow 卡),按功能域分层:
  * - 显示:外观模式 sheet + 主题色 sheet(跟随壁纸 / 20 色预设网格);
- * - 应用列表(2026-08-17 V7):已作用域应用置顶开关(AppListSettings 单一事实源);
- * - 框架与作用域 / 通信服务 / 使用说明:只读信息(SettingsInfoItem);
- * - 数据治理:清空全部日志(errorContainer 危险块);
- * - 通用:语言 sheet(LocaleManager 双路径)+ 关于 Dialog。
+ * - 语言与地区:语言 sheet(LocaleManager 热切换,零重建);
+ * - 应用列表:已作用域应用置顶开关(AppListSettings 单一事实源);
+ * - 数据:总记录数只读行 + 清空全部日志(errorContainer 危险块);
+ * - 服务与诊断:框架与作用域 + 通信服务只读信息(SettingsInfoItem)+
+ *   管道统计折叠卡(默认收起,AnimatedVisibility,状态 rememberSaveable);
+ * - 关于:版本 + 关于 Dialog。
  * 本页经应用列表筛选菜单「设置」项进入(唯一入口),返回箭头常显。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -106,11 +113,11 @@ fun SettingsScreen(
     onBack: () -> Unit = {},
 ) {
     val connectedCount by viewModel.connectedCount.collectAsStateWithLifecycle()
+    val totalRecords by viewModel.totalRecords.collectAsStateWithLifecycle()
     val frameworkState by viewModel.frameworkState.collectAsStateWithLifecycle()
     val pipelineStats by viewModel.pipelineStats.collectAsStateWithLifecycle()
     val pinScoped by AppListSettings.pinScoped.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val activity = context.resolveActivity()
     val config by ThemeSettingsManager.themeConfig.collectAsState()
 
     var showAppearanceSheet by remember { mutableStateOf(false) }
@@ -119,7 +126,16 @@ fun SettingsScreen(
     var showAboutDialog by remember { mutableStateOf(false) }
     var showClearAllConfirm by remember { mutableStateOf(false) }
 
-    val currentLanguageTag = LocaleManager.currentLanguageTag
+    // 语言 sheet 状态(V9.1):点选语言先播退场动画再切换,动画期间语言不变,
+    // 避免「sheet 瞬时消失 + 全屏文本同帧切换」叠影闪烁。
+    val scope = rememberCoroutineScope()
+    val languageSheetState = rememberModalBottomSheetState()
+
+    // 管道统计折叠态(跨重建存活:展开/收起不因重组复位)。
+    var statsExpanded by rememberSaveable { mutableStateOf(false) }
+
+    // 语言标签收集 localeFlow(V9 热切换:切换即时刷新,零重建)。
+    val currentLanguageTag by LocaleManager.localeFlow.collectAsStateWithLifecycle()
     val languageSubtitle =
         when (currentLanguageTag) {
             LocaleManager.TAG_SYSTEM -> stringResource(R.string.system_default)
@@ -170,6 +186,16 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(24.dp))
+            SettingsSection(stringResource(R.string.settings_language_section)) {
+                SettingsItem(
+                    icon = Icons.Default.Language,
+                    title = stringResource(R.string.language),
+                    subtitle = languageSubtitle,
+                    onClick = { showLanguageSheet = true },
+                )
+            }
+
+            Spacer(Modifier.height(24.dp))
             SettingsSection(stringResource(R.string.settings_apps_section)) {
                 SettingsToggleItem(
                     icon = Icons.Default.PushPin,
@@ -180,7 +206,35 @@ fun SettingsScreen(
             }
 
             Spacer(Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_framework_section)) {
+            SettingsSection(stringResource(R.string.settings_data_section)) {
+                SettingsInfoItem(
+                    icon = Icons.Default.Storage,
+                    title = stringResource(R.string.settings_total_records),
+                    value = stringResource(R.string.settings_total_records_value, totalRecords),
+                )
+                Surface(
+                    onClick = { showClearAllConfirm = true },
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.errorContainer,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Row(
+                        Modifier.padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
+                        Spacer(Modifier.width(12.dp))
+                        Text(
+                            stringResource(R.string.settings_clear_all_logs),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(24.dp))
+            SettingsSection(stringResource(R.string.settings_service_section)) {
                 when (val framework = frameworkState) {
                     is ScopeState.Connecting -> {
                         SettingsInfoItem(
@@ -220,10 +274,6 @@ fun SettingsScreen(
                         }
                     }
                 }
-            }
-
-            Spacer(Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_server_section)) {
                 SettingsInfoItem(
                     icon = Icons.Default.Dns,
                     title = stringResource(R.string.settings_port),
@@ -234,78 +284,51 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_online_targets),
                     value = stringResource(R.string.settings_online_targets_value, connectedCount),
                 )
-            }
-
-            Spacer(Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_data_section)) {
-                Surface(
-                    onClick = { showClearAllConfirm = true },
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.errorContainer,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Row(
-                        Modifier.padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
-                        Spacer(Modifier.width(12.dp))
-                        Text(
-                            stringResource(R.string.settings_clear_all_logs),
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            style = MaterialTheme.typography.bodyLarge,
+                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                StatsToggleRow(expanded = statsExpanded, onClick = { statsExpanded = !statsExpanded })
+                AnimatedVisibility(visible = statsExpanded) {
+                    Column {
+                        SettingsInfoItem(
+                            icon = Icons.Default.Dns,
+                            title = stringResource(R.string.stats_received),
+                            value = pipelineStats.received.toString(),
+                        )
+                        SettingsInfoItem(
+                            icon = Icons.Default.Dns,
+                            title = stringResource(R.string.stats_dropped),
+                            value = pipelineStats.dropped.toString(),
+                        )
+                        SettingsInfoItem(
+                            icon = Icons.Default.Dns,
+                            title = stringResource(R.string.stats_write_failures),
+                            value = pipelineStats.writeFailures.toString(),
+                        )
+                        SettingsInfoItem(
+                            icon = Icons.Default.Dns,
+                            title = stringResource(R.string.stats_trimmed),
+                            value = pipelineStats.trimmed.toString(),
+                        )
+                        SettingsInfoItem(
+                            icon = Icons.Default.Dns,
+                            title = stringResource(R.string.stats_rejected_hellos),
+                            value = pipelineStats.channel.rejectedHellos.toString(),
+                        )
+                        SettingsInfoItem(
+                            icon = Icons.Default.Dns,
+                            title = stringResource(R.string.stats_dropped_records),
+                            value = pipelineStats.channel.droppedRecords.toString(),
+                        )
+                        SettingsInfoItem(
+                            icon = Icons.Default.Dns,
+                            title = stringResource(R.string.stats_rejected_records),
+                            value = pipelineStats.channel.rejectedRecords.toString(),
                         )
                     }
                 }
             }
 
             Spacer(Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_stats_section)) {
-                SettingsInfoItem(
-                    icon = Icons.Default.Dns,
-                    title = stringResource(R.string.stats_received),
-                    value = pipelineStats.received.toString(),
-                )
-                SettingsInfoItem(
-                    icon = Icons.Default.Dns,
-                    title = stringResource(R.string.stats_dropped),
-                    value = pipelineStats.dropped.toString(),
-                )
-                SettingsInfoItem(
-                    icon = Icons.Default.Dns,
-                    title = stringResource(R.string.stats_write_failures),
-                    value = pipelineStats.writeFailures.toString(),
-                )
-                SettingsInfoItem(
-                    icon = Icons.Default.Dns,
-                    title = stringResource(R.string.stats_trimmed),
-                    value = pipelineStats.trimmed.toString(),
-                )
-                SettingsInfoItem(
-                    icon = Icons.Default.Dns,
-                    title = stringResource(R.string.stats_rejected_hellos),
-                    value = pipelineStats.channel.rejectedHellos.toString(),
-                )
-                SettingsInfoItem(
-                    icon = Icons.Default.Dns,
-                    title = stringResource(R.string.stats_dropped_records),
-                    value = pipelineStats.channel.droppedRecords.toString(),
-                )
-                SettingsInfoItem(
-                    icon = Icons.Default.Dns,
-                    title = stringResource(R.string.stats_rejected_records),
-                    value = pipelineStats.channel.rejectedRecords.toString(),
-                )
-            }
-
-            Spacer(Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_general_section)) {
-                SettingsItem(
-                    icon = Icons.Default.Language,
-                    title = stringResource(R.string.language),
-                    subtitle = languageSubtitle,
-                    onClick = { showLanguageSheet = true },
-                )
+            SettingsSection(stringResource(R.string.settings_about_section)) {
                 SettingsItem(
                     icon = Icons.Default.Info,
                     title = stringResource(R.string.about),
@@ -348,13 +371,16 @@ fun SettingsScreen(
     if (showLanguageSheet) {
         LanguageSheet(
             currentTag = currentLanguageTag,
+            sheetState = languageSheetState,
             onSelect = { tag ->
-                LocaleManager.setLanguage(context, tag)
-                showLanguageSheet = false
-                // API 33+ 由框架按 per-app locale 自动重建 Activity,
-                // 手动 recreate 会双重重建;<33 才手动(wrap 生效路径)。
-                if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-                    activity?.recreate()
+                // V9.1 无闪切换:先播 sheet 退场动画(掩蔽切换瞬间),动画完成后
+                // 再切语言——避免「sheet 窗口瞬间消失 + 全屏文本同时切换」叠影闪烁
+                // (实机复现 2026-08-17)。移除组合(showLanguageSheet=false)在
+                // hide 完成后执行,退场动画不会被截断。
+                scope.launch {
+                    languageSheetState.hide()
+                    LocaleManager.setLanguage(context, tag)
+                    showLanguageSheet = false
                 }
             },
             onDismiss = { showLanguageSheet = false },
@@ -411,10 +437,11 @@ fun SettingsScreen(
 @Composable
 private fun LanguageSheet(
     currentTag: String,
+    sheetState: SheetState,
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(modifier = Modifier.padding(bottom = 32.dp)) {
             Text(
                 stringResource(R.string.language),
@@ -625,9 +652,36 @@ private fun selectedMarkColor(
     isDark: Boolean,
 ): Color = if (isDark) Color.White else Color.Black
 
-private tailrec fun Context.resolveActivity(): Activity? =
-    when (this) {
-        is Activity -> this
-        is ContextWrapper -> baseContext.resolveActivity()
-        else -> null
+/**
+ * 管道统计折叠头行(V9):图标 + 标题 + 方向指示图标(展开↑/收起↓),
+ * 与详情页字节区块「展开/收起」文案同语义(contentDescription 复用)。
+ */
+@Composable
+private fun StatsToggleRow(
+    expanded: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(Icons.Default.Insights, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(16.dp))
+        Text(
+            stringResource(R.string.settings_stats_section),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Icon(
+            if (expanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+            contentDescription = stringResource(if (expanded) R.string.section_collapse else R.string.section_expand),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(20.dp),
+        )
     }
+}

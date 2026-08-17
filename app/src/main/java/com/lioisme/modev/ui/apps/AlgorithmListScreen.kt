@@ -258,7 +258,8 @@ private fun AlgorithmListContent(
             LazyColumn(
                 state = rememberLazyListState(),
                 modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(0.dp),
+                // 卡片列表呼吸感:上下 8dp + 行内 4dp,卡间距合计 8dp。
+                contentPadding = PaddingValues(vertical = 8.dp),
             ) {
                 when {
                     records.itemCount == 0 && records.loadState.refresh is LoadState.NotLoading ->
@@ -293,7 +294,11 @@ private fun AlgorithmListContent(
                             RecordRow(
                                 record = record,
                                 onClick = { onOpenRecord(record.id) },
-                                modifier = Modifier.testTag("record-row"),
+                                // 卡片左右贴 16dp 页边距,行间留白(间距合计 8dp)。
+                                modifier =
+                                    Modifier
+                                        .testTag("record-row")
+                                        .padding(horizontal = 16.dp, vertical = 4.dp),
                             )
                         }
                     }

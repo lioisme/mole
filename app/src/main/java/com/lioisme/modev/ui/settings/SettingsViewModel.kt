@@ -24,6 +24,11 @@ class SettingsViewModel(
         .map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
+    /** 全部应用记录总数(「数据」分区只读行)。 */
+    val totalRecords: StateFlow<Long> = container.logs.observeRecordCounts()
+        .map { counts -> counts.values.sum() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
+
     /** 管道统计(接收/丢弃/写失败/裁剪/通道拒绝),供「管道统计」分区展示。 */
     val pipelineStats: StateFlow<PipelineStats> = container.logs.statsFlow
 

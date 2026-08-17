@@ -107,6 +107,12 @@
     <string name="dir_unwrap">解包装</string>
     <string name="dir_mode">模式 %1$d</string>
 
+    <!-- 记录行数据段前缀(2026-08-17 V8:列表行收敛为单段关键数据;技术词保留拉丁) -->
+    <string name="record_data_key">key:</string>
+    <string name="record_data_alias">alias:</string>
+    <string name="record_data_out">out:</string>
+    <string name="record_data_in">in:</string>
+
     <!-- 记录详情页 -->
     <string name="record_title">记录详情</string>
     <string name="record_not_found">记录不存在或已被清理</string>
@@ -145,7 +151,12 @@
 
     <!-- 设置页 -->
     <string name="settings_title">设置</string>
-    <string name="settings_framework_section">框架与作用域</string>
+    <string name="settings_display_section">显示</string>
+    <string name="settings_language_section">语言与地区</string>
+    <string name="settings_apps_section">应用列表</string>
+    <string name="settings_data_section">数据</string>
+    <string name="settings_service_section">服务与诊断</string>
+    <string name="settings_about_section">关于</string>
     <string name="settings_framework_service">框架服务</string>
     <string name="settings_connecting">连接中…</string>
     <string name="settings_framework">框架</string>
@@ -153,13 +164,13 @@
     <string name="settings_scoped_count_value">%1$d 个</string>
     <string name="settings_not_connected">未连接</string>
     <string name="settings_framework_error">框架服务异常:%1$s</string>
-    <string name="settings_server_section">通信服务</string>
     <string name="settings_port">监听端口</string>
     <string name="settings_port_value">127.0.0.1:%1$d(仅本机)</string>
     <string name="settings_online_targets">在线目标进程</string>
     <string name="settings_online_targets_value">%1$d 个</string>
-    <string name="settings_data_section">数据治理</string>
     <string name="settings_clear_all_logs">清空全部日志</string>
+    <string name="settings_total_records">总记录数</string>
+    <string name="settings_total_records_value">%1$d 条</string>
     <string name="settings_stats_section">管道统计</string>
     <string name="stats_received">已接收记录</string>
     <string name="stats_dropped">队列溢出丢弃</string>
@@ -168,10 +179,7 @@
     <string name="stats_rejected_hellos">拒绝握手</string>
     <string name="stats_dropped_records">格式非法丢弃</string>
     <string name="stats_rejected_records">包名不符拒绝</string>
-    <string name="settings_display_section">显示</string>
-    <string name="settings_apps_section">应用列表</string>
     <string name="settings_pin_scoped">已作用域应用置顶</string>
-    <string name="settings_general_section">通用</string>
     <string name="appearance">外观</string>
     <string name="follow_system">跟随系统</string>
     <string name="light_mode">浅色</string>

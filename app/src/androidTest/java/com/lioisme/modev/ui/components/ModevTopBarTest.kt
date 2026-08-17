@@ -9,6 +9,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.lioisme.modev.R
@@ -60,7 +61,10 @@ class ModevTopBarTest {
             }
         }
         // 单行省略守卫:标题节点边界高度 ≤ 32dp(两行 ≈ 56dp 必失败),AppBar 不被撑高。
+        // boundsInRoot 为像素,与密度无关断言须经 rule.density 换算(640dpi 设备上
+        // 32dp=128px,直比 32f 恒红——2026-08-17 实机回归修正)。
         val height = rule.onNodeWithText(longTitle).fetchSemanticsNode().boundsInRoot.height
-        assertTrue("long title must stay single line (height=$height)", height <= 32f)
+        val maxHeightPx = with(rule.density) { 32.dp.toPx() }
+        assertTrue("long title must stay single line (height=$height)", height <= maxHeightPx)
     }
 }

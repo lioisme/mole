@@ -5,10 +5,13 @@ import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.graphics.drawable.toDrawable
 import androidx.core.view.WindowCompat
 import androidx.navigation.compose.rememberNavController
@@ -53,8 +56,14 @@ class MainActivity : ComponentActivity() {
                     controller.isAppearanceLightStatusBars = !isDarkTheme
                     controller.isAppearanceLightNavigationBars = !isDarkTheme
                 }
-                val navController = rememberNavController()
-                ModevNavHost(navController = navController)
+                // 语言热切换(V9):语言变更 = 更新 localeFlow → 此处以包装 Context
+                // 覆写 LocalContext,全站 stringResource 即时重组,零 Activity 重建。
+                val localeTag by LocaleManager.localeFlow.collectAsState()
+                val localizedContext = remember(localeTag) { LocaleManager.wrap(this) }
+                CompositionLocalProvider(LocalContext provides localizedContext) {
+                    val navController = rememberNavController()
+                    ModevNavHost(navController = navController)
+                }
             }
         }
     }

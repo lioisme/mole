@@ -1,12 +1,16 @@
 package com.lioisme.modev.ui.apps
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
@@ -50,12 +54,15 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.ui.components.ModevTopBar
+import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.components.SettingsToggleItem
 
 /**
- * 捕获设置页(2026-08-16 V5,全量捕获对齐):
+ * 捕获设置页(2026-08-17 V9 分组,全量捕获对齐):
  * 从算法记录列表页的「捕获设置」入口进入,单一职责 = 该应用的算法捕获开关
  * (11 类算法 + 记录堆栈 + 单字段上限 + 忽略栈前缀)+ 危险操作(移出作用域 / 清空该应用日志,均带确认)。
+ * 卡片按功能域分组(SettingsSection 标题):「算法捕获」11 类开关 /
+ * 「记录选项」堆栈开关 + 上限 + 忽略前缀 / 危险区(errorContainer 块,默认全显示)。
  * 与算法记录列表页共享同一 [AlgorithmListViewModel] 实例(ModevNav 同 key),
  * 开关状态 / 作用域 / 操作消息单一数据源;返回 = 弹栈(过导航门控)。
  */
@@ -97,145 +104,99 @@ fun CaptureSettingsScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            item(key = "switches") {
-                Surface(
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column {
-                        SwitchRowItem(
-                            icon = Icons.Filled.Lock,
-                            title = stringResource(R.string.switch_cipher),
-                            checked = switch.enabled(CryptoKind.CIPHER),
-                            onCheckedChange = { on -> viewModel.setSwitch { it.copy(cipher = on) } },
-                        )
-                        SwitchRowItem(
-                            icon = Icons.Filled.Psychology,
-                            title = stringResource(R.string.switch_message_digest),
-                            checked = switch.enabled(CryptoKind.MESSAGE_DIGEST),
-                            onCheckedChange = { on -> viewModel.setSwitch { it.copy(messageDigest = on) } },
-                        )
-                        SwitchRowItem(
-                            icon = Icons.Filled.SwapHoriz,
-                            title = stringResource(R.string.switch_mac),
-                            checked = switch.enabled(CryptoKind.MAC),
-                            onCheckedChange = { on -> viewModel.setSwitch { it.copy(mac = on) } },
-                        )
-                        SwitchRowItem(
-                            icon = Icons.Filled.GppBad,
-                            title = stringResource(R.string.switch_signature),
-                            checked = switch.enabled(CryptoKind.SIGNATURE),
-                            onCheckedChange = { on -> viewModel.setSwitch { it.copy(signature = on) } },
-                        )
-                        SwitchRowItem(
-                            icon = Icons.Filled.Key,
-                            title = stringResource(R.string.switch_key_param),
-                            checked = switch.enabled(CryptoKind.KEY_PARAM),
-                            onCheckedChange = { on -> viewModel.setSwitch { it.copy(keyParam = on) } },
-                        )
-                        SwitchRowItem(
-                            icon = Icons.Filled.Star,
-                            title = stringResource(R.string.switch_key_generation),
-                            checked = switch.enabled(CryptoKind.KEY_GENERATION),
-                            onCheckedChange = { on -> viewModel.setSwitch { it.copy(keyGeneration = on) } },
-                        )
-                        SwitchRowItem(
-                            icon = Icons.Filled.Key,
-                            title = stringResource(R.string.switch_key_factory),
-                            checked = switch.enabled(CryptoKind.KEY_FACTORY),
-                            onCheckedChange = { on -> viewModel.setSwitch { it.copy(keyFactory = on) } },
-                        )
-                        SwitchRowItem(
-                            icon = Icons.Filled.VpnKey,
-                            title = stringResource(R.string.switch_key_store),
-                            checked = switch.enabled(CryptoKind.KEY_STORE),
-                            onCheckedChange = { on -> viewModel.setSwitch { it.copy(keyStore = on) } },
-                        )
-                        SwitchRowItem(
-                            icon = Icons.Filled.SwapHoriz,
-                            title = stringResource(R.string.switch_key_agreement),
-                            checked = switch.enabled(CryptoKind.KEY_AGREEMENT),
-                            onCheckedChange = { on -> viewModel.setSwitch { it.copy(keyAgreement = on) } },
-                        )
-                        SwitchRowItem(
-                            icon = Icons.Filled.Psychology,
-                            title = stringResource(R.string.switch_random),
-                            checked = switch.enabled(CryptoKind.RANDOM),
-                            onCheckedChange = { on -> viewModel.setSwitch { it.copy(random = on) } },
-                        )
-                        SwitchRowItem(
-                            icon = Icons.Filled.TextFields,
-                            title = stringResource(R.string.switch_base64),
-                            checked = switch.enabled(CryptoKind.BASE64),
-                            onCheckedChange = { on -> viewModel.setSwitch { it.copy(base64 = on) } },
-                        )
-                        HorizontalDivider()
-                        SwitchRowItem(
-                            icon = Icons.Filled.Psychology,
-                            title = stringResource(R.string.switch_log_stack),
-                            checked = switch.logStack,
-                            onCheckedChange = { on -> viewModel.setSwitch { it.copy(logStack = on) } },
-                        )
-                    }
+            item(key = "algorithms") {
+                SettingsSection(stringResource(R.string.section_algorithms)) {
+                    SwitchRowItem(
+                        icon = Icons.Filled.Lock,
+                        title = stringResource(R.string.switch_cipher),
+                        checked = switch.enabled(CryptoKind.CIPHER),
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(cipher = on) } },
+                    )
+                    SwitchRowItem(
+                        icon = Icons.Filled.Psychology,
+                        title = stringResource(R.string.switch_message_digest),
+                        checked = switch.enabled(CryptoKind.MESSAGE_DIGEST),
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(messageDigest = on) } },
+                    )
+                    SwitchRowItem(
+                        icon = Icons.Filled.SwapHoriz,
+                        title = stringResource(R.string.switch_mac),
+                        checked = switch.enabled(CryptoKind.MAC),
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(mac = on) } },
+                    )
+                    SwitchRowItem(
+                        icon = Icons.Filled.GppBad,
+                        title = stringResource(R.string.switch_signature),
+                        checked = switch.enabled(CryptoKind.SIGNATURE),
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(signature = on) } },
+                    )
+                    SwitchRowItem(
+                        icon = Icons.Filled.Key,
+                        title = stringResource(R.string.switch_key_param),
+                        checked = switch.enabled(CryptoKind.KEY_PARAM),
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(keyParam = on) } },
+                    )
+                    SwitchRowItem(
+                        icon = Icons.Filled.Star,
+                        title = stringResource(R.string.switch_key_generation),
+                        checked = switch.enabled(CryptoKind.KEY_GENERATION),
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(keyGeneration = on) } },
+                    )
+                    SwitchRowItem(
+                        icon = Icons.Filled.Key,
+                        title = stringResource(R.string.switch_key_factory),
+                        checked = switch.enabled(CryptoKind.KEY_FACTORY),
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(keyFactory = on) } },
+                    )
+                    SwitchRowItem(
+                        icon = Icons.Filled.VpnKey,
+                        title = stringResource(R.string.switch_key_store),
+                        checked = switch.enabled(CryptoKind.KEY_STORE),
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(keyStore = on) } },
+                    )
+                    SwitchRowItem(
+                        icon = Icons.Filled.SwapHoriz,
+                        title = stringResource(R.string.switch_key_agreement),
+                        checked = switch.enabled(CryptoKind.KEY_AGREEMENT),
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(keyAgreement = on) } },
+                    )
+                    SwitchRowItem(
+                        icon = Icons.Filled.Psychology,
+                        title = stringResource(R.string.switch_random),
+                        checked = switch.enabled(CryptoKind.RANDOM),
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(random = on) } },
+                    )
+                    SwitchRowItem(
+                        icon = Icons.Filled.TextFields,
+                        title = stringResource(R.string.switch_base64),
+                        checked = switch.enabled(CryptoKind.BASE64),
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(base64 = on) } },
+                    )
                 }
             }
-            item(key = "max-bytes") {
-                Surface(
-                    onClick = { showMaxBytesDialog = true },
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Filled.Tune, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Text(
-                                stringResource(R.string.capture_max_bytes),
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                if (switch.maxBytesPerField <= 0) "∞" else "${switch.maxBytesPerField}",
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                        Text(
-                            stringResource(R.string.capture_max_bytes_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            item(key = "ignore-stack") {
-                Surface(
-                    onClick = { showIgnoreStackDialog = true },
-                    shape = MaterialTheme.shapes.medium,
-                    color = MaterialTheme.colorScheme.surfaceContainerLow,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(Modifier.padding(16.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Icon(Icons.Filled.GppBad, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                            Text(
-                                stringResource(R.string.capture_ignore_stack),
-                                style = MaterialTheme.typography.bodyLarge,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Text(
-                                switch.ignoreStackPrefixes.size.toString(),
-                                style = MaterialTheme.typography.titleMedium,
-                                color = MaterialTheme.colorScheme.primary,
-                            )
-                        }
-                        Text(
-                            stringResource(R.string.capture_ignore_stack_hint),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
+            item(key = "record-options") {
+                SettingsSection(stringResource(R.string.section_record_options)) {
+                    SwitchRowItem(
+                        icon = Icons.Filled.Psychology,
+                        title = stringResource(R.string.switch_log_stack),
+                        checked = switch.logStack,
+                        onCheckedChange = { on -> viewModel.setSwitch { it.copy(logStack = on) } },
+                    )
+                    HorizontalDivider()
+                    OptionRowItem(
+                        icon = Icons.Filled.Tune,
+                        title = stringResource(R.string.capture_max_bytes),
+                        value = if (switch.maxBytesPerField <= 0) "∞" else "${switch.maxBytesPerField}",
+                        hint = stringResource(R.string.capture_max_bytes_hint),
+                        onClick = { showMaxBytesDialog = true },
+                    )
+                    OptionRowItem(
+                        icon = Icons.Filled.GppBad,
+                        title = stringResource(R.string.capture_ignore_stack),
+                        value = switch.ignoreStackPrefixes.size.toString(),
+                        hint = stringResource(R.string.capture_ignore_stack_hint),
+                        onClick = { showIgnoreStackDialog = true },
+                    )
                 }
             }
             if (scoped) {
@@ -402,6 +363,41 @@ private fun SwitchRowItem(
         checked = checked,
         onCheckedChange = onCheckedChange,
     )
+}
+
+/**
+ * 记录选项行(V9):icon + 标题 + 提示 + 当前值(primary,Dialog 型交互入口),
+ * token 对齐 SettingsItem(icon 24dp / 间距 16dp / padding h16 v12)。
+ */
+@Composable
+private fun OptionRowItem(
+    icon: ImageVector,
+    title: String,
+    value: String,
+    hint: String,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(16.dp))
+        Column(Modifier.weight(1f)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            Text(hint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            value,
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
 }
 
 /** 危险操作块(errorContainer 底 + onErrorContainer 文字,清空/移出作用域惯例)。 */

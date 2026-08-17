@@ -17,6 +17,7 @@ import com.lioisme.modev.data.server.ConfigServer
 import com.lioisme.modev.domain.scope.ScopeChangeResult
 import com.lioisme.modev.domain.scope.ScopeRepository
 import com.lioisme.modev.domain.scope.ScopeState
+import com.lioisme.modev.i18n.LocaleManager
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -105,7 +106,10 @@ class AppsViewModel(
         combine(query, onlyScoped, showSystem, pending, refreshing, ::UiPrefs),
         // 置顶开关(AppListSettings 单一事实源):变更即重排,跨页返回不滞留旧序。
         AppListSettings.pinScoped,
-    ) { catalogData, prefs, pinScoped ->
+        // 语言热切换触发器(V9):tag 变化即重排——AppSort 按调用时
+        // Locale.getDefault() 现建比较器,重算即按新语言 Collator 排序。
+        LocaleManager.localeFlow,
+    ) { catalogData, prefs, pinScoped, _ ->
         val ready = catalogData.scopeState as? ScopeState.Ready
         val scopedSet = ready?.scope ?: emptySet()
         val nameComparator = AppSort.nameComparator()

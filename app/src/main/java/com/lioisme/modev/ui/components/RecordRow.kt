@@ -1,5 +1,6 @@
 package com.lioisme.modev.ui.components
 
+import android.text.format.DateFormat
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -12,15 +13,19 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
@@ -31,20 +36,23 @@ import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.ui.theme.kindColor
+import java.util.Date
 
 /**
- * 记录行(2026-08-16 V3,自 LogsScreen 迁出,算法列表与算法详情共用):
- * 固定列锚点(LogFox 同款):每行 = [类别徽章固定宽列 28dp] + 固定 12dp 间距 + [右侧内容列],
- * 右侧消息/元数据左缘全列表恒定 x 对齐:
- * - 左列:类别徽章——圆角 6dp、类别色 15% alpha 淡底 + 类别色字母
- *   (labelMedium 等宽居中,top 对齐消息首行);
- * - 主体 Column(weight 1f):行1 消息(算法 + 操作,bodyLarge Monospace
- *   maxLines 2,超长省略 + 详情页全文);行2 元数据小字一行
- *   (labelSmall onSurfaceVariant):`包名末段 · 线程 · 方向 · 关键数据`(包内列表)
- *   或 `时间 · 包名末段 · 线程`(全局场景由调用方自定义摘要);
- * - 行高 minHeight 64dp + padding(h16, v10);
- * - 行末细分隔线(outlineVariant 0.4 alpha);
- * - 单击进详情;长按复制记录文本。
+ * 记录行(2026-08-17 V8,算法列表 item 重设计——卡片化 + 信息收敛):
+ * 每行 = 圆角卡片(16dp, surfaceContainerLow 浮于 surface),行间留白 8dp,
+ * 取代旧版「细分隔线 + 六段拼接摘要」的拥挤版式:
+ * - 左:类别徽章 28dp 圆角方块(类别色 15% alpha 淡底 + 类别色字母,竖直居中,
+ *   列锚点恒定);徽章与内容间距 14dp;
+ * - 主体 Column(weight 1f):
+ *   行1 算法(等宽 bodyLarge,超长省略)+ 操作阶段(labelMedium 类别色,
+ *   与徽章同色系,取代旧 primary 色);
+ *   行2(仅当有方向或数据)方向胶囊(类别色 15% alpha 淡底小字)+
+ *   唯一最有价值数据段(等宽 labelMedium,优先级 key > alias > out > in,
+ *   单段展示不堆叠,取代旧版包名·线程·方向·key·in·out 六段拼接);
+ * - 右:时间(系统时制,labelSmall onSurfaceVariant),垂直居中;
+ * - 行高 minHeight 68dp;
+ * - 单击进详情;长按复制记录文本(涟漪随卡片圆角裁剪)。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -55,65 +63,94 @@ fun RecordRow(
     modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
-    val dirLabel = record.direction?.let { directionLabel(it) }
-    Row(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .combinedClickable(onClick = onClick, onLongClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onLongClick()
-                })
-                .heightIn(min = RECORD_ROW_MIN_HEIGHT)
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+    val context = LocalContext.current
+    val timeFormat = remember(context) { DateFormat.getTimeFormat(context) }
+    val dataSnippet = record.valuableDataSnippet()
+    Surface(
+        modifier = modifier.fillMaxWidth(),
+        shape = MaterialTheme.shapes.large,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        // 左列:类别徽章(固定宽淡底圆角;右侧内容左缘恒定锚点)。
-        KindBadge(kind = record.kind)
-        Spacer(Modifier.width(BADGE_TO_CONTENT_GAP))
-        // 主体:算法 + 操作独占整行区 + 元数据小字一行,左缘恒定。
-        Column(modifier = Modifier.weight(1f)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = record.algorithm,
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(
-                    operationLabel(record.operation),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    maxLines = 1,
-                )
+        Row(
+            modifier =
+                Modifier
+                    .clip(MaterialTheme.shapes.large)
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onLongClick()
+                        },
+                    )
+                    .heightIn(min = RECORD_ROW_MIN_HEIGHT)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            // 左列:类别徽章(固定尺寸;右侧内容左缘全列表恒定锚点)。
+            KindBadge(kind = record.kind)
+            Spacer(Modifier.width(BADGE_TO_CONTENT_GAP))
+            // 主体:算法 + 操作独占首行,方向/关键数据收敛为次行单段。
+            Column(Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = record.algorithm,
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = operationLabel(record.operation),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = kindColor(record.kind),
+                        maxLines = 1,
+                    )
+                }
+                if (record.direction != null || dataSnippet != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        record.direction?.let { direction ->
+                            DirectionChip(
+                                text = directionLabel(direction),
+                                kind = record.kind,
+                            )
+                            Spacer(Modifier.width(8.dp))
+                        }
+                        if (dataSnippet != null) {
+                            Text(
+                                text = dataSnippet,
+                                style = MaterialTheme.typography.labelMedium,
+                                fontFamily = FontFamily.Monospace,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
             }
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.width(12.dp))
             Text(
-                text = record.summary(directionLabel = dirLabel),
+                text = timeFormat.format(Date(record.timestamp)),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
             )
         }
     }
-    // 行末细分隔线:日志密度大时扫描清晰(LIDE ClassRow/LogRow 同款惯例)。
-    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
 }
 
-/** 类别徽章:固定宽淡底圆角(类别色 15% alpha 底 + 类别色字母居中),列锚点恒定。 */
+/** 类别徽章:28dp 圆角方块(类别色 15% alpha 淡底 + 类别色字母),列锚点恒定。 */
 @Composable
 private fun KindBadge(kind: CryptoKind) {
     val color = kindColor(kind)
     Box(
         modifier =
             Modifier
-                .width(KIND_BADGE_WIDTH)
-                .background(color.copy(alpha = KIND_BADGE_ALPHA), RoundedCornerShape(KIND_BADGE_CORNER))
-                .padding(vertical = 2.dp),
+                .size(KIND_BADGE_SIZE)
+                .background(color.copy(alpha = KIND_BADGE_ALPHA), RoundedCornerShape(KIND_BADGE_CORNER)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -126,11 +163,29 @@ private fun KindBadge(kind: CryptoKind) {
     }
 }
 
-/** 类别徽章固定列宽(右侧内容左缘全列表恒定锚点)。 */
-private val KIND_BADGE_WIDTH = 28.dp
+/** 方向胶囊:类别色淡底 + 类别色小字(与徽章同色系;方向是加密流关键信息)。 */
+@Composable
+private fun DirectionChip(text: String, kind: CryptoKind) {
+    val color = kindColor(kind)
+    Surface(
+        shape = RoundedCornerShape(KIND_BADGE_CORNER),
+        color = color.copy(alpha = KIND_BADGE_ALPHA),
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = color,
+            maxLines = 1,
+        )
+    }
+}
+
+/** 类别徽章固定尺寸(右侧内容左缘全列表恒定锚点)。 */
+private val KIND_BADGE_SIZE = 28.dp
 
 /** 徽章与内容间距(固定,与徽章宽共同构成列锚点)。 */
-private val BADGE_TO_CONTENT_GAP = 12.dp
+private val BADGE_TO_CONTENT_GAP = 14.dp
 
 /** 徽章淡底透明度(类别色 alpha,淡色底 + 类别色字母)。 */
 private const val KIND_BADGE_ALPHA = 0.15f
@@ -138,19 +193,21 @@ private const val KIND_BADGE_ALPHA = 0.15f
 /** 徽章圆角(与 LIDE LevelBadge 同款 6dp,勿用 shapes.small=8dp)。 */
 private val KIND_BADGE_CORNER = 6.dp
 
-/** 行最小高度(消息 1 行时行高一致,列表滚动整齐)。 */
-private val RECORD_ROW_MIN_HEIGHT = 64.dp
+/** 行最小高度(数据段缺失时行高一致,列表滚动整齐)。 */
+private val RECORD_ROW_MIN_HEIGHT = 68.dp
 
-/** 记录行摘要:包名末段 · 线程 · 方向 · 最有价值数据段。 */
-private fun CryptoRecord.summary(directionLabel: String?): String = buildString {
-    append(packageName.substringAfterLast('.'))
-    append(" · ")
-    append(threadName)
-    directionLabel?.let { append(" · ").append(it) }
-    key?.let { append(" · key:").append(it.hex.take(24)) }
-    keyAlias?.let { append(" · alias:").append(it) }
-    input?.let { append(" · in:").append(it.hex.take(24)) }
-    output?.let { append(" · out:").append(it.hex.take(24)) }
+/**
+ * 最有价值数据段(单段展示不堆叠,优先级 密钥 > 别名 > 输出 > 输入):
+ * 取代旧版六段拼接摘要(包名·线程·方向·key·in·out)——包内列表包名冗余,
+ * 线程为噪音,列表行只留「最重要的一段数据」。
+ */
+@Composable
+private fun CryptoRecord.valuableDataSnippet(): String? = when {
+    keyAlias != null -> stringResource(R.string.record_data_alias) + " " + keyAlias
+    key != null -> stringResource(R.string.record_data_key) + " " + key.hex.take(24)
+    output != null -> stringResource(R.string.record_data_out) + " " + output.hex.take(24)
+    input != null -> stringResource(R.string.record_data_in) + " " + input.hex.take(24)
+    else -> null
 }
 
 /** 类别徽章字母(单字符扫描)。 */
