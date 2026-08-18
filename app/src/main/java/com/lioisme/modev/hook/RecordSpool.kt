@@ -12,8 +12,9 @@ import java.io.FileOutputStream
  * - 行格式 `seq\tjson`:seq 为注入侧进程级单调序号,ACK 与幂等去重的依据;
  * - [append] 先落盘再发送(先写后删的 at-least-once 语义):持续打开的输出流 + flush,
  *   每 [FSYNC_EVERY] 条或 [FSYNC_INTERVAL_MS] 一次 `fd.sync()`(崩溃持久性上限 ≤ 一批);
- * - 双游标:[ackedSeq](宿主已确认,仅增)+ [sentSeq](已发送);[drain] 只发送
- *   `seq > sentSeq` 的行,命中在途行即停(防重复轰炸);断连时 [resetSentCursor]
+ * - 双游标:[ackedSeq](宿主已确认,仅增)+ [sentSeq](已发送);[drain] 发送全部
+ *   `seq > ackedSeq` 的行(乱序文件安全:低 seq 行不会被已发送高 seq 行挡住),
+ *   重复发送由宿主唯一索引幂等吸收,重复量受 ACK 裁剪收敛;断连时 [resetSentCursor]
  *   将 sentSeq 回退到 ackedSeq,重连后完整重放未确认行(宿主唯一索引幂等吸收重复);
  * - [onAck] 推进 ackedSeq 并原子重写文件(临时文件 fsync 后 rename),删除已确认前缀;
  * - 超 [maxBytes] 轮转:当前文件先 fsync 再改名 `.old`,旧文件删除(丢最老数据,计数上报);
@@ -103,8 +104,11 @@ class RecordSpool(
                 when {
                     seq == Long.MIN_VALUE -> Unit // 未识别的行(理论上不出现)
                     seq <= ackedSeq -> Unit // 已确认,等待 trim
-                    seq <= sentSeq -> ok = false // 在途:停止,防重发轰炸
                     else -> {
+                        // 乱序文件(队列满时直落盘与工作线程消费交错)中,低 seq 行可能位于
+                        // 已发送高 seq 行之后,不能按 sentSeq 跳过——未发送行会永久滞留。
+                        // 统一按 ackedSeq 判定:仅确认行跳过,其余重发(宿主唯一索引幂等吸收);
+                        // 重复轰炸由 ACK 驱动的文件裁剪自然收敛(仅重发 ACK 滞后窗口内的行)。
                         if (line.length > MAX_LINE_CHARS) {
                             corruptLines++
                             sawCorrupt = true
@@ -130,11 +134,17 @@ class RecordSpool(
         return ok
     }
 
-    /** 删除已确认前缀:仅当文件头行已确认时才重写。 */
+    /**
+     * 删除已确认行:乱序文件中低 seq 行可能位于高 seq 行之后,前缀裁剪(原 dropWhile)
+     * 无法移除,导致已确认行永久滞留。改为过滤全部 `seq <= ackedSeq` 的行:
+     * ACK 仅由宿主在批量落库成功后按"会话内最大 seq"回执,ackedSeq 单调推进且
+     * 恒 ≤ 已成功发送的最大 seq(宿主只确认收到的记录),故被裁行必然已持久化,
+     * 不违反 at-least-once 语义。
+     */
     private fun trimConfirmed(f: File) {
         if (!f.exists()) return
         val lines = readLines(f)
-        val keep = lines.dropWhile { it.first <= ackedSeq }
+        val keep = lines.filter { it.first > ackedSeq }
         if (keep.size == lines.size) return
         rewriteFile(f, keep.map { it.second })
     }

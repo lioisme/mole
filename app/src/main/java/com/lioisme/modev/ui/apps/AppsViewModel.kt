@@ -9,6 +9,7 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.data.repo.AppCatalogRepository
+import com.lioisme.modev.data.repo.AppCatalogSource
 import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.data.repo.LogRepository
 import com.lioisme.modev.domain.scope.ScopeChangeResult
@@ -38,7 +39,7 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppsViewModel(
-    private val catalog: AppCatalogRepository,
+    private val catalog: AppCatalogSource,
     private val logs: LogRepository,
     server: ConnectionMonitor,
     private val scopeRepository: ScopeRepository,
@@ -55,6 +56,8 @@ data class AppRow(
 
     data class UiState(
         val rows: List<AppRow> = emptyList(),
+        /** 目录扫描进行中(首帧 progress 依据,防误显空态)。 */
+        val loading: Boolean = false,
         /** 框架作用域是否可用(不可用时禁用勾选)。 */
         val scopeReady: Boolean = false,
         /** 变更进行中的包(防重复点击)。 */
@@ -92,11 +95,10 @@ private data class CatalogBase(
         val showSystem: Boolean,
         val pending: Set<String>,
         val refreshing: Boolean,
+        val loading: Boolean,
     )
 
-    private val query = MutableStateFlow("")
-    private val onlyScoped = MutableStateFlow(false)
-    private val showSystem = MutableStateFlow(true)
+private val query = MutableStateFlow("")
     private val pending = MutableStateFlow<Set<String>>(emptySet())
     private val refreshing = MutableStateFlow(false)
 
@@ -107,13 +109,14 @@ private data class CatalogBase(
      * 排序流水线(S2):目录 × 作用域 × UI 偏好 × 置顶开关 × 语言。
      * 计数与连接态不在本流内——记录数每 200ms 落库变化不再触发全量过滤 + 排序。
      * 置顶 = 稳定分区(O(n) 无比较器,组内保持名称序)。
+     * 筛选/置顶偏好 V14 R7/R8 起统一取自 AppListSettings(单一事实源 + 持久化)。
      */
     val sortedRows: StateFlow<List<SortedRow>> = combine(
         combine(catalog.apps, scopeRepository.state, ::CatalogBase),
         combine(
             query,
-            onlyScoped,
-            showSystem,
+            AppListSettings.onlyScoped,
+            AppListSettings.showSystem,
             AppListSettings.pinScoped,
             LocaleManager.localeFlow,
             ::SortPrefs,
@@ -145,7 +148,19 @@ private data class CatalogBase(
     val uiState: StateFlow<UiState> = combine(
         sortedRows,
         combine(logs.observeRecordCounts(), server.connectedPackagesFlow) { counts, connected -> counts to connected },
-        combine(query, onlyScoped, showSystem, pending, refreshing, ::UiPrefs),
+        combine(
+            combine(query, AppListSettings.onlyScoped, AppListSettings.showSystem) { q, o, s -> Triple(q, o, s) },
+            combine(pending, refreshing, catalog.loading) { p, r, l -> Triple(p, r, l) },
+        ) { prefs3, state3 ->
+            UiPrefs(
+                query = prefs3.first,
+                onlyScoped = prefs3.second,
+                showSystem = prefs3.third,
+                pending = state3.first,
+                refreshing = state3.second,
+                loading = state3.third,
+            )
+        },
         scopeRepository.state,
     ) { rows, countsAndConnected, prefs, scopeState ->
         val (counts, connected) = countsAndConnected
@@ -160,6 +175,7 @@ private data class CatalogBase(
                     recordCount = counts[row.packageName] ?: 0L,
                 )
             },
+            loading = prefs.loading,
             scopeReady = scopeState is ScopeState.Ready,
             pending = prefs.pending,
             refreshing = prefs.refreshing,
@@ -171,14 +187,6 @@ private data class CatalogBase(
 
     fun setQuery(value: String) {
         query.value = value
-    }
-
-    fun setOnlyScoped(value: Boolean) {
-        onlyScoped.value = value
-    }
-
-    fun setShowSystem(value: Boolean) {
-        showSystem.value = value
     }
 
     /** 下拉刷新:重扫应用列表 + 重读框架作用域(无论成败均复位刷新态)。 */
@@ -254,6 +262,16 @@ class AppRecordsViewModel(
     val appInfo: StateFlow<AppCatalogRepository.AppInfo?> = catalog.apps
         .map { list -> list.firstOrNull { it.packageName == packageName } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val launchableState = MutableStateFlow<Boolean?>(null)
+    /** 启动入口解析结果(null = 解析中;V16 R4 惰性单次解析 + 缓存)。 */
+    val launchable: StateFlow<Boolean?> = launchableState
+
+    init {
+        viewModelScope.launch {
+            launchableState.value = catalog.resolveLaunchable(packageName)
+        }
+    }
 
     val connected: StateFlow<Boolean> = server.connectedPackagesFlow
         .map { set -> packageName in set }

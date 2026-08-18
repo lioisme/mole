@@ -142,6 +142,8 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.paging.runtime)
     implementation(libs.androidx.paging.compose)
+    // 详情页过长文本「展开/收起」组件(WEBTOON ReadMoreTextView,Apache-2.0)
+    implementation(libs.readmore.material3)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

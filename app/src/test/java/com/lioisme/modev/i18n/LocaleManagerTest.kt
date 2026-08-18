@@ -13,9 +13,11 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * 瀹氬悜娴嬭瘯(LocaleManager,2026-08-17 V9 璇█鐑垏鎹?:
- * resolveTag 涓夋簮浼樺厛绾?/ setLanguage 鏇存柊 flow + 鎸佷箙鍖?閲嶅惎鎭㈠)/
- * SYSTEM 鎭㈠杩涚▼鍚姩绯荤粺榛樿 / wrap 鍑烘寚瀹氳瑷€璧勬簮 / SYSTEM 鎭掕繑鍘?context銆? */
+ * 定向测试(LocaleManager,2026-08-17 V9 语言热切换;2026-08-18 V15 解析修正):
+ * resolveTag 优先级(App 内显式选择权威 / 跟随系统时查 per-app locale)/
+ * setLanguage 更新 flow + 持久化(重启恢复)/ SYSTEM 恢复系统默认 /
+ * refreshForRecreation 重建路径重解析 / wrap 出指定语言资源 / SYSTEM 恒返回 base。
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class LocaleManagerTest {
@@ -38,14 +40,29 @@ class LocaleManagerTest {
     }
 
     @Test
-    fun resolveTag_systemStateWins_overPref() {
+    fun resolveTag_explicitPref_isAuthoritative_overSystemState() {
+        // V15:App 内显式选择权威,系统 per-app locale 不再覆盖
+        // (修复「App 内选英文,重启后回退系统中文」)
         assertEquals(
-            LocaleManager.TAG_EN,
+            LocaleManager.TAG_ZH,
             LocaleManager.resolveTag(prefTag = LocaleManager.TAG_ZH, systemTag = LocaleManager.TAG_EN),
         )
         assertEquals(
-            LocaleManager.TAG_ZH,
-            LocaleManager.resolveTag(prefTag = LocaleManager.TAG_ZH, systemTag = null),
+            LocaleManager.TAG_EN,
+            LocaleManager.resolveTag(prefTag = LocaleManager.TAG_EN, systemTag = null),
+        )
+    }
+
+    @Test
+    fun resolveTag_followSystem_consultsSystemState() {
+        // 仅「跟随系统」时采用系统 per-app locale,否则跟随系统默认
+        assertEquals(
+            LocaleManager.TAG_EN,
+            LocaleManager.resolveTag(prefTag = LocaleManager.TAG_SYSTEM, systemTag = LocaleManager.TAG_EN),
+        )
+        assertEquals(
+            LocaleManager.TAG_SYSTEM,
+            LocaleManager.resolveTag(prefTag = LocaleManager.TAG_SYSTEM, systemTag = null),
         )
     }
 
@@ -61,12 +78,13 @@ class LocaleManagerTest {
         )
         assertEquals(Locale.forLanguageTag("zh"), Locale.getDefault())
 
-        // 閲嶅惎璇箟:init 浠庢寔涔呭寲鎭㈠(绯荤粺 per-app locale 鏈缃?銆?        LocaleManager.init(app)
+        // 重启语义:init 从持久化恢复(显式选择不再被系统状态覆盖)
+        LocaleManager.init(app)
         assertEquals(LocaleManager.TAG_ZH, LocaleManager.localeFlow.value)
     }
 
     @Test
-    fun setLanguage_system_restoresProcessDefaultLocale() {
+    fun setLanguage_system_restoresSystemDefaultLocale() {
         val systemDefault = Locale.getDefault()
 
         LocaleManager.setLanguage(app, LocaleManager.TAG_ZH)
@@ -75,6 +93,28 @@ class LocaleManagerTest {
         LocaleManager.setLanguage(app, LocaleManager.TAG_SYSTEM)
         assertEquals(systemDefault, Locale.getDefault())
         assertEquals(LocaleManager.TAG_SYSTEM, LocaleManager.localeFlow.value)
+    }
+
+    @Test
+    fun refreshForRecreation_keepsExplicitPref() {
+        // 重建路径:显式 App 内选择不受系统变更影响(不产生「变回去」)
+        LocaleManager.setLanguage(app, LocaleManager.TAG_ZH)
+        LocaleManager.refreshForRecreation(app)
+        assertEquals(LocaleManager.TAG_ZH, LocaleManager.localeFlow.value)
+        assertEquals(Locale.forLanguageTag("zh"), Locale.getDefault())
+    }
+
+    @Test
+    fun refreshForRecreation_system_refreshesSystemDefault() {
+        LocaleManager.setLanguage(app, LocaleManager.TAG_SYSTEM)
+
+        // 模拟系统语言变更为中文(设备级配置更新)
+        RuntimeEnvironment.setQualifiers("zh-rCN")
+        LocaleManager.refreshForRecreation(app)
+        assertEquals(LocaleManager.TAG_SYSTEM, LocaleManager.localeFlow.value)
+        // 系统默认语言已刷新:恢复「跟随系统」落到当前系统语言,而非进程启动旧值
+        LocaleManager.setLanguage(app, LocaleManager.TAG_SYSTEM)
+        assertEquals("zh", Locale.getDefault().language)
     }
 
     @Test

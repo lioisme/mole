@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.AlertDialog
@@ -66,10 +67,12 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.BuildConfig
 import com.lioisme.modev.R
+import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.i18n.LocaleManager
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsItem
 import com.lioisme.modev.ui.components.SettingsSection
+import com.lioisme.modev.ui.components.SettingsToggleItem
 import com.lioisme.modev.ui.theme.AppearanceMode
 import com.lioisme.modev.ui.theme.LocalIsDarkTheme
 import com.lioisme.modev.ui.theme.ThemeConfig
@@ -85,8 +88,8 @@ private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
  * 卡片式分区(SettingsSection = surfaceContainerLow 卡),仅通用设置 + 入口:
  * - 显示:外观模式 sheet + 主题色 sheet(跟随壁纸 / 20 色预设网格);
  * - 语言与地区:语言 sheet(LocaleManager 热切换,零重建);
- * - 功能:能力注册表驱动(CapabilityRegistry 单一事实源),当前为「捕获设置」
- *   (全局算法捕获,自注册的 CryptoCaptureCapability),新增能力自动出现入口;
+ * - 功能:能力注册表驱动(CapabilityRegistry 单一事实源),当前为「算法监听」
+ *   (全局算法监听,自注册的 AlgorithmListenCapability),新增能力自动出现入口;
  * - 数据与服务:数据管理(记录总量 / 清空全部)、服务与诊断(框架/端口/统计)
  *   ——两者为二级设置页入口(V10 分级,配置/数据/诊断类均不直占主设置页);
  * - 关于:版本 + 关于 Dialog。
@@ -172,6 +175,20 @@ fun SettingsScreen(
                     title = stringResource(R.string.language),
                     subtitle = languageSubtitle,
                     onClick = { showLanguageSheet = true },
+                )
+            }
+
+            // V14 R7:应用列表分区——置顶开关唯一入口(筛选菜单已移除该项),
+            // AppListSettings 单一事实源,开关即时重排。
+            Spacer(Modifier.height(24.dp))
+            SettingsSection(stringResource(R.string.settings_apps_section)) {
+                val pinScoped by AppListSettings.pinScoped.collectAsStateWithLifecycle()
+                SettingsToggleItem(
+                    icon = Icons.Default.PushPin,
+                    title = stringResource(R.string.settings_pin_scoped),
+                    subtitle = stringResource(R.string.settings_pin_scoped_hint),
+                    checked = pinScoped,
+                    onCheckedChange = { AppListSettings.setPinScoped(it, context) },
                 )
             }
 

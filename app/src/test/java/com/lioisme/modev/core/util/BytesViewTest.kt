@@ -6,6 +6,11 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
+/**
+ * BytesView 契约(2026-08-18 V15):
+ * 截断不再烧入 `…(+N bytes)` 硬编码英文后缀(hex 恒纯前缀,本地化由 UI 层承担);
+ * 硬保险丝 [BytesView.HARD_MAX_HEX_CHARS]/[BytesView.HARD_MAX_TEXT_CHARS] 兜底。
+ */
 class BytesViewTest {
 
     @Test
@@ -39,11 +44,12 @@ class BytesViewTest {
     }
 
     @Test
-    fun of_truncation() {
+    fun of_truncation_keeps_pure_hex_prefix() {
         val bytes = ByteArray(200) { 0x41 } // 200 个 'A',hex 400 字符 > 64 上限
         val view = BytesView.of(bytes, maxHexChars = 64)
         assertTrue(view!!.truncated)
-        assertTrue(view.hex.endsWith("…(+168 bytes)"))
+        // V15:hex 为纯前缀,不再含硬编码英文后缀(本地化由 UI 层承载)
+        assertEquals("41".repeat(32), view.hex)
         assertEquals(200, view.totalLength)
     }
 
@@ -63,6 +69,22 @@ class BytesViewTest {
     }
 
     @Test
+    fun of_hard_hex_cap_bounds_unlimited_request() {
+        // 硬保险丝:调用方传无限上限也不得超限物化(防 OOM)
+        val bytes = ByteArray(9 * 1024 * 1024) { 0x41 } // hex 18M 字符 > 16M 硬顶
+        val view = BytesView.of(bytes, maxHexChars = Int.MAX_VALUE)
+        assertTrue(view!!.truncated)
+        assertEquals(BytesView.HARD_MAX_HEX_CHARS, view.hex.length)
+    }
+
+    @Test
+    fun of_hard_text_cap_bounds_unlimited_request() {
+        val bytes = ByteArray(BytesView.HARD_MAX_TEXT_CHARS + 1) { 0x41 }
+        val view = BytesView.of(bytes, maxHexChars = Int.MAX_VALUE, maxTextChars = Int.MAX_VALUE)
+        assertNull(view!!.text)
+    }
+
+    @Test
     fun isPrintable_rejects_control_chars() {
         assertFalse(TextUtil.isPrintable(byteArrayOf(0x01, 0x02)))
         assertTrue(TextUtil.isPrintable(byteArrayOf(0x0A, 0x20, 0x7E)))
@@ -73,38 +95,5 @@ class BytesViewTest {
         assertFalse(TextUtil.isPrintable(byteArrayOf(0xC2.toByte())))
         assertFalse(TextUtil.isPrintable(byteArrayOf(0xE0.toByte(), 0x80.toByte(), 0xBF.toByte())))
         assertFalse(TextUtil.isPrintable(byteArrayOf(0xF4.toByte(), 0x90.toByte(), 0x80.toByte(), 0x80.toByte())))
-    }
-
-    @Test
-    fun preview_returns_full_hex_when_within_limit() {
-        val view = BytesView.of("hello".toByteArray(Charsets.UTF_8))
-        assertEquals("68656c6c6f", view!!.preview(maxChars = 64))
-    }
-
-    @Test
-    fun preview_truncates_with_byte_count_suffix() {
-        val bytes = ByteArray(100) { 0x41 } // hex 200 字符
-        val view = BytesView.of(bytes)
-        val preview = view!!.preview(maxChars = 32)
-        assertEquals(32, preview.length - "…(+${100 - 16} bytes)".length)
-        assertTrue(preview.endsWith("…(+84 bytes)"))
-        assertEquals("41414141414141414141414141414141…(+84 bytes)", preview)
-    }
-
-    @Test
-    fun preview_floors_illegal_small_limit() {
-        val view = BytesView.of("abcdef".toByteArray(Charsets.UTF_8))
-        // maxChars 过小被下限兜底,仍返回完整 hex(不产生空预览)
-        assertEquals("616263646566", view!!.preview(maxChars = 1))
-    }
-
-    @Test
-    fun preview_collaborates_with_capture_truncation() {
-        // 捕获侧已截断(hex 本身带标记):预览仅做展示裁剪,不叠加语义
-        val bytes = ByteArray(200) { 0x41 }
-        val view = BytesView.of(bytes, maxHexChars = 64)
-        val preview = view!!.preview(maxChars = 32)
-        assertTrue(preview.endsWith("…(+184 bytes)"))
-        assertEquals(32, preview.length - "…(+184 bytes)".length)
     }
 }

@@ -100,4 +100,31 @@ class RecordSinkTest {
         Thread.sleep(1100)
         assertEquals(1L, seqFile.readText().trim().toLong())
     }
+
+    @Test
+    fun `queue-full direct append carries assigned seq in payload`() {
+        val seqFile = File(dir, "seq.dat")
+        val spool = RecordSpool(dir)
+        val sink = RecordSink(
+            jsonOf = { it.seq.toString() },
+            sendJson = { true },
+            isConnected = { false },
+            spoolProvider = { spool },
+            seqFileProvider = { seqFile },
+        )
+        sink.start()
+        // 同步连发远超队列容量(2048)的记录:溢出部分走直落盘路径
+        repeat(4000) { sink.emit(record("burst-$it")) }
+        Thread.sleep(2500) // 等工作线程消费完
+        val lines = File(dir, "spool.dat").readLines()
+        assertTrue("全部 4000 行应已落盘,实际 ${lines.size}", lines.size >= 4000)
+        val bad = lines.filter { line ->
+            val tab = line.indexOf('\t')
+            tab > 0 && line.substring(0, tab) != line.substring(tab + 1)
+        }
+        assertTrue(
+            "直落盘行载荷必须携带已分配 seq,发现 ${bad.size} 行不符",
+            bad.isEmpty(),
+        )
+    }
 }

@@ -5,6 +5,10 @@ import com.lioisme.modev.core.model.RecordLimits
 /**
  * 字节数组的双态视图:hex 与 UTF-8 文本,均支持超限截断。
  * 设计为不可变值对象,可直接跨进程序列化。
+ *
+ * V15 契约变更:截断不再向 hex 内烧入 `…(+N bytes)` 硬编码英文后缀 ——
+ * hex 恒为纯十六进制前缀(数据侧零本地化耦合),截断语义由
+ * [truncated]/[totalLength] 承载,UI 层以资源渲染截断标记。
  */
 data class BytesView(
     val hex: String,
@@ -12,34 +16,24 @@ data class BytesView(
     val totalLength: Int,
     val truncated: Boolean,
 ) {
-    /**
-     * 展示预览:hex 前缀 + 省略标记(truncated 语义同捕获侧)。
-     * 与全量 [hex] 并存——折叠态 UI 使用,避免大字符串全量排版引发 OOM/ANR。
-     */
-    fun preview(maxChars: Int = DEFAULT_PREVIEW_CHARS): String {
-        val limit = maxChars.coerceAtLeast(MIN_PREVIEW_CHARS)
-        if (hex.length <= limit) return hex
-        return hex.take(limit) + "…(+${totalLength - limit / 2} bytes)"
-    }
-
     companion object {
         /**
          * 将字节数组转为双态视图。
          *
-         * @param maxHexChars hex 输出上限(字符数),超出截断并标记 truncated
-         * @param maxTextChars 文本输出上限;文本仅在全部字节可打印时生成
+         * @param maxHexChars hex 输出上限(字符数),超出截断并标记 truncated;
+         *                    受 [HARD_MAX_HEX_CHARS] 硬保险丝约束,无论调用方
+         *                    传值多大(含 0 = 无限配置),单字段 hex 永不超限物化
+         * @param maxTextChars 文本输出上限;文本仅在全部字节可打印时生成,
+         *                     同样受 [HARD_MAX_TEXT_CHARS] 约束
          */
         fun of(bytes: ByteArray?, maxHexChars: Int = DEFAULT_MAX_HEX_CHARS, maxTextChars: Int = DEFAULT_MAX_TEXT_CHARS): BytesView? {
             if (bytes == null || bytes.isEmpty()) return null
             val total = bytes.size
-            val hexLen = maxHexChars.coerceAtLeast(32)
+            val hexLen = maxHexChars.coerceAtLeast(32).coerceAtMost(HARD_MAX_HEX_CHARS)
             val truncated = total * 2 > hexLen
-            val hex = if (truncated) {
-                Hex.encode(bytes, 0, hexLen / 2) + "…(+${total - hexLen / 2} bytes)"
-            } else {
-                Hex.encode(bytes)
-            }
-            val text = if (total <= maxTextChars && TextUtil.isPrintable(bytes, maxChars = maxTextChars)) {
+            val hex = if (truncated) Hex.encode(bytes, 0, hexLen / 2) else Hex.encode(bytes)
+            val textLimit = maxTextChars.coerceAtMost(HARD_MAX_TEXT_CHARS)
+            val text = if (total <= textLimit && TextUtil.isPrintable(bytes, maxChars = textLimit)) {
                 String(bytes, Charsets.UTF_8)
             } else {
                 null
@@ -53,11 +47,13 @@ data class BytesView(
         /** 默认文本字节上限(见 [RecordLimits])。 */
         const val DEFAULT_MAX_TEXT_CHARS = RecordLimits.DEFAULT_MAX_TEXT_CHARS
 
-        /** 详情页折叠态预览字符上限(UI 渲染成本控制)。 */
-        const val DEFAULT_PREVIEW_CHARS = 4096
-
-        /** 预览下限兜底(防止非法小值导致空预览)。 */
-        private const val MIN_PREVIEW_CHARS = 16
+        /**
+         * 硬保险丝(V15,不可配置):无论调用方上限多大(含 0 = 无限),
+         * 单字段 hex 字符数 / 文本字节数不超此值 —— 详情页解码与渲染永不
+         * 因超大字段 OOM/ANR。
+         */
+        const val HARD_MAX_HEX_CHARS = 16 * 1024 * 1024
+        const val HARD_MAX_TEXT_CHARS = 8 * 1024 * 1024
     }
 }
 

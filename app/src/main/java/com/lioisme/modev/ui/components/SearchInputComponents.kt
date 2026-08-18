@@ -31,6 +31,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lioisme.modev.R
+import com.lioisme.modev.ui.common.rememberLocaleAwareResources
 
 /*
  * 共享搜索输入组件(2026-08-16 LIDE 风格对齐):
@@ -62,6 +63,9 @@ fun SearchInputField(
     placeholder: String,
     filterSlot: @Composable () -> Unit,
 ) {
+    // 展开态可能在独立 Dialog 窗口组合:窗口组合不接收主树 LocalContext 更新,
+    // 文本一律经语言状态驱动解析(见 rememberLocaleAwareResources)。
+    val res = rememberLocaleAwareResources()
     SearchBarDefaults.InputField(
         query = query,
         onQueryChange = onQueryChange,
@@ -71,10 +75,10 @@ fun SearchInputField(
         placeholder = { Text(placeholder) },
         leadingIcon = {
             if (onBack != null) {
-                TipIconButton(tooltip = stringResource(R.string.cd_back), onClick = onBack) {
+                TipIconButton(tooltip = res.getString(R.string.cd_back), onClick = onBack) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = stringResource(R.string.cd_back),
+                        contentDescription = res.getString(R.string.cd_back),
                     )
                 }
             }
@@ -83,12 +87,12 @@ fun SearchInputField(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (query.isNotEmpty()) {
                     TipIconButton(
-                        tooltip = stringResource(R.string.clear_search),
+                        tooltip = res.getString(R.string.clear_search),
                         onClick = { onQueryChange("") },
                     ) {
                         Icon(
                             Icons.Default.Close,
-                            contentDescription = stringResource(R.string.clear_search),
+                            contentDescription = res.getString(R.string.clear_search),
                         )
                     }
                 }

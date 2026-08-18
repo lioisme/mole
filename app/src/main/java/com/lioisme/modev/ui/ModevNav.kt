@@ -4,7 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -32,9 +32,9 @@ import com.lioisme.modev.ui.navigation.navigateGuarded
 import com.lioisme.modev.ui.navigation.popGuarded
 import com.lioisme.modev.ui.navigation.popWhenReady
 import com.lioisme.modev.ui.navigation.slideComposable
+import com.lioisme.modev.ui.settings.AlgorithmMonitorScreen
+import com.lioisme.modev.ui.settings.AlgorithmMonitorViewModelFactory
 import com.lioisme.modev.ui.settings.CapabilityUiRegistry
-import com.lioisme.modev.ui.settings.CaptureSettingsScreen
-import com.lioisme.modev.ui.settings.CaptureSettingsViewModelFactory
 import com.lioisme.modev.ui.settings.DataSettingsScreen
 import com.lioisme.modev.ui.settings.DataSettingsViewModelFactory
 import com.lioisme.modev.ui.settings.DiagnosticsScreen
@@ -45,8 +45,8 @@ import com.lioisme.modev.ui.settings.SettingsViewModelFactory
 /**
  * 单栈导航宿主(2026-08-16 V4,五界面收敛;2026-08-17 V10 设置分级):
  * 信息架构 = 应用列表(根页) → 应用记录(每应用,含应用级危险操作)→ 记录详情;
- * 设置页 = 通用设置,入口 = 应用列表筛选菜单底部;二级设置页(捕获设置 / 数据管理 /
- * 服务与诊断)经设置页进入(捕获设置 V10 全局化)。
+ * 设置页 = 通用设置,入口 = 应用列表筛选菜单底部;二级设置页(算法监听 / 数据管理 /
+ * 服务与诊断)经设置页进入(算法监听 V10 全局化,V14 R5 更名)。
  * 全部目的地 slideComposable(编译器层杜绝 fade)+ 返回键统一过门控。
  * 根页(APPS)空闲返回抛回系统退出;次级页返回一律 popGuarded 回退上级。
  */
@@ -62,16 +62,16 @@ fun ModevNavHost(navController: NavHostController) {
         CapabilityUiRegistry().apply {
             register(
                 CapabilityUiRegistry.Entry(
-                    kind = CapabilityKind.CRYPTO_CAPTURE,
-                    icon = Icons.Default.Tune,
-                    titleRes = R.string.capture_settings_title,
-                    onClick = { navController.navigateGuarded(ModevRoutes.CAPTURE_SETTINGS) },
+                    kind = CapabilityKind.ALGORITHM_LISTEN,
+                    icon = Icons.Default.Sensors,
+                    titleRes = R.string.algorithm_monitor_title,
+                    onClick = { navController.navigateGuarded(ModevRoutes.ALGORITHM_MONITOR) },
                 )
             )
         }
     }
 
-    // 一键启动作用域应用:getLaunchIntentForPackage 取入口,加 NEW_TASK 从宿主前台启动。
+    // 一键启动作用域应用:getLaunchIntentForPackage(全 API 稳定,无弃用重载)取入口,加 NEW_TASK 从宿主前台启动。
     val launchApp: (String) -> Unit = { pkg ->
         runCatching {
             context.packageManager.getLaunchIntentForPackage(pkg)?.let { intent ->
@@ -175,10 +175,10 @@ fun ModevNavHost(navController: NavHostController) {
                 )
             }
         }
-        slideComposable(route = ModevRoutes.CAPTURE_SETTINGS) {
+        slideComposable(route = ModevRoutes.ALGORITHM_MONITOR) {
             BackGuarded(navController) {
-                CaptureSettingsScreen(
-                    viewModel = viewModel(factory = CaptureSettingsViewModelFactory(app.container)),
+                AlgorithmMonitorScreen(
+                    viewModel = viewModel(factory = AlgorithmMonitorViewModelFactory(app.container)),
                     onBack = { navController.popGuarded() },
                 )
             }

@@ -26,19 +26,22 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.core.util.ChunkedText
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 定向测试(ByteSection,2026-08-17 V13 去折叠契约):
- * - 无折叠按钮:任何数据量下区块恒展开(移除行数阈值折叠交互);
- * - 全量惰性组合:仅可视块在树中,滚动按需创建([ChunkedText] O(1) 取块),
- *   全量 hex/text 永不为单一节点;
- * - 长按任意块复制「整段」(text 块复制全文 / hex 块复制全 hex),宿主回调
- *   收到完整文本,而非仅当前块;
- * - footer 复制按钮([section_copy] 描述)复制完整 hex(无障碍/可发现入口)。
- * 实机 100K 字符单 Text 展开 26s ANR 的回归防线(恒展开 + 惰性分块)。
+ * 定向测试(ByteSection,2026-08-18 V14 R2/R3 + V15 双层渲染契约):
+ * ①短内容(≤4096 字符)无折叠控件,整段单 Text 全量可见;
+ * ②>4096 字符默认收起:预览(ReadMoreText,「… 展开更多」)在树、分块不在;
+ * ③点「展开更多」→ Tier A(≤128K 字符)整段单 Text 组合(整段可选中),「收起」出现;
+ * ④点「收起」→ 回折叠态(预览在树、分块不在);
+ * ⑤Tier A 长按整段 → 不触发整段复制回调(SelectionContainer 原生选择);
+ * ⑥footer 复制按钮仍复制完整 hex;
+ * ⑦>128K 字符(Tier B)展开 → 分块惰性组合,无整段单 Text;
+ * ⑧300K hex/text 惰性滚动回归(V11 性能防线:末块未滚动不在树,滚动后组合成功)。
+ * 实机 100K 字符单 Text 展开 26s ANR 的回归防线(收起预览有界 + 展开惰性分块)。
  */
 @RunWith(AndroidJUnit4::class)
 class ByteSectionTest {
@@ -70,17 +73,21 @@ class ByteSectionTest {
     private fun setSection(
         hex: String,
         text: String? = "plain text",
+        initiallyExpanded: Boolean = false,
     ) {
         lastCopied = null
         rule.setContent {
             MaterialTheme {
                 var copied by remember { mutableStateOf<String?>(null) }
                 lastCopied = copied
+                var expanded by remember { mutableStateOf(initiallyExpanded) }
                 LazyColumn(Modifier.fillMaxSize()) {
                     byteSectionItems(
                         sectionKey = "test",
                         titleRes = R.string.section_key,
                         view = view(hex, text),
+                        expanded = expanded,
+                        onExpandedChange = { expanded = it },
                         copyFull = { _, fullText -> copied = fullText },
                     )
                 }
@@ -88,93 +95,141 @@ class ByteSectionTest {
         }
     }
 
+    /** 折叠态标记:预览节点(前 4096 字符)唯一,无「展开更多/收起」之外控件。 */
+    private fun previewChunk(hex: String) = hex.take(ChunkedText.DEFAULT_CHUNK_CHARS)
+
     @Test
-    fun smallData_alwaysExpanded_noToggleButton() {
+    fun smallData_noFoldControls_allVisible() {
         val hex = "abcd"
         setSection(hex = hex, text = null)
-        // 恒展开:全量 hex 可见;折叠交互彻底移除(无「展开/收起」按钮)
+        // ①短内容:整段单 Text 全量可见,无任何折叠控件(展开更多/收起按钮均不在树)
         rule.onNodeWithText(hex).assertIsDisplayed()
-        rule.onAllNodesWithText(str(R.string.section_expand)).assertCountEquals(0)
+        rule.onAllNodesWithText(str(R.string.record_see_more)).assertCountEquals(0)
         rule.onAllNodesWithText(str(R.string.section_collapse)).assertCountEquals(0)
     }
 
     @Test
-    fun largeData_alwaysExpanded_lazyChunksNotSingleNode() {
-        val full = "ab".repeat(5_000) // 10K 字符 → 3 块(4096/4096/1808)
+    fun largeData_defaultCollapsed_previewInTree_contentAbsent() {
+        // ②>4096 字符默认收起:10K hex → 预览(前 4096 字符)唯一在树,
+        // 内容节点不在树;「展开更多」链接在树。
+        val full = "ab".repeat(5_000)
         setSection(full, text = null)
-        // 首块组合且可见,全量 hex 永不是单一节点(分块契约核心)
-        rule.onNodeWithText(full.take(ChunkedText.DEFAULT_CHUNK_CHARS)).assertIsDisplayed()
-        rule.onAllNodesWithText(full).assertCountEquals(0)
-        // 无折叠按钮(展开态常驻,无「收起」入口)
+        rule.onAllNodesWithText(previewChunk(full), substring = false).assertCountEquals(1)
+        rule.onNodeWithText(str(R.string.record_see_more)).assertIsDisplayed()
         rule.onAllNodesWithText(str(R.string.section_collapse)).assertCountEquals(0)
+    }
+
+    @Test
+    fun clickSeeMore_expandsIntoSingleSelectableSegment() {
+        // ③点「展开更多」→ Tier A(≤128K 字符)整段单 Text 组合(10K hex 全量单节点,
+        // 系统「全选」可一次覆盖整段),「收起」按钮出现,「展开更多」链接消失。
+        val full = "ab".repeat(5_000)
+        setSection(full, text = null)
+        rule.onNodeWithText(str(R.string.record_see_more)).performClick()
+        rule.waitForIdle()
+        rule.onAllNodesWithText(full, substring = false).assertCountEquals(1)
+        rule.onNodeWithText(str(R.string.section_collapse)).assertIsDisplayed()
+        rule.onAllNodesWithText(str(R.string.record_see_more)).assertCountEquals(0)
+    }
+
+    @Test
+    fun collapseButton_returnsToCollapsedPreview() {
+        // ④展开态点「收起」→ 回折叠态:预览唯一在树、内容不在树、展开链接回来。
+        val full = "ab".repeat(5_000)
+        setSection(full, text = null, initiallyExpanded = true)
+        rule.onNodeWithText(str(R.string.section_collapse)).performClick()
+        rule.waitForIdle()
+        rule.onAllNodesWithText(previewChunk(full), substring = false).assertCountEquals(1)
+        rule.onNodeWithText(str(R.string.record_see_more)).assertIsDisplayed()
+        rule.onAllNodesWithText(str(R.string.section_collapse)).assertCountEquals(0)
+    }
+
+    @Test
+    fun tierA_longPress_triggersNoWholeSectionCopy() {
+        // ⑤Tier A 展开态长按整段 → 不触发整段复制回调(SelectionContainer 原生选择,
+        // 系统选择手柄属平台 UI,不进组合树)。
+        val full = "ab".repeat(5_000)
+        setSection(full, text = null, initiallyExpanded = true)
+        longPressOn(full)
+        assertNull(lastCopied)
+    }
+
+    @Test
+    fun copyButton_opensMenu_copiesFullHex() {
+        // ⑥footer 复制按钮(V16 R3 菜单化)仍复制完整 hex,不受折叠影响:
+        // 点按钮 → 菜单 → 「复制 Hex」→ 完整 hex 进回调。
+        val full = "ab".repeat(5_000)
+        setSection(full, text = null)
+        rule.onNodeWithContentDescription(str(R.string.section_copy)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.section_copy_hex)).performClick()
+        rule.waitForIdle()
+        assertEquals(full, lastCopied)
+    }
+
+    @Test
+    fun copyMenu_copiesTextAndAll_whenTextPresent() {
+        // V16 R3:文本存在时菜单含「复制文本/复制 Hex/复制文本+Hex」三项;
+        // 文本项复制纯文本,全部项复制 文本\nhex 拼接。
+        val full = "ab".repeat(5_000)
+        setSection(full, text = "plain text")
+        rule.onNodeWithContentDescription(str(R.string.section_copy)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.section_copy_text)).performClick()
+        rule.waitForIdle()
+        assertEquals("plain text", lastCopied)
+
+        rule.onNodeWithContentDescription(str(R.string.section_copy)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.section_copy_all)).performClick()
+        rule.waitForIdle()
+        assertEquals("plain text\n$full", lastCopied)
+    }
+
+    @Test
+    fun copyMenu_hidesTextItem_whenTextAbsent() {
+        // V16 R3:文本缺失时「复制文本」项隐藏(不留空白项)。
+        val full = "ab".repeat(5_000)
+        setSection(full, text = null)
+        rule.onNodeWithContentDescription(str(R.string.section_copy)).performClick()
+        rule.waitForIdle()
+        rule.onAllNodesWithText(str(R.string.section_copy_text)).assertCountEquals(0)
+        rule.onNodeWithText(str(R.string.section_copy_hex)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.section_copy_all)).assertIsDisplayed()
+    }
+
+    @Test
+    fun oversizedHex_aboveSelectableCap_keepsChunkedTier() {
+        // ⑦>128K 字符(Tier B)展开 → 分块惰性组合(块 0 在树),无整段单 Text。
+        val full = "ab".repeat(70_000) // 140K 字符 > SELECTABLE_CAP_CHARS
+        setSection(full, text = null, initiallyExpanded = true)
+        rule.onAllNodesWithText(full, substring = false).assertCountEquals(0)
+        rule.onAllNodesWithText("ab".repeat(2048), substring = false).assertCountEquals(1)
+        rule.onNodeWithText(str(R.string.section_collapse)).assertIsDisplayed()
     }
 
     @Test
     fun oversizedHex_expandsLazilyChunkByChunk() {
-        // 300K 字符,前 150K 为 ab 段、后 150K 为 cd 段
+        // ⑧300K hex 惰性滚动回归(展开态):末块未滚动不在树,滚动后组合成功。
         val full = "ab".repeat(75_000) + "cd".repeat(75_000)
-        setSection(full, text = null)
+        setSection(full, text = null, initiallyExpanded = true)
         val chunks = ChunkedText(full)
         val lastChunk = chunks[chunks.size - 1]
-        // 惰性:末块未滚动时不在树中(精确匹配,防前缀块子串误命中)
         rule.onAllNodes(hasText(lastChunk, substring = false)).assertCountEquals(0)
-        // 滚动到末块后其组合成功(按需创建,无巨型单 Text)
         rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(lastChunk, substring = false))
         rule.onNode(hasText(lastChunk, substring = false)).assertIsDisplayed()
     }
 
     @Test
     fun oversizedText_expandsLazilyChunkByChunk() {
-        // 300K 可打印文本(hex 600K),文本亦分块惰性组合
+        // ⑧300K text(hex 600K)惰性滚动回归(展开态)。
         val text = "a".repeat(300_000)
         val hex = "ab".repeat(150_000)
-        setSection(hex = hex, text = text)
+        setSection(hex = hex, text = text, initiallyExpanded = true)
         val textChunks = ChunkedText(text)
         val lastTextChunk = textChunks[textChunks.size - 1]
         rule.onAllNodes(hasText(lastTextChunk, substring = false)).assertCountEquals(0)
         rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(lastTextChunk, substring = false))
         rule.onNode(hasText(lastTextChunk, substring = false)).assertIsDisplayed()
-    }
-
-    @Test
-    fun textChunkLongPress_copiesFullTextNotJustChunk() {
-        // 块间互异:块1=ab×2048、块2=cd×2048、块3=ef×904(hex 3 块同长)
-        val hex = "ab".repeat(2048) + "cd".repeat(2048) + "ef".repeat(904)
-        val text = "T".repeat(300)
-        setSection(hex = hex, text = text)
-        // 长按 text 块 → 宿主收到整段全文(而非仅当前块)
-        longPressOn("T".repeat(300))
-        assertEquals(text, lastCopied)
-    }
-
-    @Test
-    fun hexChunkLongPress_copiesFullHex() {
-        // 块间互异:块1=ab×2048、块2=cd×2048、块3=ef×904,精确匹配唯一节点;
-        // 4096 字符单块超一屏,先滚动至目标块再长按。
-        val full = "ab".repeat(2048) + "cd".repeat(2048) + "ef".repeat(904)
-        setSection(full, text = null)
-        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText("cd".repeat(2048), substring = false))
-        rule.waitForIdle()
-        longPressOn("cd".repeat(2048))
-        assertEquals(full, lastCopied)
-    }
-
-    @Test
-    fun copyButton_copiesFullHex() {
-        val full = "ab".repeat(5_000)
-        setSection(full, text = null)
-        // footer 复制按钮(无障碍入口,contentDescription = section_copy)
-        rule.onNodeWithContentDescription(str(R.string.section_copy)).performClick()
-        rule.waitForIdle()
-        assertEquals(full, lastCopied)
-    }
-
-    @Test
-    fun emptyText_rendersHexChunksOnly_noCopyButtonSpam() {
-        val hex = "abcd"
-        setSection(hex = hex, text = null)
-        rule.onNodeWithText(hex).assertIsDisplayed()
-        // 恰一个复制入口(footer),无冗余
-        rule.onAllNodesWithContentDescription(str(R.string.section_copy)).assertCountEquals(1)
     }
 }

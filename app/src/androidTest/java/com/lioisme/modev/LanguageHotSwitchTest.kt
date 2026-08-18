@@ -20,9 +20,12 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 语言热切换验收测试(T10,2026-08-17 V9):
+ * 语言热切换验收测试(T10,2026-08-17 V9;V16 R5 扩展搜索 Dialog 语境):
  * R1 契约:语言切换**零 Activity 重建**(ActivityLifecycleCallbacks 断言
  * onDestroy 不触发)+ 导航栈保留(返回仍落应用列表)+ 全站文本即时切换。
+ * V16 R5:官方全屏搜索为独立 Dialog 窗口,断言其内部文本(返回按钮
+ * contentDescription,仅 Dialog 内存在)随热切换即时更替(CompositionLocalProvider
+ * 覆写 LocalContext 路径)。
  * 结束经 [LocaleManager.setLanguage] 恢复跟随系统,不污染后续用例。
  */
 @RunWith(AndroidJUnit4::class)
@@ -85,5 +88,21 @@ class LanguageHotSwitchTest {
         } finally {
             app.unregisterActivityLifecycleCallbacks(callback)
         }
+    }
+
+    @Test
+    fun expandedSearchDialog_followsHotSwitchedLanguage() {
+        // 切中文后展开搜索:占位符经包装上下文取当前语言文本(设备默认语言未知,不硬编码)。
+        LocaleManager.setLanguage(ctx, LocaleManager.TAG_ZH)
+        rule.waitForIdle()
+        rule.onNodeWithText(LocaleManager.wrap(ctx).getString(R.string.apps_search)).performClick()
+        rule.waitForIdle()
+        // 返回按钮仅存在于展开 Dialog 内(折叠条无返回语义)→ 唯一定位 Dialog 内文本。
+        rule.onNodeWithContentDescription(LocaleManager.wrap(ctx).getString(R.string.cd_back)).assertIsDisplayed()
+
+        // 热切换英文(Dialog 保持展开,零重建):Dialog 内文本即时更替。
+        LocaleManager.setLanguage(ctx, LocaleManager.TAG_EN)
+        rule.waitForIdle()
+        rule.onNodeWithContentDescription("Back").assertIsDisplayed()
     }
 }

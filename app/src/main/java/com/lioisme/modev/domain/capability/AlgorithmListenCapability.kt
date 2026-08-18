@@ -8,15 +8,16 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * 算法捕获能力:全局捕获配置([HookSwitch])的领域投影。
+ * 算法监听能力(V14 R5 更名自 CryptoCaptureCapability):全局监听配置
+ * ([HookSwitch])的领域投影。
  * 启用态 = 任一算法类别开启([HookSwitch.anyEnabled])。
  */
-class CryptoCaptureCapability(
+class AlgorithmListenCapability(
     globalSwitch: StateFlow<HookSwitch>,
     scope: CoroutineScope,
 ) : Capability {
 
-    override val kind: CapabilityKind = CapabilityKind.CRYPTO_CAPTURE
+    override val kind: CapabilityKind = CapabilityKind.ALGORITHM_LISTEN
 
     override val enabled: StateFlow<Boolean> =
         globalSwitch

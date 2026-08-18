@@ -27,15 +27,18 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 界面导航验收测试(T4,2026-08-16 V3;2026-08-17 V7 五需求同步;V10 设置分级同步):
- * R1(信息架构:应用列表→应用记录→记录详情;设置页→二级设置页:捕获设置/数据管理/
+ * 界面导航验收测试(T4,2026-08-16 V3;2026-08-17 V7 五需求同步;V10 设置分级同步;
+ * V14 R5/R7 同步):
+ * R1(信息架构:应用列表→应用记录→记录详情;设置页→二级设置页:算法监听/数据管理/
  * 服务与诊断,往返可达)、
  * R2(应用列表/应用记录 AppBar 内仅一个 SearchBar)、
  * R3(SearchBar 内仅一个筛选按钮,无返回/清除)、
  * V7 变更:应用行无运行按钮(根页 app-launch=0)、详情页顶栏更多菜单承载导出,
  * V10 变更:捕获设置全局化(入口移至设置页,记录页筛选菜单仅算法类别)、
  * 记录页「更多」菜单承载应用级危险操作(移出作用域/清空该应用日志)、
- * 置顶开关入筛选菜单、设置页含「数据管理/服务与诊断」入口。
+ * 设置页含「数据管理/服务与诊断」入口。
+ * V14 变更:算法监听更名链(无「捕获设置」文案)、置顶开关收敛至设置页
+ * 「应用列表」分区(筛选菜单无置顶项,开关默认开可切换)。
  * 数据依赖断言(应用行/记录行)以 assumeTrue 防御,空机不红。
  */
 @RunWith(AndroidJUnit4::class)
@@ -63,11 +66,12 @@ class FourScreensNavTest {
         // V7:根页应用行无运行按钮(启动入口仅保留于应用记录页头部)。
         rule.onAllNodesWithTag("app-launch").assertCountEquals(0)
 
-        // 筛选菜单:含「仅作用域 / 系统应用 / 置顶 / 设置」四项。
+        // 筛选菜单:含「仅作用域 / 系统应用 / 设置」三项(V14 R7:置顶项已收敛
+        // 至通用设置页「应用列表」分区,菜单内不再出现)。
         rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
         rule.onNodeWithText(str(R.string.apps_only_scoped)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.apps_system)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.settings_pin_scoped)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.settings_pin_scoped)).assertDoesNotExist()
         rule.onNodeWithText(str(R.string.settings_title)).assertIsDisplayed()
 
         // 仅作用域筛选生效后菜单关闭(过滤语义无异常即可)。
@@ -84,11 +88,12 @@ class FourScreensNavTest {
     }
 
     @Test
-    fun appRowOpensAppRecords_andDangerMenu_andGlobalCaptureSettingsNavigates() {
+    fun appRowOpensAppRecords_andDangerMenu_andAlgorithmMonitorNavigates() {
         rule.waitForIdle()
         assumeTrue(rule.onAllNodesWithTag("app-row").fetchSemanticsNodes().isNotEmpty())
 
-        // V7:头部「启动」按钮仅对可启动应用渲染(launchable==true && enabled)。
+        // V16 R4:头部「启动」按钮按需惰性解析(单次 binder + 缓存),进入页面后
+        // 异步出现 → 有界轮询(300ms),防未解析完误判为不可启动。
         // 逐个进入应用记录页寻找带启动按钮的应用;可见行全部不可启动时上滑列表
         // (模拟器首屏常为无启动入口的系统组件)继续寻找;仍找不到则跳过本用例,
         // 保证启动按钮/危险操作/全局捕获设置断言只在有效语境下执行。
@@ -104,7 +109,17 @@ class FourScreensNavTest {
                 // (LIDE 同款,二级页有返回语义)→ 全页恰 1 个返回按钮;筛选按钮 1 个。
                 rule.onAllNodesWithContentDescription(str(R.string.cd_back)).assertCountEquals(1)
                 rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(1)
-                if (rule.onAllNodesWithTag("app-launch").fetchSemanticsNodes().isNotEmpty()) {
+                val deadline = System.currentTimeMillis() + 300
+                var hasLaunch = false
+                while (System.currentTimeMillis() < deadline) {
+                    rule.waitForIdle()
+                    if (rule.onAllNodesWithTag("app-launch").fetchSemanticsNodes().isNotEmpty()) {
+                        hasLaunch = true
+                        break
+                    }
+                    Thread.sleep(50)
+                }
+                if (hasLaunch) {
                     openedLaunchable = true
                     break
                 }
@@ -132,25 +147,34 @@ class FourScreensNavTest {
         }
         pressBack()
 
-        // 筛选菜单:全部算法类别(V10 起无「捕获设置」入口,配置已全局化)。
+        // 筛选菜单:全部算法类别(V10 起无捕获设置入口,配置已全局化;V14 更名后
+        // 亦无「算法监听」入口——入口仅收敛于设置页)。
         rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
         rule.onNodeWithText(str(R.string.kind_cipher)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.kind_key_generation)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.capture_settings_title)).assertDoesNotExist()
+        rule.onNodeWithText(str(R.string.algorithm_monitor_title)).assertDoesNotExist()
         pressBack()
         rule.onAllNodesWithTag("app-launch").assertCountEquals(1)
 
-        // 回根页 → 筛选菜单 → 设置页(捕获设置全局入口)。
+        // 回根页 → 筛选菜单 → 设置页(算法监听全局入口)。
         pressBack()
         rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
         rule.onAllNodes(hasText(str(R.string.settings_title)) and hasAnyAncestor(isPopup())).onFirst().performClick()
         rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.capture_settings_title)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.algorithm_monitor_title)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.data_settings_title)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.diagnostics_settings_title)).assertIsDisplayed()
 
-        // 捕获设置全局页:开关区 + 全局提示,无筛选按钮。
-        rule.onNodeWithText(str(R.string.capture_settings_title)).performClick()
+        // V14 R7:设置页「应用列表」分区含置顶开关(唯一入口),可切换并还原。
+        rule.onNodeWithText(str(R.string.settings_apps_section)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.settings_pin_scoped)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.settings_pin_scoped)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.settings_pin_scoped)).performClick()
+        rule.waitForIdle()
+
+        // 算法监听全局页:开关区 + 全局提示,无筛选按钮。
+        rule.onNodeWithText(str(R.string.algorithm_monitor_title)).performClick()
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.switch_cipher)).assertIsDisplayed()
         // 记录选项区在 LazyColumn 折叠区,滚动至可见后断言。

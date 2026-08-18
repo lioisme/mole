@@ -8,6 +8,9 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -24,19 +27,21 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.VpnKey
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,10 +55,11 @@ import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.components.SettingsToggleItem
+import kotlinx.coroutines.launch
 
 /**
- * 捕获设置页(V10 全局化,自设置页「功能」区入口):
- * 全局算法捕获开关(11 类)+ 记录选项(记录堆栈 / 单字段字节上限 / 忽略栈前缀)。
+ * 算法监听页(V10 全局化,自设置页「功能」区入口;V14 R5 更名自「捕获设置」):
+ * 全局算法监听开关(11 类)+ 记录选项(记录堆栈 / 单字段字节上限 / 忽略栈前缀)。
  * 单一事实源 = SettingsRepository.globalSwitch(镜像 switch_global,
  * 读优先已注入作用域客户端,无则回退本地;变更经 ConfigServer 广播全部客户端,
  * 载荷带会话包名、协议兼容)。
@@ -61,8 +67,8 @@ import com.lioisme.modev.ui.components.SettingsToggleItem
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CaptureSettingsScreen(
-    viewModel: CaptureSettingsViewModel,
+fun AlgorithmMonitorScreen(
+    viewModel: AlgorithmMonitorViewModel,
     onBack: () -> Unit,
 ) {
     val switch by viewModel.switchState.collectAsStateWithLifecycle()
@@ -73,7 +79,7 @@ fun CaptureSettingsScreen(
     Scaffold(
         topBar = {
             ModevTopBar(
-                title = stringResource(R.string.capture_settings_title),
+                title = stringResource(R.string.algorithm_monitor_title),
                 onBack = onBack,
             )
         },
@@ -84,7 +90,7 @@ fun CaptureSettingsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             item(key = "algorithms") {
-                SettingsSection(stringResource(R.string.section_algorithms)) {
+                SettingsSection(stringResource(R.string.section_monitor_kinds)) {
                     SwitchRowItem(
                         icon = Icons.Filled.Lock,
                         title = stringResource(R.string.switch_cipher),
@@ -210,7 +216,8 @@ fun CaptureSettingsScreen(
     }
 }
 
-/** 单字段字节上限编辑(数字键盘,非负整数,0=无限)。 */
+/** 单字段字节上限编辑(底部 sheet,V15:键盘输入一律底部化,ime 上推不遮挡)。 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MaxBytesDialog(
     initial: Int,
@@ -218,10 +225,35 @@ private fun MaxBytesDialog(
     onDismiss: () -> Unit,
 ) {
     var text by remember { mutableStateOf(if (initial <= 0) "0" else initial.toString()) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.capture_max_bytes_dialog_title)) },
-        text = {
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+
+    fun confirm() {
+        val value = text.toIntOrNull() ?: 0
+        scope.launch { sheetState.hide() }.invokeOnCompletion { onConfirm(value) }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = {
+            scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+        },
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 24.dp),
+        ) {
+            Text(
+                stringResource(R.string.capture_max_bytes_dialog_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(16.dp))
             OutlinedTextField(
                 value = text,
                 onValueChange = { input ->
@@ -230,22 +262,29 @@ private fun MaxBytesDialog(
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 supportingText = { Text(stringResource(R.string.capture_max_bytes_hint)) },
+                modifier = Modifier.fillMaxWidth(),
             )
-        },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(text.toIntOrNull() ?: 0) }) {
-                Text(stringResource(R.string.confirm))
+            Spacer(Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = {
+                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                }) {
+                    Text(stringResource(R.string.cancel))
+                }
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = { confirm() }) {
+                    Text(stringResource(R.string.confirm))
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-    )
+        }
+    }
 }
 
-/** 忽略栈前缀编辑(每行一个,去空行去重)。 */
+/** 忽略栈前缀编辑(底部 sheet,每行一个,去空行去重)。 */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun IgnoreStackDialog(
     initial: List<String>,
@@ -253,32 +292,59 @@ private fun IgnoreStackDialog(
     onDismiss: () -> Unit,
 ) {
     var text by remember { mutableStateOf(initial.joinToString("\n")) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.capture_ignore_stack_dialog_title)) },
-        text = {
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+
+    fun confirm() {
+        val prefixes = text.lines().map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+        scope.launch { sheetState.hide() }.invokeOnCompletion { onConfirm(prefixes) }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = {
+            scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+        },
+        sheetState = sheetState,
+    ) {
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .navigationBarsPadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 24.dp),
+        ) {
+            Text(
+                stringResource(R.string.capture_ignore_stack_dialog_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            )
+            Spacer(Modifier.height(16.dp))
             OutlinedTextField(
                 value = text,
                 onValueChange = { text = it },
                 minLines = 4,
                 supportingText = { Text(stringResource(R.string.capture_ignore_stack_dialog_hint)) },
+                modifier = Modifier.fillMaxWidth(),
             )
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                onConfirm(
-                    text.lines().map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-                )
-            }) {
-                Text(stringResource(R.string.confirm))
+            Spacer(Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = {
+                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+                }) {
+                    Text(stringResource(R.string.cancel))
+                }
+                Spacer(Modifier.width(8.dp))
+                TextButton(onClick = { confirm() }) {
+                    Text(stringResource(R.string.confirm))
+                }
             }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        },
-    )
+        }
+    }
 }
 
 /** 开关行(对齐 LIDE SettingsToggleItem 语义,参数名本地化)。 */

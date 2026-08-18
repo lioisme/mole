@@ -1,39 +1,64 @@
 package com.lioisme.modev.ui.apps
 
+import java.util.Locale
 import org.junit.Assert.assertEquals
 import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
 
-/** 记录数紧凑格式化(纯函数,en/zh 资源语义对齐,回归 S3)。 */
+/**
+ * 记录数紧凑格式化契约(2026-08-18 V15):
+ * zh ≥1 万 → 「1.2万」式紧凑(1 位小数);en ≥1 千 → 「1.2K」;
+ * 阈值以下千分位整数(「3,000」,不再有「3千+」式自造单位);0 → 「0」。
+ * Robolectric 提供真实 android.icu 实现(纯 JVM 下为桩,静态方法返回 null)。
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
 class AppCountFormatTest {
 
-    // 缩放语义与 UI 一致:zh 万=÷10000、千=÷1000;en 恒 K=÷1000。
-    private val zhWan = { n: Long -> "${n / 10_000}万+" }
-    private val zhQian = { n: Long -> "${n / 1_000}千+" }
-    private val enK = { n: Long -> "${n / 1_000}K+" }
+    private val zh = Locale.SIMPLIFIED_CHINESE
+    private val en = Locale.US
 
     @Test
-    fun `wan level uses wan formatter`() {
-        assertEquals("2万+", AppCountFormat.compact(20_000, zhWan, zhQian))
-        assertEquals("20K+", AppCountFormat.compact(20_000, enK, enK))
+    fun zh_compact_aboveTenThousand() {
+        assertEquals("1.2万", AppCountFormat.compact(12_345, zh))
+        assertEquals("10万", AppCountFormat.compact(100_000, zh))
     }
 
     @Test
-    fun `qian level uses qian formatter`() {
-        assertEquals("2千+", AppCountFormat.compact(2_000, zhWan, zhQian))
-        assertEquals("2K+", AppCountFormat.compact(2_000, enK, enK))
+    fun zh_grouped_belowTenThousand() {
+        assertEquals("3,000", AppCountFormat.compact(3_000, zh))
+        assertEquals("999", AppCountFormat.compact(999, zh))
+        assertEquals("0", AppCountFormat.compact(0, zh))
     }
 
     @Test
-    fun `boundary rounding is floor`() {
-        assertEquals("1万+", AppCountFormat.compact(10_000, zhWan, zhQian))
-        assertEquals("9K+", AppCountFormat.compact(9_999, enK, enK))
-        assertEquals("1K+", AppCountFormat.compact(1_000, enK, enK))
+    fun en_compact_aboveThousand() {
+        assertEquals("1.2K", AppCountFormat.compact(1_200, en))
+        assertEquals("1.5M", AppCountFormat.compact(1_500_000, en))
     }
 
     @Test
-    fun `below thousand renders verbatim`() {
-        assertEquals("999", AppCountFormat.compact(999, zhWan, zhQian))
-        assertEquals("0", AppCountFormat.compact(0, zhWan, zhQian))
-        assertEquals("1", AppCountFormat.compact(1, enK, enK))
+    fun en_grouped_belowThousand() {
+        assertEquals("999", AppCountFormat.compact(999, en))
+        // 恰在阈值(1,000)上走紧凑档
+        assertEquals("1K", AppCountFormat.compact(1_000, en))
+    }
+
+    @Test
+    fun thresholds_follow_locale() {
+        assertEquals(10_000L, AppCountFormat.compactThreshold(zh))
+        assertEquals(1_000L, AppCountFormat.compactThreshold(en))
+        // 边界:恰在阈值上走紧凑,之下走千分位
+        assertEquals("1万", AppCountFormat.compact(10_000, zh))
+        assertEquals("9,999", AppCountFormat.compact(9_999, zh))
+    }
+
+    @Test
+    fun grouped_addsLocaleGrouping() {
+        assertEquals("1,234,567", AppCountFormat.grouped(1_234_567, en))
+        assertEquals("123", AppCountFormat.grouped(123, en))
+        assertEquals("0", AppCountFormat.grouped(0, en))
     }
 }

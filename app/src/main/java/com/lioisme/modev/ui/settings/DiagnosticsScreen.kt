@@ -38,9 +38,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
 import com.lioisme.modev.domain.scope.ScopeState
+import com.lioisme.modev.ui.apps.AppCountFormat
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsInfoItem
 import com.lioisme.modev.ui.components.SettingsSection
+import com.lioisme.modev.ui.common.rememberEffectiveLocale
 
 /**
  * 服务与诊断页(V10 设置分级,自设置页「数据与服务」入口):
@@ -56,6 +58,11 @@ fun DiagnosticsScreen(
     val connectedCount by viewModel.connectedCount.collectAsStateWithLifecycle()
     val frameworkState by viewModel.frameworkState.collectAsStateWithLifecycle()
     val pipelineStats by viewModel.pipelineStats.collectAsStateWithLifecycle()
+
+    // V15:统计数值按应用实际生效 locale 千分位分组(与 stringResource 解析同源)。
+    // V16 R5:热切换下 LocalConfiguration 陈旧,一律经包过 Context 解析(effectiveLocale)。
+    val locale = rememberEffectiveLocale()
+    fun stat(value: Long): String = AppCountFormat.grouped(value, locale)
 
     // 管道统计折叠态(跨重建存活:展开/收起不因重组复位)。
     var statsExpanded by rememberSaveable { mutableStateOf(false) }
@@ -134,37 +141,37 @@ fun DiagnosticsScreen(
                         SettingsInfoItem(
                             icon = Icons.Default.Dns,
                             title = stringResource(R.string.stats_received),
-                            value = pipelineStats.received.toString(),
+                            value = stat(pipelineStats.received),
                         )
                         SettingsInfoItem(
                             icon = Icons.Default.Dns,
                             title = stringResource(R.string.stats_dropped),
-                            value = pipelineStats.dropped.toString(),
+                            value = stat(pipelineStats.dropped),
                         )
                         SettingsInfoItem(
                             icon = Icons.Default.Dns,
                             title = stringResource(R.string.stats_write_failures),
-                            value = pipelineStats.writeFailures.toString(),
+                            value = stat(pipelineStats.writeFailures),
                         )
                         SettingsInfoItem(
                             icon = Icons.Default.Dns,
                             title = stringResource(R.string.stats_trimmed),
-                            value = pipelineStats.trimmed.toString(),
+                            value = stat(pipelineStats.trimmed),
                         )
                         SettingsInfoItem(
                             icon = Icons.Default.Dns,
                             title = stringResource(R.string.stats_rejected_hellos),
-                            value = pipelineStats.channel.rejectedHellos.toString(),
+                            value = stat(pipelineStats.channel.rejectedHellos),
                         )
                         SettingsInfoItem(
                             icon = Icons.Default.Dns,
                             title = stringResource(R.string.stats_dropped_records),
-                            value = pipelineStats.channel.droppedRecords.toString(),
+                            value = stat(pipelineStats.channel.droppedRecords),
                         )
                         SettingsInfoItem(
                             icon = Icons.Default.Dns,
                             title = stringResource(R.string.stats_rejected_records),
-                            value = pipelineStats.channel.rejectedRecords.toString(),
+                            value = stat(pipelineStats.channel.rejectedRecords),
                         )
                     }
                 }

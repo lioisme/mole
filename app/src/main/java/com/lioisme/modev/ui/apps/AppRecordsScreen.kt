@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -38,7 +37,6 @@ import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
@@ -73,10 +71,12 @@ import com.lioisme.modev.ui.components.CollapsedSearchInput
 import com.lioisme.modev.ui.components.EmptyState
 import com.lioisme.modev.ui.components.RecordRow
 import com.lioisme.modev.ui.components.SearchInputField
+import com.lioisme.modev.ui.components.StatusDot
 import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.components.copySummary
 import com.lioisme.modev.ui.components.kindLabelRes
 import com.lioisme.modev.ui.components.rememberSearchController
+import com.lioisme.modev.ui.theme.StatusKind
 import kotlinx.coroutines.launch
 
 /**
@@ -87,7 +87,7 @@ import kotlinx.coroutines.launch
  *   AppBar 内仅此一个元素(硬性规范);
  * - 搜索条内仅筛选按钮(类别单选 9 项,KindFilterMenu;有激活条件时按钮着色);
  * - 内容区(自顶向下,头部固定不滚动):
- *   应用头部(AppIcon 40dp + 应用名 + 状态 chips:在线/监听 + 「启动」按钮 +
+ *   应用头部(AppIcon 40dp + 应用名 + 状态角标:在线/监听(作用域)+ 「启动」按钮 +
  *   「更多」菜单 = 移出作用域 / 清空该应用日志,均带确认)+ 分页记录列表
  *   (Paging + 类别筛选 + 搜索,空态/加载/重试);
  * - 返回语义:仅弹栈(过导航门控)。
@@ -299,6 +299,7 @@ private fun AppRecordsContent(
     val connected by viewModel.connected.collectAsStateWithLifecycle()
     val scopeState by viewModel.scopeState.collectAsStateWithLifecycle()
     val appInfo by viewModel.appInfo.collectAsStateWithLifecycle()
+    val launchable by viewModel.launchable.collectAsStateWithLifecycle()
     val scoped = (scopeState as? ScopeState.Ready)?.isScoped(viewModel.packageName) == true
 
     Column(Modifier.fillMaxSize()) {
@@ -309,9 +310,9 @@ private fun AppRecordsContent(
             connected = connected,
             scopeState = scopeState,
             scoped = scoped,
-            // 仅存在启动入口时展示「启动」按钮
+            // 仅存在启动入口时展示「启动」按钮(解析完成前不渲染,防闪变)
             onLaunch =
-                if (appInfo?.launchable == true && appInfo?.enabled != false) {
+                if (launchable == true) {
                     { onLaunch(viewModel.packageName) }
                 } else {
                     null
@@ -392,7 +393,8 @@ private fun AppRecordsContent(
 }
 
 /**
- * 固定头部:AppIcon 40dp + 应用名(titleMedium)+ 在线/监听 chips + 「启动」按钮
+ * 固定头部:AppIcon 40dp + 应用名(titleMedium)+ 状态角标(连接/作用域双圆点,
+ * V14 R4 角标化,完整语义进 contentDescription 与长按 tooltip)+ 「启动」按钮
  * + 「更多」菜单(移出作用域 / 清空该应用日志,V10 自捕获设置页归位)。
  */
 @Composable
@@ -430,23 +432,40 @@ private fun AppHeaderRow(
                 overflow = TextOverflow.Ellipsis,
             )
         }
-        StatusChip(
-            if (connected) stringResource(R.string.online) else stringResource(R.string.offline),
-            connected,
+        StatusDot(
+            kind = if (connected) StatusKind.ONLINE else StatusKind.OFFLINE,
+            label =
+                if (connected) {
+                    stringResource(R.string.online)
+                } else {
+                    stringResource(R.string.offline)
+                },
         )
-        StatusChip(
-            when (scopeState) {
-                is ScopeState.Ready ->
-                    if (scoped) stringResource(R.string.detail_listening) else stringResource(R.string.detail_not_listening)
-                ScopeState.Connecting -> stringResource(R.string.detail_reading_scope)
-                is ScopeState.Unavailable ->
-                    if (scopeState.reason == ScopeState.UnavailableReason.NO_SERVICE) {
-                        stringResource(R.string.detail_framework_no_service)
-                    } else {
-                        stringResource(R.string.detail_not_listening)
-                    }
-            },
-            active = scoped && connected,
+        StatusDot(
+            kind =
+                when (scopeState) {
+                    is ScopeState.Ready ->
+                        if (scoped) StatusKind.SCOPED else StatusKind.UNSCOPED
+                    ScopeState.Connecting -> StatusKind.CONNECTING
+                    is ScopeState.Unavailable ->
+                        if (scopeState.reason == ScopeState.UnavailableReason.NO_SERVICE) {
+                            StatusKind.ERROR
+                        } else {
+                            StatusKind.UNSCOPED
+                        }
+                },
+            label =
+                when (scopeState) {
+                    is ScopeState.Ready ->
+                        if (scoped) stringResource(R.string.detail_listening) else stringResource(R.string.detail_not_listening)
+                    ScopeState.Connecting -> stringResource(R.string.detail_reading_scope)
+                    is ScopeState.Unavailable ->
+                        if (scopeState.reason == ScopeState.UnavailableReason.NO_SERVICE) {
+                            stringResource(R.string.detail_framework_no_service)
+                        } else {
+                            stringResource(R.string.detail_not_listening)
+                        }
+                },
         )
         if (onLaunch != null) {
             IconButton(
@@ -554,38 +573,7 @@ private fun KindFilterMenu(
     }
 }
 
-/** 状态 chip(在线/监听语义色);宽度受限防长文字挤出操作按钮(V12 修复)。 */
-@Composable
-private fun StatusChip(text: String, active: Boolean) {
-    Surface(
-        shape = MaterialTheme.shapes.small,
-        color =
-            if (active) {
-                MaterialTheme.colorScheme.primaryContainer
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerHigh
-            },
-    ) {
-        Text(
-            text,
-            modifier =
-                Modifier
-                    .padding(horizontal = 10.dp, vertical = 4.dp)
-                    .widthIn(max = 110.dp),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-            style = MaterialTheme.typography.labelMedium,
-            color =
-                if (active) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-        )
-    }
-}
-
-/** 重试行(Surface 承载 M3 质感,error 色文本)。 */
+/** 重试行(Box 承载 M3 质感,error 色文本)。 */
 @Composable
 private fun RetryRow(onRetry: () -> Unit) {
     Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {

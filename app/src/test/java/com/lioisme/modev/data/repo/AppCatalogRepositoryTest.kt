@@ -23,7 +23,12 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
-/** AppCatalogRepository 映射:全量/系统标记/enabled 状态/label 兜底(Robolectric ShadowPackageManager)。 */
+/**
+ * AppCatalogRepository 契约(V16 R4 性能整改):
+ * 全量/系统标记/label 兜底/加载态(loading 时序)/启动入口按需惰性解析 + 缓存;
+ * enabled / 逐包 launchable 字段已移除(getInstalledApplications(0) 恒为 enabled 应用,
+ * 启动入口改按需单次解析,列表扫描零 binder 往返)。
+ */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class AppCatalogRepositoryTest {
@@ -56,19 +61,6 @@ class AppCatalogRepositoryTest {
         assertTrue(sys.system)
         // 未配置 labelRes 时兜底为包名
         assertEquals("com.user.app", user.label)
-        assertTrue(user.enabled)
-    }
-
-    @Test
-    fun `disabled app maps enabled false`() = runBlocking {
-        val pm = RuntimeEnvironment.getApplication().packageManager
-        shadowOf(pm).addPackage(packageInfo("com.dis.app"))
-        pm.setApplicationEnabledSetting("com.dis.app", PackageManager.COMPONENT_ENABLED_STATE_DISABLED, 0)
-
-        val repo = AppCatalogRepository(pm, CoroutineScope(SupervisorJob() + Dispatchers.IO))
-        val apps = withTimeout(5_000) { repo.apps.first { it.isNotEmpty() } }
-
-        assertFalse(apps.first { it.packageName == "com.dis.app" }.enabled)
     }
 
     @Test
@@ -87,7 +79,7 @@ class AppCatalogRepositoryTest {
     }
 
     @Test
-    fun `launchable reflects launcher activity availability`() = runBlocking {
+    fun `resolveLaunchable resolves once and caches per package`() = runBlocking {
         val pm = RuntimeEnvironment.getApplication().packageManager
         val shadow = shadowOf(pm)
         shadow.addPackage(packageInfo("com.launchable.app"))
@@ -106,9 +98,42 @@ class AppCatalogRepositoryTest {
         )
 
         val repo = AppCatalogRepository(pm, CoroutineScope(SupervisorJob() + Dispatchers.IO))
-        val apps = withTimeout(5_000) { repo.apps.first { it.isNotEmpty() } }
+        withTimeout(5_000) { repo.apps.first { it.isNotEmpty() } }
 
-        assertTrue(apps.first { it.packageName == "com.launchable.app" }.launchable)
-        assertFalse(apps.first { it.packageName == "com.nolaunch.app" }.launchable)
+        assertTrue(repo.resolveLaunchable("com.launchable.app"))
+        assertFalse(repo.resolveLaunchable("com.nolaunch.app"))
+        // 缓存命中:重复解析(模拟多次进入同一应用记录页)不重新走 PackageManager
+        assertTrue(repo.resolveLaunchable("com.launchable.app"))
+    }
+
+@Test
+    fun `loading true during scan then false`() = runBlocking {
+        val pm = RuntimeEnvironment.getApplication().packageManager
+        // 800 个包拉宽扫描窗口:单包扫描 <1ms 与 flow 订阅存在竞态(loading 可能
+        // 未被观测到即复位),包量足够时扫描耗时 ≫ 订阅耗时,观测确定性成立。
+        repeat(800) { shadowOf(pm).addPackage(packageInfo("com.load.$it")) }
+
+        val repo = AppCatalogRepository(pm, CoroutineScope(SupervisorJob() + Dispatchers.IO))
+        // init 触发首扫,loading 至少观测到 true(防首帧误显空态)
+        withTimeout(10_000) { repo.loading.first { it } }
+        withTimeout(10_000) { repo.loading.first { !it } }
+        withTimeout(10_000) { repo.apps.first { it.size >= 800 } }
+        Unit
+    }
+
+    @Test
+    fun `concurrent refresh is serialized - single in-flight scan`() = runBlocking {
+        val pm = RuntimeEnvironment.getApplication().packageManager
+        shadowOf(pm).addPackage(packageInfo("com.serial.app"))
+
+        val repo = AppCatalogRepository(pm, CoroutineScope(SupervisorJob() + Dispatchers.IO))
+        withTimeout(5_000) { repo.apps.first { it.isNotEmpty() } }
+
+        repo.refresh()
+        repo.refresh()
+        repo.refresh()
+        // 串行化后终态稳定(loading 恢复 false 且列表非空)
+        withTimeout(5_000) { repo.loading.first { !it } }
+        assertTrue(repo.apps.value.any { it.packageName == "com.serial.app" })
     }
 }

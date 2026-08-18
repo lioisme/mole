@@ -77,4 +77,33 @@ class AppSortTest {
         val rows = listOf(row("A"), row("B"))
         assertEquals(rows, AppSort.pinScoped(rows) { it.scoped })
     }
+
+    @Test
+    fun `pin scoped keeps name order inside pinned group`() {
+        // V14 R6 契约:置顶组内仍按名称升序(先名称序,后稳定分区)
+        val rows =
+            listOf(
+                row("Zebra", scoped = true),
+                row("Alpha", scoped = true),
+                row("Mango"),
+                row("Beta", scoped = true),
+            )
+        val sorted = rows.sortedWith(byName(Locale.US))
+        val pinned = AppSort.pinScoped(sorted) { it.scoped }
+        assertEquals(listOf("Alpha", "Beta", "Zebra", "Mango"), pinned.map { it.label })
+    }
+
+    @Test
+    fun `sort then pin keeps order invariant for full flow`() {
+        // V14 R6 契约:名称序 → 置顶分区全流程,组内外均保持名称升序
+        val rows =
+            listOf(
+                row("Delta", scoped = true),
+                row("Alpha"),
+                row("Charlie", scoped = true),
+                row("Beta"),
+            )
+        val pinned = AppSort.pinScoped(rows.sortedWith(byName(Locale.US))) { it.scoped }
+        assertEquals(listOf("Charlie", "Delta", "Alpha", "Beta"), pinned.map { it.label })
+    }
 }

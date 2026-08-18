@@ -17,6 +17,7 @@ libxposed = "102.0.0"
 libxposedService = "101.0.0"
 xposedApi = "82"
 paging = "3.3.6"
+readmore = "1.7.5"
 junit = "4.13.2"
 robolectric = "4.14.1"
 coroutinesTest = "1.10.2"
@@ -48,6 +49,7 @@ libxposed-service = { group = "io.github.libxposed", name = "service", version.r
 xposed-api = { group = "de.robv.android.xposed", name = "api", version.ref = "xposedApi" }
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
 androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
+readmore-material3 = { group = "com.webtoonscorp.android", name = "readmore-material3", version.ref = "readmore" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4", version = "1.8.3" }
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }

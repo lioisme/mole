@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Modev</string>
-    <string name="app_description">An Xposed module that monitors target apps through scoped instrumentation: algorithm capture (digest/encryption/signature/MAC/keys/encoding), with more capabilities in development. Supports both Vector (libxposed 102) and legacy LSPosed.</string>
+    <string name="app_description">An Xposed module that monitors target apps through scoped instrumentation: algorithm listening (digest/encryption/signature/MAC/keys/encoding), with more monitoring capabilities in development. Supports both Vector (libxposed 102) and legacy LSPosed.</string>
 
     <!-- Common -->
     <string name="cd_back">Back</string>
     <string name="cd_filter">Filter</string>
     <string name="confirm">OK</string>
     <string name="all">All</string>
-    <string name="online">● Online</string>
-    <string name="offline">○ Offline</string>
+    <string name="online">Online</string>
+    <string name="offline">Offline</string>
     <string name="loading">Loading…</string>
     <string name="retry">Load failed, tap to retry</string>
     <string name="unknown_error">Unknown error</string>
@@ -20,7 +20,7 @@
     <string name="apps_system">System apps</string>
     <string name="apps_empty_no_match">No matching apps</string>
     <string name="apps_empty_no_apps">No apps found</string>
-    <string name="apps_not_running">○ Not running</string>
+    <string name="apps_not_running">Not running</string>
     <string name="apps_launch">Launch</string>
     <string name="apps_scope_requested">Scope requested for %1$s; confirm in the system notification (applies after target process restart)</string>
     <string name="apps_scope_removed">Unscoped %1$s; applies after target process restart</string>
@@ -29,8 +29,6 @@
     <string name="apps_scope_failed_rejected">Scope request rejected</string>
     <string name="apps_scope_failed_timeout">Timed out waiting for confirmation; pull down to refresh after confirming</string>
     <string name="apps_scope_failed_remove">Failed to remove %1$s from scope</string>
-    <string name="apps_count_wan">%1$dK+</string>
-    <string name="apps_count_qian">%1$dK+</string>
     <string name="apps_logs_cleared">Cleared logs for %1$s</string>
 
     <!-- App records -->
@@ -41,11 +39,11 @@
     <string name="detail_reading_scope">Reading scope…</string>
     <string name="detail_search">Search records…</string>
     <string name="detail_empty">No records yet</string>
-    <string name="section_algorithms">Algorithm Capture</string>
+    <string name="section_monitor_kinds">Monitor Kinds</string>
     <string name="section_record_options">Record Options</string>
     <string name="switch_cipher">Cipher</string>
     <string name="switch_message_digest">MessageDigest</string>
-    <string name="switch_mac">HMAC Mac</string>
+    <string name="switch_mac">MAC</string>
     <string name="switch_signature">Signature</string>
     <string name="switch_key_param">Key Parameter Construction</string>
     <string name="switch_key_generation">Key Generation</string>
@@ -128,6 +126,7 @@
     <string name="record_more">More</string>
     <string name="record_export">Export JSON</string>
     <string name="export_ok">Exported</string>
+    <string name="export_too_large">Record too large to export (%1$d chars)</string>
     <string name="meta_kind">Kind</string>
     <string name="meta_operation">Operation</string>
     <string name="meta_time">Time</string>
@@ -149,12 +148,26 @@
     <string name="section_public_key">Public Key</string>
     <string name="section_params">Parameters</string>
     <string name="section_stack">Call Stack</string>
-    <string name="bytes_count">%1$d bytes</string>
+    <string name="bytes_count">%1$,d bytes</string>
     <string name="bytes_truncated">(truncated)</string>
     <string name="section_expand">Expand</string>
     <string name="section_collapse">Collapse</string>
-    <string name="section_copy">Copy full hex</string>
+    <string name="section_copy">Copy</string>
+    <string name="section_copy_text">Copy text</string>
+    <string name="section_copy_hex">Copy hex</string>
+    <string name="section_copy_all">Copy text + hex</string>
+    <plurals name="params_omitted">
+        <item quantity="one">+%1$d more parameter omitted</item>
+        <item quantity="other">+%1$d more parameters omitted</item>
+    </plurals>
+    <string name="params_truncated">… (long values truncated)</string>
+    <plurals name="stack_more">
+        <item quantity="one">+%1$d more stack frame omitted</item>
+        <item quantity="other">+%1$d more stack frames omitted</item>
+    </plurals>
+    <string name="record_see_more">See more</string>
     <string name="record_copy_done">Copied %1$s: %2$d chars</string>
+    <string name="record_copy_too_large">Too large to copy (%1$d chars). Long-press or copy the hex of a section instead.</string>
     <string name="record_copied">Record copied</string>
     <string name="export_failed">Export failed</string>
 
@@ -166,7 +179,7 @@
     <string name="settings_data_section">Data</string>
     <string name="settings_service_section">Service &amp; Diagnostics</string>
     <string name="settings_about_section">About</string>
-    <string name="capture_settings_title">Capture Settings</string>
+    <string name="algorithm_monitor_title">Algorithm Monitor</string>
     <string name="data_settings_title">Data Management</string>
     <string name="diagnostics_settings_title">Service &amp; Diagnostics</string>
     <string name="settings_framework_service">Framework service</string>
@@ -175,16 +188,16 @@
     <string name="settings_capability_enabled">Enabled</string>
     <string name="settings_capability_disabled">Disabled</string>
     <string name="settings_scoped_count">Scoped apps</string>
-    <string name="settings_scoped_count_value">%1$d</string>
+    <string name="settings_scoped_count_value">%1$,d</string>
     <string name="settings_not_connected">Not connected</string>
     <string name="settings_framework_error">Framework service error: %1$s</string>
     <string name="settings_port">Listening port</string>
     <string name="settings_port_value">127.0.0.1:%1$d (local only)</string>
     <string name="settings_online_targets">Online target processes</string>
-    <string name="settings_online_targets_value">%1$d</string>
+    <string name="settings_online_targets_value">%1$,d</string>
     <string name="settings_clear_all_logs">Clear all logs</string>
     <string name="settings_total_records">Total records</string>
-    <string name="settings_total_records_value">%1$d</string>
+    <string name="settings_total_records_value">%1$,d</string>
     <string name="settings_stats_section">Pipeline Statistics</string>
     <string name="stats_received">Records received</string>
     <string name="stats_dropped">Queue overflow dropped</string>
@@ -194,6 +207,8 @@
     <string name="stats_dropped_records">Malformed records dropped</string>
     <string name="stats_rejected_records">Package mismatch rejected</string>
     <string name="settings_pin_scoped">Pin scoped apps on top</string>
+    <string name="settings_pin_scoped_hint">Scoped apps always stay on top</string>
+    <string name="settings_apps_section">App List</string>
     <string name="appearance">Appearance</string>
     <string name="follow_system">Follow system</string>
     <string name="light_mode">Light</string>

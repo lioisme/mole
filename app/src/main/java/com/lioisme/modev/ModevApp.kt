@@ -14,7 +14,7 @@ import com.lioisme.modev.data.repo.MirroredConfigWriter
 import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.data.server.ConfigServer
 import com.lioisme.modev.domain.capability.CapabilityRegistry
-import com.lioisme.modev.domain.capability.CryptoCaptureCapability
+import com.lioisme.modev.domain.capability.AlgorithmListenCapability
 import com.lioisme.modev.domain.scope.ScopeGateway
 import com.lioisme.modev.domain.scope.ScopeRepository
 import com.lioisme.modev.domain.scope.ScopeService
@@ -49,7 +49,7 @@ class ModevApp : Application() {
         AppListSettings.init(this)
         // 应用语言(系统 per-app locale / App 内 preference 解析)
         LocaleManager.init(this)
-        // 宿主进程注册框架服务监听(现代框架投�?XposedService,legacy 下自然降�?
+        // 宿主进程注册框架服务监听(现代框架投递 XposedService,legacy 下自然降级)
         FrameworkBridge.ensureRegistered()
         // 远程偏好桥:宿主写配置镜像与令牌(legacy 下自然降级)
         RemotePrefsBridge.ensureRegistered()
@@ -110,7 +110,7 @@ class AppContainer(private val context: Context) {
      */
     val capabilityRegistry: CapabilityRegistry by lazy {
         CapabilityRegistry().apply {
-            register(CryptoCaptureCapability(settings.globalSwitch, appScope))
+            register(AlgorithmListenCapability(settings.globalSwitch, appScope))
         }
     }
 

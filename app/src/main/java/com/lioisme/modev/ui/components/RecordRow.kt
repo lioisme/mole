@@ -11,12 +11,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -24,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lioisme.modev.R
@@ -37,14 +40,14 @@ import java.util.Locale
 
 /**
  * 记录行(2026-08-17 V8 卡片化;2026-08-17 V12 秒级时间 + 参数独立成行;
- * 2026-08-17 V13 去徽章 + 空白治理):
+ * 2026-08-17 V13 去徽章 + 空白治理;2026-08-18 V14 R1 精修 M3 ListItem 层级):
  * 每行 = 圆角卡片(16dp, surfaceContainerLow 浮于 surface),行间留白 8dp:
- * - 主体 Column(weight 1f),每参数独立成行(V12 语义):
- *   行1 算法(等宽 bodyLarge,超长省略);
- *   行2 操作阶段(labelMedium 类别色,类别语义唯一承载点);
+ * - 三级信息架构(对齐 M3 ListItem:headline + supporting + 数据段)+ 尾部时间:
+ *   行1 headline 算法(等宽 bodyLarge SemiBold,超长省略);
+ *   行2 supporting 类别·操作组合(labelMedium 类别色,类别语义唯一承载点);
  *   行3(仅当有方向)方向胶囊(类别色 15% alpha 淡底小字);
  *   行4(仅当有数据)唯一最有价值数据段(等宽 labelMedium,优先级 key > alias > out > in);
- *   行5 时间(秒级精度,labelSmall onSurfaceVariant,尊重系统 12/24h 时制);
+ *   尾部时间(秒级精度,labelSmall onSurfaceVariant,尊重系统 12/24h 时制);
  * - V13 移除类别徽章(与操作行类别色重复承载)与固定最小高度 68dp——卡片
  *   内容自适应高度、顶对齐,字段空缺不留空白区域;
  * - 单击进详情;长按复制记录摘要([copySummary]),回调由宿主接线。
@@ -81,23 +84,31 @@ fun RecordRow(
                         },
                     )
                     .padding(horizontal = 16.dp, vertical = 12.dp),
+            // 尾部时间与 headline 顶对齐(V14 R1 层级)。
+            verticalAlignment = Alignment.Top,
         ) {
             // 主体:每参数独立成行(V13:无徽章,内容顶对齐、高度自适应)。
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = record.algorithm,
+                    text = record.displayAlgorithm(),
                     style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.SemiBold,
                     fontFamily = FontFamily.Monospace,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
                 Spacer(Modifier.height(4.dp))
+                // 类别·操作组合行(V14 R1:合并单行承载,类别色语义不变)。
                 Text(
-                    text = operationLabel(record.operation),
+                    text =
+                        stringResource(kindLabelRes(record.kind)) +
+                            " · " +
+                            operationLabel(record.operation),
                     style = MaterialTheme.typography.labelMedium,
                     color = kindColor(record.kind),
                     maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
                 record.direction?.let { direction ->
                     Spacer(Modifier.height(4.dp))
@@ -117,13 +128,14 @@ fun RecordRow(
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-                Spacer(Modifier.height(4.dp))
-                Text(
-                    text = timeFormat.format(Date(record.timestamp)),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
+            Spacer(Modifier.width(8.dp))
+            // 尾部时间(V14 R1:移出主体,独立于数据区右对齐)。
+            Text(
+                text = timeFormat.format(Date(record.timestamp)),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -159,6 +171,18 @@ internal fun CryptoRecord.valuableDataPair(): Pair<Int, String>? = when {
 }
 
 /**
+ * 算法展示名单一事实源(V16 R1 空白治理):algorithm 为空串/空白时回退类别名(恒有),
+ * 杜绝列表行 headline、详情页标题、复制摘要首行出现空白。
+ */
+@Composable
+fun CryptoRecord.displayAlgorithm(): String =
+    algorithm.ifBlank { stringResource(kindLabelRes(kind)) }
+
+/** 算法展示名(非组合;经 Context 解析,供事件回调 / 摘要等非组合路径使用)。 */
+fun CryptoRecord.displayAlgorithm(context: Context): String =
+    algorithm.ifBlank { context.getString(kindLabelRes(kind)) }
+
+/**
  * 记录摘要文本(V13 列表行长按复制单一事实源):
  * 算法 / 操作 / 方向 / 最有价值数据段 / 秒级时间 / 包名,逐行拼接,无冗余空行。
  * 纯函数(非组合,时间格式尊重系统 12/24h 时制),宿主可直接在事件回调中调用。
@@ -169,7 +193,7 @@ fun CryptoRecord.copySummary(context: Context): String {
         Locale.getDefault(),
     ).format(Date(timestamp))
     return buildString {
-        append(algorithm)
+        append(displayAlgorithm(context))
         append('\n')
         append(context.getString(operationLabelRes(operation)))
         direction?.let { dir ->

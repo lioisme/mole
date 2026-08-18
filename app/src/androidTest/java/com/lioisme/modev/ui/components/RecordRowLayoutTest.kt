@@ -28,10 +28,11 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * 行版式契约(V12 T5;V13 去徽章 + 空白治理):
- * - 五段各占一行:算法 / 操作 / 方向胶囊 / 数据段 / 时间(秒级);
+ * 行版式契约(V12 T5;V13 去徽章 + 空白治理;V14 R1 层级精修):
+ * - 三级信息架构(M3 ListItem)+ 尾部时间:算法(SemiBold)/ 类别·操作组合行 /
+ *   方向胶囊 / 数据段,时间尾随右对齐(秒级);
  * - 时间尊重系统 12/24h 时制,恒含秒;
- * - 无类别字母徽章(V13 移除,与操作行类别色去重);
+ * - 无类别字母徽章(V13 移除,与类别色去重);
  * - 单击进详情、长按复制摘要回调([copySummary] 拼接契约)。
  */
 @RunWith(AndroidJUnit4::class)
@@ -60,18 +61,19 @@ class RecordRowLayoutTest {
     )
 
     @Test
-    fun rendersFiveOwnLines_withSecondsPrecisionTime() {
+    fun rendersOwnLines_withSecondsPrecisionTime() {
         rule.setContent {
             MaterialTheme {
                 RecordRow(record = record, onClick = {}, onLongClick = {})
             }
         }
-        // 行1 算法 / 行2 操作 / 行3 方向胶囊 / 行4 数据段
+        // V14 R1 层级:算法(SemiBold headline)/ 类别·操作组合行(supporting)/
+        // 方向胶囊 / 数据段;时间尾随右对齐(秒级)。
         rule.onNodeWithText("WebCrypto/AES-GCM").assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.op_encrypt)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.kind_webview) + " · " + str(R.string.op_encrypt)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.dir_encrypt)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.record_data_out) + " " + "cafebabe").assertIsDisplayed()
-        // 行5 时间:秒级精度(格式与生产同源)
+        // 尾部时间:秒级精度(格式与生产同源)
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         val pattern = if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a"
         val expected = SimpleDateFormat(pattern, Locale.getDefault()).format(Date(record.timestamp))
@@ -85,8 +87,9 @@ class RecordRowLayoutTest {
                 RecordRow(record = record, onClick = {}, onLongClick = {})
             }
         }
-        // V13:徽章移除,类别字母(与筛选菜单同源的首字母)不得再渲染
-        rule.onAllNodesWithText("W").assertCountEquals(0)
+        // V13:徽章移除,类别字母(与筛选菜单同源的首字母)不得再以独立节点渲染
+        // (精确匹配防算法名/组合行首字母误命中)
+        rule.onAllNodesWithText("W", substring = false).assertCountEquals(0)
     }
 
     @Test
@@ -126,6 +129,20 @@ class RecordRowLayoutTest {
         assertTrue("长按须触发复制回调", longPressed.get())
         rule.onNodeWithText("WebCrypto/AES-GCM").performTouchInput { click() }
         assertTrue("单击须触发导航回调", clicked.get())
+    }
+
+    @Test
+    fun blankAlgorithm_headlineAndSummaryFallBackToKindLabel() {
+        val blank = record.copy(algorithm = "   ")
+        rule.setContent {
+            MaterialTheme {
+                RecordRow(record = blank, onClick = {}, onLongClick = {})
+            }
+        }
+        // V16 R1:空算法不得渲染空白行,回退类别名(与详情页标题/摘要同源)
+        rule.onNodeWithText(str(R.string.kind_webview)).assertIsDisplayed()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        assertEquals(str(R.string.kind_webview), blank.copySummary(context).lineSequence().elementAt(0))
     }
 
     @Test

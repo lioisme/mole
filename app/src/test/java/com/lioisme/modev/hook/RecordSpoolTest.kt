@@ -25,7 +25,7 @@ class RecordSpoolTest {
     }
 
     @Test
-    fun `drain sends only un-sent seq and does not resend in-flight`() {
+    fun `drain sends un-acked lines and ack empties spool`() {
         val spool = RecordSpool(dir, maxBytes = 1024)
         spool.append(1, "r1")
         spool.append(2, "r2")
@@ -35,11 +35,17 @@ class RecordSpoolTest {
         spool.drain { first.add(it); true }
         assertEquals(listOf("r1", "r2", "r3"), first)
 
-        // 已发送未确认:再次 drain 不重发(防重复轰炸)
+        // 未确认行重发(宿主唯一索引幂等吸收);确认后不再出现
         val second = mutableListOf<String>()
         spool.drain { second.add(it); true }
-        assertTrue(second.isEmpty())
+        assertEquals(listOf("r1", "r2", "r3"), second)
         assertTrue(spool.hasPending())
+
+        spool.onAck(3)
+        assertFalse(spool.hasPending())
+        val third = mutableListOf<String>()
+        spool.drain { third.add(it); true }
+        assertTrue(third.isEmpty())
     }
 
     @Test
@@ -53,7 +59,7 @@ class RecordSpoolTest {
         spool.onAck(2) // 宿主确认 r1/r2
         val replayed = mutableListOf<String>()
         spool.drain { replayed.add(it); true }
-        assertTrue(replayed.isEmpty()) // r3 仍在途
+        assertEquals(listOf("r3"), replayed) // r3 未确认,重发
         assertTrue(spool.hasPending())
 
         spool.onAck(3)
@@ -215,6 +221,57 @@ class RecordSpoolTest {
         spool.append(1, "r1")
         assertTrue(File(dir, "com.a_push/spool.dat").exists())
         assertFalse(File(dir, "spool.dat").exists())
+    }
+
+    @Test
+    fun `out-of-order file drains all lines and stops on failure`() {
+        val spool = RecordSpool(dir, maxBytes = 1024)
+        // 模拟队列满时直落盘与工作线程消费交错产生的乱序文件
+        File(dir, "spool.dat").writeText("3\tr3\n1\tr1\n2\tr2\n", Charsets.UTF_8)
+
+        val replayed = mutableListOf<String>()
+        spool.drain { line ->
+            if (line == "r1") false else {
+                replayed.add(line)
+                true
+            }
+        }
+        // 乱序文件按行序发送,遇失败即停
+        assertEquals(listOf("r3"), replayed)
+
+        spool.resetSentCursor()
+        val second = mutableListOf<String>()
+        spool.drain { second.add(it); true }
+        // 回退后完整重放(行序),宿主唯一索引幂等吸收
+        assertEquals(listOf("r3", "r1", "r2"), second)
+        spool.onAck(3)
+        assertFalse(spool.hasPending())
+    }
+
+    @Test
+    fun `out-of-order file drains all lines and trim removes confirmed lines anywhere`() {
+        val spool = RecordSpool(dir, maxBytes = 1024)
+        File(dir, "spool.dat").writeText("3\tr3\n1\tr1\n2\tr2\n", Charsets.UTF_8)
+
+        val first = mutableListOf<String>()
+        spool.drain { first.add(it); true }
+        assertEquals(listOf("r3", "r1", "r2"), first)
+
+        // 未确认行重发不卡死(低 seq 行不会被已发送高 seq 行挡住)
+        val second = mutableListOf<String>()
+        spool.drain { second.add(it); true }
+        assertEquals(listOf("r3", "r1", "r2"), second)
+
+        // 确认 r1/r2:乱序文件中位于高 seq 行之后的已确认行同样被裁剪
+        spool.onAck(2)
+        spool.onAck(1)
+        val third = mutableListOf<String>()
+        spool.drain { third.add(it); true }
+        assertEquals(listOf("r3"), third)
+        assertTrue(spool.hasPending()) // r3 未确认,保留
+
+        spool.onAck(3)
+        assertFalse(spool.hasPending())
     }
 
     @Test

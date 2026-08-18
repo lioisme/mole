@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,7 +18,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -40,14 +40,17 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import com.lioisme.modev.i18n.LocaleManager
+import com.lioisme.modev.ui.common.rememberEffectiveLocale
+import com.lioisme.modev.ui.common.rememberLocaleAwareResources
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -61,8 +64,10 @@ import com.lioisme.modev.ui.components.AppIcon
 import com.lioisme.modev.ui.components.CollapsedSearchInput
 import com.lioisme.modev.ui.components.EmptyState
 import com.lioisme.modev.ui.components.SearchInputField
+import com.lioisme.modev.ui.components.StatusDot
 import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.components.rememberSearchController
+import com.lioisme.modev.ui.theme.StatusKind
 /// 搜索收起动画完成后的导航目标(先收后导,单一事实源)。
 internal sealed interface AppsNavTarget {
     /// 应用详情页。
@@ -97,9 +102,8 @@ fun AppsScreen(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
 
-    // 已作用域应用置顶(V10 自设置页迁入筛选菜单):AppListSettings 单一事实源,
-    // 变更即重排,跨页返回不滞留旧序。
-    val pinScoped by AppListSettings.pinScoped.collectAsStateWithLifecycle()
+    // 已作用域应用置顶(V14 R7 自筛选菜单收敛至通用设置页):AppListSettings
+    // 单一事实源,排序流水线直接消费,变更即重排,跨页返回不滞留旧序。
 
     // 搜索状态机共享封装(无参 rememberSearchBarState / 独立意图 / 唯一动画驱动 /
     // 收起后导航 / snapTo 兜底,红线全守)。T = 导航目标(应用详情 / 设置)。
@@ -158,11 +162,9 @@ CollapsedSearchInput(
                                         expanded = filterMenuOpen,
                                         onExpandedChange = { filterMenuOpen = it },
                                         onlyScoped = state.onlyScoped,
-                                        onOnlyScopedChange = viewModel::setOnlyScoped,
+                                        onOnlyScopedChange = { AppListSettings.setOnlyScoped(it, context) },
                                         showSystem = state.showSystem,
-                                        onShowSystemChange = viewModel::setShowSystem,
-                                        pinScoped = pinScoped,
-                                        onPinScopedChange = { AppListSettings.setPinScoped(it, context) },
+                                        onShowSystemChange = { AppListSettings.setShowSystem(it, context) },
                                         onOpenSettings = openSettings,
                                     )
                                 },
@@ -186,7 +188,20 @@ CollapsedSearchInput(
             modifier = Modifier.fillMaxSize().padding(innerPadding),
         ) {
 Column(Modifier.fillMaxSize()) {
-                if (state.rows.isEmpty()) {
+                // V16 R4:目录扫描进行中且尚无行 → progress,防首帧误显「未发现应用」。
+                if (state.rows.isEmpty() && state.loading) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator()
+                            Spacer(Modifier.height(12.dp))
+                            Text(
+                                text = stringResource(R.string.loading),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                } else if (state.rows.isEmpty()) {
                     EmptyState(
                         icon = Icons.Outlined.Android,
                         message =
@@ -226,10 +241,15 @@ items(state.rows, key = { it.packageName }) { row ->
     // 全屏搜索视图:Dialog 新窗口承载(官方组件,返回键/缩放动画/键盘管理内置)。
     // 内容直接渲染 ViewModel 过滤结果(state.rows),不做二次内存过滤(数据流单一事实源)。
     if (search.searchBarState.currentValue == SearchBarValue.Expanded) {
-        ExpandedFullScreenSearchBar(
+        // V16 R5/R6:官方 ExpandedFullScreenSearchBar 为独立 Dialog 窗口,窗口组合
+        // 只继承创建时的 LocalContext 快照(主树 provider 更新不传入窗口),故窗口内
+        // 文本一律经 rememberLocaleAwareResources(语言状态驱动重组 + wrap 解析)。
+        val dlgRes = rememberLocaleAwareResources()
+        CompositionLocalProvider(LocalContext provides LocaleManager.wrap(context)) {
+            ExpandedFullScreenSearchBar(
             state = search.searchBarState,
             inputField = {
-SearchInputField(
+                SearchInputField(
                     query = search.queryText,
                     onQueryChange = { search.queryText = it },
                     active = search.searchActive,
@@ -243,17 +263,15 @@ SearchInputField(
                         search.collapse()
                         focusManager.clearFocus()
                     },
-                    placeholder = stringResource(R.string.apps_search),
+                    placeholder = dlgRes.getString(R.string.apps_search),
                     filterSlot = {
                         ScopeFilterMenu(
                             expanded = filterMenuOpen,
                             onExpandedChange = { filterMenuOpen = it },
                             onlyScoped = state.onlyScoped,
-                            onOnlyScopedChange = viewModel::setOnlyScoped,
+                            onOnlyScopedChange = { AppListSettings.setOnlyScoped(it, context) },
                             showSystem = state.showSystem,
-                            onShowSystemChange = viewModel::setShowSystem,
-                            pinScoped = pinScoped,
-                            onPinScopedChange = { AppListSettings.setPinScoped(it, context) },
+                            onShowSystemChange = { AppListSettings.setShowSystem(it, context) },
                             onOpenSettings = openSettings,
                         )
                     },
@@ -268,7 +286,7 @@ SearchInputField(
             if (state.rows.isEmpty()) {
                 EmptyState(
                     icon = Icons.Outlined.Android,
-                    message = stringResource(R.string.apps_empty_no_match),
+                    message = dlgRes.getString(R.string.apps_empty_no_match),
                 )
             } else {
                 LazyColumn(
@@ -294,15 +312,17 @@ items(state.rows, key = { it.packageName }) { row ->
                     }
                 }
             }
+            }
         }
     }
 }
 
 /**
- * 作用域筛选菜单(2026-08-16 V3;2026-08-17 V10 置顶入菜单):
+ * 作用域筛选菜单(2026-08-16 V3;2026-08-17 V10 置顶入菜单;2026-08-18 V14 R7
+ * 置顶收敛通用设置页):
  * SearchBar trailingIcon 槽内,
- * 「仅已作用域」/「系统应用」Checkbox 复选 + 「已作用域应用置顶」Checkbox
- * (V10 自设置页迁入,应用列表语境就近摆放)+ 底部「设置」项(全局设置页唯一规范入口)。
+ * 「仅已作用域」/「系统应用」Checkbox 复选(状态持久化,AppListSettings 单一事实源)
+ * + 底部「设置」项(全局设置页唯一规范入口)。
  * 有激活条件时筛选按钮 primary 着色(筛选启用指示)。
  */
 @Composable
@@ -313,15 +333,15 @@ private fun ScopeFilterMenu(
     onOnlyScopedChange: (Boolean) -> Unit,
     showSystem: Boolean,
     onShowSystemChange: (Boolean) -> Unit,
-    pinScoped: Boolean,
-    onPinScopedChange: (Boolean) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
+    // 筛选槽可组合进 Dialog 窗口(展开态 trailingIcon),文本经语言状态驱动解析。
+    val res = rememberLocaleAwareResources()
     Box {
-        TipIconButton(tooltip = stringResource(R.string.cd_filter), onClick = { onExpandedChange(true) }) {
+        TipIconButton(tooltip = res.getString(R.string.cd_filter), onClick = { onExpandedChange(true) }) {
             Icon(
                 Icons.Default.FilterList,
-                contentDescription = stringResource(R.string.cd_filter),
+                contentDescription = res.getString(R.string.cd_filter),
                 tint =
                     if (onlyScoped || !showSystem) {
                         MaterialTheme.colorScheme.primary
@@ -332,7 +352,7 @@ private fun ScopeFilterMenu(
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { onExpandedChange(false) }) {
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.apps_only_scoped), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                text = { Text(res.getString(R.string.apps_only_scoped), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 leadingIcon = { Checkbox(checked = onlyScoped, onCheckedChange = null) },
                 onClick = {
                     onOnlyScopedChange(!onlyScoped)
@@ -340,7 +360,7 @@ private fun ScopeFilterMenu(
                 },
             )
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.apps_system), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                text = { Text(res.getString(R.string.apps_system), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 leadingIcon = { Checkbox(checked = showSystem, onCheckedChange = null) },
                 onClick = {
                     onShowSystemChange(!showSystem)
@@ -349,22 +369,7 @@ private fun ScopeFilterMenu(
             )
             HorizontalDivider()
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.settings_pin_scoped), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.PushPin,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
-                onClick = {
-                    onPinScopedChange(!pinScoped)
-                    onExpandedChange(false)
-                },
-            )
-            HorizontalDivider()
-            DropdownMenuItem(
-                text = { Text(stringResource(R.string.settings_title), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                text = { Text(res.getString(R.string.settings_title), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 leadingIcon = {
                     Icon(
                         Icons.Default.Settings,
@@ -382,10 +387,12 @@ private fun ScopeFilterMenu(
 }
 
 /**
- * 应用行(2026-08-15 UI 重构 Phase 5,对齐 LIDE ProjectList 行规范;2026-08-17 V7):
+ * 应用行(2026-08-15 UI 重构 Phase 5,对齐 LIDE ProjectList 行规范;2026-08-17 V7;
+ * 2026-08-18 V14 R4 状态角标化):
  * AppIcon 40dp + 名称 bodyLarge Medium + 记录数 secondaryContainer 徽标 +
- * 包名 bodySmall + 在线状态,行尾 Checkbox(作用域勾选,V7 起置于右侧,
- * 无运行按钮);
+ * 包名 bodySmall + 状态角标(已作用域时:在线=绿色圆点/未运行=灰色圆点,
+ * 完整语义进 contentDescription 与长按 tooltip),行尾 Checkbox(作用域勾选,
+ * V7 起置于右侧,无运行按钮);
  * padding h16/v12,行间 outlineVariant 分隔线(列表外侧,行内不分隔)。
  */
 @Composable
@@ -446,18 +453,18 @@ private fun AppRowItem(
                 )
                 if (row.scoped) {
                     Spacer(Modifier.width(6.dp))
-                    Text(
-                        if (row.connected) {
-                            stringResource(R.string.online)
-                        } else {
-                            stringResource(R.string.apps_not_running)
-                        },
-                        style = MaterialTheme.typography.labelSmall,
-                        color =
+                    StatusDot(
+                        kind =
                             if (row.connected) {
-                                MaterialTheme.colorScheme.primary
+                                StatusKind.ONLINE
                             } else {
-                                MaterialTheme.colorScheme.onSurfaceVariant
+                                StatusKind.OFFLINE
+                            },
+                        label =
+                            if (row.connected) {
+                                stringResource(R.string.online)
+                            } else {
+                                stringResource(R.string.apps_not_running)
                             },
                     )
                 }
@@ -474,14 +481,10 @@ private fun AppRowItem(
 
 @Composable
 private fun countText(count: Long): String {
-    val context = LocalContext.current
     // V13:按应用实际生效 locale 判定(与 stringResource 解析同源)——跟随系统
     // 时 LocaleManager.currentLanguageTag = "system" 会误判为英文(万/千错位)。
-    val zh = LocalConfiguration.current.locales[0].language.startsWith("zh")
-    val wanScale = if (zh) 10_000L else 1_000L
-    return AppCountFormat.compact(
-        count = count,
-        formatWan = { context.getString(R.string.apps_count_wan, it / wanScale) },
-        formatQian = { context.getString(R.string.apps_count_qian, it / 1_000L) },
-    )
+    // V15:locale 驱动 NumberFormat(zh ≥1万紧凑 / 其他 ≥1千;以下千分位)。
+    // V16 R5:热切换下 LocalConfiguration 陈旧,一律经包过 Context 解析(effectiveLocale)。
+    val locale = rememberEffectiveLocale()
+    return AppCountFormat.compact(count, locale)
 }

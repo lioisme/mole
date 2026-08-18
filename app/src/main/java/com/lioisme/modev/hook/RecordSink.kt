@@ -71,7 +71,9 @@ class RecordSink(
             // 仅当 spool 尚未就绪(注入极早期)才计入丢弃
             val sp = currentSpool()
             if (sp != null) {
-                sp.append(seq, jsonOf(record))
+                // 直落盘路径同样必须携带已分配 seq,否则载荷内 seq 为 0,
+                // 宿主唯一索引/ACK 游标与行前缀序号错位(前缀被剥除,宿主只见载荷 seq)
+                sp.append(seq, jsonOf(record.copy(seq = seq)))
             } else {
                 dropped.incrementAndGet()
             }

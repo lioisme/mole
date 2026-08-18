@@ -28,7 +28,10 @@ import com.lioisme.modev.ui.theme.resolveColorSchemeNow
  */
 class MainActivity : ComponentActivity() {
     override fun attachBaseContext(newBase: android.content.Context) {
-        // 语言包装(<33 生效路径;33+ 由系统 per-app locale 提供资源)
+        // 重建路径重解析(V15):系统语言 / per-app locale 变更触发 Activity 重建时,
+        // 先按最新系统状态刷新 LocaleManager(跟随系统立即生效,无需重启),
+        // 再以最新语言标签包装资源(<33 生效路径;33+ 由系统 per-app locale 提供资源)。
+        LocaleManager.refreshForRecreation(newBase)
         super.attachBaseContext(LocaleManager.wrap(newBase))
     }
 
