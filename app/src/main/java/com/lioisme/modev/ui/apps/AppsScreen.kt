@@ -165,6 +165,8 @@ CollapsedSearchInput(
                                         onOnlyScopedChange = { AppListSettings.setOnlyScoped(it, context) },
                                         showSystem = state.showSystem,
                                         onShowSystemChange = { AppListSettings.setShowSystem(it, context) },
+                                        showModules = state.showModules,
+                                        onShowModulesChange = { AppListSettings.setShowModules(it, context) },
                                         onOpenSettings = openSettings,
                                     )
                                 },
@@ -272,6 +274,8 @@ items(state.rows, key = { it.packageName }) { row ->
                             onOnlyScopedChange = { AppListSettings.setOnlyScoped(it, context) },
                             showSystem = state.showSystem,
                             onShowSystemChange = { AppListSettings.setShowSystem(it, context) },
+                            showModules = state.showModules,
+                            onShowModulesChange = { AppListSettings.setShowModules(it, context) },
                             onOpenSettings = openSettings,
                         )
                     },
@@ -319,10 +323,10 @@ items(state.rows, key = { it.packageName }) { row ->
 
 /**
  * 作用域筛选菜单(2026-08-16 V3;2026-08-17 V10 置顶入菜单;2026-08-18 V14 R7
- * 置顶收敛通用设置页):
+ * 置顶收敛通用设置页;V17 R1 新增「Xposed 模块」显隐):
  * SearchBar trailingIcon 槽内,
- * 「仅已作用域」/「系统应用」Checkbox 复选(状态持久化,AppListSettings 单一事实源)
- * + 底部「设置」项(全局设置页唯一规范入口)。
+ * 「仅已作用域」/「系统应用」/「Xposed 模块」Checkbox 复选(状态持久化,
+ * AppListSettings 单一事实源)+ 底部「设置」项(全局设置页唯一规范入口)。
  * 有激活条件时筛选按钮 primary 着色(筛选启用指示)。
  */
 @Composable
@@ -333,6 +337,8 @@ private fun ScopeFilterMenu(
     onOnlyScopedChange: (Boolean) -> Unit,
     showSystem: Boolean,
     onShowSystemChange: (Boolean) -> Unit,
+    showModules: Boolean,
+    onShowModulesChange: (Boolean) -> Unit,
     onOpenSettings: () -> Unit,
 ) {
     // 筛选槽可组合进 Dialog 窗口(展开态 trailingIcon),文本经语言状态驱动解析。
@@ -343,7 +349,7 @@ private fun ScopeFilterMenu(
                 Icons.Default.FilterList,
                 contentDescription = res.getString(R.string.cd_filter),
                 tint =
-                    if (onlyScoped || !showSystem) {
+                    if (onlyScoped || !showSystem || !showModules) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
@@ -364,6 +370,14 @@ private fun ScopeFilterMenu(
                 leadingIcon = { Checkbox(checked = showSystem, onCheckedChange = null) },
                 onClick = {
                     onShowSystemChange(!showSystem)
+                    onExpandedChange(false)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(res.getString(R.string.apps_modules), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon = { Checkbox(checked = showModules, onCheckedChange = null) },
+                onClick = {
+                    onShowModulesChange(!showModules)
                     onExpandedChange(false)
                 },
             )
@@ -464,7 +478,7 @@ private fun AppRowItem(
                             if (row.connected) {
                                 stringResource(R.string.online)
                             } else {
-                                stringResource(R.string.apps_not_running)
+                                stringResource(R.string.offline)
                             },
                     )
                 }

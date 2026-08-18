@@ -18,6 +18,7 @@ object AppListSettings {
     private const val KEY_PIN_SCOPED = "pin_scoped_on_top"
     private const val KEY_ONLY_SCOPED = "only_scoped"
     private const val KEY_SHOW_SYSTEM = "show_system"
+    private const val KEY_SHOW_MODULES = "show_xposed_modules"
 
     private val _pinScoped = MutableStateFlow(true)
 
@@ -34,11 +35,17 @@ object AppListSettings {
     /** 显示系统应用(V14 R8 持久化)。 */
     val showSystem: StateFlow<Boolean> = _showSystem.asStateFlow()
 
+    private val _showModules = MutableStateFlow(false)
+
+    /** 显示 Xposed 模块应用(V17 R1 默认隐藏,设置项可显示)。 */
+    val showModules: StateFlow<Boolean> = _showModules.asStateFlow()
+
     fun init(context: Context) {
         val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
         _pinScoped.value = prefs.getBoolean(KEY_PIN_SCOPED, true)
         _onlyScoped.value = prefs.getBoolean(KEY_ONLY_SCOPED, false)
         _showSystem.value = prefs.getBoolean(KEY_SHOW_SYSTEM, true)
+        _showModules.value = prefs.getBoolean(KEY_SHOW_MODULES, false)
     }
 
     fun setPinScoped(
@@ -63,6 +70,14 @@ object AppListSettings {
     ) {
         persist(context, KEY_SHOW_SYSTEM, value)
         _showSystem.value = value
+    }
+
+    fun setShowModules(
+        value: Boolean,
+        context: Context,
+    ) {
+        persist(context, KEY_SHOW_MODULES, value)
+        _showModules.value = value
     }
 
     private fun persist(

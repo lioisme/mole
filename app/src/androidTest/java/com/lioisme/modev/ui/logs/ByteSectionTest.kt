@@ -95,9 +95,6 @@ class ByteSectionTest {
         }
     }
 
-    /** 折叠态标记:预览节点(前 4096 字符)唯一,无「展开更多/收起」之外控件。 */
-    private fun previewChunk(hex: String) = hex.take(ChunkedText.DEFAULT_CHUNK_CHARS)
-
     @Test
     fun smallData_noFoldControls_allVisible() {
         val hex = "abcd"
@@ -114,9 +111,11 @@ class ByteSectionTest {
         // 内容节点不在树;「展开更多」链接在树。
         val full = "ab".repeat(5_000)
         setSection(full, text = null)
-        rule.onAllNodesWithText(previewChunk(full), substring = false).assertCountEquals(1)
-        rule.onNodeWithText(str(R.string.record_see_more)).assertIsDisplayed()
-        rule.onAllNodesWithText(str(R.string.section_collapse)).assertCountEquals(0)
+        // ReadMoreText 预览的语义文本仅含可见片段(整段可点,「… 展开更多」并入
+        // 同一节点),故用短前缀 + 展开文案断言,全量内容精确匹配必须为 0。
+        rule.onAllNodesWithText("ab".repeat(16), substring = true).assertCountEquals(1)
+        rule.onAllNodesWithText(full, substring = false).assertCountEquals(0)
+        rule.onAllNodesWithText(str(R.string.record_see_more), substring = true).assertCountEquals(1)
     }
 
     @Test
@@ -125,11 +124,14 @@ class ByteSectionTest {
         // 系统「全选」可一次覆盖整段),「收起」按钮出现,「展开更多」链接消失。
         val full = "ab".repeat(5_000)
         setSection(full, text = null)
-        rule.onNodeWithText(str(R.string.record_see_more)).performClick()
+        // 「展开更多」并入预览节点,substring 命中唯一含它的节点;点击即展开。
+        rule.onNodeWithText(str(R.string.record_see_more), substring = true).performClick()
         rule.waitForIdle()
         rule.onAllNodesWithText(full, substring = false).assertCountEquals(1)
+        // 「收起」在展开内容末尾,可能位于视口外,先滚动至可见再断言/点击。
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(str(R.string.section_collapse)))
         rule.onNodeWithText(str(R.string.section_collapse)).assertIsDisplayed()
-        rule.onAllNodesWithText(str(R.string.record_see_more)).assertCountEquals(0)
+        rule.onAllNodesWithText(str(R.string.record_see_more), substring = true).assertCountEquals(0)
     }
 
     @Test
@@ -137,10 +139,14 @@ class ByteSectionTest {
         // ④展开态点「收起」→ 回折叠态:预览唯一在树、内容不在树、展开链接回来。
         val full = "ab".repeat(5_000)
         setSection(full, text = null, initiallyExpanded = true)
+        // 「收起」在展开内容末尾(视口外),先滚动至可见再点击。
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(str(R.string.section_collapse)))
         rule.onNodeWithText(str(R.string.section_collapse)).performClick()
         rule.waitForIdle()
-        rule.onAllNodesWithText(previewChunk(full), substring = false).assertCountEquals(1)
-        rule.onNodeWithText(str(R.string.record_see_more)).assertIsDisplayed()
+        // 回折叠态:可见预览前缀唯一在树(语义文本仅含可见片段),展开链接并入预览节点。
+        rule.onAllNodesWithText("ab".repeat(16), substring = true).assertCountEquals(1)
+        rule.onAllNodesWithText(full, substring = false).assertCountEquals(0)
+        rule.onAllNodesWithText(str(R.string.record_see_more), substring = true).assertCountEquals(1)
         rule.onAllNodesWithText(str(R.string.section_collapse)).assertCountEquals(0)
     }
 
@@ -205,6 +211,8 @@ class ByteSectionTest {
         setSection(full, text = null, initiallyExpanded = true)
         rule.onAllNodesWithText(full, substring = false).assertCountEquals(0)
         rule.onAllNodesWithText("ab".repeat(2048), substring = false).assertCountEquals(1)
+        // 「收起」在 Tier B 内容末尾,先滚动至可见再断言。
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(str(R.string.section_collapse)))
         rule.onNodeWithText(str(R.string.section_collapse)).assertIsDisplayed()
     }
 

@@ -44,6 +44,8 @@ class AppListSettingsTest {
         assertTrue(AppListSettings.pinScoped.value)
         assertFalse(AppListSettings.onlyScoped.value)
         assertTrue(AppListSettings.showSystem.value)
+        // V17 R1:模块默认隐藏
+        assertFalse(AppListSettings.showModules.value)
     }
 
     @Test
@@ -76,5 +78,20 @@ class AppListSettingsTest {
         AppListSettings.init(context)
         assertEquals(false, AppListSettings.onlyScoped.value)
         assertEquals(true, AppListSettings.showSystem.value)
+    }
+
+    @Test
+    fun `set showModules persists and reloads`() {
+        AppListSettings.init(context)
+        assertFalse(AppListSettings.showModules.value)
+        AppListSettings.setShowModules(true, context)
+        assertTrue(AppListSettings.showModules.value)
+        // 进程重启等价:重新 init 从 SharedPreferences 回读
+        AppListSettings.init(context)
+        assertTrue(AppListSettings.showModules.value)
+        // 还原默认
+        AppListSettings.setShowModules(false, context)
+        AppListSettings.init(context)
+        assertFalse(AppListSettings.showModules.value)
     }
 }

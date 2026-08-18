@@ -7,6 +7,10 @@ import android.content.pm.ActivityInfo
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
+import android.os.Bundle
+import java.io.File
+import java.util.zip.ZipEntry
+import java.util.zip.ZipOutputStream
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -28,19 +32,41 @@ import org.robolectric.annotation.Config
  * 全量/系统标记/label 兜底/加载态(loading 时序)/启动入口按需惰性解析 + 缓存;
  * enabled / 逐包 launchable 字段已移除(getInstalledApplications(0) 恒为 enabled 应用,
  * 启动入口改按需单次解析,列表扫描零 binder 往返)。
+ * V17 R1 模块识别:meta-data 通道(免 IO)+ 资产通道(临时 zip 模拟 APK)。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
 class AppCatalogRepositoryTest {
 
-    private fun packageInfo(packageName: String, system: Boolean = false): PackageInfo =
+    private fun packageInfo(
+        packageName: String,
+        system: Boolean = false,
+        metaData: Bundle? = null,
+        sourceDir: String? = null,
+    ): PackageInfo =
         PackageInfo().apply {
             this.packageName = packageName
             applicationInfo = ApplicationInfo().apply {
                 this.packageName = packageName
                 if (system) flags = flags or ApplicationInfo.FLAG_SYSTEM
+                this.metaData = metaData
+                this.sourceDir = sourceDir
             }
         }
+
+    /** 以 zip 结构模拟 APK 文件(资产通道检测目标)。 */
+    private fun fakeApk(vararg entries: Pair<String, String>): String {
+        val dir = createTempDir(prefix = "modev-apk-")
+        val file = File(dir, "fake.apk")
+        ZipOutputStream(file.outputStream()).use { zos ->
+            for ((name, content) in entries) {
+                zos.putNextEntry(ZipEntry(name))
+                zos.write(content.toByteArray())
+                zos.closeEntry()
+            }
+        }
+        return file.absolutePath
+    }
 
     @Test
     fun `refresh maps installed apps with system flag and label fallback`() = runBlocking {
@@ -119,6 +145,71 @@ class AppCatalogRepositoryTest {
         withTimeout(10_000) { repo.loading.first { !it } }
         withTimeout(10_000) { repo.apps.first { it.size >= 800 } }
         Unit
+    }
+
+    @Test
+    fun `metaData channel marks xposed modules`() = runBlocking {
+        val pm = RuntimeEnvironment.getApplication().packageManager
+        val shadow = shadowOf(pm)
+        shadow.addPackage(
+            packageInfo(
+                "com.module.bool",
+                metaData = Bundle().apply { putBoolean("xposedmodule", true) },
+            ),
+        )
+        shadow.addPackage(
+            packageInfo(
+                "com.module.min",
+                metaData = Bundle().apply { putInt("xposedminversion", 82) },
+            ),
+        )
+        shadow.addPackage(packageInfo("com.plain.app"))
+
+        val repo = AppCatalogRepository(pm, CoroutineScope(SupervisorJob() + Dispatchers.IO))
+        val apps = withTimeout(5_000) { repo.apps.first { it.isNotEmpty() } }
+        // 被测应用自身(真实 manifest 含 xposedminversion)也会命中 meta-data 通道,过滤后断言目标包
+        val modules = apps
+            .filter { it.isXposedModule && it.packageName in setOf("com.module.bool", "com.module.min") }
+            .map { it.packageName }
+            .toSet()
+        assertEquals(setOf("com.module.bool", "com.module.min"), modules)
+    }
+
+    @Test
+    fun `asset channel flags module apks via xposed_init and java_init_list`() = runBlocking {
+        val pm = RuntimeEnvironment.getApplication().packageManager
+        val shadow = shadowOf(pm)
+        shadow.addPackage(
+            packageInfo("com.module.assets", sourceDir = fakeApk("assets/xposed_init" to "com.example.Init\n")),
+        )
+        shadow.addPackage(
+            packageInfo("com.module.java", sourceDir = fakeApk("META-INF/xposed/java_init.list" to "")),
+        )
+        shadow.addPackage(
+            packageInfo("com.plain.apk", sourceDir = fakeApk("classes.dex" to "dex")),
+        )
+        shadow.addPackage(
+            packageInfo("com.empty.init", sourceDir = fakeApk("assets/xposed_init" to "")),
+        )
+
+        val repo = AppCatalogRepository(pm, CoroutineScope(SupervisorJob() + Dispatchers.IO))
+        val apps = withTimeout(5_000) { repo.apps.first { it.isNotEmpty() } }
+        // 被测应用自身命中 meta-data 通道,过滤后断言目标包
+        val modules = apps
+            .filter { it.isXposedModule && it.packageName in setOf("com.module.assets", "com.module.java") }
+            .map { it.packageName }
+            .toSet()
+        assertEquals(setOf("com.module.assets", "com.module.java"), modules)
+    }
+
+    @Test
+    fun `isXposedModuleApk detects by asset entry and tolerates missing files`() {
+        assertTrue(isXposedModuleApk(fakeApk("assets/xposed_init" to "com.example.Init")))
+        assertTrue(isXposedModuleApk(fakeApk("META-INF/xposed/java_init.list" to "")))
+        assertFalse(isXposedModuleApk(fakeApk("assets/xposed_init" to "")))
+        assertFalse(isXposedModuleApk(fakeApk("classes.dex" to "x")))
+        val missing = File(createTempDir(prefix = "modev-missing-"), "missing.apk")
+        assertFalse(isXposedModuleApk(missing.absolutePath))
     }
 
     @Test

@@ -110,6 +110,36 @@ class CryptoRecordDaoTest {
         return (result as PagingSource.LoadResult.Page).data
     }
 
+    /** 集合过滤投影分页加载助手(哨兵语义:count=0 跳过该维过滤)。 */
+    private suspend fun pageByFilter(
+        recordTypes: List<String> = listOf(""),
+        packages: List<String> = listOf(""),
+        kinds: List<String> = listOf(""),
+        typeCount: Int = 0,
+        packageCount: Int = 0,
+        kindCount: Int = 0,
+        query: String? = null,
+        limit: Int = 20,
+        offset: Int = 0,
+    ): List<CryptoRecordRow> {
+        val source: PagingSource<Int, CryptoRecordRow> = dao.observePagedRowsByFilter(
+            recordTypes = recordTypes,
+            packages = packages,
+            kinds = kinds,
+            typeCount = typeCount,
+            packageCount = packageCount,
+            kindCount = kindCount,
+            query = query,
+            previewChars = 48,
+            limit = limit,
+            offset = offset,
+        )
+        val result = source.load(
+            PagingSource.LoadParams.Refresh(key = null, loadSize = limit, placeholdersEnabled = false),
+        )
+        return (result as PagingSource.LoadResult.Page).data
+    }
+
     @Test
     fun `paged query orders by timestamp desc then id desc`() = runBlocking {
         dao.insert(entity("pkg.a", "cipher", "encrypt", "AES", 100))
@@ -169,6 +199,74 @@ class CryptoRecordDaoTest {
 
         val counts = dao.observeRecordCounts(null).first()
         assertEquals(mapOf("pkg.a" to 2L, "pkg.b" to 1L), counts.associate { it.packageName to it.count })
+    }
+
+    @Test
+    fun `paged rows by filter supports IN collections and sentinel skip`() = runBlocking {
+        dao.insert(entity("pkg.a", "cipher", "encrypt", "AES", 100))
+        dao.insert(entity("pkg.a", "digest", "digest", "SHA-256", 200).copy(recordType = "database"))
+        dao.insert(entity("pkg.b", "mac", "mac", "HmacSHA256", 300))
+
+        // 哨兵全跳过 = 不过滤(全部 3 条)
+        assertEquals(3, pageByFilter().size)
+        // 类型 IN 多值
+        assertEquals(2, pageByFilter(recordTypes = listOf("crypto"), typeCount = 1).size)
+        assertEquals(
+            3,
+            pageByFilter(recordTypes = listOf("crypto", "database"), typeCount = 2).size,
+        )
+        // 包 IN 多值(pkg.a 两行 + pkg.b 一行 = 3)
+        assertEquals(
+            3,
+            pageByFilter(packages = listOf("pkg.a", "pkg.b"), packageCount = 2).size,
+        )
+        assertEquals(2, pageByFilter(packages = listOf("pkg.a"), packageCount = 1).size)
+        // 类别 IN
+        assertEquals(1, pageByFilter(kinds = listOf("mac"), kindCount = 1).size)
+        // 组合过滤
+        assertEquals(
+            1,
+            pageByFilter(
+                recordTypes = listOf("database"),
+                packages = listOf("pkg.a"),
+                typeCount = 1,
+                packageCount = 1,
+            ).size,
+        )
+        // 关键字与哨兵维度共存
+        assertEquals(
+            1,
+            pageByFilter(
+                packages = listOf("pkg.a"),
+                packageCount = 1,
+                query = "%SHA%",
+            ).size,
+        )
+    }
+
+    @Test
+    fun `count by filter totals with IN collections and query`() = runBlocking {
+        dao.insert(entity("pkg.a", "cipher", "encrypt", "AES", 100))
+        dao.insert(entity("pkg.a", "digest", "digest", "SHA-256", 200).copy(recordType = "database"))
+        dao.insert(entity("pkg.b", "mac", "mac", "HmacSHA256", 300))
+
+        assertEquals(3L, dao.observeCountByFilter(listOf(""), listOf(""), listOf(""), 0, 0, 0, null).first())
+        assertEquals(2L, dao.observeCountByFilter(listOf("crypto"), listOf(""), listOf(""), 1, 0, 0, null).first())
+        assertEquals(3L, dao.observeCountByFilter(listOf(""), listOf("pkg.a", "pkg.b"), listOf(""), 0, 2, 0, null).first())
+        assertEquals(1L, dao.observeCountByFilter(listOf(""), listOf(""), listOf("mac"), 0, 0, 1, "%Hmac%").first())
+    }
+
+    @Test
+    fun `record type counts group by type`() = runBlocking {
+        dao.insert(entity("pkg.a", "cipher", "op1", "AES", 1))
+        dao.insert(entity("pkg.a", "digest", "op2", "SHA-256", 2))
+        dao.insert(entity("pkg.b", "mac", "op3", "HmacSHA256", 3).copy(recordType = "database"))
+
+        val counts = dao.observeRecordTypeCounts().first()
+        assertEquals(
+            mapOf("crypto" to 2L, "database" to 1L),
+            counts.associate { it.recordType to it.count },
+        )
     }
 
     @Test

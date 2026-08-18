@@ -101,6 +101,88 @@ interface CryptoRecordDao {
         offset: Int,
     ): PagingSource<Int, CryptoRecordRow>
 
+    /**
+     * 集合过滤投影分页(V17 R2 RecordFilter 契约):与 [observePagedRows] 同列投影,
+     * 但类型/包/类别为 IN 多值语义。Room 需绑定非空集合:仓库层以哨兵计数
+     * (`:xCount = 0 OR ... IN (...)`)表达"不过滤",集合为 null/空时绑定占位单例。
+     */
+    @Query(
+        """
+        SELECT id, packageName, kind, operation, algorithm, threadName, direction,
+               timestamp, keyAlias,
+               substr(keyHex, 1, :previewChars) AS keyPreview,
+               substr(inputHex, 1, :previewChars) AS inputPreview,
+               substr(outputHex, 1, :previewChars) AS outputPreview,
+               keyTruncated, inputTruncated, outputTruncated
+        FROM crypto_records
+        WHERE (:typeCount = 0 OR recordType IN (:recordTypes))
+          AND (:packageCount = 0 OR packageName IN (:packages))
+          AND (:kindCount = 0 OR kind IN (:kinds))
+          AND (:query IS NULL OR :query = ''
+               OR algorithm LIKE :query ESCAPE '\'
+               OR operation LIKE :query ESCAPE '\'
+               OR keyText LIKE :query ESCAPE '\'
+               OR keyHex LIKE :query ESCAPE '\'
+               OR inputText LIKE :query ESCAPE '\'
+               OR inputHex LIKE :query ESCAPE '\'
+               OR outputText LIKE :query ESCAPE '\'
+               OR outputHex LIKE :query ESCAPE '\'
+               OR threadName LIKE :query ESCAPE '\')
+        ORDER BY timestamp DESC, id DESC
+        LIMIT :limit OFFSET :offset
+        """
+    )
+    fun observePagedRowsByFilter(
+        recordTypes: List<String>,
+        packages: List<String>,
+        kinds: List<String>,
+        typeCount: Int,
+        packageCount: Int,
+        kindCount: Int,
+        query: String?,
+        previewChars: Int,
+        limit: Int,
+        offset: Int,
+    ): PagingSource<Int, CryptoRecordRow>
+
+    /** 匹配 [RecordFilter] 的记录总数(契约计数入口)。 */
+    @Query(
+        """
+        SELECT COUNT(*) AS total FROM crypto_records
+        WHERE (:typeCount = 0 OR recordType IN (:recordTypes))
+          AND (:packageCount = 0 OR packageName IN (:packages))
+          AND (:kindCount = 0 OR kind IN (:kinds))
+          AND (:query IS NULL OR :query = ''
+               OR algorithm LIKE :query ESCAPE '\'
+               OR operation LIKE :query ESCAPE '\'
+               OR keyText LIKE :query ESCAPE '\'
+               OR keyHex LIKE :query ESCAPE '\'
+               OR inputText LIKE :query ESCAPE '\'
+               OR inputHex LIKE :query ESCAPE '\'
+               OR outputText LIKE :query ESCAPE '\'
+               OR outputHex LIKE :query ESCAPE '\'
+               OR threadName LIKE :query ESCAPE '\')
+        """
+    )
+    fun observeCountByFilter(
+        recordTypes: List<String>,
+        packages: List<String>,
+        kinds: List<String>,
+        typeCount: Int,
+        packageCount: Int,
+        kindCount: Int,
+        query: String?,
+    ): Flow<Long>
+
+    /** 按记录类型分组计数(V17 R2:全类型总览,设置页/未来 REST 元信息)。 */
+    @Query(
+        """
+        SELECT recordType, COUNT(*) AS recordCount FROM crypto_records
+        GROUP BY recordType
+        """
+    )
+    fun observeRecordTypeCounts(): Flow<List<RecordTypeCount>>
+
     /** 每包记录数(应用列表徽标;可限定类型)。 */
     @Query(
         """
@@ -198,6 +280,12 @@ interface CryptoRecordDao {
 /** 每包记录计数(应用列表徽标)。 */
 data class RecordCount(
     val packageName: String,
+    @ColumnInfo(name = "recordCount") val count: Long,
+)
+
+/** 按记录类型的记录计数(V17 R2)。 */
+data class RecordTypeCount(
+    val recordType: String,
     @ColumnInfo(name = "recordCount") val count: Long,
 )
 

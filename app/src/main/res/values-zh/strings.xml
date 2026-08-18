@@ -8,8 +8,8 @@
     <string name="cd_filter">筛选</string>
     <string name="confirm">确定</string>
     <string name="all">全部</string>
-    <string name="online">在线</string>
-    <string name="offline">离线</string>
+    <string name="online">运行中</string>
+    <string name="offline">未运行</string>
     <string name="loading">加载中…</string>
     <string name="retry">加载失败,点击重试</string>
     <string name="unknown_error">未知错误</string>
@@ -18,9 +18,9 @@
     <string name="apps_search">搜索应用名称 / 包名…</string>
     <string name="apps_only_scoped">仅已作用域</string>
     <string name="apps_system">系统应用</string>
+    <string name="apps_modules">Xposed 模块</string>
     <string name="apps_empty_no_match">没有匹配的应用</string>
     <string name="apps_empty_no_apps">未发现应用</string>
-    <string name="apps_not_running">未运行</string>
     <string name="apps_launch">启动</string>
     <string name="apps_scope_requested">已请求将 %1$s 加入作用域,请在系统通知中确认(目标进程重启后生效)</string>
     <string name="apps_scope_removed">已将 %1$s 移出作用域,目标进程重启后生效</string>
@@ -29,11 +29,12 @@
     <string name="apps_scope_failed_rejected">作用域请求被拒绝</string>
     <string name="apps_scope_failed_timeout">等待确认超时;确认后下拉刷新即可同步</string>
     <string name="apps_scope_failed_remove">移出作用域失败:%1$s</string>
-    <string name="apps_logs_cleared">已清空 %1$s 的日志</string>
+    <string name="apps_records_cleared">已清空 %1$s 的记录</string>
 
     <!-- 应用记录页 -->
-    <string name="detail_listening">已在作用域</string>
-    <string name="detail_not_listening">未在作用域</string>
+    <string name="detail_listening">已作用域</string>
+    <string name="detail_not_listening">未作用域</string>
+    <string name="detail_clear_records">清空该应用的记录</string>
     <string name="detail_framework_no_service">框架服务未连接</string>
     <string name="detail_framework_error">框架异常:%1$s</string>
     <string name="detail_reading_scope">正在读取作用域…</string>
@@ -62,7 +63,6 @@
     <string name="capture_ignore_stack_dialog_title">忽略调用栈前缀</string>
     <string name="capture_ignore_stack_dialog_hint">每行一个类前缀,例如 com.google.gson</string>
     <string name="detail_remove_scope">移出作用域</string>
-    <string name="detail_clear_logs">清空该应用的日志</string>
 
     <!-- 危险操作确认 -->
     <string name="danger_title">确认操作</string>
@@ -192,19 +192,19 @@
     <string name="settings_framework_error">框架服务异常:%1$s</string>
     <string name="settings_port">监听端口</string>
     <string name="settings_port_value">127.0.0.1:%1$d(仅本机)</string>
-    <string name="settings_online_targets">在线目标进程</string>
+    <string name="settings_online_targets">运行中目标进程</string>
     <string name="settings_online_targets_value">%1$,d 个</string>
-    <string name="settings_clear_all_logs">清空全部日志</string>
+    <string name="settings_clear_all_records">清空全部记录</string>
     <string name="settings_total_records">总记录数</string>
     <string name="settings_total_records_value">%1$,d 条</string>
     <string name="settings_stats_section">管道统计</string>
-    <string name="stats_received">已接收记录</string>
-    <string name="stats_dropped">队列溢出丢弃</string>
+    <string name="stats_received">已接收</string>
+    <string name="stats_dropped">队列已满丢弃</string>
     <string name="stats_write_failures">写库失败</string>
-    <string name="stats_trimmed">容量治理裁剪</string>
-    <string name="stats_rejected_hellos">拒绝握手</string>
-    <string name="stats_dropped_records">格式非法丢弃</string>
-    <string name="stats_rejected_records">包名不符拒绝</string>
+    <string name="stats_trimmed">超容量裁剪</string>
+    <string name="stats_rejected_hellos">握手被拒</string>
+    <string name="stats_dropped_records">畸形记录丢弃</string>
+    <string name="stats_rejected_records">包名不符被拒</string>
     <string name="settings_pin_scoped">已作用域应用置顶</string>
     <string name="settings_pin_scoped_hint">已作用域应用始终排在前面</string>
     <string name="settings_apps_section">应用列表</string>

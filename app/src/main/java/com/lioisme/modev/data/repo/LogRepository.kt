@@ -14,6 +14,7 @@ import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.data.db.CryptoRecordDao
 import com.lioisme.modev.data.db.CryptoRecordRow
+import com.lioisme.modev.data.db.RecordTypeCount
 import com.lioisme.modev.data.mapping.toEntity
 import com.lioisme.modev.data.mapping.toModelOrNull
 import com.lioisme.modev.data.mapping.toRowModelOrNull
@@ -211,22 +212,24 @@ class LogRepository(
     }
 
     /**
-     * 分页记录流(Paging3):时间倒序,支持包/类别/关键字过滤。
+     * 分页记录流(Paging3):时间倒序,支持包/类别/关键字/记录类型过滤。
      * 关键字在 SQL 侧匹配(algorithm/operation/hex/文本/线程),不在内存过滤。
      * 列表走投影查询 [CryptoRecordDao.observePagedRows],仅物化展示列与 SQL 侧预览,
      * 零大字段加载;枚举未知的行按 null 丢弃(计数由 DAO 层不感知,属 Schema 漂移兜底)。
+     * V17 R2:recordType 参数化(null = 全部类型,跨监听类型"整体"语义)。
      */
     fun pagedRecords(
         packageName: String? = null,
         kind: CryptoKind? = null,
         query: String = "",
+        recordType: String? = null,
     ): Flow<PagingData<CryptoRecord>> {
         val like = if (query.isBlank()) null else likePattern(query.trim())
         return Pager(
             config = PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = false),
             pagingSourceFactory = {
                 dao.observePagedRows(
-                    recordType = RecordTypes.CRYPTO,
+                    recordType = recordType,
                     packageName = packageName,
                     kind = kind?.name,
                     query = like,
@@ -242,9 +245,54 @@ class LogRepository(
         }
     }
 
-    /** 每包记录数(应用列表徽标)。 */
-    fun observeRecordCounts(): Flow<Map<String, Long>> =
-        dao.observeRecordCounts(RecordTypes.CRYPTO).map { list -> list.associate { it.packageName to it.count } }
+    /** 每包记录数(应用列表徽标;V17 R2 recordType 可空 = 全类型合计)。 */
+    fun observeRecordCounts(recordType: String? = null): Flow<Map<String, Long>> =
+        dao.observeRecordCounts(recordType).map { list -> list.associate { it.packageName to it.count } }
+
+    /**
+     * 统一查询契约分页入口(V17 R2;REST/MCP 唯一依赖面):
+     * [RecordFilter] 集合多值语义,空集/空 query = 不过滤;单值退化为与
+     * [pagedRecords] 等价的 DAO 路径(IN 单元素),行为一致。
+     */
+    fun paged(filter: RecordFilter): Flow<PagingData<CryptoRecord>> {
+        val query = filter.query?.takeIf { it.isNotBlank() }?.let(::likePattern)
+        return Pager(
+            config = PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = false),
+            pagingSourceFactory = {
+                dao.observePagedRowsByFilter(
+                    recordTypes = filter.recordTypes.toBindList(),
+                    packages = filter.packages.toBindList(),
+                    kinds = filter.kinds.toBindList(),
+                    typeCount = filter.recordTypes?.size ?: 0,
+                    packageCount = filter.packages?.size ?: 0,
+                    kindCount = filter.kinds?.size ?: 0,
+                    query = query,
+                    previewChars = ROW_PREVIEW_CHARS,
+                    limit = PAGE_SIZE,
+                    offset = 0,
+                )
+            },
+        ).flow.map { pagingData ->
+            pagingData.flatMap { row ->
+                row.toRowModelOrNull()?.let { listOf(it) } ?: emptyList()
+            }
+        }
+    }
+
+    /** 统一查询契约计数入口(V17 R2):匹配 [RecordFilter] 的记录总数(分页元信息)。 */
+    fun counts(filter: RecordFilter): Flow<Long> =
+        dao.observeCountByFilter(
+            recordTypes = filter.recordTypes.toBindList(),
+            packages = filter.packages.toBindList(),
+            kinds = filter.kinds.toBindList(),
+            typeCount = filter.recordTypes?.size ?: 0,
+            packageCount = filter.packages?.size ?: 0,
+            kindCount = filter.kinds?.size ?: 0,
+            query = filter.query?.takeIf { it.isNotBlank() }?.let(::likePattern),
+        )
+
+    /** 按记录类型分组计数(V17 R2,全类型总览基础)。 */
+    fun observeRecordTypeCounts(): Flow<List<RecordTypeCount>> = dao.observeRecordTypeCounts()
 
     /** 单条记录(记录详情页),记录被清理或不可解码后返回 null。 */
     fun observeById(id: Long): Flow<CryptoRecord?> =
@@ -270,6 +318,13 @@ class LogRepository(
     /** SQL LIKE 模式转义(% / _ / \)。 */
     private fun likePattern(raw: String): String =
         "%" + raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+
+    /**
+     * RecordFilter 集合 → Room IN 绑定列表:null/空集绑定哨兵单例(内容无意义,
+     * 由 DAO 侧 `:xCount = 0 OR` 短路为不过滤);非空集合原样绑定。
+     */
+    private fun Set<String>?.toBindList(): List<String> =
+        this?.toList()?.takeIf { it.isNotEmpty() } ?: listOf(EMPTY_IN_SENTINEL)
 
     companion object {
         private fun cryptoRegistry(): RecordCodecRegistry =
@@ -301,6 +356,9 @@ class LogRepository(
 
         /** 每插入这么多条执行一次双层容量治理。 */
         private const val TRIM_EVERY = 500L
+
+        /** Room IN 绑定哨兵(Room 不支持空集合绑定;哨兵内容不被求值)。 */
+        private const val EMPTY_IN_SENTINEL = ""
     }
 }
 

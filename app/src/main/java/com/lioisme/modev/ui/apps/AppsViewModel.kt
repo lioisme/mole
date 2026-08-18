@@ -65,6 +65,7 @@ data class AppRow(
         val refreshing: Boolean = false,
         val onlyScoped: Boolean = false,
         val showSystem: Boolean = true,
+        val showModules: Boolean = false,
     )
 
 private data class CatalogBase(
@@ -77,6 +78,7 @@ private data class CatalogBase(
         val query: String,
         val onlyScoped: Boolean,
         val showSystem: Boolean,
+        val showModules: Boolean,
         val pinScoped: Boolean,
         val localeTag: String,
     )
@@ -89,10 +91,19 @@ private data class CatalogBase(
         val scoped: Boolean,
     )
 
+    /** uiState 投影所需筛选偏好(与 SortPrefs 分离:不触发重排的仅投影字段)。 */
+    private data class UiFilterPrefs(
+        val query: String,
+        val onlyScoped: Boolean,
+        val showSystem: Boolean,
+        val showModules: Boolean,
+    )
+
     private data class UiPrefs(
         val query: String,
         val onlyScoped: Boolean,
         val showSystem: Boolean,
+        val showModules: Boolean,
         val pending: Set<String>,
         val refreshing: Boolean,
         val loading: Boolean,
@@ -114,18 +125,24 @@ private val query = MutableStateFlow("")
     val sortedRows: StateFlow<List<SortedRow>> = combine(
         combine(catalog.apps, scopeRepository.state, ::CatalogBase),
         combine(
-            query,
-            AppListSettings.onlyScoped,
-            AppListSettings.showSystem,
+            combine(
+                query,
+                AppListSettings.onlyScoped,
+                AppListSettings.showSystem,
+                AppListSettings.showModules,
+                ::UiFilterPrefs,
+            ),
             AppListSettings.pinScoped,
             LocaleManager.localeFlow,
-            ::SortPrefs,
-        ),
+        ) { f, pin, locale ->
+            SortPrefs(f.query, f.onlyScoped, f.showSystem, f.showModules, pin, locale)
+        },
     ) { base, prefs ->
         val scopedSet = (base.scopeState as? ScopeState.Ready)?.scope ?: emptySet()
         val nameComparator = AppSort.nameComparator<SortedRow>(label = { it.label }, key = { it.packageName })
         val rows = base.apps
             .filter { prefs.showSystem || !it.system }
+            .filter { prefs.showModules || !it.isXposedModule }
             .filter { !prefs.onlyScoped || it.packageName in scopedSet }
             .filter {
                 prefs.query.isBlank() ||
@@ -149,13 +166,14 @@ private val query = MutableStateFlow("")
         sortedRows,
         combine(logs.observeRecordCounts(), server.connectedPackagesFlow) { counts, connected -> counts to connected },
         combine(
-            combine(query, AppListSettings.onlyScoped, AppListSettings.showSystem) { q, o, s -> Triple(q, o, s) },
+            combine(query, AppListSettings.onlyScoped, AppListSettings.showSystem, AppListSettings.showModules, ::UiFilterPrefs),
             combine(pending, refreshing, catalog.loading) { p, r, l -> Triple(p, r, l) },
-        ) { prefs3, state3 ->
+        ) { prefs4, state3 ->
             UiPrefs(
-                query = prefs3.first,
-                onlyScoped = prefs3.second,
-                showSystem = prefs3.third,
+                query = prefs4.query,
+                onlyScoped = prefs4.onlyScoped,
+                showSystem = prefs4.showSystem,
+                showModules = prefs4.showModules,
                 pending = state3.first,
                 refreshing = state3.second,
                 loading = state3.third,
@@ -181,6 +199,7 @@ private val query = MutableStateFlow("")
             refreshing = prefs.refreshing,
             onlyScoped = prefs.onlyScoped,
             showSystem = prefs.showSystem,
+            showModules = prefs.showModules,
         )
         // V10 稳态状态流:内容未变(行/筛选/连接/作用域一致)不发射 → 列表零无谓重组。
     }.distinctUntilChanged().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), UiState())
@@ -301,7 +320,7 @@ class AppRecordsViewModel(
     fun clearLogs() {
         viewModelScope.launch {
             logs.clear(packageName)
-            messages.emit(UiMessage(R.string.apps_logs_cleared, listOf(packageName)))
+            messages.emit(UiMessage(R.string.apps_records_cleared, listOf(packageName)))
         }
     }
 

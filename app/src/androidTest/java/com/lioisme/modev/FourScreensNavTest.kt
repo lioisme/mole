@@ -1,6 +1,9 @@
 package com.lioisme.modev
 
 import android.view.KeyEvent
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.semantics.SemanticsNode
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
@@ -21,7 +24,9 @@ import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.lioisme.modev.ui.MainActivity
+import kotlin.math.abs
 import org.junit.Assume.assumeTrue
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -69,8 +74,52 @@ class FourScreensNavTest {
         // 筛选菜单:含「仅作用域 / 系统应用 / 设置」三项(V14 R7:置顶项已收敛
         // 至通用设置页「应用列表」分区,菜单内不再出现)。
         rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
-        rule.onNodeWithText(str(R.string.apps_only_scoped)).assertIsDisplayed()
+rule.onNodeWithText(str(R.string.apps_only_scoped)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.apps_system)).assertIsDisplayed()
+        // V17 R1:模块显隐默认关,行为级验证 = 勾选后被测包行出现(自身是 Xposed
+        // 模块,默认隐藏),取消后行消失。菜单项整项合并语义(M3 DropdownMenuItem
+        // MergeDescendants),Checkbox 只读无 ToggleableState,故不走勾选态断言。
+        rule.onNodeWithText(str(R.string.apps_modules)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.apps_modules)).performClick()
+        rule.waitForIdle()
+        // 行可能出现于折叠区外,轮询滚动至可见(与 TimelineListTest 同款)。
+        val shownDeadline = System.currentTimeMillis() + 10_000
+        var moduleRowShown = false
+        while (System.currentTimeMillis() < shownDeadline) {
+            rule.waitForIdle()
+            if (rule.onAllNodesWithText(MODULE_PACKAGE).fetchSemanticsNodes().isNotEmpty()) {
+                moduleRowShown = true
+                break
+            }
+            val scrollables = rule.onAllNodes(hasScrollAction()).fetchSemanticsNodes()
+            if (scrollables.isNotEmpty()) {
+                try {
+                    rule.onAllNodes(hasScrollAction()).onFirst()
+                        .performScrollToNode(hasText(MODULE_PACKAGE))
+                } catch (_: AssertionError) {
+                    // 行未加载,下一轮重试。
+                }
+            }
+            Thread.sleep(100)
+        }
+        assertTrue("勾选「Xposed 模块」后被测包行应出现", moduleRowShown)
+        // 还原:取消勾选 → 行消失。
+        rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
+        rule.onNodeWithText(str(R.string.apps_modules)).performClick()
+        val hiddenDeadline = System.currentTimeMillis() + 5_000
+        var moduleRowHidden = false
+        while (System.currentTimeMillis() < hiddenDeadline) {
+            rule.waitForIdle()
+            if (rule.onAllNodesWithText(MODULE_PACKAGE).fetchSemanticsNodes().isEmpty()) {
+                moduleRowHidden = true
+                break
+            }
+            Thread.sleep(100)
+        }
+        assertTrue("取消勾选后被测包行应消失", moduleRowHidden)
+        // 恢复菜单打开态,衔接原流程(仅作用域点击 / 设置入口)。
+        rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
+        rule.waitForIdle()
         rule.onNodeWithText(str(R.string.settings_pin_scoped)).assertDoesNotExist()
         rule.onNodeWithText(str(R.string.settings_title)).assertIsDisplayed()
 
@@ -141,7 +190,7 @@ class FourScreensNavTest {
         // 更多菜单:应用级危险操作(移出作用域仅对已作用域应用出现;清空该应用日志恒在),
         // 仅断言存在不触发。
         rule.onNodeWithContentDescription(str(R.string.record_more)).performClick()
-        rule.onNodeWithText(str(R.string.detail_clear_logs)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.detail_clear_records)).assertIsDisplayed()
         if (rule.onAllNodesWithText(str(R.string.detail_remove_scope)).fetchSemanticsNodes().isNotEmpty()) {
             rule.onNodeWithText(str(R.string.detail_remove_scope)).assertIsDisplayed()
         }
@@ -163,7 +212,14 @@ class FourScreensNavTest {
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.algorithm_monitor_title)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.data_settings_title)).assertIsDisplayed()
+        // 服务与诊断入口位于列表底部折叠区,滚动至可见后断言(小屏防未组合)。
+        rule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText(str(R.string.diagnostics_settings_title)))
         rule.onNodeWithText(str(R.string.diagnostics_settings_title)).assertIsDisplayed()
+        // 回到列表顶部,保证「应用列表」分区断言与入口点击可见。
+        rule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText(str(R.string.algorithm_monitor_title)))
+        rule.waitForIdle()
 
         // V14 R7:设置页「应用列表」分区含置顶开关(唯一入口),可切换并还原。
         rule.onNodeWithText(str(R.string.settings_apps_section)).assertIsDisplayed()
@@ -188,10 +244,12 @@ class FourScreensNavTest {
         rule.onNodeWithText(str(R.string.data_settings_title)).performClick()
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.settings_total_records)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.settings_clear_all_logs)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.settings_clear_all_records)).assertIsDisplayed()
         pressBack()
 
-        // 返回设置页 → 服务与诊断页:端口行 + 管线统计折叠头。
+        // 返回设置页 → 服务与诊断页:入口在底部折叠区,滚动后进入(端口行 + 管线统计折叠头)。
+        rule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText(str(R.string.diagnostics_settings_title)))
         rule.onNodeWithText(str(R.string.diagnostics_settings_title)).performClick()
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.settings_port)).assertIsDisplayed()
@@ -234,5 +292,60 @@ class FourScreensNavTest {
         // 返回根页:唯一筛选按钮、无运行按钮。
         rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(1)
         rule.onAllNodesWithTag("app-launch").assertCountEquals(0)
+    }
+
+    /**
+     * V17 R4:记录页头部状态点归位——在线点与作用域点与包名同一行,
+     * 且位于包名文本之后(与应用列表行几何同源:weight(1f, fill=false) + 6dp)。
+     * 包名取自被点击行的语义树文本(取含点文本),与生产渲染同源。
+     */
+    @Test
+    fun appRecordsHeader_hasStatusDotsBesidePackageName() {
+        rule.waitForIdle()
+        assumeTrue(rule.onAllNodesWithTag("app-row").fetchSemanticsNodes().isNotEmpty())
+
+        val rowNode = rule.onAllNodesWithTag("app-row").onFirst().fetchSemanticsNode()
+        val packageName =
+            collectTexts(rowNode).firstOrNull { it.contains('.') }
+        assumeTrue("应用行须含包名文本", packageName != null)
+
+        rule.onAllNodesWithTag("app-row").onFirst().performClick()
+        rule.waitForIdle()
+
+        val pkgNodes = rule.onAllNodesWithText(packageName!!).fetchSemanticsNodes()
+        assumeTrue("记录页须渲染包名文本", pkgNodes.isNotEmpty())
+        val pkgBounds = pkgNodes.first().boundsInRoot
+
+        // 双状态点(连接 + 作用域),候选文案取设备现态;每点至多命中一个标签。
+        val dotLabels =
+            listOf(
+                R.string.online,
+                R.string.offline,
+                R.string.detail_listening,
+                R.string.detail_not_listening,
+                R.string.detail_reading_scope,
+                R.string.detail_framework_no_service,
+            )
+        val dotNodes =
+            dotLabels
+                .flatMap { id -> rule.onAllNodesWithContentDescription(str(id)).fetchSemanticsNodes() }
+                .filter { it.boundsInRoot != Rect.Zero }
+        assumeTrue("头部须渲染双状态点", dotNodes.size >= 2)
+        for (node in dotNodes.take(2)) {
+            val b = node.boundsInRoot
+            // 同行:中心 y 差 < 12dp(行高量级);包名之后:左缘 ≥ 包名右缘(容 1dp 取整)。
+            assertTrue("状态点须与包名同行,实际 Δy=${abs(b.center.y - pkgBounds.center.y)}", abs(b.center.y - pkgBounds.center.y) < 12f)
+            assertTrue("状态点须位于包名之后,实际 left=${b.left} right=${pkgBounds.right}", b.left >= pkgBounds.right - 1f)
+        }
+    }
+
+    /** 深度优先收集语义树中全部文本(行内包名/标签/统计等,取含点者为包名)。 */
+    private fun collectTexts(node: SemanticsNode): List<String> =
+        node.config.getOrElse(SemanticsProperties.Text) { emptyList() }.map { it.text } +
+            node.children.flatMap { collectTexts(it) }
+
+    companion object {
+        /** 被测应用自身即 Xposed 模块(manifest 声明),模块显隐开关的天然实验对象。 */
+        private const val MODULE_PACKAGE = "com.lioisme.modev"
     }
 }

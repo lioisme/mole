@@ -4,6 +4,7 @@ import androidx.room.Room
 import com.lioisme.modev.data.db.ModevDatabase
 import com.lioisme.modev.data.repo.AppCatalogRepository
 import com.lioisme.modev.data.repo.AppCatalogSource
+import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.data.repo.LogRepository
 import com.lioisme.modev.data.server.ConfigServer
 import com.lioisme.modev.domain.scope.ScopeGateway
@@ -88,6 +89,8 @@ class AppsViewModelTest {
 
     @After
     fun tearDown() {
+        // AppListSettings 单例跨测试存活,复位模块显隐开关防串扰
+        AppListSettings.setShowModules(false, RuntimeEnvironment.getApplication())
         db.close()
     }
 
@@ -129,5 +132,25 @@ class AppsViewModelTest {
     fun scopeUnavailable_disablesScopeReady() {
         val state = awaitState { it.rows.size == 2 }
         assertFalse(state.scopeReady)
+    }
+
+    @Test
+    fun modulesHiddenByDefault_andRevealedBySetting() {
+        fakeCatalog.appsState.value = listOf(
+            AppCatalogRepository.AppInfo("com.module.app", "Module App", system = false, isXposedModule = true),
+            AppCatalogRepository.AppInfo("com.plain.app", "Plain App", system = false),
+        )
+        val hidden = awaitState {
+            it.rows.any { r -> r.packageName == "com.plain.app" } &&
+                it.rows.none { r -> r.packageName == "com.module.app" }
+        }
+        assertEquals(listOf("com.plain.app"), hidden.rows.map { it.packageName })
+
+        AppListSettings.setShowModules(true, RuntimeEnvironment.getApplication())
+        val shown = awaitState { it.rows.any { r -> r.packageName == "com.module.app" } }
+        assertEquals(
+            listOf("com.module.app", "com.plain.app"),
+            shown.rows.map { it.packageName },
+        )
     }
 }

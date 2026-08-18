@@ -84,7 +84,7 @@ fun DataSettingsScreen(
                         Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
                         Spacer(Modifier.width(12.dp))
                         Text(
-                            stringResource(R.string.settings_clear_all_logs),
+                            stringResource(R.string.settings_clear_all_records),
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             style = MaterialTheme.typography.bodyLarge,
                         )

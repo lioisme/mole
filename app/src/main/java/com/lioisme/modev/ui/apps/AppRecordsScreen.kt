@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
@@ -72,11 +73,17 @@ import com.lioisme.modev.ui.components.EmptyState
 import com.lioisme.modev.ui.components.RecordRow
 import com.lioisme.modev.ui.components.SearchInputField
 import com.lioisme.modev.ui.components.StatusDot
+import com.lioisme.modev.ui.components.TimelineHeader
 import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.components.copySummary
 import com.lioisme.modev.ui.components.kindLabelRes
 import com.lioisme.modev.ui.components.rememberSearchController
+import com.lioisme.modev.ui.common.groupLabelOrNull
+import com.lioisme.modev.ui.common.rememberEffectiveLocale
+import com.lioisme.modev.ui.common.secondKey
+import com.lioisme.modev.ui.common.timelineLabel
 import com.lioisme.modev.ui.theme.StatusKind
+import android.text.format.DateFormat
 import kotlinx.coroutines.launch
 
 /**
@@ -301,6 +308,10 @@ private fun AppRecordsContent(
     val appInfo by viewModel.appInfo.collectAsStateWithLifecycle()
     val launchable by viewModel.launchable.collectAsStateWithLifecycle()
     val scoped = (scopeState as? ScopeState.Ready)?.isScoped(viewModel.packageName) == true
+    // V17 R3:组头 locale/时制与 RecordRow 尾部时间同源(context 包 locale)。
+    val context = LocalContext.current
+    val locale = rememberEffectiveLocale()
+    val is24h = remember(context) { DateFormat.is24HourFormat(context) }
 
     Column(Modifier.fillMaxSize()) {
         // 固定头部:应用名 + 状态 chips(AppBar 无标题,头部是唯一语境来源)。
@@ -357,18 +368,52 @@ private fun AppRecordsContent(
                         }
 
                     else -> {
-                        items(records.itemCount, key = { index -> records[index]?.id ?: -index }) { index ->
-                            val record = records[index] ?: return@items
-                            RecordRow(
-                                record = record,
-                                onClick = { onOpenRecord(record.id) },
-                                onLongClick = { onCopyRecord(record) },
-                                // 卡片左右贴 16dp 页边距,行间留白(间距合计 8dp)。
-                                modifier =
-                                    Modifier
-                                        .testTag("record-row")
-                                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                            )
+                        // 手动索引循环(V17 R3 秒级时间线分组):组起始插组头。
+                        // 首项恒为组起始(日期 + 秒级时间);邻行比较跨秒出新头,
+                        // 跨日带日期前缀;record==null 时渲染占位槽(分页窗口,
+                        // 组头决策待数据补齐后自然补出,防错头闪动)。
+                        for (index in 0 until records.itemCount) {
+                            val record = records[index]
+                            if (record == null) {
+                                item(key = "ph-$index") { Box(Modifier.fillMaxWidth().height(0.dp)) }
+                            } else {
+                                val previous = if (index > 0) records[index - 1] else null
+                                val label =
+                                    if (index == 0) {
+                                        timelineLabel(record.timestamp, locale, is24h)
+                                    } else {
+                                        groupLabelOrNull(
+                                            record.timestamp,
+                                            previous?.timestamp,
+                                            locale,
+                                            is24h,
+                                        )
+                                    }
+                                if (label != null) {
+                                    item(key = "h-" + secondKey(record.timestamp)) {
+                                        Box(
+                                            Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                                            contentAlignment = Alignment.Center,
+                                        ) {
+                                            TimelineHeader(text = label)
+                                        }
+                                    }
+                                }
+                                item(key = record.id) {
+                                    RecordRow(
+                                        record = record,
+                                        onClick = { onOpenRecord(record.id) },
+                                        onLongClick = { onCopyRecord(record) },
+                                        // 卡片左右贴 16dp 页边距,行间留白(间距合计 8dp)。
+                                        modifier =
+                                            Modifier
+                                                .testTag("record-row")
+                                                .padding(horizontal = 16.dp, vertical = 4.dp),
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -394,7 +439,8 @@ private fun AppRecordsContent(
 
 /**
  * 固定头部:AppIcon 40dp + 应用名(titleMedium)+ 状态角标(连接/作用域双圆点,
- * V14 R4 角标化,完整语义进 contentDescription 与长按 tooltip)+ 「启动」按钮
+ * V14 R4 角标化,V17 R4 归位包名之后与应用列表同款几何;完整语义进
+ * contentDescription 与长按 tooltip)+ 「启动」按钮
  * + 「更多」菜单(移出作用域 / 清空该应用日志,V10 自捕获设置页归位)。
  */
 @Composable
@@ -424,49 +470,56 @@ private fun AppHeaderRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                packageName,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            // V17 R4:双状态点归位到包名之后(与应用列表行同款几何:
+            // 包名省略优先,状态点紧跟,行尾仅启动/更多)。
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    packageName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(Modifier.width(6.dp))
+                StatusDot(
+                    kind = if (connected) StatusKind.ONLINE else StatusKind.OFFLINE,
+                    label =
+                        if (connected) {
+                            stringResource(R.string.online)
+                        } else {
+                            stringResource(R.string.offline)
+                        },
+                )
+                Spacer(Modifier.width(6.dp))
+                StatusDot(
+                    kind =
+                        when (scopeState) {
+                            is ScopeState.Ready ->
+                                if (scoped) StatusKind.SCOPED else StatusKind.UNSCOPED
+                            ScopeState.Connecting -> StatusKind.CONNECTING
+                            is ScopeState.Unavailable ->
+                                if (scopeState.reason == ScopeState.UnavailableReason.NO_SERVICE) {
+                                    StatusKind.ERROR
+                                } else {
+                                    StatusKind.UNSCOPED
+                                }
+                        },
+                    label =
+                        when (scopeState) {
+                            is ScopeState.Ready ->
+                                if (scoped) stringResource(R.string.detail_listening) else stringResource(R.string.detail_not_listening)
+                            ScopeState.Connecting -> stringResource(R.string.detail_reading_scope)
+                            is ScopeState.Unavailable ->
+                                if (scopeState.reason == ScopeState.UnavailableReason.NO_SERVICE) {
+                                    stringResource(R.string.detail_framework_no_service)
+                                } else {
+                                    stringResource(R.string.detail_not_listening)
+                                }
+                        },
+                )
+            }
         }
-        StatusDot(
-            kind = if (connected) StatusKind.ONLINE else StatusKind.OFFLINE,
-            label =
-                if (connected) {
-                    stringResource(R.string.online)
-                } else {
-                    stringResource(R.string.offline)
-                },
-        )
-        StatusDot(
-            kind =
-                when (scopeState) {
-                    is ScopeState.Ready ->
-                        if (scoped) StatusKind.SCOPED else StatusKind.UNSCOPED
-                    ScopeState.Connecting -> StatusKind.CONNECTING
-                    is ScopeState.Unavailable ->
-                        if (scopeState.reason == ScopeState.UnavailableReason.NO_SERVICE) {
-                            StatusKind.ERROR
-                        } else {
-                            StatusKind.UNSCOPED
-                        }
-                },
-            label =
-                when (scopeState) {
-                    is ScopeState.Ready ->
-                        if (scoped) stringResource(R.string.detail_listening) else stringResource(R.string.detail_not_listening)
-                    ScopeState.Connecting -> stringResource(R.string.detail_reading_scope)
-                    is ScopeState.Unavailable ->
-                        if (scopeState.reason == ScopeState.UnavailableReason.NO_SERVICE) {
-                            stringResource(R.string.detail_framework_no_service)
-                        } else {
-                            stringResource(R.string.detail_not_listening)
-                        }
-                },
-        )
         if (onLaunch != null) {
             IconButton(
                 onClick = onLaunch,
@@ -505,7 +558,7 @@ private fun AppHeaderRow(
                     }
                     if (onClearLogs != null) {
                         DropdownMenuItem(
-                            text = { Text(stringResource(R.string.detail_clear_logs), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            text = { Text(stringResource(R.string.detail_clear_records), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                             leadingIcon = {
                                 Icon(
                                     Icons.Filled.Delete,
