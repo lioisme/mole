@@ -1,6 +1,6 @@
 package com.lioisme.modev
 
-import com.lioisme.modev.hook.HookManager
+import com.lioisme.modev.hook.HookInstaller
 import com.lioisme.modev.hook.adapters.LegacyPlatform
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.XposedBridge
@@ -18,11 +18,11 @@ class LegacyModuleEntry : IXposedHookLoadPackage {
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam) {
         try {
             // 主包名归并:legacy lpparam 直接提供真实包名,分离进程记录统一归档主包名下
-            HookManager.install(
+            HookInstaller(
                 platform = LegacyPlatform,
                 packageName = lpparam.packageName ?: lpparam.processName.substringBefore(':'),
                 processName = lpparam.processName,
-            )
+            ).install()
         } catch (t: Throwable) {
             XposedBridge.log("Modev: module init crashed: $t")
             XposedBridge.log(t)

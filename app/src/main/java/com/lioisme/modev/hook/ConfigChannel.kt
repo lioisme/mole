@@ -167,7 +167,7 @@ class ConfigChannel(
                     when (msg.type) {
                         WireProtocol.TYPE_CONFIG -> {
                             // 双端强校验:配置推送同样携带 magic/version,不匹配视为协议异常断开
-                            if (!WireCodec.isHelloCompatible(msg.payload)) {
+                            if (!WireCodec.isProtocolCompatible(msg.payload)) {
                                 android.util.Log.w(
                                     "Modev",
                                     "config channel: protocol mismatch in config push, disconnecting"

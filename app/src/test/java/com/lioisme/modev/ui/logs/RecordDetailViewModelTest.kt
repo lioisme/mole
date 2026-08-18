@@ -65,65 +65,69 @@ class RecordDetailViewModelTest {
     )
 
     /** 泵主 Looper 让 viewModelScope 协程推进,Room 在真实线程,以真实超时轮询状态。 */
-    private fun awaitRecord(
+    private fun awaitState(
         vm: RecordDetailViewModel,
-        predicate: (CryptoRecord?) -> Boolean,
-    ): CryptoRecord? {
+        predicate: (DetailUiState) -> Boolean,
+    ): DetailUiState {
         val deadline = System.currentTimeMillis() + 5_000
         while (System.currentTimeMillis() < deadline) {
             org.robolectric.shadows.ShadowLooper.idleMainLooper()
-            if (predicate(vm.record.value)) return vm.record.value
+            val state = vm.uiState.value
+            if (predicate(state)) return state
             Thread.sleep(20)
         }
-        return null
+        return vm.uiState.value
     }
 
     @Test
     fun `initial state is loading until first real query result`() {
         val vm = RecordDetailViewModel(recordId = 42, logs = repo)
         // 首个真实查询在后台线程,此刻必然仍是加载中(回归 stateIn 初始值假阳性的修复)
-        assertTrue(!vm.loaded.value)
-        assertEquals(null, vm.record.value)
+        val state = vm.uiState.value
+        assertFalse(state.loaded)
+        assertEquals(null, state.record)
+        assertFalse(state.failed)
     }
 
     @Test
     fun `record emits loaded after insert`() = runBlocking {
         val id = insert("pkg.a", CryptoKind.CIPHER, 100)
         val vm = RecordDetailViewModel(recordId = id, logs = repo)
-        val record = awaitRecord(vm) { it != null }
-        assertNotNull(record)
-        assertTrue(vm.loaded.value)
-        assertEquals("pkg.a", record?.packageName)
-        assertEquals(CryptoKind.CIPHER, record?.kind)
+        val state = awaitState(vm) { it.record != null }
+        assertNotNull(state.record)
+        assertTrue(state.loaded)
+        assertEquals("pkg.a", state.record?.packageName)
+        assertEquals(CryptoKind.CIPHER, state.record?.kind)
     }
 
     @Test
     fun `record becomes null after deletion (failed data condition)`() = runBlocking {
         val id = insert("pkg.a", CryptoKind.CIPHER, 100)
         val vm = RecordDetailViewModel(recordId = id, logs = repo)
-        awaitRecord(vm) { it != null }
+        awaitState(vm) { it.record != null }
 
         db.cryptoRecordDao().clearAll()
         // 记录被清理后重发 null → 详情页进入失败态
-        awaitRecord(vm) { it == null }
-        assertNull(vm.record.value)
-        assertTrue(vm.loaded.value)
+        val state = awaitState(vm) { it.record == null && it.loaded }
+        assertNull(state.record)
+        assertTrue(state.loaded)
+        assertTrue(state.failed)
     }
 
     @Test
     fun `retry re-subscribes and stays failed while record stays gone`() = runBlocking {
         val id = insert("pkg.a", CryptoKind.CIPHER, 100)
         val vm = RecordDetailViewModel(recordId = id, logs = repo)
-        awaitRecord(vm) { it != null }
+        awaitState(vm) { it.record != null }
 
         db.cryptoRecordDao().clearAll()
-        awaitRecord(vm) { it == null }
+        awaitState(vm) { it.record == null && it.loaded }
 
         // retry 重新订阅同一 id(自增 id 不可复用,生产语义:记录已删则保持失败态,不回到加载中)
         vm.retry()
-        val after = awaitRecord(vm) { it == null && vm.loaded.value }
-        assertNull(after)
-        assertTrue(vm.loaded.value)
+        val state = awaitState(vm) { it.record == null && it.loaded }
+        assertNull(state.record)
+        assertTrue(state.loaded)
     }
 
     @Test
@@ -135,16 +139,16 @@ class RecordDetailViewModelTest {
 
         val vm = RecordDetailViewModel(recordId = olderId, logs = repo)
         // 邻居标志在 collect 内依次查询,连同标志一起等待避免竞态
-        val first = awaitRecord(vm) { it != null && !vm.canOlder.value && vm.canNewer.value }
-        assertEquals(olderId, first?.id)
+        val first = awaitState(vm) { it.record != null && !it.canOlder && it.canNewer }
+        assertEquals(olderId, first.record?.id)
 
         vm.goNewer()
-        val second = awaitRecord(vm) { it != null && vm.canOlder.value && !vm.canNewer.value }
-        assertEquals(newerId, second?.id)
+        val second = awaitState(vm) { it.record != null && it.canOlder && !it.canNewer }
+        assertEquals(newerId, second.record?.id)
 
         vm.goOlder()
-        val third = awaitRecord(vm) { it != null && !vm.canOlder.value && vm.canNewer.value }
-        assertEquals(olderId, third?.id)
+        val third = awaitState(vm) { it.record != null && !it.canOlder && it.canNewer }
+        assertEquals(olderId, third.record?.id)
     }
 
     @Test
@@ -168,14 +172,15 @@ class RecordDetailViewModelTest {
         )
 
         val vm = RecordDetailViewModel(recordId = id, logs = repo)
-        val record = awaitRecord(vm) { it != null }
+        val state = awaitState(vm) { it.record != null }
+        val record = state.record
         assertNotNull(record)
         // 全量数据保留(取证语义不变),截断标记正确
         assertEquals(bigHex, record?.key?.hex)
         assertFalse(record!!.key!!.truncated)
         assertEquals(bigHex.length / 2, record.key!!.totalLength)
         // 邻接查询仅投影 id:无邻居 → 标志为 false,不加载任何大字段
-        assertTrue(!vm.canOlder.value)
-        assertTrue(!vm.canNewer.value)
+        assertFalse(state.canOlder)
+        assertFalse(state.canNewer)
     }
 }

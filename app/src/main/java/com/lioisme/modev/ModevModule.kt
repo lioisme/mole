@@ -3,7 +3,7 @@ package com.lioisme.modev
 import android.content.SharedPreferences
 import com.lioisme.modev.framework.FrameworkBridge
 import com.lioisme.modev.framework.RemotePrefsBridge
-import com.lioisme.modev.hook.HookManager
+import com.lioisme.modev.hook.HookInstaller
 import com.lioisme.modev.hook.adapters.LibxposedPlatform
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.ModuleLoadedParam
@@ -37,12 +37,12 @@ class ModevModule : XposedModule() {
             null
         }
         // 主包名归并:分离进程(pkg:sub)记录统一归档到主包名下,processName 保留原值区分
-        HookManager.install(
+        HookInstaller(
             platform = LibxposedPlatform(this),
             packageName = param.processName.substringBefore(':'),
             processName = param.processName,
             remotePrefsProvider = remotePrefsProvider,
-        )
+        ).install()
     }
 
     companion object {

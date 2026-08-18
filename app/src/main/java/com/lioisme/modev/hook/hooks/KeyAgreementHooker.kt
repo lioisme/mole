@@ -1,4 +1,4 @@
-package com.lioisme.modev.hook.hooks
+﻿package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -10,21 +10,17 @@ import com.lioisme.modev.hook.HookerSupport
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.MethodFinder
+import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.RecordSink
 import java.security.Key
 import java.security.Provider
 
 /**
- * 密钥协商捕获(KeyAgreement,ECDH/DH):
- * getInstance → init(己方密钥)→ doPhase(对端公钥,lastPhase)→ generateSecret(共享密钥,含 int 返回型)。
- */
+ * 瀵嗛挜鍗忓晢鎹曡幏(KeyAgreement,ECDH/DH):
+ * getInstance 鈫?init(宸辨柟瀵嗛挜)鈫?doPhase(瀵圭鍏挜,lastPhase)鈫?generateSecret(鍏变韩瀵嗛挜,鍚?int 杩斿洖鍨?銆? */
 class KeyAgreementHooker(
-    engine: HookEngine,
-    config: () -> HookSwitch,
-    tracker: CryptoContextTracker,
-    sink: RecordSink,
-    packageName: String,
-) : BaseHooker(engine, config, tracker, sink, packageName, CryptoKind.KEY_AGREEMENT) {
+    context: ProbeContext,
+) : BaseHooker(context, CryptoKind.KEY_AGREEMENT) {
 
     override fun install() {
         val f = MethodFinder

@@ -1,4 +1,4 @@
-package com.lioisme.modev.hook.hooks
+﻿package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -11,6 +11,7 @@ import com.lioisme.modev.hook.HookerSupport
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.MethodFinder
+import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.RecordSink
 import java.nio.ByteBuffer
 import java.security.Key
@@ -18,16 +19,10 @@ import java.security.Provider
 import java.security.spec.AlgorithmParameterSpec
 
 /**
- * 带密钥哈希捕获(HMAC-MD5 / HMAC-SHA1 / HMAC-SHA256 等)。
- * 含 int 返回型 doFinal(byte[],int) 出参缓冲回读与 ByteBuffer 入参暂存。
- */
+ * 甯﹀瘑閽ュ搱甯屾崟鑾?HMAC-MD5 / HMAC-SHA1 / HMAC-SHA256 绛?銆? * 鍚?int 杩斿洖鍨?doFinal(byte[],int) 鍑哄弬缂撳啿鍥炶涓?ByteBuffer 鍏ュ弬鏆傚瓨銆? */
 class MacHooker(
-    engine: HookEngine,
-    config: () -> HookSwitch,
-    tracker: CryptoContextTracker,
-    sink: RecordSink,
-    packageName: String,
-) : BaseHooker(engine, config, tracker, sink, packageName, CryptoKind.MAC) {
+    context: ProbeContext,
+) : BaseHooker(context, CryptoKind.MAC) {
 
     override fun install() {
         val f = MethodFinder
@@ -130,7 +125,7 @@ class MacHooker(
             else -> HookerSupport.take()
         }
         ctx.inputTotal += input?.size ?: 0
-        // doFinal(byte[],int):result 为写入字节数,MAC 落在 arg0[0, result)
+        // doFinal(byte[],int):result 涓哄啓鍏ュ瓧鑺傛暟,MAC 钀藉湪 arg0[0, result)
         val output = when {
             result is ByteArray -> result
             result is Int && invocation.getArg(0) is ByteArray -> {

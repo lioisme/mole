@@ -3,8 +3,9 @@ package com.lioisme.modev.data.server
 import com.lioisme.modev.core.codec.WireCodec
 import com.lioisme.modev.core.codec.WireMessage
 import com.lioisme.modev.core.codec.WireProtocol
-import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.codec.WireRecord
 import com.lioisme.modev.core.model.HookSwitch
+import com.lioisme.modev.domain.server.ConnectionMonitor
 import java.io.BufferedReader
 import java.io.BufferedWriter
 import java.io.Closeable
@@ -18,6 +19,7 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlin.concurrent.thread
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.update
 
 /**
  * 宿主侧配置/日志服务端(仅监听 loopback):
@@ -29,14 +31,16 @@ import kotlinx.coroutines.flow.StateFlow
  */
 class ConfigServer(
     private val port: Int = WireProtocol.PORT,
-) : Closeable {
+) : Closeable, ConnectionMonitor {
 
     /**
-     * 记录回调,由 LogRepository 接线(可热替换)。
-     * 第二参数为该记录所属会话的 ACK 通道:宿主成功落库后回调以推进注入侧确认游标。
+     * 类型化记录回调(ADR-1,由 LogRepository 接线,可热替换):
+     * 载荷为通用信封 [WireRecord],类型化分发由宿主注册表完成,
+     * 本服务不感知具体记录模型 —— 与具体监听能力完全解耦。
+     * 第二参数为该记录所属会话的 ACK 通道:宿主处理完成后回调以推进注入侧确认游标。
      */
     @Volatile
-    var onRecord: (CryptoRecord, (Long) -> Unit) -> Unit = { _, _ -> }
+    var onRecord: (WireRecord, (Long) -> Unit) -> Unit = { _, _ -> }
 
     @Volatile
     private var running = false
@@ -49,9 +53,9 @@ class ConfigServer(
     /** 已注册(握手成功)的包名 → 当前连接数。 */
     private val registeredPackages = ConcurrentHashMap<String, Int>()
 
-    /** 当前已连接(已握手)的包名集合,供 UI 订阅。 */
+    /** 当前已连接(已握手)的包名集合,供 UI 订阅(ConnectionMonitor)。 */
     private val _connectedPackages = MutableStateFlow<Set<String>>(emptySet())
-    val connectedPackagesFlow: StateFlow<Set<String>> = _connectedPackages
+    override val connectedPackagesFlow: StateFlow<Set<String>> = _connectedPackages
 
     /** 当前已连接(已握手)的包名集合快照。 */
     fun connectedPackages(): Set<String> = registeredPackages.keys.toSet()
@@ -61,7 +65,7 @@ class ConfigServer(
     val statsFlow: StateFlow<ChannelStats> = _stats
 
     private fun bumpStats(transform: (ChannelStats) -> ChannelStats) {
-        _stats.value = transform(_stats.value)
+        _stats.update { transform(it) }
     }
 
     /**
@@ -144,7 +148,7 @@ class ConfigServer(
     private fun onHello(socket: Socket, session: ClientSession, msg: WireMessage) {
         val payload = msg.payload
         // ① 握手 magic/version 强校验:不匹配断开并记录原因
-        if (!WireCodec.isHelloCompatible(payload)) {
+        if (!WireCodec.isProtocolCompatible(payload)) {
             android.util.Log.w(
                 "Modev",
                 "rejected hello from ${socket.inetAddress}: protocol mismatch (magic=${WireCodec.magicOf(payload)} version=${WireCodec.versionOf(payload)})"
@@ -180,7 +184,14 @@ class ConfigServer(
         registeredPackages[packageName] = (registeredPackages[packageName] ?: 0) + 1
         _connectedPackages.value = connectedPackages()
         // 握手后立即推送全局配置;未配置时由注入侧使用默认值
-        configProvider?.invoke()?.let { broadcastConfig(it) }
+        val pushed = configProvider?.invoke()?.let { cfg ->
+            broadcastConfig(cfg)
+            cfg
+        }
+        android.util.Log.i(
+            "Modev",
+            "handshake ${packageName}(${processName}) registered, config pushed=${pushed != null}"
+        )
     }
 
     private fun onRecordMessage(session: ClientSession, msg: WireMessage) {
@@ -190,17 +201,24 @@ class ConfigServer(
             bumpStats { it.copy(droppedRecords = it.droppedRecords + 1) }
             return
         }
-        // ③ 记录包名与会话包名一致性:不匹配丢弃并计数
+        // ③ 记录包名与会话包名一致性:缺失按畸形丢弃,不匹配丢弃并计数
+        val recordPackage = WireCodec.packageNameOf(record.payload)
+        if (recordPackage == null) {
+            android.util.Log.w("Modev", "server dropped record: missing packageName")
+            bumpStats { it.copy(droppedRecords = it.droppedRecords + 1) }
+            return
+        }
         val sessionPackage = session.packageName
-        if (sessionPackage != null && record.packageName != sessionPackage) {
+        if (sessionPackage != null && recordPackage != sessionPackage) {
             android.util.Log.w(
                 "Modev",
-                "server dropped record: package mismatch (record=${record.packageName} session=$sessionPackage)"
+                "server dropped record: package mismatch (record=$recordPackage session=$sessionPackage)"
             )
             bumpStats { it.copy(rejectedRecords = it.rejectedRecords + 1) }
             return
         }
-        runCatching { onRecord(record) { seq -> session.sendAck(seq) } }
+        // ACK 回调身份稳定(会话内同一实例),宿主按身份聚合每会话单游标
+        runCatching { onRecord(record, session.ack) }
     }
 
     private fun sendPong(session: ClientSession) {
@@ -264,6 +282,13 @@ class ConfigServer(
 
         @Volatile
         var processName: String? = null
+
+        /**
+         * 会话内身份稳定的 ACK 回调(唯一实例):
+         * 宿主 LogRepository 以回调身份聚合每会话最大 seq(ADR-2),
+         * 若每记录新建 lambda 将失去身份一致性,聚合退化为每条一 ACK。
+         */
+        val ack: (Long) -> Unit = { seq -> sendAck(seq) }
 
         /** 发送 ACK:通知注入侧该 seq(含)之前的记录已落库,可推进确认游标。 */
         fun sendAck(seq: Long) {

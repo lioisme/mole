@@ -1,5 +1,7 @@
 package com.lioisme.modev.core.util
 
+import com.lioisme.modev.core.model.RecordLimits
+
 /**
  * 字节数组的双态视图:hex 与 UTF-8 文本,均支持超限截断。
  * 设计为不可变值对象,可直接跨进程序列化。
@@ -45,11 +47,11 @@ data class BytesView(
             return BytesView(hex = hex, text = text, totalLength = total, truncated = truncated)
         }
 
-        /** 默认 hex 字符上限(2×1MB,支持 1MB 字段全量输出)。 */
-        const val DEFAULT_MAX_HEX_CHARS = 2_097_152
+        /** 默认 hex 字符上限(见 [RecordLimits])。 */
+        const val DEFAULT_MAX_HEX_CHARS = RecordLimits.DEFAULT_MAX_HEX_CHARS
 
-        /** 默认文本字节上限(1MB)。 */
-        const val DEFAULT_MAX_TEXT_CHARS = 1_048_576
+        /** 默认文本字节上限(见 [RecordLimits])。 */
+        const val DEFAULT_MAX_TEXT_CHARS = RecordLimits.DEFAULT_MAX_TEXT_CHARS
 
         /** 详情页折叠态预览字符上限(UI 渲染成本控制)。 */
         const val DEFAULT_PREVIEW_CHARS = 4096

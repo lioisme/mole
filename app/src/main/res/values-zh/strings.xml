@@ -24,7 +24,11 @@
     <string name="apps_launch">启动</string>
     <string name="apps_scope_requested">已请求将 %1$s 加入作用域,请在系统通知中确认(目标进程重启后生效)</string>
     <string name="apps_scope_removed">已将 %1$s 移出作用域,目标进程重启后生效</string>
-    <string name="apps_scope_failed">操作失败:%1$s %2$s</string>
+    <string name="apps_scope_failed_not_ready">无法修改作用域:框架未就绪</string>
+    <string name="apps_scope_failed_service">无法修改作用域:服务未连接</string>
+    <string name="apps_scope_failed_rejected">作用域请求被拒绝</string>
+    <string name="apps_scope_failed_timeout">等待确认超时;确认后下拉刷新即可同步</string>
+    <string name="apps_scope_failed_remove">移出作用域失败:%1$s</string>
     <string name="apps_count_wan">%1$d万+</string>
     <string name="apps_count_qian">%1$d千+</string>
     <string name="apps_logs_cleared">已清空 %1$s 的日志</string>
@@ -150,6 +154,9 @@
     <string name="bytes_truncated">(已截断)</string>
     <string name="section_expand">展开</string>
     <string name="section_collapse">收起</string>
+    <string name="section_copy">复制完整十六进制</string>
+    <string name="record_copy_done">已复制%1$s:共 %2$d 字符</string>
+    <string name="record_copied">已复制记录文本</string>
     <string name="export_failed">导出失败</string>
 
     <!-- 设置页 -->
@@ -166,6 +173,8 @@
     <string name="settings_framework_service">框架服务</string>
     <string name="settings_connecting">连接中…</string>
     <string name="settings_framework">框架</string>
+    <string name="settings_capability_enabled">已启用</string>
+    <string name="settings_capability_disabled">未启用</string>
     <string name="settings_scoped_count">作用域应用数</string>
     <string name="settings_scoped_count_value">%1$d 个</string>
     <string name="settings_not_connected">未连接</string>

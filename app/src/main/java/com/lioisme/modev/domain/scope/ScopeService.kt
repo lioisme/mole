@@ -39,7 +39,27 @@ sealed interface ScopeChangeResult {
     /** 已从作用域移除。 */
     data object ScopeRemoved : ScopeChangeResult
 
-    data class Failed(val message: String) : ScopeChangeResult
+    /**
+     * 变更失败(M17 错误码化):domain 零硬编码文案,Snackbar 文案由 UI 层
+     * 按错误码本地化(en/zh)。错误码为稳定契约,新增失败类型不得破坏现有码。
+     */
+    sealed interface Failed : ScopeChangeResult {
+
+        /** 框架状态未就绪(非 Ready,无法修改作用域)。 */
+        data object FrameworkNotReady : Failed
+
+        /** 框架服务未连接。 */
+        data object ServiceNotConnected : Failed
+
+        /** 系统通知确认被拒绝 / 框架回调失败。 */
+        data object UserRejected : Failed
+
+        /** 等待系统通知确认超时。 */
+        data object Timeout : Failed
+
+        /** 移出作用域执行失败。 */
+        data object RemoveFailed : Failed
+    }
 }
 
 /** 框架作用域服务流(宿主进程单例,可空 = 无现代框架服务)。 */

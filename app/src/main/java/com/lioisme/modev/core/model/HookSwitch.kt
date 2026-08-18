@@ -21,13 +21,13 @@ data class HookSwitch(
     val logStack: Boolean = true,
     val maxStackDepth: Int = 24,
     /** 单字段字节上限(全量捕获保险丝);0 表示无限。 */
-    val maxBytesPerField: Int = 1_048_576,
+    val maxBytesPerField: Int = RecordLimits.DEFAULT_MAX_BYTES_PER_FIELD,
     /** 调用栈前缀 denylist:任一帧命中即跳过该记录;默认空 = 全捕获。 */
     val ignoreStackPrefixes: List<String> = emptyList(),
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
-    val maxHexChars: Int = 1_048_576 * 2,
+    val maxHexChars: Int = RecordLimits.DEFAULT_MAX_HEX_CHARS,
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
-    val maxTextChars: Int = 1_048_576,
+    val maxTextChars: Int = RecordLimits.DEFAULT_MAX_TEXT_CHARS,
 ) {
     /** 是否存在任何需要 Hook 的类别。 */
     val anyEnabled: Boolean

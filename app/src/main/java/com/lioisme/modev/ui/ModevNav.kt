@@ -3,8 +3,11 @@ package com.lioisme.modev.ui
 import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -14,6 +17,8 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.navArgument
+import com.lioisme.modev.R
+import com.lioisme.modev.domain.capability.CapabilityKind
 import com.lioisme.modev.ui.apps.AppRecordsScreen
 import com.lioisme.modev.ui.apps.AppRecordsViewModelFactory
 import com.lioisme.modev.ui.apps.AppsScreen
@@ -27,6 +32,7 @@ import com.lioisme.modev.ui.navigation.navigateGuarded
 import com.lioisme.modev.ui.navigation.popGuarded
 import com.lioisme.modev.ui.navigation.popWhenReady
 import com.lioisme.modev.ui.navigation.slideComposable
+import com.lioisme.modev.ui.settings.CapabilityUiRegistry
 import com.lioisme.modev.ui.settings.CaptureSettingsScreen
 import com.lioisme.modev.ui.settings.CaptureSettingsViewModelFactory
 import com.lioisme.modev.ui.settings.DataSettingsScreen
@@ -47,7 +53,23 @@ import com.lioisme.modev.ui.settings.SettingsViewModelFactory
 @Composable
 fun ModevNavHost(navController: NavHostController) {
     val context = LocalContext.current
-    val app = context.applicationContext as com.lioisme.modev.ModevApp
+    // L4:防御性转型——预览/测试替身 Application 下渲染空壳,不崩溃
+    val app = context.applicationContext as? com.lioisme.modev.ModevApp
+    if (app == null) return
+
+    // M19:能力 → UI 呈现注册(导航动作在此绑定,设置页零 when(CapabilityKind))。
+    val capabilityUi = remember {
+        CapabilityUiRegistry().apply {
+            register(
+                CapabilityUiRegistry.Entry(
+                    kind = CapabilityKind.CRYPTO_CAPTURE,
+                    icon = Icons.Default.Tune,
+                    titleRes = R.string.capture_settings_title,
+                    onClick = { navController.navigateGuarded(ModevRoutes.CAPTURE_SETTINGS) },
+                )
+            )
+        }
+    }
 
     // 一键启动作用域应用:getLaunchIntentForPackage 取入口,加 NEW_TASK 从宿主前台启动。
     val launchApp: (String) -> Unit = { pkg ->
@@ -122,7 +144,12 @@ fun ModevNavHost(navController: NavHostController) {
             route = ModevRoutes.RECORD_DETAIL,
             arguments = listOf(navArgument("recordId") { type = NavType.LongType }),
         ) { entry ->
-            val recordId = entry.arguments?.getLong("recordId") ?: return@slideComposable
+            // 参数缺失兜底:popWhenReady 在转场/队列空闲后出栈(与 APP_RECORDS 同款),
+            // 杜绝「recordId 为 null → 返回空屏 + 返回键死循环」。
+            val recordId = entry.arguments?.getLong("recordId") ?: run {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
             BackGuarded(navController) {
                 RecordDetailScreen(
                     viewModel = viewModel(
@@ -137,10 +164,8 @@ fun ModevNavHost(navController: NavHostController) {
             BackGuarded(navController) {
                 SettingsScreen(
                     viewModel = viewModel(factory = SettingsViewModelFactory(app.container)),
+                    capabilityUi = capabilityUi,
                     onBack = { navController.popGuarded() },
-                    onOpenCaptureSettings = {
-                        navController.navigateGuarded(ModevRoutes.CAPTURE_SETTINGS)
-                    },
                     onOpenDataSettings = {
                         navController.navigateGuarded(ModevRoutes.DATA_SETTINGS)
                     },

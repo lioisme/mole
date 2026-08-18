@@ -17,6 +17,7 @@ import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.util.BytesView
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -27,11 +28,11 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
- * 行版式契约(V12 T5):
+ * 行版式契约(V12 T5;V13 去徽章 + 空白治理):
  * - 五段各占一行:算法 / 操作 / 方向胶囊 / 数据段 / 时间(秒级);
  * - 时间尊重系统 12/24h 时制,恒含秒;
- * - 类别徽章字母与筛选菜单同源(WEB_CRYPTO→'W');
- * - 单击进详情、长按复制回调。
+ * - 无类别字母徽章(V13 移除,与操作行类别色去重);
+ * - 单击进详情、长按复制摘要回调([copySummary] 拼接契约)。
  */
 @RunWith(AndroidJUnit4::class)
 class RecordRowLayoutTest {
@@ -78,13 +79,34 @@ class RecordRowLayoutTest {
     }
 
     @Test
-    fun badge_showsKindLetterW_forWebCrypto() {
+    fun noBadgeLetterRendered() {
         rule.setContent {
             MaterialTheme {
                 RecordRow(record = record, onClick = {}, onLongClick = {})
             }
         }
-        rule.onNodeWithText("W").assertIsDisplayed()
+        // V13:徽章移除,类别字母(与筛选菜单同源的首字母)不得再渲染
+        rule.onAllNodesWithText("W").assertCountEquals(0)
+    }
+
+    @Test
+    fun copySummary_concatenatesAllOwnLines() {
+        rule.setContent {
+            MaterialTheme {
+                RecordRow(record = record, onClick = {}, onLongClick = {})
+            }
+        }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val pattern = if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a"
+        val expectedTime = SimpleDateFormat(pattern, Locale.getDefault()).format(Date(record.timestamp))
+        val summary = record.copySummary(context)
+        // 摘要 = 算法 / 操作 / 方向 / 数据段 / 时间 / 包名,逐行拼接
+        assertEquals("WebCrypto/AES-GCM", summary.lineSequence().elementAt(0))
+        assertEquals(str(R.string.op_encrypt), summary.lineSequence().elementAt(1))
+        assertEquals(str(R.string.dir_encrypt), summary.lineSequence().elementAt(2))
+        assertEquals(str(R.string.record_data_out) + " " + "cafebabe", summary.lineSequence().elementAt(3))
+        assertEquals(expectedTime, summary.lineSequence().elementAt(4))
+        assertEquals("com.example.app", summary.lineSequence().elementAt(5))
     }
 
     @Test

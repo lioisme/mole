@@ -67,10 +67,13 @@ class WireCodecTest {
             provider = "AndroidOpenSSL",
             stack = listOf("com.example.app.Main:1"),
         )
-        val line = WireCodec.record(record)
+        val line = WireCodec.record(record.seq, record.recordType, CryptoRecordCodec.encode(record))
         val msg = WireCodec.parse(line)
         assertEquals(WireProtocol.TYPE_RECORD, msg!!.type)
-        val decoded = WireCodec.recordOf(msg.payload)
+        val wire = WireCodec.recordOf(msg.payload)
+        assertNotNull(wire)
+        assertEquals(CryptoRecordCodec.RECORD_TYPE, wire!!.recordType)
+        val decoded = CryptoRecordCodec.decode(wire.payload)
         assertNotNull(decoded)
         assertEquals("com.example.app", decoded!!.packageName)
         assertEquals(CryptoKind.CIPHER, decoded.kind)
@@ -124,16 +127,49 @@ class WireCodecTest {
             processName = "com.example.app",
             seq = 7L,
         )
-        val msg = WireCodec.parse(WireCodec.record(record))!!
-        val decoded = WireCodec.recordOf(msg.payload)
-        assertNotNull(decoded)
-        assertEquals(7L, decoded!!.seq)
+        val msg = WireCodec.parse(WireCodec.record(record.seq, record.recordType, CryptoRecordCodec.encode(record)))!!
+        val wire = WireCodec.recordOf(msg.payload)
+        assertNotNull(wire)
+        assertEquals(7L, wire!!.seq)
+        assertEquals(7L, CryptoRecordCodec.decode(wire.payload)!!.seq)
     }
 
     @Test
     fun recordOf_invalid_payload() {
         assertNull(WireCodec.recordOf(null))
+        // 无 recordType:类型化分发依据缺失
         assertNull(WireCodec.recordOf(JsonObject().apply { addProperty("foo", "bar") }))
+        // 有 recordType 但 seq 缺失:ACK 游标依据缺失
+        assertNull(
+            WireCodec.recordOf(
+                JsonObject().apply { addProperty(WireProtocol.KEY_RECORD_TYPE, "crypto") },
+            ),
+        )
+        // recordType 为数字:类型化分发依据必须是字符串
+        assertNull(
+            WireCodec.recordOf(
+                JsonObject().apply {
+                    addProperty(WireProtocol.KEY_RECORD_TYPE, 123)
+                    addProperty(WireProtocol.KEY_SEQ, 1L)
+                },
+            ),
+        )
+    }
+
+    @Test
+    fun recordOf_preserves_unknown_record_type_for_registry_dispatch() {
+        // 未来监听类型(未知于当前编解码器):信封完整保留,由宿主注册表决定解码与否
+        val payload = JsonObject().apply {
+            addProperty("recordType", "database")
+            addProperty("seq", 3L)
+            addProperty("packageName", "com.example.app")
+            addProperty("table", "contacts")
+        }
+        val wire = WireCodec.recordOf(payload)
+        assertNotNull(wire)
+        assertEquals("database", wire!!.recordType)
+        assertEquals(3L, wire.seq)
+        assertEquals("com.example.app", WireCodec.packageNameOf(wire.payload))
     }
 
     @Test
@@ -149,8 +185,10 @@ class WireCodecTest {
             processName = "com.example.app",
             seq = 9L,
         )
-        val msg = WireCodec.parse(WireCodec.record(record))!!
-        val decoded = WireCodec.recordOf(msg.payload)
+        val msg = WireCodec.parse(WireCodec.record(record.seq, record.recordType, CryptoRecordCodec.encode(record)))!!
+        val wire = WireCodec.recordOf(msg.payload)
+        assertNotNull(wire)
+        val decoded = CryptoRecordCodec.decode(wire!!.payload)
         assertNotNull(decoded)
         assertEquals("", decoded!!.algorithm)
         assertEquals(9L, decoded.seq)
@@ -168,24 +206,24 @@ class WireCodecTest {
         val msg = WireCodec.parse(line)
         assertEquals(WireProtocol.TYPE_CONFIG, msg!!.type)
         // 注入侧凭此做双端强校验
-        assertTrue(WireCodec.isHelloCompatible(msg.payload))
+        assertTrue(WireCodec.isProtocolCompatible(msg.payload))
     }
 
     @Test
-    fun is_hello_compatible_checks_magic_and_version() {
-        assertTrue(WireCodec.isHelloCompatible(WireCodec.parse(WireCodec.hello("pkg", "pkg"))!!.payload))
+    fun is_protocol_compatible_checks_magic_and_version() {
+        assertTrue(WireCodec.isProtocolCompatible(WireCodec.parse(WireCodec.hello("pkg", "pkg"))!!.payload))
         val bad = JsonObject().apply {
             addProperty("magic", "WRONG")
             addProperty("version", WireProtocol.VERSION)
         }
-        assertFalse(WireCodec.isHelloCompatible(bad))
+        assertFalse(WireCodec.isProtocolCompatible(bad))
         val badVersion = JsonObject().apply {
             addProperty("magic", WireProtocol.MAGIC)
             addProperty("version", WireProtocol.VERSION + 1)
         }
-        assertFalse(WireCodec.isHelloCompatible(badVersion))
-        assertFalse(WireCodec.isHelloCompatible(JsonObject()))
-        assertFalse(WireCodec.isHelloCompatible(null))
+        assertFalse(WireCodec.isProtocolCompatible(badVersion))
+        assertFalse(WireCodec.isProtocolCompatible(JsonObject()))
+        assertFalse(WireCodec.isProtocolCompatible(null))
     }
 
     @Test
@@ -211,8 +249,10 @@ class WireCodecTest {
             threadName = "worker",
             stack = listOf("com.example.app.Main:1"),
         )
-        val msg = WireCodec.parse(WireCodec.record(record))!!
-        val decoded = WireCodec.recordOf(msg.payload)
+        val msg = WireCodec.parse(WireCodec.record(record.seq, record.recordType, CryptoRecordCodec.encode(record)))!!
+        val wire = WireCodec.recordOf(msg.payload)
+        assertNotNull(wire)
+        val decoded = CryptoRecordCodec.decode(wire!!.payload)
         assertNotNull(decoded)
         assertEquals("02", decoded!!.salt?.hex)
         assertEquals("03", decoded.aad?.hex)
@@ -223,5 +263,37 @@ class WireCodecTest {
         assertEquals(42L, decoded.contextId)
         assertEquals("alias0", decoded.keyAlias)
         assertEquals(false, decoded.keyExportable)
+    }
+
+    @Test
+    fun crypto_record_codec_rejects_malformed_payloads() {
+        // 缺 kind:畸形载荷,不得误标为任何枚举
+        assertNull(CryptoRecordCodec.decode(JsonObject().apply {
+            addProperty("packageName", "com.example.app")
+            addProperty("operation", "encrypt")
+            addProperty("seq", 1L)
+            addProperty("recordType", "crypto")
+        }))
+        // 空包名:非法
+        assertNull(CryptoRecordCodec.decode(JsonObject().apply {
+            addProperty("packageName", "")
+            addProperty("kind", "cipher")
+            addProperty("operation", "encrypt")
+            addProperty("seq", 1L)
+            addProperty("recordType", "crypto")
+        }))
+    }
+
+    @Test
+    fun crypto_record_codec_rejects_unknown_enum_values() {
+        val payload = JsonObject().apply {
+            addProperty("packageName", "com.example.app")
+            addProperty("kind", "quantum_compute")
+            addProperty("operation", "encrypt")
+            addProperty("seq", 1L)
+            addProperty("recordType", "crypto")
+        }
+        // 未知 kind:解码失败(null),由宿主管线计数丢弃,绝不回退误标
+        assertNull(CryptoRecordCodec.decode(payload))
     }
 }

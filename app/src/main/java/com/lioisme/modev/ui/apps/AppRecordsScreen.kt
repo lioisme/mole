@@ -47,14 +47,17 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -71,8 +74,10 @@ import com.lioisme.modev.ui.components.EmptyState
 import com.lioisme.modev.ui.components.RecordRow
 import com.lioisme.modev.ui.components.SearchInputField
 import com.lioisme.modev.ui.components.TipIconButton
+import com.lioisme.modev.ui.components.copySummary
 import com.lioisme.modev.ui.components.kindLabelRes
 import com.lioisme.modev.ui.components.rememberSearchController
+import kotlinx.coroutines.launch
 
 /**
  * 应用记录页(2026-08-16 V3 五界面收敛;2026-08-17 V7 捕获设置入筛选菜单;
@@ -98,6 +103,8 @@ fun AppRecordsScreen(
 ) {
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
     val focusManager = LocalFocusManager.current
     val records = viewModel.records.collectAsLazyPagingItems()
 
@@ -122,6 +129,12 @@ fun AppRecordsScreen(
                 context.getString(message.resId, *message.args.toTypedArray())
             )
         }
+    }
+
+    // 列表行长按复制记录摘要(V13,与详情页整段复制同 UX:剪贴板 + Snackbar 反馈)。
+    fun copyRecord(record: CryptoRecord) {
+        clipboard.setText(AnnotatedString(record.copySummary(context)))
+        scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.record_copied)) }
     }
 
     Scaffold(
@@ -164,6 +177,7 @@ fun AppRecordsScreen(
                 viewModel = viewModel,
                 records = records,
                 onLaunch = onLaunch,
+                onCopyRecord = ::copyRecord,
                 onRemoveScope = { pendingDanger = DangerAction.REMOVE_SCOPE },
                 onClearLogs = { pendingDanger = DangerAction.CLEAR_LOGS },
                 onOpenRecord = { id ->
@@ -219,6 +233,7 @@ fun AppRecordsScreen(
                 viewModel = viewModel,
                 records = records,
                 onLaunch = onLaunch,
+                onCopyRecord = ::copyRecord,
                 onRemoveScope = { pendingDanger = DangerAction.REMOVE_SCOPE },
                 onClearLogs = { pendingDanger = DangerAction.CLEAR_LOGS },
                 onOpenRecord = { id ->
@@ -276,6 +291,7 @@ private fun AppRecordsContent(
     viewModel: AppRecordsViewModel,
     records: LazyPagingItems<CryptoRecord>,
     onLaunch: (String) -> Unit,
+    onCopyRecord: (CryptoRecord) -> Unit,
     onRemoveScope: () -> Unit,
     onClearLogs: () -> Unit,
     onOpenRecord: (Long) -> Unit,
@@ -345,6 +361,7 @@ private fun AppRecordsContent(
                             RecordRow(
                                 record = record,
                                 onClick = { onOpenRecord(record.id) },
+                                onLongClick = { onCopyRecord(record) },
                                 // 卡片左右贴 16dp 页边距,行间留白(间距合计 8dp)。
                                 modifier =
                                     Modifier

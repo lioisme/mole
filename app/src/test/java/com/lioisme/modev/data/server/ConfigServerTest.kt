@@ -1,7 +1,9 @@
 package com.lioisme.modev.data.server
 
+import com.lioisme.modev.core.codec.CryptoRecordCodec
 import com.lioisme.modev.core.codec.WireCodec
 import com.lioisme.modev.core.codec.WireProtocol
+import com.lioisme.modev.core.codec.WireRecord
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
@@ -196,7 +198,7 @@ class ConfigServerTest {
             timestamp = 1L,
             seq = 42L,
         )
-        w.write(WireCodec.record(record))
+        w.write(WireCodec.record(record.seq, record.recordType, CryptoRecordCodec.encode(record)))
         w.newLine()
         w.flush()
 
@@ -233,7 +235,7 @@ class ConfigServerTest {
             threadName = "main",
             timestamp = 1L,
         )
-        w.write(WireCodec.record(record))
+        w.write(WireCodec.record(record.seq, record.recordType, CryptoRecordCodec.encode(record)))
         w.newLine()
         w.flush()
 
@@ -247,6 +249,74 @@ class ConfigServerTest {
             Thread.sleep(20)
         }
         assertTrue(rejectedSeen)
+        s.close()
+    }
+
+    @Test
+    fun `record without recordType is dropped as malformed`() {
+        server.start()
+        val (s, reader) = connect()
+        val w = writer(s)
+        w.write(WireCodec.hello("com.a.app", "com.a.app"))
+        w.newLine()
+        w.flush()
+
+        // 裸载荷(无 recordType/seq):v4 下按畸形丢弃,不得误分发给回调
+        var callbackInvocations = 0
+        server.onRecord = { _, _ -> callbackInvocations++ }
+        val payload = com.google.gson.JsonObject().apply {
+            addProperty("packageName", "com.a.app")
+            addProperty("kind", "cipher")
+        }
+        w.write("{\"t\":\"record\",\"p\":$payload}")
+        w.newLine()
+        w.flush()
+
+        val deadline = System.currentTimeMillis() + 5000
+        var droppedSeen = false
+        while (System.currentTimeMillis() < deadline) {
+            if (server.statsFlow.value.droppedRecords >= 1) {
+                droppedSeen = true
+                break
+            }
+            Thread.sleep(20)
+        }
+        assertTrue(droppedSeen)
+        assertEquals(0, callbackInvocations)
+        s.close()
+    }
+
+    @Test
+    fun `ack callback identity is stable within a session`() {
+        server.start()
+        val callbackIdentities = mutableSetOf<(Long) -> Unit>()
+        server.onRecord = { record: WireRecord, ack -> callbackIdentities.add(ack); ack(record.seq) }
+        val (s, reader) = connect()
+        val w = writer(s)
+        w.write(WireCodec.hello("com.a.app", "com.a.app"))
+        w.newLine()
+        w.flush()
+
+        // 同一会话连续发 3 条记录:ACK 回调必须是同一实例(身份聚合前提,ADR-2)
+        for (seq in 1L..3L) {
+            val record = CryptoRecord(
+                packageName = "com.a.app",
+                kind = CryptoKind.CIPHER,
+                operation = CryptoOperation.DO_FINAL,
+                algorithm = "AES",
+                threadName = "main",
+                timestamp = seq,
+                seq = seq,
+            )
+            w.write(WireCodec.record(record.seq, record.recordType, CryptoRecordCodec.encode(record)))
+            w.newLine()
+            w.flush()
+        }
+        val deadline = System.currentTimeMillis() + 5000
+        while (callbackIdentities.size < 1 && System.currentTimeMillis() < deadline) {
+            Thread.sleep(20)
+        }
+        assertEquals(1, callbackIdentities.size)
         s.close()
     }
 }

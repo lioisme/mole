@@ -1,27 +1,22 @@
 package com.lioisme.modev.ui.components
 
+import android.content.Context
 import android.text.format.DateFormat
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -41,19 +36,18 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 记录行(2026-08-17 V8 卡片化;2026-08-17 V12 秒级时间 + 参数独立成行):
- * 每行 = 圆角卡片(16dp, surfaceContainerLow 浮于 surface),行间留白 8dp,
- * 取代旧版「细分隔线 + 六段拼接摘要」的拥挤版式:
- * - 左:类别徽章 28dp 圆角方块(类别色 15% alpha 淡底 + 类别色字母,竖直居中,
- *   列锚点恒定);徽章与内容间距 14dp;
- * - 主体 Column(weight 1f),除徽章外每参数独立成行(V12 语义):
+ * 记录行(2026-08-17 V8 卡片化;2026-08-17 V12 秒级时间 + 参数独立成行;
+ * 2026-08-17 V13 去徽章 + 空白治理):
+ * 每行 = 圆角卡片(16dp, surfaceContainerLow 浮于 surface),行间留白 8dp:
+ * - 主体 Column(weight 1f),每参数独立成行(V12 语义):
  *   行1 算法(等宽 bodyLarge,超长省略);
- *   行2 操作阶段(labelMedium 类别色,与徽章同色系);
+ *   行2 操作阶段(labelMedium 类别色,类别语义唯一承载点);
  *   行3(仅当有方向)方向胶囊(类别色 15% alpha 淡底小字);
  *   行4(仅当有数据)唯一最有价值数据段(等宽 labelMedium,优先级 key > alias > out > in);
  *   行5 时间(秒级精度,labelSmall onSurfaceVariant,尊重系统 12/24h 时制);
- * - 行高 minHeight 68dp(内容自适应加高,空段行高一致);
- * - 单击进详情;长按复制记录文本(涟漪随卡片圆角裁剪)。
+ * - V13 移除类别徽章(与操作行类别色重复承载)与固定最小高度 68dp——卡片
+ *   内容自适应高度、顶对齐,字段空缺不留空白区域;
+ * - 单击进详情;长按复制记录摘要([copySummary]),回调由宿主接线。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -86,14 +80,9 @@ fun RecordRow(
                             onLongClick()
                         },
                     )
-                    .heightIn(min = RECORD_ROW_MIN_HEIGHT)
                     .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 左列:类别徽章(固定尺寸;右侧内容左缘全列表恒定锚点)。
-            KindBadge(kind = record.kind)
-            Spacer(Modifier.width(BADGE_TO_CONTENT_GAP))
-            // 主体:每参数独立成行(V12;徽章为唯一同行豁免元素)。
+            // 主体:每参数独立成行(V13:无徽章,内容顶对齐、高度自适应)。
             Column(Modifier.weight(1f)) {
                 Text(
                     text = record.algorithm,
@@ -139,28 +128,7 @@ fun RecordRow(
     }
 }
 
-/** 类别徽章:28dp 圆角方块(类别色 15% alpha 淡底 + 类别色字母),列锚点恒定。 */
-@Composable
-private fun KindBadge(kind: CryptoKind) {
-    val color = kindColor(kind)
-    Box(
-        modifier =
-            Modifier
-                .size(KIND_BADGE_SIZE)
-                .background(color.copy(alpha = KIND_BADGE_ALPHA), RoundedCornerShape(KIND_BADGE_CORNER)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = kindSymbol(kind).toString(),
-            style = MaterialTheme.typography.labelMedium,
-            fontFamily = FontFamily.Monospace,
-            color = color,
-            maxLines = 1,
-        )
-    }
-}
-
-/** 方向胶囊:类别色淡底 + 类别色小字(与徽章同色系;方向是加密流关键信息)。 */
+/** 方向胶囊:类别色淡底 + 类别色小字(方向是加密流关键信息)。 */
 @Composable
 private fun DirectionChip(text: String, kind: CryptoKind) {
     val color = kindColor(kind)
@@ -178,20 +146,48 @@ private fun DirectionChip(text: String, kind: CryptoKind) {
     }
 }
 
-/** 类别徽章固定尺寸(右侧内容左缘全列表恒定锚点)。 */
-private val KIND_BADGE_SIZE = 28.dp
+/**
+ * 最有价值数据段原始选择(纯数据单一事实源,优先级 密钥 > 别名 > 输出 > 输入):
+ * 返回(标签资源, 值)或 null;本地化由 UI 层(组合 / 非组合)各自承担。
+ */
+internal fun CryptoRecord.valuableDataPair(): Pair<Int, String>? = when {
+    keyAlias != null -> R.string.record_data_alias to keyAlias
+    key != null -> R.string.record_data_key to key.hex.take(24)
+    output != null -> R.string.record_data_out to output.hex.take(24)
+    input != null -> R.string.record_data_in to input.hex.take(24)
+    else -> null
+}
 
-/** 徽章与内容间距(固定,与徽章宽共同构成列锚点)。 */
-private val BADGE_TO_CONTENT_GAP = 14.dp
+/**
+ * 记录摘要文本(V13 列表行长按复制单一事实源):
+ * 算法 / 操作 / 方向 / 最有价值数据段 / 秒级时间 / 包名,逐行拼接,无冗余空行。
+ * 纯函数(非组合,时间格式尊重系统 12/24h 时制),宿主可直接在事件回调中调用。
+ */
+fun CryptoRecord.copySummary(context: Context): String {
+    val time = SimpleDateFormat(
+        if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
+        Locale.getDefault(),
+    ).format(Date(timestamp))
+    return buildString {
+        append(algorithm)
+        append('\n')
+        append(context.getString(operationLabelRes(operation)))
+        direction?.let { dir ->
+            append('\n').append(directionLabel(context, dir))
+        }
+        valuableDataPair()?.let { (labelRes, value) ->
+            append('\n').append(context.getString(labelRes)).append(' ').append(value)
+        }
+        append('\n').append(time)
+        append('\n').append(packageName)
+    }
+}
 
-/** 徽章淡底透明度(类别色 alpha,淡色底 + 类别色字母)。 */
+/** 方向胶囊淡底透明度(类别色 alpha,淡色底 + 类别色小字)。 */
 private const val KIND_BADGE_ALPHA = 0.15f
 
-/** 徽章圆角(与 LIDE LevelBadge 同款 6dp,勿用 shapes.small=8dp)。 */
+/** 方向胶囊圆角(与 LIDE LevelBadge 同款 6dp,勿用 shapes.small=8dp)。 */
 private val KIND_BADGE_CORNER = 6.dp
-
-/** 行最小高度(数据段缺失时行高一致,列表滚动整齐)。 */
-private val RECORD_ROW_MIN_HEIGHT = 68.dp
 
 /**
  * 最有价值数据段(单段展示不堆叠,优先级 密钥 > 别名 > 输出 > 输入):
@@ -199,29 +195,8 @@ private val RECORD_ROW_MIN_HEIGHT = 68.dp
  * 线程为噪音,列表行只留「最重要的一段数据」。
  */
 @Composable
-private fun CryptoRecord.valuableDataSnippet(): String? = when {
-    keyAlias != null -> stringResource(R.string.record_data_alias) + " " + keyAlias
-    key != null -> stringResource(R.string.record_data_key) + " " + key.hex.take(24)
-    output != null -> stringResource(R.string.record_data_out) + " " + output.hex.take(24)
-    input != null -> stringResource(R.string.record_data_in) + " " + input.hex.take(24)
-    else -> null
-}
-
-/** 类别徽章字母(单字符扫描)。 */
-private fun kindSymbol(kind: CryptoKind): Char = when (kind) {
-    CryptoKind.MESSAGE_DIGEST -> 'D'
-    CryptoKind.CIPHER -> 'C'
-    CryptoKind.MAC -> 'M'
-    CryptoKind.SIGNATURE -> 'S'
-    CryptoKind.KEY_PARAM -> 'P'
-    CryptoKind.KEY_GENERATION -> 'G'
-    CryptoKind.KEY_FACTORY -> 'F'
-    CryptoKind.KEY_STORE -> 'K'
-    CryptoKind.KEY_AGREEMENT -> 'A'
-    CryptoKind.RANDOM -> 'R'
-    CryptoKind.BASE64 -> 'B'
-    CryptoKind.WEB_CRYPTO -> 'W'
-}
+private fun CryptoRecord.valuableDataSnippet(): String? =
+    valuableDataPair()?.let { (labelRes, value) -> stringResource(labelRes) + " " + value }
 
 /** 类别显示名资源(筛选菜单 / 详情页元数据共用)。 */
 @StringRes
@@ -240,42 +215,53 @@ fun kindLabelRes(kind: CryptoKind): Int = when (kind) {
     CryptoKind.WEB_CRYPTO -> R.string.kind_webview
 }
 
-/** 操作标签(2026-08-16 V3 起走资源,消除硬编码英文;i18n 双语言)。 */
-@Composable
-fun operationLabel(operation: CryptoOperation): String = stringResource(
-    when (operation) {
-        CryptoOperation.GET_INSTANCE -> R.string.op_get_instance
-        CryptoOperation.INIT -> R.string.op_init
-        CryptoOperation.UPDATE -> R.string.op_update
-        CryptoOperation.DO_FINAL -> R.string.op_do_final
-        CryptoOperation.DIGEST -> R.string.op_digest
-        CryptoOperation.SIGN -> R.string.op_sign
-        CryptoOperation.VERIFY -> R.string.op_verify
-        CryptoOperation.GET_IV -> R.string.op_get_iv
-        CryptoOperation.CONSTRUCT -> R.string.op_construct
-        CryptoOperation.GENERATE -> R.string.op_generate
-        CryptoOperation.GENERATE_PRIVATE -> R.string.op_generate_private
-        CryptoOperation.GENERATE_PUBLIC -> R.string.op_generate_public
-        CryptoOperation.GENERATE_SECRET -> R.string.op_generate_secret
-        CryptoOperation.GET_KEY -> R.string.op_get_key
-        CryptoOperation.SET_KEY -> R.string.op_set_key
-        CryptoOperation.DELETE_KEY -> R.string.op_delete_key
-        CryptoOperation.LOAD -> R.string.op_load
-        CryptoOperation.DO_PHASE -> R.string.op_do_phase
-        CryptoOperation.GENERATE_SEED -> R.string.op_generate_seed
-        CryptoOperation.ENCODE -> R.string.op_encode
-        CryptoOperation.DECODE -> R.string.op_decode
-        CryptoOperation.ENCRYPT -> R.string.op_encrypt
-        CryptoOperation.DECRYPT -> R.string.op_decrypt
-    },
-)
-
-/** 方向标签(资源化;未知模式带模式号,同详情页展示)。 */
-@Composable
-fun directionLabel(direction: Int): String = when (direction) {
-    1 -> stringResource(R.string.dir_encrypt)
-    2 -> stringResource(R.string.dir_decrypt)
-    3 -> stringResource(R.string.dir_wrap)
-    4 -> stringResource(R.string.dir_unwrap)
-    else -> stringResource(R.string.dir_mode, direction)
+/** 操作标签资源(2026-08-16 V3 起走资源,消除硬编码英文;i18n 双语言)。 */
+@StringRes
+fun operationLabelRes(operation: CryptoOperation): Int = when (operation) {
+    CryptoOperation.GET_INSTANCE -> R.string.op_get_instance
+    CryptoOperation.INIT -> R.string.op_init
+    CryptoOperation.UPDATE -> R.string.op_update
+    CryptoOperation.DO_FINAL -> R.string.op_do_final
+    CryptoOperation.DIGEST -> R.string.op_digest
+    CryptoOperation.SIGN -> R.string.op_sign
+    CryptoOperation.VERIFY -> R.string.op_verify
+    CryptoOperation.GET_IV -> R.string.op_get_iv
+    CryptoOperation.CONSTRUCT -> R.string.op_construct
+    CryptoOperation.GENERATE -> R.string.op_generate
+    CryptoOperation.GENERATE_PRIVATE -> R.string.op_generate_private
+    CryptoOperation.GENERATE_PUBLIC -> R.string.op_generate_public
+    CryptoOperation.GENERATE_SECRET -> R.string.op_generate_secret
+    CryptoOperation.GET_KEY -> R.string.op_get_key
+    CryptoOperation.SET_KEY -> R.string.op_set_key
+    CryptoOperation.DELETE_KEY -> R.string.op_delete_key
+    CryptoOperation.LOAD -> R.string.op_load
+    CryptoOperation.DO_PHASE -> R.string.op_do_phase
+    CryptoOperation.GENERATE_SEED -> R.string.op_generate_seed
+    CryptoOperation.ENCODE -> R.string.op_encode
+    CryptoOperation.DECODE -> R.string.op_decode
+    CryptoOperation.ENCRYPT -> R.string.op_encrypt
+    CryptoOperation.DECRYPT -> R.string.op_decrypt
 }
+
+/** 操作标签(组合包装,视觉承载)。 */
+@Composable
+fun operationLabel(operation: CryptoOperation): String = stringResource(operationLabelRes(operation))
+
+/** 方向标签资源(未知模式无固定资源,由调用方带模式号)。 */
+@StringRes
+fun directionLabelRes(direction: Int): Int? = when (direction) {
+    1 -> R.string.dir_encrypt
+    2 -> R.string.dir_decrypt
+    3 -> R.string.dir_wrap
+    4 -> R.string.dir_unwrap
+    else -> null
+}
+
+/** 方向标签(组合包装;未知模式带模式号,同详情页展示)。 */
+@Composable
+fun directionLabel(direction: Int): String =
+    directionLabelRes(direction)?.let { stringResource(it) } ?: stringResource(R.string.dir_mode, direction)
+
+/** 方向标签(非组合;经 Context 解析,供事件回调使用)。 */
+fun directionLabel(context: Context, direction: Int): String =
+    directionLabelRes(direction)?.let { context.getString(it) } ?: context.getString(R.string.dir_mode, direction)

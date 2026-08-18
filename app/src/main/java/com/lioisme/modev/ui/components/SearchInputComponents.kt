@@ -24,6 +24,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lioisme.modev.R
@@ -134,6 +138,8 @@ fun CollapsedSearchInput(
                 )
             }
         }
+        // 折叠条主体:纯 pointer 手势 + 显式语义按钮(pointerInput 语义空白——
+        // 折叠态 = 一次单击展开,不随「无图标节点」被 TalkBack 跳过)。
         Box(
             modifier =
                 Modifier
@@ -144,6 +150,13 @@ fun CollapsedSearchInput(
                             onTap = { onTapToExpand() },
                             onLongPress = {},
                         )
+                    }
+                    .semantics {
+                        role = Role.Button
+                        onClick {
+                            onTapToExpand()
+                            true
+                        }
                     },
             contentAlignment = Alignment.CenterStart,
         ) {

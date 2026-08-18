@@ -1,4 +1,4 @@
-package com.lioisme.modev.hook.hooks
+﻿package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -11,25 +11,19 @@ import com.lioisme.modev.hook.HookerSupport
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.MethodFinder
+import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.RecordSink
 import java.nio.ByteBuffer
 
 /**
- * Base64 编码/解码捕获(android.util.Base64 全 7 个公开方法 + java.util.Base64 编解码实例)。
- * 默认开关关闭(噪声大),用于辅助定位编码链路。
- * android.util.Base64 为静态入口,使用进程级占位上下文;java.util.Base64 按实例关联(经工厂方法)。
- */
+ * Base64 缂栫爜/瑙ｇ爜鎹曡幏(android.util.Base64 鍏?7 涓叕寮€鏂规硶 + java.util.Base64 缂栬В鐮佸疄渚?銆? * 榛樿寮€鍏冲叧闂?鍣０澶?,鐢ㄤ簬杈呭姪瀹氫綅缂栫爜閾捐矾銆? * android.util.Base64 涓洪潤鎬佸叆鍙?浣跨敤杩涚▼绾у崰浣嶄笂涓嬫枃;java.util.Base64 鎸夊疄渚嬪叧鑱?缁忓伐鍘傛柟娉?銆? */
 class Base64Hooker(
-    engine: HookEngine,
-    config: () -> HookSwitch,
-    tracker: CryptoContextTracker,
-    sink: RecordSink,
-    packageName: String,
-) : BaseHooker(engine, config, tracker, sink, packageName, CryptoKind.BASE64) {
+    context: ProbeContext,
+) : BaseHooker(context, CryptoKind.BASE64) {
 
     override fun install() {
         val f = MethodFinder
-        // ---- android.util.Base64(静态,全 7 个公开方法)----
+        // ---- android.util.Base64(闈欐€?鍏?7 涓叕寮€鏂规硶)----
         hook(f.find(ANDROID_B64, "encode", ByteArray::class.java, Int::class.javaPrimitiveType)) { inv, result -> afterEncode(inv, result, null) }
         hook(f.find(ANDROID_B64, "encode", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, result -> afterEncode(inv, result, null) }
         hook(f.find(ANDROID_B64, "encodeToString", ByteArray::class.java, Int::class.javaPrimitiveType)) { inv, result -> afterEncode(inv, result, null) }
@@ -38,7 +32,7 @@ class Base64Hooker(
         hook(f.find(ANDROID_B64, "decode", ByteArray::class.java, Int::class.javaPrimitiveType)) { inv, result -> afterDecode(inv, result, null) }
         hook(f.find(ANDROID_B64, "decode", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, result -> afterDecode(inv, result, null) }
 
-        // ---- java.util.Base64(工厂 → 实例关联上下文)----
+        // ---- java.util.Base64(宸ュ巶 鈫?瀹炰緥鍏宠仈涓婁笅鏂?----
         val javaB64 = "java.util.Base64"
         hook(f.find(javaB64, "getEncoder")) { inv, result -> afterFactory(inv, result) }
         hook(f.find(javaB64, "getDecoder")) { inv, result -> afterFactory(inv, result) }
@@ -140,7 +134,7 @@ class Base64Hooker(
         )
     }
 
-    /** 实例上下文:java.util.Base64 按实例关联;android.util.Base64 静态调用用进程级占位。 */
+    /** 瀹炰緥涓婁笅鏂?java.util.Base64 鎸夊疄渚嬪叧鑱?android.util.Base64 闈欐€佽皟鐢ㄧ敤杩涚▼绾у崰浣嶃€?*/
     private fun contextOf(invocation: Invocation): Any =
         invocation.thisObject ?: STATIC_CTX
 

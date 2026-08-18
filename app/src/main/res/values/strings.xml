@@ -24,9 +24,13 @@
     <string name="apps_launch">Launch</string>
     <string name="apps_scope_requested">Scope requested for %1$s; confirm in the system notification (applies after target process restart)</string>
     <string name="apps_scope_removed">Unscoped %1$s; applies after target process restart</string>
-    <string name="apps_scope_failed">Operation failed: %1$s %2$s</string>
+    <string name="apps_scope_failed_not_ready">Cannot change scope: framework not ready</string>
+    <string name="apps_scope_failed_service">Cannot change scope: service not connected</string>
+    <string name="apps_scope_failed_rejected">Scope request rejected</string>
+    <string name="apps_scope_failed_timeout">Timed out waiting for confirmation; pull down to refresh after confirming</string>
+    <string name="apps_scope_failed_remove">Failed to remove %1$s from scope</string>
     <string name="apps_count_wan">%1$dK+</string>
-    <string name="apps_count_qian">%1$d+</string>
+    <string name="apps_count_qian">%1$dK+</string>
     <string name="apps_logs_cleared">Cleared logs for %1$s</string>
 
     <!-- App records -->
@@ -149,6 +153,9 @@
     <string name="bytes_truncated">(truncated)</string>
     <string name="section_expand">Expand</string>
     <string name="section_collapse">Collapse</string>
+    <string name="section_copy">Copy full hex</string>
+    <string name="record_copy_done">Copied %1$s: %2$d chars</string>
+    <string name="record_copied">Record copied</string>
     <string name="export_failed">Export failed</string>
 
     <!-- Settings -->
@@ -165,6 +172,8 @@
     <string name="settings_framework_service">Framework service</string>
     <string name="settings_connecting">Connecting…</string>
     <string name="settings_framework">Framework</string>
+    <string name="settings_capability_enabled">Enabled</string>
+    <string name="settings_capability_disabled">Disabled</string>
     <string name="settings_scoped_count">Scoped apps</string>
     <string name="settings_scoped_count_value">%1$d</string>
     <string name="settings_not_connected">Not connected</string>

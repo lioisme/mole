@@ -1,6 +1,6 @@
 package com.lioisme.modev.hook.webview
 
-import com.google.gson.Gson
+import com.lioisme.modev.core.codec.Json
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
@@ -31,11 +31,9 @@ data class JsEvent(
 /** 事件解析:畸形载荷返回 null,静默丢弃(与 WireCodec.recordOf 同规)。 */
 object WebViewEventParser {
 
-    private val gson = Gson()
-
     fun parse(json: String?): JsEvent? {
         if (json.isNullOrBlank()) return null
-        return runCatching { gson.fromJson(json, JsEvent::class.java) }.getOrNull()?.takeIf { it.op != null }
+        return runCatching { Json.gson.fromJson(json, JsEvent::class.java) }.getOrNull()?.takeIf { it.op != null }
     }
 }
 

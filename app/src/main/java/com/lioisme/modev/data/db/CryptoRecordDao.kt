@@ -9,8 +9,9 @@ import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 算法记录存取。所有查询按 (packageName, timestamp) 倒序,支持 kind / 关键字过滤。
+ * 算法记录存取。所有查询按 (packageName, timestamp) 倒序,支持 recordType / kind / 关键字过滤。
  * 复合索引 (packageName, timestamp)、(packageName, kind) 由实体声明。
+ * recordType 过滤语义:null = 不过滤(跨类型合计),非 null = 仅该监听类型(ADR-4)。
  */
 @Dao
 interface CryptoRecordDao {
@@ -26,18 +27,6 @@ interface CryptoRecordDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(records: List<CryptoRecordEntity>)
 
-    /** 最近 [limit] 条(可先按包名过滤)。 */
-    @Query(
-        """
-        SELECT * FROM crypto_records
-        WHERE (:packageName IS NULL OR packageName = :packageName)
-          AND (:kind IS NULL OR kind = :kind)
-        ORDER BY timestamp DESC
-        LIMIT :limit
-        """
-    )
-    fun observe(packageName: String?, kind: String?, limit: Int): Flow<List<CryptoRecordEntity>>
-
     /**
      * 分页查询(供 Paging3 使用)。关键字为已转义的 LIKE 模式(仓库层负责 escape)。
      * `LIMIT :limit OFFSET :offset` 由 Room 生成的 PagingSource 注入。
@@ -45,7 +34,8 @@ interface CryptoRecordDao {
     @Query(
         """
         SELECT * FROM crypto_records
-        WHERE (:packageName IS NULL OR packageName = :packageName)
+        WHERE (:recordType IS NULL OR recordType = :recordType)
+          AND (:packageName IS NULL OR packageName = :packageName)
           AND (:kind IS NULL OR kind = :kind)
           AND (:query IS NULL OR :query = ''
                OR algorithm LIKE :query ESCAPE '\'
@@ -62,6 +52,7 @@ interface CryptoRecordDao {
         """
     )
     fun observePaged(
+        recordType: String?,
         packageName: String?,
         kind: String?,
         query: String?,
@@ -83,7 +74,8 @@ interface CryptoRecordDao {
                substr(outputHex, 1, :previewChars) AS outputPreview,
                keyTruncated, inputTruncated, outputTruncated
         FROM crypto_records
-        WHERE (:packageName IS NULL OR packageName = :packageName)
+        WHERE (:recordType IS NULL OR recordType = :recordType)
+          AND (:packageName IS NULL OR packageName = :packageName)
           AND (:kind IS NULL OR kind = :kind)
           AND (:query IS NULL OR :query = ''
                OR algorithm LIKE :query ESCAPE '\'
@@ -100,6 +92,7 @@ interface CryptoRecordDao {
         """
     )
     fun observePagedRows(
+        recordType: String?,
         packageName: String?,
         kind: String?,
         query: String?,
@@ -108,17 +101,24 @@ interface CryptoRecordDao {
         offset: Int,
     ): PagingSource<Int, CryptoRecordRow>
 
-    /** 每包记录数(应用列表徽标)。 */
+    /** 每包记录数(应用列表徽标;可限定类型)。 */
     @Query(
         """
         SELECT packageName, COUNT(*) AS recordCount FROM crypto_records
+        WHERE (:recordType IS NULL OR recordType = :recordType)
         GROUP BY packageName
         """
     )
-    fun observeRecordCounts(): Flow<List<RecordCount>>
+    fun observeRecordCounts(recordType: String?): Flow<List<RecordCount>>
 
-    @Query("SELECT DISTINCT packageName FROM crypto_records ORDER BY packageName")
-    fun observePackages(): Flow<List<String>>
+    @Query(
+        """
+        SELECT DISTINCT packageName FROM crypto_records
+        WHERE (:recordType IS NULL OR recordType = :recordType)
+        ORDER BY packageName
+        """
+    )
+    fun observePackages(recordType: String?): Flow<List<String>>
 
     @Query("DELETE FROM crypto_records WHERE packageName = :packageName")
     suspend fun clearPackage(packageName: String)
@@ -137,25 +137,27 @@ interface CryptoRecordDao {
     @Query(
         """
         SELECT id FROM crypto_records
-        WHERE (:packageName IS NULL OR packageName = :packageName)
+        WHERE (:recordType IS NULL OR recordType = :recordType)
+          AND (:packageName IS NULL OR packageName = :packageName)
           AND (timestamp < :ts OR (timestamp = :ts AND id < :id))
         ORDER BY timestamp DESC, id DESC
         LIMIT 1
         """
     )
-    suspend fun neighborIdOlderThan(packageName: String?, ts: Long, id: Long): Long?
+    suspend fun neighborIdOlderThan(recordType: String?, packageName: String?, ts: Long, id: Long): Long?
 
     /** 比 (ts, id) 更新的相邻一条的 id(记录详情"下一条";投影语义同 [neighborIdOlderThan])。 */
     @Query(
         """
         SELECT id FROM crypto_records
-        WHERE (:packageName IS NULL OR packageName = :packageName)
+        WHERE (:recordType IS NULL OR recordType = :recordType)
+          AND (:packageName IS NULL OR packageName = :packageName)
           AND (timestamp > :ts OR (timestamp = :ts AND id > :id))
         ORDER BY timestamp ASC, id ASC
         LIMIT 1
         """
     )
-    suspend fun neighborIdNewerThan(packageName: String?, ts: Long, id: Long): Long?
+    suspend fun neighborIdNewerThan(recordType: String?, packageName: String?, ts: Long, id: Long): Long?
 
     /** 保留最近 [keep] 条,其余删除(全局容量治理);返回删除条数。 */
     @Query(
@@ -186,10 +188,11 @@ interface CryptoRecordDao {
     @Query(
         """
         SELECT packageName, COUNT(*) AS recordCount FROM crypto_records
+        WHERE (:recordType IS NULL OR recordType = :recordType)
         GROUP BY packageName
         """
     )
-    suspend fun counts(): List<RecordCount>
+    suspend fun counts(recordType: String?): List<RecordCount>
 }
 
 /** 每包记录计数(应用列表徽标)。 */

@@ -1,4 +1,4 @@
-package com.lioisme.modev.hook.hooks
+﻿package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -9,22 +9,18 @@ import com.lioisme.modev.hook.HookEngine
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.MethodFinder
+import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.RecordSink
 import java.security.Key
 import java.security.Provider
 import java.security.spec.KeySpec
 
 /**
- * 密钥还原捕获:KeyFactory.generatePrivate/Public/getKeySpec/translateKey
- * 与 SecretKeyFactory.generateSecret。
- */
+ * 瀵嗛挜杩樺師鎹曡幏:KeyFactory.generatePrivate/Public/getKeySpec/translateKey
+ * 涓?SecretKeyFactory.generateSecret銆? */
 class KeyFactoryHooker(
-    engine: HookEngine,
-    config: () -> HookSwitch,
-    tracker: CryptoContextTracker,
-    sink: RecordSink,
-    packageName: String,
-) : BaseHooker(engine, config, tracker, sink, packageName, CryptoKind.KEY_FACTORY) {
+    context: ProbeContext,
+) : BaseHooker(context, CryptoKind.KEY_FACTORY) {
 
     override fun install() {
         val f = MethodFinder
@@ -80,7 +76,7 @@ class KeyFactoryHooker(
         )
     }
 
-    /** getKeySpec(Key, Class):输入密钥材料 + 还原出的 KeySpec 结构参数。 */
+    /** getKeySpec(Key, Class):杈撳叆瀵嗛挜鏉愭枡 + 杩樺師鍑虹殑 KeySpec 缁撴瀯鍙傛暟銆?*/
     private fun afterGetKeySpec(invocation: Invocation, result: Any?) {
         val instance = invocation.thisObject ?: return
         val ctx = tracker.contextFor(instance)
@@ -97,7 +93,7 @@ class KeyFactoryHooker(
         )
     }
 
-    /** translateKey(Key):翻译后的密钥材料 + 结构参数。 */
+    /** translateKey(Key):缈昏瘧鍚庣殑瀵嗛挜鏉愭枡 + 缁撴瀯鍙傛暟銆?*/
     private fun afterTranslateKey(invocation: Invocation, result: Any?) {
         val instance = invocation.thisObject ?: return
         val ctx = tracker.contextFor(instance)

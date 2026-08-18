@@ -112,12 +112,12 @@ class ScopeRepositoryTest {
     }
 
     @Test
-    fun `toggle add rejected - failed with message and scope unchanged`() = runTest {
+    fun `toggle add rejected - user rejected and scope unchanged`() = runTest {
         val fake = FakeScopeService(requestBehavior = { _, cb -> cb.onFailed("scope request blocked") })
         val gateway = FakeGateway(fake)
         val repo = newRepository(gateway)
         val result = repo.toggle("com.target")
-        assertEquals(ScopeChangeResult.Failed("scope request blocked"), result)
+        assertEquals(ScopeChangeResult.Failed.UserRejected, result)
         assertEquals(emptySet<String>(), (repo.state.value as ScopeState.Ready).scope)
     }
 

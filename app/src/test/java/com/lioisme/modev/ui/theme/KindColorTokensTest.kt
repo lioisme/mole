@@ -71,16 +71,17 @@ class KindColorTokensTest {
     }
 
     @Test
-    fun kindBadgeLetterMeetsAaOnTintedBadgeForBothModes() {
+    fun directionChipMeetsAaOnTintedChipForBothModes() {
+        // 方向胶囊(V13 徽章移除后类别色 15% 淡底的唯一承载):类别色 on 淡底 ≥ 4.5:1
         for (kind in CryptoKind.entries) {
             for (isDark in listOf(false, true)) {
                 val s = schemeFor(isDark)
                 val surface = s.surface
                 val fg = kindColorForMode(kind, isDark).toArgb()
-                val badgeBg = blendAlpha(fg, surface, 0.15f)
-                val ratio = contrastRatio(fg, badgeBg)
+                val chipBg = blendAlpha(fg, surface, 0.15f)
+                val ratio = contrastRatio(fg, chipBg)
                 assertTrue(
-                    "badge kind=$kind dark=$isDark ratio=$ratio 低于 AA 严格档 4.5:1",
+                    "chip kind=$kind dark=$isDark ratio=$ratio 低于 AA 严格档 4.5:1",
                     ratio >= 4.5,
                 )
             }

@@ -1,4 +1,4 @@
-package com.lioisme.modev.hook.hooks
+﻿package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -10,6 +10,7 @@ import com.lioisme.modev.hook.HookEngine
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.MethodFinder
+import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.RecordSink
 import java.io.InputStream
 import java.security.Key
@@ -18,16 +19,10 @@ import java.security.Provider
 import java.security.cert.Certificate
 
 /**
- * 密钥库捕获(KeyStore):类型/provider、load 口令、别名查询、取键/写键/删键、证书链。
- * 口令(char[])与返回密钥照常捕获(调试工具定位,与参考软件一致);不可导出密钥记 alias + 标记。
- */
+ * 瀵嗛挜搴撴崟鑾?KeyStore):绫诲瀷/provider銆乴oad 鍙ｄ护銆佸埆鍚嶆煡璇€佸彇閿?鍐欓敭/鍒犻敭銆佽瘉涔﹂摼銆? * 鍙ｄ护(char[])涓庤繑鍥炲瘑閽ョ収甯告崟鑾?璋冭瘯宸ュ叿瀹氫綅,涓庡弬鑰冭蒋浠朵竴鑷?;涓嶅彲瀵煎嚭瀵嗛挜璁?alias + 鏍囪銆? */
 class KeyStoreHooker(
-    engine: HookEngine,
-    config: () -> HookSwitch,
-    tracker: CryptoContextTracker,
-    sink: RecordSink,
-    packageName: String,
-) : BaseHooker(engine, config, tracker, sink, packageName, CryptoKind.KEY_STORE) {
+    context: ProbeContext,
+) : BaseHooker(context, CryptoKind.KEY_STORE) {
 
     override fun install() {
         val f = MethodFinder
@@ -146,7 +141,7 @@ class KeyStoreHooker(
         emitKeyResult(instance, ctx, alias, password, key)
     }
 
-    /** 取键结果统一组装:导出密钥取 encoded;不可导出记 alias + 标记。 */
+    /** 鍙栭敭缁撴灉缁熶竴缁勮:瀵煎嚭瀵嗛挜鍙?encoded;涓嶅彲瀵煎嚭璁?alias + 鏍囪銆?*/
     private fun emitKeyResult(
         instance: Any,
         ctx: CryptoContext,
@@ -165,7 +160,7 @@ class KeyStoreHooker(
             keyExportable = encoded != null,
             params = mapOf("alias" to alias),
         )
-        // 口令单独成条(与密钥材料分离,便于对照)
+        // 鍙ｄ护鍗曠嫭鎴愭潯(涓庡瘑閽ユ潗鏂欏垎绂?渚夸簬瀵圭収)
         if (password != null) {
             emit(
                 operation = CryptoOperation.GET_KEY,

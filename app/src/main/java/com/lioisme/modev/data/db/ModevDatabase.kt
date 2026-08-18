@@ -14,10 +14,11 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * v2 → v3:新增 seq 列(注入侧进程级单调序号)与 (packageName, processName, seq) 唯一索引,
  *   断线重放幂等(REPLACE 吸收重复);存量行 seq 为 NULL,不参与唯一性冲突。
  * v3 → v4:新增 recordType 列(记录类型维度,默认 crypto),存量行迁移后为 'crypto'。
+ * v4 → v5:新增 timestamp 单列索引(时间倒序热路径:全局裁剪/每包裁剪/邻接/分页)。
  */
 @Database(
     entities = [CryptoRecordEntity::class],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class ModevDatabase : RoomDatabase() {
@@ -68,6 +69,16 @@ abstract class ModevDatabase : RoomDatabase() {
             }
         }
 
+        /** v4 → v5:新增 timestamp 单列索引(时间倒序热路径,纯增量无数据变更)。 */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_crypto_records_timestamp` " +
+                        "ON `crypto_records` (`timestamp`)"
+                )
+            }
+        }
+
         @Volatile
         private var instance: ModevDatabase? = null
 
@@ -78,7 +89,7 @@ abstract class ModevDatabase : RoomDatabase() {
                     ModevDatabase::class.java,
                     "modev.db",
                 )
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                     .fallbackToDestructiveMigration(false)
                     .build()
                     .also { instance = it }

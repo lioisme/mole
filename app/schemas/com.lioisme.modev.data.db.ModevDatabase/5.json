@@ -1,0 +1,314 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 5,
+    "identityHash": "0e3a9263689d954f11bec6b2bcb70846",
+    "entities": [
+      {
+        "tableName": "crypto_records",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `recordType` TEXT NOT NULL, `packageName` TEXT NOT NULL, `kind` TEXT NOT NULL, `operation` TEXT NOT NULL, `algorithm` TEXT NOT NULL, `provider` TEXT, `direction` INTEGER, `keyHex` TEXT, `keyText` TEXT, `keyLength` INTEGER, `keyTruncated` INTEGER NOT NULL, `ivHex` TEXT, `ivText` TEXT, `ivLength` INTEGER, `ivTruncated` INTEGER NOT NULL, `keyAlias` TEXT, `keyExportable` INTEGER NOT NULL, `inputHex` TEXT, `inputText` TEXT, `inputLength` INTEGER, `inputTruncated` INTEGER NOT NULL, `outputHex` TEXT, `outputText` TEXT, `outputLength` INTEGER, `outputTruncated` INTEGER NOT NULL, `saltHex` TEXT, `saltText` TEXT, `saltLength` INTEGER, `saltTruncated` INTEGER NOT NULL, `aadHex` TEXT, `aadText` TEXT, `aadLength` INTEGER, `aadTruncated` INTEGER NOT NULL, `publicKeyHex` TEXT, `publicKeyText` TEXT, `publicKeyLength` INTEGER, `publicKeyTruncated` INTEGER NOT NULL, `paramsJson` TEXT, `verifyResult` INTEGER, `processName` TEXT, `contextId` INTEGER NOT NULL, `threadName` TEXT NOT NULL, `stack` TEXT, `timestamp` INTEGER NOT NULL, `seq` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordType",
+            "columnName": "recordType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operation",
+            "columnName": "operation",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "algorithm",
+            "columnName": "algorithm",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "direction",
+            "columnName": "direction",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "keyHex",
+            "columnName": "keyHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "keyText",
+            "columnName": "keyText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "keyLength",
+            "columnName": "keyLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "keyTruncated",
+            "columnName": "keyTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ivHex",
+            "columnName": "ivHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "ivText",
+            "columnName": "ivText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "ivLength",
+            "columnName": "ivLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "ivTruncated",
+            "columnName": "ivTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "keyAlias",
+            "columnName": "keyAlias",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "keyExportable",
+            "columnName": "keyExportable",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "inputHex",
+            "columnName": "inputHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "inputText",
+            "columnName": "inputText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "inputLength",
+            "columnName": "inputLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "inputTruncated",
+            "columnName": "inputTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "outputHex",
+            "columnName": "outputHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "outputText",
+            "columnName": "outputText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "outputLength",
+            "columnName": "outputLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "outputTruncated",
+            "columnName": "outputTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "saltHex",
+            "columnName": "saltHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "saltText",
+            "columnName": "saltText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "saltLength",
+            "columnName": "saltLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "saltTruncated",
+            "columnName": "saltTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aadHex",
+            "columnName": "aadHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "aadText",
+            "columnName": "aadText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "aadLength",
+            "columnName": "aadLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "aadTruncated",
+            "columnName": "aadTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicKeyHex",
+            "columnName": "publicKeyHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "publicKeyText",
+            "columnName": "publicKeyText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "publicKeyLength",
+            "columnName": "publicKeyLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "publicKeyTruncated",
+            "columnName": "publicKeyTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "paramsJson",
+            "columnName": "paramsJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "verifyResult",
+            "columnName": "verifyResult",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "processName",
+            "columnName": "processName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "contextId",
+            "columnName": "contextId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "threadName",
+            "columnName": "threadName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stackJson",
+            "columnName": "stack",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seq",
+            "columnName": "seq",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_crypto_records_packageName_timestamp",
+            "unique": false,
+            "columnNames": [
+              "packageName",
+              "timestamp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_crypto_records_packageName_timestamp` ON `${TABLE_NAME}` (`packageName`, `timestamp`)"
+          },
+          {
+            "name": "index_crypto_records_packageName_kind",
+            "unique": false,
+            "columnNames": [
+              "packageName",
+              "kind"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_crypto_records_packageName_kind` ON `${TABLE_NAME}` (`packageName`, `kind`)"
+          },
+          {
+            "name": "index_crypto_records_timestamp",
+            "unique": false,
+            "columnNames": [
+              "timestamp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_crypto_records_timestamp` ON `${TABLE_NAME}` (`timestamp`)"
+          },
+          {
+            "name": "index_crypto_records_packageName_processName_seq",
+            "unique": true,
+            "columnNames": [
+              "packageName",
+              "processName",
+              "seq"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_crypto_records_packageName_processName_seq` ON `${TABLE_NAME}` (`packageName`, `processName`, `seq`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0e3a9263689d954f11bec6b2bcb70846')"
+    ]
+  }
+}

@@ -46,6 +46,10 @@ class RecordSink(
 
     private var lastSeqPersistMs = 0L
 
+    /** M14: Hook 线程仅写内存检查点(volatile),工作线程消费后周期落盘。 */
+    @Volatile
+    private var seqCheckpoint = 0L
+
     val droppedCount: Long get() = dropped.get()
 
     fun start() {
@@ -60,7 +64,8 @@ class RecordSink(
     fun emit(record: CryptoRecord) {
         if (!running) return
         val seq = seqCounter.incrementAndGet()
-        persistSeqIfDue(seq)
+        // M14: 仅写入内存检查点(Hook 线程零 I/O);落盘由工作线程周期执行
+        seqCheckpoint = seq
         if (!queue.offer(record.copy(seq = seq))) {
             // 队列满:不阻塞 Hook 线程——直接落盘(WAL 追加,低成本),由工作线程 drain 发送;
             // 仅当 spool 尚未就绪(注入极早期)才计入丢弃
@@ -85,11 +90,13 @@ class RecordSink(
     }
 
     /** 批量持久化 seq 检查点:每 [SEQ_PERSIST_INTERVAL_MS] 或 [SEQ_PERSIST_EVERY] 条一次。 */
-    private fun persistSeqIfDue(seq: Long) {
-        if (seq % SEQ_PERSIST_EVERY != 0L && System.currentTimeMillis() - lastSeqPersistMs < SEQ_PERSIST_INTERVAL_MS) return
+    private fun persistSeqCheckpointIfDue() {
+        val checkpoint = seqCheckpoint
+        if (checkpoint == 0L) return
+        if (checkpoint % SEQ_PERSIST_EVERY != 0L && System.currentTimeMillis() - lastSeqPersistMs < SEQ_PERSIST_INTERVAL_MS) return
         lastSeqPersistMs = System.currentTimeMillis()
         val file = currentSeqFile() ?: return
-        runCatching { file.writeText(seq.toString()) }
+        runCatching { file.writeText(checkpoint.toString()) }
     }
 
     private fun loop() {
@@ -99,25 +106,26 @@ class RecordSink(
                 val sp = currentSpool()
                 if (sp == null) {
                     // 无 spool(注入早于 Application):直发,失败丢弃并计数
-                    val r = record ?: continue
-                    if (!sendJson(jsonOf(r))) {
+                    if (record != null && !sendJson(jsonOf(record))) {
                         dropped.incrementAndGet()
                     }
-                    continue
-                }
-                if (record != null) {
-                    // 先落盘再发送:写入失败也不阻塞 Hook 线程(记录由统计暴露)
-                    sp.append(record.seq, jsonOf(record))
-                }
-                if (!isConnected()) {
-                    // 断连:回退发送游标,积压保留在 WAL,重连后重放
-                    sp.resetSentCursor()
                 } else {
-                    sp.drain(sendJson)
+                    if (record != null) {
+                        // 先落盘再发送:写入失败也不阻塞 Hook 线程(记录由统计暴露)
+                        sp.append(record.seq, jsonOf(record))
+                    }
+                    if (!isConnected()) {
+                        // 断连:回退发送游标,积压保留在 WAL,重连后重放
+                        sp.resetSentCursor()
+                    } else {
+                        sp.drain(sendJson)
+                    }
                 }
             } catch (t: Throwable) {
                 dropped.incrementAndGet()
             }
+            // M14: seq 检查点落盘在工作线程(与 WAL 写同一线程,天然串行化文件 I/O)
+            persistSeqCheckpointIfDue()
         }
     }
 

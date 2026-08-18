@@ -56,7 +56,46 @@ class CryptoRecordDaoTest {
         timestamp = timestamp,
     )
 
+    @Test
+    fun `paged query filters by record type`() = runBlocking {
+        dao.insert(entity("pkg.a", "cipher", "encrypt", "AES", 100))
+        dao.insert(entity("pkg.a", "digest", "digest", "SHA-256", 200).copy(recordType = "database"))
+
+        // recordType = null 不过滤(跨类型合计)
+        assertEquals(2, page().size)
+        // 按类型过滤:仅 crypto
+        assertEquals(1, page(recordType = "crypto").size)
+        assertEquals("cipher", page(recordType = "crypto").single().kind)
+    }
+
+    @Test
+    fun `counts and packages respect record type filter`() = runBlocking {
+        dao.insert(entity("pkg.a", "cipher", "op1", "AES", 1))
+        dao.insert(entity("pkg.a", "digest", "op2", "SHA-256", 2).copy(recordType = "database"))
+
+        assertEquals(1L, dao.counts("crypto").single().count)
+        assertEquals(listOf("pkg.a"), dao.observePackages("crypto").first())
+        // null = 不过滤
+        assertEquals(2L, dao.counts(null).single().count)
+        assertEquals(1L, dao.observeRecordCounts("crypto").first().single().count)
+    }
+
+    @Test
+    fun `neighbor queries respect record type filter`() = runBlocking {
+        val op1Id = dao.insertReturningId(entity("pkg.a", "cipher", "op1", "AES", 100))
+        val cryptoId = dao.insertReturningId(entity("pkg.a", "cipher", "op2", "AES", 200))
+        val dbId = dao.insertReturningId(entity("pkg.a", "cipher", "op3", "AES", 300).copy(recordType = "database"))
+
+        // crypto 视角:op2 之后无更近的 crypto 记录(database 记录不可见)
+        assertNull(dao.neighborIdNewerThan("crypto", "pkg.a", 200, cryptoId))
+        // 不过滤视角:database 记录就是更新的邻居
+        assertEquals(dbId, dao.neighborIdNewerThan(null, "pkg.a", 200, cryptoId))
+        // 更旧方向:两种视角都回到 op1
+        assertEquals(op1Id, dao.neighborIdOlderThan("crypto", "pkg.a", 200, cryptoId))
+    }
+
     private suspend fun page(
+        recordType: String? = null,
         packageName: String? = null,
         kind: String? = null,
         query: String? = null,
@@ -64,7 +103,7 @@ class CryptoRecordDaoTest {
         offset: Int = 0,
     ): List<CryptoRecordEntity> {
         val source: PagingSource<Int, CryptoRecordEntity> =
-            dao.observePaged(packageName, kind, query, limit, offset)
+            dao.observePaged(recordType, packageName, kind, query, limit, offset)
         val result = source.load(
             PagingSource.LoadParams.Refresh(key = null, loadSize = limit, placeholdersEnabled = false),
         )
@@ -128,7 +167,7 @@ class CryptoRecordDaoTest {
         dao.insert(entity("pkg.a", "digest", "op2", "SHA-256", 2))
         dao.insert(entity("pkg.b", "cipher", "op3", "AES", 3))
 
-        val counts = dao.observeRecordCounts().first()
+        val counts = dao.observeRecordCounts(null).first()
         assertEquals(mapOf("pkg.a" to 2L, "pkg.b" to 1L), counts.associate { it.packageName to it.count })
     }
 
@@ -139,15 +178,15 @@ class CryptoRecordDaoTest {
         val newerId = dao.insertReturningId(entity("pkg.a", "cipher", "op3", "AES", 300))
         dao.insert(entity("pkg.b", "cipher", "opx", "AES", 100))
 
-        val older = dao.neighborIdOlderThan("pkg.a", 300, mid)
-        val newer = dao.neighborIdNewerThan("pkg.a", 100, mid)
+        val older = dao.neighborIdOlderThan(null, "pkg.a", 300, mid)
+        val newer = dao.neighborIdNewerThan(null, "pkg.a", 100, mid)
         // 仅投影 id:op3 的相邻上一条 = 同包最新更旧记录 op2
         assertEquals(mid, older)
         assertEquals(newerId, newer)
         // 与 op2 同时间戳时按 id 决胜:仅 op1 严格更旧
-        assertEquals(1L, dao.neighborIdOlderThan("pkg.a", 100, mid))
+        assertEquals(1L, dao.neighborIdOlderThan(null, "pkg.a", 100, mid))
         // 邻居查询不跨包
-        assertNull(dao.neighborIdOlderThan("pkg.b", 100, mid))
+        assertNull(dao.neighborIdOlderThan(null, "pkg.b", 100, mid))
     }
 
     @Test
@@ -162,7 +201,7 @@ class CryptoRecordDaoTest {
             ),
         )
         val source: PagingSource<Int, CryptoRecordRow> =
-            dao.observePagedRows(null, null, null, previewChars = 48, limit = 20, offset = 0)
+            dao.observePagedRows(null, null, null, null, previewChars = 48, limit = 20, offset = 0)
         val result = source.load(
             PagingSource.LoadParams.Refresh(key = null, loadSize = 20, placeholdersEnabled = false),
         )
@@ -185,7 +224,7 @@ class CryptoRecordDaoTest {
 
         suspend fun pageRows(pkg: String?, kind: String?, query: String?): List<CryptoRecordRow> {
             val source: PagingSource<Int, CryptoRecordRow> =
-                dao.observePagedRows(pkg, kind, query, previewChars = 48, limit = 20, offset = 0)
+                dao.observePagedRows(null, pkg, kind, query, previewChars = 48, limit = 20, offset = 0)
             val result = source.load(
                 PagingSource.LoadParams.Refresh(key = null, loadSize = 20, placeholdersEnabled = false),
             )
@@ -226,6 +265,8 @@ class CryptoRecordDaoTest {
         assertTrue(names.contains("index_crypto_records_packageName_kind"))
         // v3:重放幂等唯一索引
         assertTrue(names.contains("index_crypto_records_packageName_processName_seq"))
+        // v5:timestamp 单列索引(时间倒序热路径)
+        assertTrue(names.contains("index_crypto_records_timestamp"))
     }
 
     @Test
@@ -255,7 +296,7 @@ class CryptoRecordDaoTest {
         val batch = (1..10).map { entity("pkg.a", "cipher", "op$it", "AES", it.toLong()) }
         dao.insertAll(batch)
         assertEquals(10, dao.count("pkg.a"))
-        assertEquals(10, dao.counts().single().count)
+        assertEquals(10, dao.counts(null).single().count)
     }
 
     @Test
@@ -263,7 +304,7 @@ class CryptoRecordDaoTest {
         dao.insert(entity("pkg.a", "cipher", "op1", "AES", 1))
         dao.insert(entity("pkg.a", "digest", "op2", "SHA-256", 2))
         dao.insert(entity("pkg.b", "cipher", "op3", "AES", 3))
-        val counts = dao.counts().associate { it.packageName to it.count }
+        val counts = dao.counts(null).associate { it.packageName to it.count }
         assertEquals(mapOf("pkg.a" to 2L, "pkg.b" to 1L), counts)
     }
 
@@ -311,6 +352,7 @@ class CryptoRecordDaoTest {
             ModevDatabase.MIGRATION_1_2,
             ModevDatabase.MIGRATION_2_3,
             ModevDatabase.MIGRATION_3_4,
+            ModevDatabase.MIGRATION_4_5,
         ).build()
         val migratedDao = migrated.cryptoRecordDao()
 
@@ -350,7 +392,7 @@ class CryptoRecordDaoTest {
         assertEquals(7L, back.contextId)
 
         // 新列含入索引查询(每包治理)
-        assertEquals(2L, migratedDao.counts().sumOf { it.count })
+        assertEquals(2L, migratedDao.counts(null).sumOf { it.count })
         migrated.close()
         dbFile.delete()
         }
@@ -381,6 +423,7 @@ class CryptoRecordDaoTest {
             ModevDatabase.MIGRATION_1_2,
             ModevDatabase.MIGRATION_2_3,
             ModevDatabase.MIGRATION_3_4,
+            ModevDatabase.MIGRATION_4_5,
         ).build()
         val migratedDao = migrated.cryptoRecordDao()
 
@@ -397,7 +440,7 @@ class CryptoRecordDaoTest {
             )
             migratedDao.insertAll(listOf(withSeq))
             migratedDao.insertAll(listOf(withSeq.copy(timestamp = 3L))) // 重放 → REPLACE
-            assertEquals(2L, migratedDao.counts().sumOf { it.count })
+            assertEquals(2L, migratedDao.counts(null).sumOf { it.count })
 
             val sqlite: SupportSQLiteDatabase = migrated.openHelper.writableDatabase
             val names = mutableListOf<String>()
@@ -474,6 +517,104 @@ class CryptoRecordDaoTest {
                             for (column in v2Columns) {
                                 db.execSQL("ALTER TABLE crypto_records ADD COLUMN $column")
                             }
+                        }
+
+                        override fun onUpgrade(
+                            db: androidx.sqlite.db.SupportSQLiteDatabase,
+                            oldVersion: Int,
+                            newVersion: Int,
+                        ) {
+                        }
+                    }
+                ).build()
+        )
+    }
+
+    @Test
+    fun `migration from v4 to v5 keeps data and adds timestamp index`() {
+        runBlocking {
+            val dbFile = RuntimeEnvironment.getApplication().getDatabasePath("mig-v4.db")
+            dbFile.delete()
+            val oldHelper = createV4Helper(dbFile)
+            oldHelper.writableDatabase.execSQL(
+                """
+                INSERT INTO crypto_records
+                    (recordType, packageName, kind, operation, algorithm, threadName, timestamp,
+                     keyTruncated, ivTruncated, keyExportable, inputTruncated, outputTruncated,
+                     saltTruncated, aadTruncated, publicKeyTruncated, contextId, processName)
+                VALUES ('crypto', 'pkg.v4', 'cipher', 'encrypt', 'AES', 'main', 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 'pkg.v4')
+                """.trimIndent()
+            )
+            oldHelper.close()
+
+            val migrated = Room.databaseBuilder(
+                RuntimeEnvironment.getApplication(),
+                ModevDatabase::class.java,
+                "mig-v4.db",
+            ).addMigrations(
+                ModevDatabase.MIGRATION_4_5,
+            ).build()
+            val migratedDao = migrated.cryptoRecordDao()
+
+            // v4 存量数据完整保留
+            val row = migratedDao.observeById(1).first()
+            assertNotNull(row)
+            assertEquals("pkg.v4", row!!.packageName)
+            assertEquals("crypto", row.recordType)
+
+            // timestamp 单列索引已就位
+            val sqlite: SupportSQLiteDatabase = migrated.openHelper.writableDatabase
+            val names = mutableListOf<String>()
+            sqlite.query("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'crypto_records'")
+                .use { c -> while (c.moveToNext()) names.add(c.getString(0)) }
+            assertTrue(names.contains("index_crypto_records_timestamp"))
+
+            migrated.close()
+            dbFile.delete()
+        }
+    }
+
+    private fun createV4Helper(dbFile: java.io.File): androidx.sqlite.db.SupportSQLiteOpenHelper {
+        // 严格复刻 v4 表结构(v3 + recordType 列 + 全部实体索引,不含 timestamp 单列索引)
+        val factory = androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory()
+        return factory.create(
+            androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(
+                RuntimeEnvironment.getApplication()
+            ).name(dbFile.path)
+                .callback(
+                    object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(4) {
+                        override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                            db.execSQL(V1_TABLE_DDL)
+                            db.execSQL(
+                                "CREATE INDEX index_crypto_records_packageName_timestamp " +
+                                    "ON crypto_records (packageName, timestamp)"
+                            )
+                            db.execSQL(
+                                "CREATE INDEX index_crypto_records_packageName_kind " +
+                                    "ON crypto_records (packageName, kind)"
+                            )
+                            val v2Columns = listOf(
+                                "saltHex TEXT", "saltText TEXT", "saltLength INTEGER",
+                                "saltTruncated INTEGER NOT NULL DEFAULT 0",
+                                "aadHex TEXT", "aadText TEXT", "aadLength INTEGER",
+                                "aadTruncated INTEGER NOT NULL DEFAULT 0",
+                                "publicKeyHex TEXT", "publicKeyText TEXT", "publicKeyLength INTEGER",
+                                "publicKeyTruncated INTEGER NOT NULL DEFAULT 0",
+                                "paramsJson TEXT", "verifyResult INTEGER", "processName TEXT",
+                            )
+                            for (column in v2Columns) {
+                                db.execSQL("ALTER TABLE crypto_records ADD COLUMN $column")
+                            }
+                            db.execSQL(
+                                "ALTER TABLE crypto_records ADD COLUMN seq INTEGER"
+                            )
+                            db.execSQL(
+                                "CREATE UNIQUE INDEX index_crypto_records_packageName_processName_seq " +
+                                    "ON crypto_records (packageName, processName, seq)"
+                            )
+                            db.execSQL(
+                                "ALTER TABLE crypto_records ADD COLUMN recordType TEXT NOT NULL DEFAULT 'crypto'"
+                            )
                         }
 
                         override fun onUpgrade(

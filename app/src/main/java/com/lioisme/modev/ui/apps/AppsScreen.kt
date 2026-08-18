@@ -1,7 +1,6 @@
 package com.lioisme.modev.ui.apps
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -47,6 +46,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
@@ -56,6 +56,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
+import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.ui.components.AppIcon
 import com.lioisme.modev.ui.components.CollapsedSearchInput
 import com.lioisme.modev.ui.components.EmptyState
@@ -84,7 +85,7 @@ internal sealed interface AppsNavTarget {
  * - 下拉刷新(PullToRefreshBox);空态用 EmptyState。
  * 返回语义:根页空闲返回由导航层抛回系统退出;全屏 SearchView 返回只收状态。
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppsScreen(
     viewModel: AppsViewModel,
@@ -387,7 +388,6 @@ private fun ScopeFilterMenu(
  * 无运行按钮);
  * padding h16/v12,行间 outlineVariant 分隔线(列表外侧,行内不分隔)。
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun AppRowItem(
     row: AppsViewModel.AppRow,
@@ -402,7 +402,7 @@ private fun AppRowItem(
                 .fillMaxWidth()
                 // 测试锚点:导航级 UI 测试经 testTag 定位应用行(Google 惯例)。
                 .testTag("app-row")
-                .combinedClickable(onClick = onClick, onLongClick = null)
+                .clickable(onClick = onClick)
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -418,8 +418,9 @@ private fun AppRowItem(
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f, fill = false),
                 )
-                Spacer(Modifier.width(6.dp))
+                // 仅计数徽标存在时保留间距(V13:无空缺字段不留空白)。
                 if (row.recordCount > 0) {
+                    Spacer(Modifier.width(6.dp))
                     Surface(
                         shape = CircleShape,
                         color = MaterialTheme.colorScheme.secondaryContainer,
@@ -472,8 +473,15 @@ private fun AppRowItem(
 }
 
 @Composable
-private fun countText(count: Long): String = when {
-    count >= 10_000 -> stringResource(R.string.apps_count_wan, count / 10_000)
-    count >= 1_000 -> stringResource(R.string.apps_count_qian, count / 1000)
-    else -> count.toString()
+private fun countText(count: Long): String {
+    val context = LocalContext.current
+    // V13:按应用实际生效 locale 判定(与 stringResource 解析同源)——跟随系统
+    // 时 LocaleManager.currentLanguageTag = "system" 会误判为英文(万/千错位)。
+    val zh = LocalConfiguration.current.locales[0].language.startsWith("zh")
+    val wanScale = if (zh) 10_000L else 1_000L
+    return AppCountFormat.compact(
+        count = count,
+        formatWan = { context.getString(R.string.apps_count_wan, it / wanScale) },
+        formatQian = { context.getString(R.string.apps_count_qian, it / 1_000L) },
+    )
 }

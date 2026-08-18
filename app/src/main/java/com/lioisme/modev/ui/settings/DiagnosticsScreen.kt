@@ -37,7 +37,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
-import com.lioisme.modev.core.codec.WireProtocol
 import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsInfoItem
@@ -120,7 +119,8 @@ fun DiagnosticsScreen(
                 SettingsInfoItem(
                     icon = Icons.Default.Dns,
                     title = stringResource(R.string.settings_port),
-                    value = stringResource(R.string.settings_port_value, WireProtocol.PORT),
+                    // M18:传输常量经 VM 暴露,UI 零传输层 import
+                    value = stringResource(R.string.settings_port_value, viewModel.port),
                 )
                 SettingsInfoItem(
                     icon = Icons.Default.Devices,

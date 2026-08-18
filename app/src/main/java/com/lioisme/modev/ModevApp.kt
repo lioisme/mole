@@ -22,7 +22,7 @@ import com.lioisme.modev.framework.FrameworkBridge
 import com.lioisme.modev.framework.RemotePrefsBridge
 import com.lioisme.modev.framework.XposedScopeService
 import com.lioisme.modev.i18n.LocaleManager
-import com.lioisme.modev.ui.apps.AppListSettings
+import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.ui.theme.ThemeSettingsManager
 import io.github.libxposed.service.XposedService
 import java.util.UUID
@@ -122,7 +122,11 @@ class AppContainer(private val context: Context) {
 
     init {
         // 进程启动即接线记录回调(并启动服务器),避免 UI 未访问日志页时记录被丢弃
-        logs
+        logs.start()
+        // 进程启动即初始化设置仓库:configProvider(握手后立即推送全局配置)与
+        // capabilityRegistry 依赖 settings 惰性实例,若仅等 UI 打开设置页才初始化,
+        // 注入进程握手的配置推送将永远缺席(客户端 60s 读超时 → 无限重连)。
+        settings
         // M3-2: 框架服务就绪后生成并持久化握手令牌,ConfigServer 启用认证
         // serviceFlow 公开为 Any?(见 FrameworkBridge),转型发生在非空分支内,
         // legacy 变体(运行时缺 service 库)空值路径零类解析,自然降级不启用认证。

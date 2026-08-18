@@ -2,6 +2,7 @@ package com.lioisme.modev.data.repo
 
 import android.content.SharedPreferences
 import com.google.gson.Gson
+import com.lioisme.modev.core.model.ConfigKeys
 import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.data.server.ConfigServer
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -83,9 +84,9 @@ class MirroredConfigWriter(
 
     companion object {
         /** 全局捕获配置键(V10):全应用共享一份,注入侧与宿主侧同键读写。 */
-        const val KEY = "switch_global"
+        const val KEY = ConfigKeys.GLOBAL_SWITCH
 
-        private const val PREFIX = "switch_"
+        private const val PREFIX = ConfigKeys.SWITCH_PREFIX
     }
 }
 

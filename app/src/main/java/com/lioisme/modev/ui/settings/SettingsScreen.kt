@@ -19,6 +19,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -31,7 +32,6 @@ import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -55,9 +55,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -65,7 +66,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.BuildConfig
 import com.lioisme.modev.R
-import com.lioisme.modev.domain.capability.CapabilityKind
 import com.lioisme.modev.i18n.LocaleManager
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsItem
@@ -96,8 +96,8 @@ private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
+    capabilityUi: CapabilityUiRegistry,
     onBack: () -> Unit = {},
-    onOpenCaptureSettings: () -> Unit = {},
     onOpenDataSettings: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
 ) {
@@ -175,18 +175,20 @@ fun SettingsScreen(
                 )
             }
 
-            // V10 能力注册表驱动:「功能」区 = 已注册监听能力,新增能力自动出现入口。
+            // V10 能力注册表驱动:M19 起呈现经 CapabilityUiRegistry(图标/标题/导航),
+            // 本行仅投影领域能力 + 启用态——新增能力不改本文件。
             Spacer(Modifier.height(24.dp))
             SettingsSection(stringResource(R.string.settings_features_section)) {
                 viewModel.capabilities.forEach { capability ->
+                    val entry = capabilityUi.entryFor(capability.kind) ?: return@forEach
+                    val enabled by capability.enabled.collectAsStateWithLifecycle()
                     SettingsItem(
-                        icon = capabilityIcon(capability.kind),
-                        title = stringResource(capabilityTitleRes(capability.kind)),
-                        onClick = {
-                            when (capability.kind) {
-                                CapabilityKind.CRYPTO_CAPTURE -> onOpenCaptureSettings()
-                            }
-                        },
+                        icon = entry.icon,
+                        title = stringResource(entry.titleRes),
+                        subtitle = stringResource(
+                            if (enabled) R.string.settings_capability_enabled else R.string.settings_capability_disabled
+                        ),
+                        onClick = entry.onClick,
                     )
                 }
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -286,15 +288,7 @@ fun SettingsScreen(
     }
 }
 
-/** 能力图标呈现(未来新能力在此追加映射)。 */
-private fun capabilityIcon(kind: CapabilityKind): ImageVector = when (kind) {
-    CapabilityKind.CRYPTO_CAPTURE -> Icons.Default.Tune
-}
-
-/** 能力标题呈现。 */
-private fun capabilityTitleRes(kind: CapabilityKind): Int = when (kind) {
-    CapabilityKind.CRYPTO_CAPTURE -> R.string.capture_settings_title
-}
+/** 能力图标呈现已收敛至 CapabilityUiRegistry(M19)。 */
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -328,7 +322,12 @@ private fun LanguageSheet(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clickable { onSelect(tag) }
+                            // 单选行语义(选中态 + RadioButton 角色):TalkBack 读「已选中」。
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { onSelect(tag) },
+                            )
                             .padding(horizontal = 24.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -387,7 +386,11 @@ private fun AppearanceSheet(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .clickable { onSelect(mode) }
+                            .selectable(
+                                selected = selected,
+                                role = Role.RadioButton,
+                                onClick = { onSelect(mode) },
+                            )
                             .padding(horizontal = 24.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -430,7 +433,11 @@ private fun ColorSheet(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .clickable { onSelectWallpaper() }
+                        .selectable(
+                            selected = useWallpaper,
+                            role = Role.RadioButton,
+                            onClick = { onSelectWallpaper() },
+                        )
                         .padding(horizontal = 24.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -477,7 +484,7 @@ private fun ColorSheet(
                     val color = Color(argb)
                     val isSelected = !useWallpaper && color == selectedColor
                     // 选中标记色:暗色恒白、亮色恒黑(任意 seed 下清晰可见)。
-                    val markColor = selectedMarkColor(color, LocalIsDarkTheme.current)
+                    val markColor = selectedMarkColor(LocalIsDarkTheme.current)
                     Box(
                         modifier =
                             Modifier
@@ -490,7 +497,11 @@ private fun ColorSheet(
                                     } else {
                                         Modifier.border(1.dp, MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f), CircleShape)
                                     },
-                                ).semantics { selected = isSelected }
+                                ).semantics {
+                                    selected = isSelected
+                                    // 色块朗读自身十六进制值(自描述,替代泛泛的「色块」)。
+                                    contentDescription = "#%06X".format(argb and 0xFFFFFF)
+                                }
                                 .clickable { onSelectColor(argb) },
                         contentAlignment = Alignment.Center,
                     ) {
@@ -511,6 +522,5 @@ private fun ColorSheet(
 
 /** 选中标记色:暗色模式恒白、亮色模式恒黑(与 LIDE 同规,中灰 seed 下不消失)。 */
 private fun selectedMarkColor(
-    color: Color,
     isDark: Boolean,
 ): Color = if (isDark) Color.White else Color.Black

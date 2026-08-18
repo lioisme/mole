@@ -4,6 +4,7 @@ import io.github.libxposed.service.XposedService
 import io.github.libxposed.service.XposedServiceHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * 现代框架服务桥:注册 [XposedServiceHelper] 监听,接收框架投递的 [XposedService]。
@@ -25,13 +26,12 @@ object FrameworkBridge {
      */
     val serviceFlow: StateFlow<Any?> = _service
 
-    @Volatile
-    private var registered = false
+    // M16: CAS 幂等注册——check-then-act 竞态下仅一个线程执行注册,其余直接返回
+    private val registered = AtomicBoolean(false)
 
     /** 幂等注册(重复调用安全,仅首次生效)。 */
     fun ensureRegistered() {
-        if (registered) return
-        registered = true
+        if (!registered.compareAndSet(false, true)) return
         // legacy 变体不含 service 库(compileOnly),此处捕获 NoClassDefFoundError 后自然降级
         runCatching {
             XposedServiceHelper.registerListener(object : XposedServiceHelper.OnServiceListener {

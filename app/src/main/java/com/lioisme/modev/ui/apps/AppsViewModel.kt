@@ -9,11 +9,12 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.data.repo.AppCatalogRepository
+import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.data.repo.LogRepository
-import com.lioisme.modev.data.server.ConfigServer
 import com.lioisme.modev.domain.scope.ScopeChangeResult
 import com.lioisme.modev.domain.scope.ScopeRepository
 import com.lioisme.modev.domain.scope.ScopeState
+import com.lioisme.modev.domain.server.ConnectionMonitor
 import com.lioisme.modev.i18n.LocaleManager
 import com.lioisme.modev.ui.common.UiMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -39,15 +40,14 @@ import kotlinx.coroutines.launch
 class AppsViewModel(
     private val catalog: AppCatalogRepository,
     private val logs: LogRepository,
-    server: ConfigServer,
+    server: ConnectionMonitor,
     private val scopeRepository: ScopeRepository,
 ) : ViewModel() {
 
-    data class AppRow(
+data class AppRow(
         val packageName: String,
         val label: String,
         val system: Boolean,
-        val enabled: Boolean,
         val scoped: Boolean,
         val connected: Boolean,
         val recordCount: Long,
@@ -64,11 +64,26 @@ class AppsViewModel(
         val showSystem: Boolean = true,
     )
 
-    private data class CatalogData(
+private data class CatalogBase(
         val apps: List<AppCatalogRepository.AppInfo>,
-        val counts: Map<String, Long>,
-        val connected: Set<String>,
         val scopeState: ScopeState,
+    )
+
+    /** 排序/筛选流水线偏好(S2:与计数/连接态分离,变化才触发重排)。 */
+    private data class SortPrefs(
+        val query: String,
+        val onlyScoped: Boolean,
+        val showSystem: Boolean,
+        val pinScoped: Boolean,
+        val localeTag: String,
+    )
+
+    /** 排序核心行(S2:排序阶段仅依赖稳定源,不含计数/连接态)。 */
+    data class SortedRow(
+        val packageName: String,
+        val label: String,
+        val system: Boolean,
+        val scoped: Boolean,
     )
 
     private data class UiPrefs(
@@ -88,25 +103,25 @@ class AppsViewModel(
     /** 一次性提示(scope 变更结果),由 UI 收集为 Snackbar。 */
     val messages = MutableSharedFlow<UiMessage>(extraBufferCapacity = 8)
 
-    val uiState: StateFlow<UiState> = combine(
+    /**
+     * 排序流水线(S2):目录 × 作用域 × UI 偏好 × 置顶开关 × 语言。
+     * 计数与连接态不在本流内——记录数每 200ms 落库变化不再触发全量过滤 + 排序。
+     * 置顶 = 稳定分区(O(n) 无比较器,组内保持名称序)。
+     */
+    val sortedRows: StateFlow<List<SortedRow>> = combine(
+        combine(catalog.apps, scopeRepository.state, ::CatalogBase),
         combine(
-            catalog.apps,
-            logs.observeRecordCounts(),
-            server.connectedPackagesFlow,
-            scopeRepository.state,
-            ::CatalogData,
+            query,
+            onlyScoped,
+            showSystem,
+            AppListSettings.pinScoped,
+            LocaleManager.localeFlow,
+            ::SortPrefs,
         ),
-        combine(query, onlyScoped, showSystem, pending, refreshing, ::UiPrefs),
-        // 置顶开关(AppListSettings 单一事实源):变更即重排,跨页返回不滞留旧序。
-        AppListSettings.pinScoped,
-        // 语言热切换触发器(V9):tag 变化即重排——AppSort 按调用时
-        // Locale.getDefault() 现建比较器,重算即按新语言 Collator 排序。
-        LocaleManager.localeFlow,
-    ) { catalogData, prefs, pinScoped, _ ->
-        val ready = catalogData.scopeState as? ScopeState.Ready
-        val scopedSet = ready?.scope ?: emptySet()
-        val nameComparator = AppSort.nameComparator()
-        val rows = catalogData.apps
+    ) { base, prefs ->
+        val scopedSet = (base.scopeState as? ScopeState.Ready)?.scope ?: emptySet()
+        val nameComparator = AppSort.nameComparator<SortedRow>(label = { it.label }, key = { it.packageName })
+        val rows = base.apps
             .filter { prefs.showSystem || !it.system }
             .filter { !prefs.onlyScoped || it.packageName in scopedSet }
             .filter {
@@ -115,28 +130,37 @@ class AppsViewModel(
                     it.packageName.contains(prefs.query, ignoreCase = true)
             }
             .map { app ->
-                AppRow(
+                SortedRow(
                     packageName = app.packageName,
                     label = app.label,
                     system = app.system,
-                    enabled = app.enabled,
                     scoped = app.packageName in scopedSet,
-                    connected = app.packageName in catalogData.connected,
-                    recordCount = catalogData.counts[app.packageName] ?: 0L,
                 )
             }
-            // 终态排序唯一在本层:名称 Collator(社区规范)恒生效;
-            // 置顶开启时已作用域优先,组内仍按名称(稳定全序)。
-            .let { list ->
-                if (pinScoped) {
-                    list.sortedWith(compareBy<AppRow> { !it.scoped }.thenComparing(nameComparator))
-                } else {
-                    list.sortedWith(nameComparator)
-                }
-            }
+            .sortedWith(nameComparator)
+        if (prefs.pinScoped) AppSort.pinScoped(rows) { it.scoped } else rows
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 终态 UI 状态:排序行 × 计数/连接 × 偏好(仅投影,不重排)。 */
+    val uiState: StateFlow<UiState> = combine(
+        sortedRows,
+        combine(logs.observeRecordCounts(), server.connectedPackagesFlow) { counts, connected -> counts to connected },
+        combine(query, onlyScoped, showSystem, pending, refreshing, ::UiPrefs),
+        scopeRepository.state,
+    ) { rows, countsAndConnected, prefs, scopeState ->
+        val (counts, connected) = countsAndConnected
         UiState(
-            rows = rows,
-            scopeReady = ready != null,
+            rows = rows.map { row ->
+                AppRow(
+                    packageName = row.packageName,
+                    label = row.label,
+                    system = row.system,
+                    scoped = row.scoped,
+                    connected = row.packageName in connected,
+                    recordCount = counts[row.packageName] ?: 0L,
+                )
+            },
+            scopeReady = scopeState is ScopeState.Ready,
             pending = prefs.pending,
             refreshing = prefs.refreshing,
             onlyScoped = prefs.onlyScoped,
@@ -157,24 +181,30 @@ class AppsViewModel(
         showSystem.value = value
     }
 
-    /** 下拉刷新:重扫应用列表 + 重读框架作用域。 */
+    /** 下拉刷新:重扫应用列表 + 重读框架作用域(无论成败均复位刷新态)。 */
     fun refresh() {
         viewModelScope.launch {
             refreshing.value = true
-            catalog.refresh()
-            scopeRepository.refresh()
-            refreshing.value = false
+            try {
+                catalog.refresh()
+                scopeRepository.refresh()
+            } finally {
+                refreshing.value = false
+            }
         }
     }
 
-    /** 勾选 / 取消勾选(等价于 LSPosed 作用域变更)。 */
+    /** 勾选 / 取消勾选(等价于 LSPosed 作用域变更,异常不悬挂 pending 态)。 */
     fun toggle(packageName: String) {
         if (packageName in pending.value) return
         viewModelScope.launch {
             pending.value = pending.value + packageName
-            val result = scopeRepository.toggle(packageName)
-            messages.emit(messageFor(packageName, result))
-            pending.value = pending.value - packageName
+            try {
+                val result = scopeRepository.toggle(packageName)
+                messages.emit(messageFor(packageName, result))
+            } finally {
+                pending.value = pending.value - packageName
+            }
         }
     }
 
@@ -183,10 +213,24 @@ class AppsViewModel(
             UiMessage(R.string.apps_scope_requested, listOf(packageName))
         is ScopeChangeResult.ScopeRemoved ->
             UiMessage(R.string.apps_scope_removed, listOf(packageName))
-        is ScopeChangeResult.Failed ->
-            UiMessage(R.string.apps_scope_failed, listOf(packageName, result.message))
+        is ScopeChangeResult.Failed -> scopeFailedMessage(packageName, result)
     }
 }
+
+/** M17:失败错误码 → 本地化文案(domain 零硬编码,Snackbar 语义由 UI 层承担)。 */
+private fun scopeFailedMessage(packageName: String, failed: ScopeChangeResult.Failed): UiMessage =
+    when (failed) {
+        ScopeChangeResult.Failed.FrameworkNotReady ->
+            UiMessage(R.string.apps_scope_failed_not_ready)
+        ScopeChangeResult.Failed.ServiceNotConnected ->
+            UiMessage(R.string.apps_scope_failed_service)
+        ScopeChangeResult.Failed.UserRejected ->
+            UiMessage(R.string.apps_scope_failed_rejected)
+        ScopeChangeResult.Failed.Timeout ->
+            UiMessage(R.string.apps_scope_failed_timeout)
+        ScopeChangeResult.Failed.RemoveFailed ->
+            UiMessage(R.string.apps_scope_failed_remove, listOf(packageName))
+    }
 
 /**
  * 应用记录页(2026-08-16 V3 四界面重构;2026-08-17 V10 更名,去算法中心化):
@@ -198,7 +242,7 @@ class AppsViewModel(
 class AppRecordsViewModel(
     val packageName: String,
     private val catalog: AppCatalogRepository,
-    server: ConfigServer,
+    server: ConnectionMonitor,
     private val logs: LogRepository,
     private val scopeRepository: ScopeRepository,
 ) : ViewModel() {
@@ -243,7 +287,7 @@ class AppRecordsViewModel(
         }
     }
 
-    /** 移出作用域(等价于 LSPosed 作用域取消勾选)。 */
+/** 移出作用域(等价于 LSPosed 作用域取消勾选)。 */
     fun removeScope() {
         viewModelScope.launch {
             val result = scopeRepository.remove(packageName)
@@ -251,9 +295,9 @@ class AppRecordsViewModel(
                 when (result) {
                     is ScopeChangeResult.ScopeRemoved ->
                         UiMessage(R.string.apps_scope_removed, listOf(packageName))
-                    is ScopeChangeResult.Failed ->
-                        UiMessage(R.string.apps_scope_failed, listOf(packageName, result.message))
-                    else -> UiMessage(R.string.apps_scope_failed, listOf(packageName))
+                    is ScopeChangeResult.ScopeRequested ->
+                        UiMessage(R.string.apps_scope_requested, listOf(packageName))
+                    is ScopeChangeResult.Failed -> scopeFailedMessage(packageName, result)
                 }
             )
         }

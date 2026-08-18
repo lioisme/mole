@@ -14,6 +14,8 @@ import com.lioisme.modev.core.model.RecordTypes
     indices = [
         Index(value = ["packageName", "timestamp"]),
         Index(value = ["packageName", "kind"]),
+        // v5:timestamp 单列索引(全局/裁剪/邻接查询的时间倒序热路径,含 M13 修复)
+        Index(value = ["timestamp"]),
         // v3:注入侧进程级单调序号,唯一约束 = 断线重放幂等(REPLACE 吸收重复)
         Index(value = ["packageName", "processName", "seq"], unique = true),
     ],

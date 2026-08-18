@@ -1,5 +1,6 @@
 package com.lioisme.modev.hook
 
+import com.lioisme.modev.core.model.RecordLimits
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -240,7 +241,7 @@ class RecordSpool(
         const val MAX_BYTES = 5L * 1024 * 1024
 
         /** 单行 JSON 上限(字符):全量捕获单条记录的理论上限,超限按损坏行处理。 */
-        const val MAX_LINE_CHARS = 4 * 1024 * 1024
+        const val MAX_LINE_CHARS = RecordLimits.WIRE_MAX_LINE_CHARS
 
         /** 批量 fsync checkpoint:条数窗口。 */
         const val FSYNC_EVERY = 100

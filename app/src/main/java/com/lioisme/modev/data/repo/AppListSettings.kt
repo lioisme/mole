@@ -1,4 +1,4 @@
-package com.lioisme.modev.ui.apps
+package com.lioisme.modev.data.repo
 
 import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -6,7 +6,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /**
- * 应用列表偏好持久化单一入口(2026-08-17 V7,对齐 ThemeSettingsManager 范式):
+ * 应用列表偏好持久化单一入口(2026-08-17 V7 对齐 ThemeSettingsManager 范式;
+ * V11 L7 自 ui.apps 移入数据层——持久化基础设施不再停留于 UI 包):
  * StateFlow 承载内存态,SharedPreferences 持久化;init 须在进程启动
  * (ModevApp.onCreate)调用一次,此后 setPinScoped 同步写双份。
  * 应用列表排序(名称 Collator / 已作用域置顶)与设置页共享本单一事实源。

@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ChevronRight
@@ -25,6 +26,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -102,11 +105,18 @@ fun SettingsToggleItem(
         } else {
             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         }
+    // 行 = toggleable(role=Switch,整行语义即开关,一焦点、一动作、双击切换);
+    // 内嵌 Switch clearAndSetSemantics 去重(双节点各读各讲是 TalkBack 噪音)。
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable(enabled = enabled, onClick = { onCheckedChange(!checked) })
+                .toggleable(
+                    value = checked,
+                    enabled = enabled,
+                    role = Role.Switch,
+                    onValueChange = onCheckedChange,
+                )
                 .padding(horizontal = 16.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -131,8 +141,9 @@ fun SettingsToggleItem(
         Spacer(Modifier.width(8.dp))
         Switch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
+            onCheckedChange = null,
             enabled = enabled,
+            modifier = Modifier.clearAndSetSemantics {},
         )
     }
 }
@@ -167,63 +178,5 @@ fun SettingsInfoItem(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false),
         )
-    }
-}
-
-/** 数值步进行:范围钳制 + 首尾禁用(边界防误操作)。 */
-@Composable
-fun SettingsStepperItem(
-    icon: ImageVector,
-    title: String,
-    valueText: String,
-    value: Int,
-    range: IntRange,
-    step: Int = 1,
-    enabled: Boolean = true,
-    onValueChange: (Int) -> Unit,
-) {
-    val titleColor =
-        if (enabled) {
-            MaterialTheme.colorScheme.onSurface
-        } else {
-            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-        }
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            icon,
-            null,
-            tint =
-                if (enabled) {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                } else {
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
-                },
-            modifier = Modifier.size(24.dp),
-        )
-        Spacer(Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = titleColor)
-            Text(valueText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Spacer(Modifier.width(8.dp))
-        FilledTonalIconButton(
-            onClick = { onValueChange((value - step).coerceIn(range)) },
-            enabled = enabled && value > range.first,
-        ) {
-            Icon(Icons.Default.Remove, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
-        Spacer(Modifier.width(4.dp))
-        FilledTonalIconButton(
-            onClick = { onValueChange((value + step).coerceIn(range)) },
-            enabled = enabled && value < range.last,
-        ) {
-            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(18.dp))
-        }
     }
 }

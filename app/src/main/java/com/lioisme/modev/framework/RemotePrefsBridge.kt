@@ -1,6 +1,7 @@
 package com.lioisme.modev.framework
 
 import android.content.SharedPreferences
+import com.lioisme.modev.core.model.ConfigKeys
 import io.github.libxposed.service.XposedService
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.flow.StateFlow
@@ -11,13 +12,15 @@ import kotlinx.coroutines.flow.StateFlow
  *
  * - 宿主进程([ModevApp])写入配置镜像与令牌;注入进程([ModevModule])只读配置 + 变更监听;
  * - legacy 变体不含 service 库(compileOnly),全部访问经 [runCatching] 兜底后自然降级为 null;
- * - 配置 key 统一前缀 [KEY_SWITCH_PREFIX],令牌 key 见 [TOKEN_KEY]。
+ * - 配置 key 统一前缀 [ConfigKeys.SWITCH_PREFIX](与宿主仓库同源,ADR-5)。
  */
 object RemotePrefsBridge {
 
     const val PREFS_KEY = "modev_config"
     const val TOKEN_KEY = "token"
-    const val KEY_SWITCH_PREFIX = "switch_"
+
+    /** 配置键前缀(与 SettingsRepository 同源引用 ConfigKeys,防双端漂移)。 */
+    const val KEY_SWITCH_PREFIX = ConfigKeys.SWITCH_PREFIX
 
     /** 当前可用的框架服务(可空 = 无现代框架服务;公开为 Any? 防 legacy 类解析,见 FrameworkBridge)。 */
     val serviceFlow: StateFlow<Any?> = FrameworkBridge.serviceFlow
@@ -43,5 +46,5 @@ object RemotePrefsBridge {
     fun token(): String? = prefs()?.getString(TOKEN_KEY, null)
 
     /** 全局捕获配置键(V10):配置与包名解耦,全应用共享一份。 */
-    const val GLOBAL_SWITCH_KEY = KEY_SWITCH_PREFIX + "global"
+    const val GLOBAL_SWITCH_KEY = ConfigKeys.GLOBAL_SWITCH
 }

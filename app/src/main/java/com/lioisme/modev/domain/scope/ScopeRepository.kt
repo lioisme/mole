@@ -115,13 +115,14 @@ class ScopeRepository(
     suspend fun toggle(packageName: String): ScopeChangeResult = mutationMutex.withLock {
         val current = state.value
         if (current !is ScopeState.Ready) {
-            return ScopeChangeResult.Failed("框架未就绪,无法修改作用域")
+            return ScopeChangeResult.Failed.FrameworkNotReady
         }
         if (current.isScoped(packageName)) removeNow(packageName) else addNow(packageName)
     }
 
     private suspend fun addNow(packageName: String): ScopeChangeResult {
-        val service = gateway.serviceFlow().first() ?: return ScopeChangeResult.Failed("框架服务未连接")
+        val service = gateway.serviceFlow().first()
+            ?: return ScopeChangeResult.Failed.ServiceNotConnected
         val outcome = withTimeoutOrNull(requestTimeoutMillis) {
             suspendCancellableCoroutine<ScopeChangeResult> { cont ->
                 service.requestScope(listOf(packageName), object : ScopeRequestCallback {
@@ -130,11 +131,11 @@ class ScopeRepository(
                     }
 
                     override fun onFailed(message: String) {
-                        if (cont.isActive) cont.resume(ScopeChangeResult.Failed(message))
+                        if (cont.isActive) cont.resume(ScopeChangeResult.Failed.UserRejected)
                     }
                 })
             }
-        } ?: ScopeChangeResult.Failed("等待系统通知确认超时,确认后下拉刷新即可同步")
+        } ?: ScopeChangeResult.Failed.Timeout
         refreshNow()
         return outcome
     }
@@ -145,13 +146,14 @@ class ScopeRepository(
     }
 
     private suspend fun removeNow(packageName: String): ScopeChangeResult {
-        val service = gateway.serviceFlow().first() ?: return ScopeChangeResult.Failed("框架服务未连接")
+        val service = gateway.serviceFlow().first()
+            ?: return ScopeChangeResult.Failed.ServiceNotConnected
         val result = runCatching { service.removeScope(listOf(packageName)) }
         refreshNow()
         return if (result.isSuccess) {
             ScopeChangeResult.ScopeRemoved
         } else {
-            ScopeChangeResult.Failed("移除失败:${result.exceptionOrNull()?.message ?: "未知错误"}")
+            ScopeChangeResult.Failed.RemoveFailed
         }
     }
 
