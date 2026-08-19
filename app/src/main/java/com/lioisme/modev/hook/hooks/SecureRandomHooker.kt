@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.hook.hooks
+package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -14,7 +14,9 @@ import com.lioisme.modev.hook.RecordSink
 import java.security.Provider
 
 /**
- * 闅忔満鏁版崟鑾?SecureRandom):绠楁硶/provider銆乻etSeed 绉嶅瓙銆乶extBytes 杈撳嚭銆乬enerateSeed銆? * 闅忔満婧愭槸 IV/瀵嗛挜/鐩愮殑鐢熸垚婧愬ご,瀵瑰畾浣?璋佸湪鐢熸垚闅忔満 IV"鏈夎緟鍔╀环鍊笺€? */
+ * 随机数捕获(SecureRandom):算法/provider、setSeed 种子、nextBytes 输出、generateSeed。
+ * 随机源是 IV/密钥/盐的生成源头,对定位"谁在生成随机 IV"有帮助价值。
+ */
 class SecureRandomHooker(
     context: ProbeContext,
 ) : BaseHooker(context, CryptoKind.RANDOM) {

@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.hook.hooks
+package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -18,8 +18,10 @@ import java.security.spec.EllipticCurve
 import javax.crypto.spec.PSource
 
 /**
- * 瀵嗛挜/鍙傛暟瀵硅薄鏋勯€犳崟鑾枫€? * 娉ㄥ唽琛ㄩ┍鍔?姣忎釜 Spec 绫?+ 鏋勯€犲櫒绛惧悕娉ㄥ唽涓€娆?鏋勯€犲畬鎴愬悗缁?[SpecExtractor] 鎻愬彇
- * 瀵嗛挜/IV/鐩?鏍囬噺鍙傛暟(鍚?PBE 杩唬娆℃暟銆丟CM tag 闀垮害銆丷SA CRT 绯绘暟銆丒C 鏇茬嚎绛?銆? */
+ * 密钥/参数对象构造捕获。
+ * 注册表驱动:每个 Spec 类 + 构造器签名注册一次,构造完成后经 [SpecExtractor] 提取
+ * 密钥/IV/目标量参数(含 PBE 迭代次数、GCM tag 长度、RSA CRT 系数、EC 曲线等)。
+ */
 class KeyParamHooker(
     context: ProbeContext,
 ) : BaseHooker(context, CryptoKind.KEY_PARAM) {
@@ -75,7 +77,7 @@ class KeyParamHooker(
         const val RSA_CRT_SPEC = "java.security.spec.RSAPrivateCrtKeySpec"
         const val RSA_KEYGEN_SPEC = "java.security.spec.RSAKeyGenParameterSpec"
 
-        /** int 鍘熷绫诲瀷(鏋勯€犲櫒绛惧悕鐢?銆?*/
+        /** int 原始类型(构造器签名用)。 */
         private val INT_TYPE: Class<*> = Int::class.javaPrimitiveType!!
 
         val CTOR_DESCRIPTORS = listOf(

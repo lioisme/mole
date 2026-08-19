@@ -13,11 +13,13 @@ class RecordTypeTest {
     @Test
     fun `fromWire maps known wire to enum`() {
         assertEquals(RecordType.CRYPTO, RecordType.fromWire("crypto"))
+        assertEquals(RecordType.DATABASE, RecordType.fromWire("db"))
     }
 
     @Test
     fun `fromWire returns null for unknown or null wire`() {
         assertNull(RecordType.fromWire("database"))
+        assertNull(RecordType.fromWire("file"))
         assertNull(RecordType.fromWire(""))
         assertNull(RecordType.fromWire(null))
     }
@@ -25,5 +27,6 @@ class RecordTypeTest {
     @Test
     fun `wire is single-sourced from RecordTypes constants`() {
         assertEquals(RecordTypes.CRYPTO, RecordType.CRYPTO.wire)
+        assertEquals(RecordTypes.DATABASE, RecordType.DATABASE.wire)
     }
 }

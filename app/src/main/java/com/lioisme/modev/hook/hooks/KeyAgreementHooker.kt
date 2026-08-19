@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.hook.hooks
+package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -16,8 +16,9 @@ import java.security.Key
 import java.security.Provider
 
 /**
- * 瀵嗛挜鍗忓晢鎹曡幏(KeyAgreement,ECDH/DH):
- * getInstance 鈫?init(宸辨柟瀵嗛挜)鈫?doPhase(瀵圭鍏挜,lastPhase)鈫?generateSecret(鍏变韩瀵嗛挜,鍚?int 杩斿洖鍨?銆? */
+ * 密钥协商捕获(KeyAgreement,ECDH/DH):
+ * getInstance → init(己方密钥)→ doPhase(对方公钥,lastPhase)→ generateSecret(共享密钥,含 int 返回型)。
+ */
 class KeyAgreementHooker(
     context: ProbeContext,
 ) : BaseHooker(context, CryptoKind.KEY_AGREEMENT) {

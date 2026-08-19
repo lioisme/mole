@@ -24,6 +24,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -33,29 +34,32 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.data.mapping.CryptoRow
+import com.lioisme.modev.data.mapping.RowModel
+import com.lioisme.modev.data.mapping.SqlRow
 import com.lioisme.modev.ui.theme.kindColor
+import com.lioisme.modev.ui.theme.sqlKindColor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 /**
  * 记录行(2026-08-17 V8 卡片化;2026-08-17 V12 秒级时间 + 参数独立成行;
- * 2026-08-17 V13 去徽章 + 空白治理;2026-08-18 V14 R1 精修 M3 ListItem 层级):
+ * 2026-08-17 V13 去徽章 + 空白治理;2026-08-18 V14 R1 精修 M3 ListItem 层级;
+ * V17 数据库监听:入参泛化为 [RowModel](算法 / 数据库双形态,按类型分支渲染)):
  * 每行 = 圆角卡片(16dp, surfaceContainerLow 浮于 surface),行间留白 8dp:
  * - 三级信息架构(对齐 M3 ListItem:headline + supporting + 数据段)+ 尾部时间:
- *   行1 headline 算法(等宽 bodyLarge SemiBold,超长省略);
+ *   行1 headline 算法/ SQL 首行(等宽 bodyLarge SemiBold,超长省略);
  *   行2 supporting 类别·操作组合(labelMedium 类别色,类别语义唯一承载点);
- *   行3(仅当有方向)方向胶囊(类别色 15% alpha 淡底小字);
- *   行4(仅当有数据)唯一最有价值数据段(等宽 labelMedium,优先级 key > alias > out > in);
+ *   行3(仅当有方向)方向胶囊(算法形态);行4(仅当有数据)唯一最有价值数据段;
+ *   数据库形态数据段 = SQL 预览,行数元数据并入操作行尾部(rows/affected);
  *   尾部时间(秒级精度,labelSmall onSurfaceVariant,尊重系统 12/24h 时制);
- * - V13 移除类别徽章(与操作行类别色重复承载)与固定最小高度 68dp——卡片
- *   内容自适应高度、顶对齐,字段空缺不留空白区域;
  * - 单击进详情;长按复制记录摘要([copySummary]),回调由宿主接线。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RecordRow(
-    record: CryptoRecord,
+    record: RowModel,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
     modifier: Modifier = Modifier,
@@ -66,7 +70,6 @@ fun RecordRow(
         val pattern = if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a"
         SimpleDateFormat(pattern, Locale.getDefault())
     }
-    val dataSnippet = record.valuableDataSnippet()
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
@@ -89,44 +92,9 @@ fun RecordRow(
         ) {
             // 主体:每参数独立成行(V13:无徽章,内容顶对齐、高度自适应)。
             Column(Modifier.weight(1f)) {
-                Text(
-                    text = record.displayAlgorithm(),
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.height(4.dp))
-                // 类别·操作组合行(V14 R1:合并单行承载,类别色语义不变)。
-                Text(
-                    text =
-                        stringResource(kindLabelRes(record.kind)) +
-                            " · " +
-                            operationLabel(record.operation),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = kindColor(record.kind),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                record.direction?.let { direction ->
-                    Spacer(Modifier.height(4.dp))
-                    DirectionChip(
-                        text = directionLabel(direction),
-                        kind = record.kind,
-                    )
-                }
-                if (dataSnippet != null) {
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        text = dataSnippet,
-                        style = MaterialTheme.typography.labelMedium,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                    )
+                when (record) {
+                    is CryptoRow -> CryptoRowContent(record)
+                    is SqlRow -> SqlRowContent(record)
                 }
             }
             Spacer(Modifier.width(8.dp))
@@ -137,6 +105,112 @@ fun RecordRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+    }
+}
+
+/** 算法形态行内容(headline / 类别·操作 / 方向 / 最有价值数据段)。 */
+@Composable
+private fun CryptoRowContent(record: CryptoRow) {
+    val r = record.record
+    Text(
+        text = r.displayAlgorithm(),
+        style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.SemiBold,
+        fontFamily = FontFamily.Monospace,
+        color = MaterialTheme.colorScheme.onSurface,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text =
+            stringResource(kindLabelRes(r.kind)) +
+                " · " +
+                operationLabel(r.operation),
+        style = MaterialTheme.typography.labelMedium,
+        color = kindColor(r.kind),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+    r.direction?.let { direction ->
+        Spacer(Modifier.height(4.dp))
+        DirectionChip(
+            text = directionLabel(direction),
+            kind = r.kind,
+        )
+    }
+    val dataSnippet = r.valuableDataSnippet()
+    if (dataSnippet != null) {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = dataSnippet,
+            style = MaterialTheme.typography.labelMedium,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** 数据库形态行内容(headline = SQL 首行 / 类别·操作 / SQL 预览 + 行数元数据)。 */
+@Composable
+private fun SqlRowContent(record: SqlRow) {
+    Text(
+        text = record.sqlHeadlineText(),
+        style = MaterialTheme.typography.bodyLarge,
+        fontWeight = FontWeight.SemiBold,
+        fontFamily = FontFamily.Monospace,
+        color = MaterialTheme.colorScheme.onSurface,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+    Spacer(Modifier.height(4.dp))
+    Text(
+        text =
+            record.databaseName.orEmpty().takeIf { it.isNotBlank() }?.let { "$it · " }.orEmpty() +
+                stringResource(sqlKindLabelRes(record.kind)) +
+                " · " +
+                sqlOperationLabel(record.operation) +
+                record.sqlRowMetaSuffix(),
+        style = MaterialTheme.typography.labelMedium,
+        color = sqlKindColor(record.kind),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+    val preview = record.sqlPreview?.trim()
+    if (!preview.isNullOrEmpty()) {
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = preview,
+            style = MaterialTheme.typography.labelMedium,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** SQL 行 headline:投影无 SQL 首行可用时回退操作名(资源,恒非空)。 */
+@Composable
+private fun SqlRow.sqlHeadlineText(): String {
+    sqlPreview?.let { s ->
+        s.lineSequence().firstOrNull { it.isNotBlank() }?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    }
+    return stringResource(sqlOperationLabelRes(operation))
+}
+
+/** SQL 行元数据后缀(行数/受影响数,括号括号括,仅当有值)。 */
+@Composable
+private fun SqlRow.sqlRowMetaSuffix(): String {
+    val rowCount = rowCount?.let { pluralStringResource(R.plurals.record_data_rows_short, it, it) }
+    val affected = affectedCount?.let { pluralStringResource(R.plurals.record_data_affected_short, it, it) }
+    return when {
+        rowCount != null && affected != null -> " ($rowCount, $affected)"
+        rowCount != null -> " ($rowCount)"
+        affected != null -> " ($affected)"
+        else -> ""
     }
 }
 

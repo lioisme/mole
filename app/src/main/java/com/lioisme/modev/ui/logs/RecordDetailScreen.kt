@@ -60,8 +60,12 @@ import androidx.lifecycle.viewModelScope
 import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.core.util.ChunkedText
+import com.lioisme.modev.data.mapping.CryptoDetail
+import com.lioisme.modev.data.mapping.RecordDetailModel
+import com.lioisme.modev.data.mapping.SqlDetail
 import com.lioisme.modev.data.mapping.toJson
 import com.lioisme.modev.data.repo.LogRepository
 import com.lioisme.modev.ui.components.ModevTopBar
@@ -70,7 +74,11 @@ import com.lioisme.modev.ui.components.directionLabel
 import com.lioisme.modev.ui.components.displayAlgorithm
 import com.lioisme.modev.ui.components.kindLabelRes
 import com.lioisme.modev.ui.components.operationLabel
+import com.lioisme.modev.ui.components.sqlHeadline
+import com.lioisme.modev.ui.components.sqlKindLabelRes
+import com.lioisme.modev.ui.components.sqlOperationLabel
 import com.lioisme.modev.ui.theme.kindColor
+import com.lioisme.modev.ui.theme.sqlKindColor
 import com.webtoonscorp.android.readmore.material3.ReadMoreText
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -176,23 +184,34 @@ fun RecordDetailScreen(
         }
 
     /** 导出:先按 ×2 保守估算预检(V16 R2,超限免构建),通过后后台构建 JSON + SAF 落盘。 */
-    fun startExport(current: CryptoRecord) {
-        // V16 R2:估算超限即拒绝(避免构建 32M+ JSON 后才判大)
-        val estimatedChars = estimateJsonChars(current)
+    fun startExport(current: RecordDetailModel) {
+        val estimatedChars =
+            when (current) {
+                is CryptoDetail -> estimateJsonChars(current.record)
+                is SqlDetail -> estimateSqlJsonChars(current.record)
+            }
         if (estimatedChars > EXPORT_MAX_CHARS) {
             showSnack(context.getString(R.string.export_too_large, estimatedChars))
             return
         }
         scope.launch {
-            runCatching { withContext(Dispatchers.Default) { current.toJson() } }
-                .onSuccess { json ->
-                    if (json.length > EXPORT_MAX_CHARS) {
-                        showSnack(context.getString(R.string.export_too_large))
-                        return@onSuccess
+            val json =
+                runCatching {
+                    withContext(Dispatchers.Default) {
+                        when (current) {
+                            is CryptoDetail -> current.record.toJson()
+                            is SqlDetail -> current.record.toJson()
+                        }
                     }
-                    exportJson = json
-                    exportLauncher.launch("modev-record-${current.id}.json")
                 }
+            json.onSuccess { text ->
+                if (text.length > EXPORT_MAX_CHARS) {
+                    showSnack(context.getString(R.string.export_too_large))
+                    return@onSuccess
+                }
+                exportJson = text
+                exportLauncher.launch("modev-record-${current.id}.json")
+            }
                 .onFailure { showSnack(context.getString(R.string.export_failed)) }
         }
     }
@@ -200,7 +219,12 @@ fun RecordDetailScreen(
     Scaffold(
         topBar = {
             ModevTopBar(
-                title = state.record?.displayAlgorithm() ?: stringResource(R.string.record_title),
+                title =
+                    when (val current = state.record) {
+                        is CryptoDetail -> current.record.displayAlgorithm()
+                        is SqlDetail -> current.record.sqlHeadline()
+                        null -> stringResource(R.string.record_title)
+                    },
                 onBack = onBack,
                 actions = {
                     TipIconButton(
@@ -268,6 +292,19 @@ fun RecordDetailScreen(
     }
 }
 
+/** 详情内容分派(V17 双形态):算法走原 [CryptoLoadedContent],数据库走 SQL 渲染。 */
+@Composable
+private fun LoadedContent(
+    record: RecordDetailModel,
+    innerPadding: PaddingValues,
+    copyFull: (titleRes: Int, fullText: String) -> Unit,
+) {
+    when (record) {
+        is CryptoDetail -> CryptoLoadedContent(record.record, innerPadding, copyFull)
+        is SqlDetail -> SqlLoadedContent(record.record, innerPadding, copyFull)
+    }
+}
+
 @Composable
 private fun LoadingState(innerPadding: PaddingValues) {
     Box(Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
@@ -309,7 +346,7 @@ private fun FailedState(innerPadding: PaddingValues, onRetry: () -> Unit) {
  * 统一写剪贴板 + Snackbar。
  */
 @Composable
-private fun LoadedContent(
+private fun CryptoLoadedContent(
     record: CryptoRecord,
     innerPadding: PaddingValues,
     copyFull: (titleRes: Int, fullText: String) -> Unit,
@@ -478,6 +515,190 @@ private fun LoadedContent(
             }
         }
         item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+/**
+ * 数据库记录详情内容(V17 T11):SQL 语句 / 绑定参数 / 结果集 / 元数据,
+ * 复用既有分档渲染设施(textSectionItems 双层渲染 + 4M 复制护栏):
+ * - SQL 原文缺失时整节隐藏(不渲染空标题);
+ * - bindArgs / rows / resultText 以纯函数格式化(有界行数/列数护栏)为文本节;
+ * - 结果行超限计数由 UI 追加本地化省略标记(不截断原始数据)。
+ */
+@Composable
+private fun SqlLoadedContent(
+    record: SqlRecord,
+    innerPadding: PaddingValues,
+    copyFull: (titleRes: Int, fullText: String) -> Unit,
+) {
+    var expandedSections by rememberSaveable { mutableStateOf(mapOf<String, Boolean>()) }
+    fun sectionExpanded(sectionKey: String): Boolean = expandedSections[sectionKey] == true
+    fun setSectionExpanded(
+        sectionKey: String,
+        value: Boolean,
+    ) {
+        expandedSections = if (value) expandedSections + (sectionKey to true) else expandedSections - sectionKey
+    }
+    val res = LocalContext.current.resources
+
+    val bindArgsText = record.bindArgs?.takeIf { it.isNotEmpty() }?.let(::formatBindArgsText)
+    val rowsText = record.rows?.takeIf { it.isNotEmpty() }?.let(::formatRowsText)
+    val omittedBindRows = (record.bindArgs?.size ?: 0) - (bindArgsText?.size ?: 0)
+    val omittedRows = (record.rows?.size ?: 0) - (rowsText?.size ?: 0)
+
+    LazyColumn(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+    ) {
+        item(key = "sql-meta") { SqlMetadataBlock(record) }
+        item(key = "divider") {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+        }
+        record.sql?.let { sql ->
+            textSectionItems(
+                sectionKey = "sql",
+                titleRes = R.string.section_sql,
+                value = sql,
+                expanded = sectionExpanded("sql"),
+                onExpandedChange = { setSectionExpanded("sql", it) },
+                copyFull = copyFull,
+            )
+        }
+        record.dbPath?.let { path ->
+            textSectionItems(
+                sectionKey = "dbpath",
+                titleRes = R.string.section_db_path,
+                value = path,
+                expanded = sectionExpanded("dbpath"),
+                onExpandedChange = { setSectionExpanded("dbpath", it) },
+                copyFull = copyFull,
+            )
+        }
+        bindArgsText?.let { lines ->
+            val body =
+                buildString {
+                    lines.forEach { append(it).append('\n') }
+                    if (omittedBindRows > 0) {
+                        append(res.getQuantityString(R.plurals.rows_more, omittedBindRows, omittedBindRows))
+                    }
+                }.trimEnd('\n')
+            textSectionItems(
+                sectionKey = "bindargs",
+                titleRes = R.string.section_bind_args,
+                value = body,
+                expanded = sectionExpanded("bindargs"),
+                onExpandedChange = { setSectionExpanded("bindargs", it) },
+                copyFull = copyFull,
+            )
+        }
+        rowsText?.let { lines ->
+            val body =
+                buildString {
+                    lines.forEach { append(it).append('\n') }
+                    if (omittedRows > 0) {
+                        append(res.getQuantityString(R.plurals.rows_more, omittedRows, omittedRows))
+                    }
+                }.trimEnd('\n')
+            textSectionItems(
+                sectionKey = "rows",
+                titleRes = R.string.section_result_rows,
+                value = body,
+                expanded = sectionExpanded("rows"),
+                onExpandedChange = { setSectionExpanded("rows", it) },
+                copyFull = copyFull,
+            )
+        }
+        record.resultText?.let { text ->
+            textSectionItems(
+                sectionKey = "result",
+                titleRes = R.string.section_result_text,
+                value = text,
+                expanded = sectionExpanded("result"),
+                onExpandedChange = { setSectionExpanded("result", it) },
+                copyFull = copyFull,
+            )
+        }
+        record.params?.takeIf { it.isNotEmpty() }?.let { params ->
+            val text = formatParamsText(params)
+            val body = buildString {
+                text.lines.forEach { append(it).append('\n') }
+                if (text.omittedEntries > 0) {
+                    append(res.getQuantityString(R.plurals.params_omitted, text.omittedEntries, text.omittedEntries))
+                }
+            }.trimEnd('\n')
+            textSectionItems(
+                sectionKey = "params",
+                titleRes = R.string.section_params,
+                value = body,
+                expanded = sectionExpanded("params"),
+                onExpandedChange = { setSectionExpanded("params", it) },
+                copyFull = copyFull,
+            )
+        }
+        if (record.stack.isNotEmpty()) {
+            item(key = "sql-stack-header") {
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    stringResource(R.string.section_stack),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            val frames = record.stack.take(STACK_MAX_FRAMES)
+            items(frames.size, key = { index -> "sql-stack-frame-$index" }) { index ->
+                SelectionContainer {
+                    Text(
+                        frames[index],
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+            if (record.stack.size > STACK_MAX_FRAMES) {
+                val omittedFrames = record.stack.size - STACK_MAX_FRAMES
+                item(key = "sql-stack-more") {
+                    Text(
+                        res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+        }
+        item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+/** 数据库记录元数据块:类别/操作/数据库/路径/时间/上下文/进程/线程/行数元数据。 */
+@Composable
+private fun SqlMetadataBlock(record: SqlRecord) {
+    val context = LocalContext.current
+    val timeFmt = remember(context) { detailTimeFmt() }
+    SelectionContainer {
+        Column {
+            Spacer(Modifier.height(8.dp))
+            MetadataRow(
+                stringResource(R.string.meta_kind),
+                stringResource(sqlKindLabelRes(record.kind)),
+                valueColor = sqlKindColor(record.kind),
+            )
+            MetadataRow(stringResource(R.string.meta_operation), sqlOperationLabel(record.operation))
+            MetadataRow(stringResource(R.string.meta_db_name), record.databaseName)
+            record.dbPath?.let { MetadataRow(stringResource(R.string.meta_db_path), it) }
+            MetadataRow(stringResource(R.string.meta_time), timeFmt.format(Date(record.timestamp)))
+            MetadataRow(stringResource(R.string.meta_context), "#${record.contextId}")
+            record.processName?.let { MetadataRow(stringResource(R.string.meta_process), it) }
+            MetadataRow(stringResource(R.string.meta_thread), record.threadName)
+            record.rowCount?.let { MetadataRow(stringResource(R.string.meta_rows), it.toString()) }
+            record.affectedCount?.let { MetadataRow(stringResource(R.string.meta_affected), it.toString()) }
+            record.rowId?.let { MetadataRow(stringResource(R.string.meta_row_id), it.toString()) }
+            Spacer(Modifier.height(12.dp))
+        }
     }
 }
 
@@ -932,8 +1153,10 @@ class RecordDetailViewModel(
                 _uiState.value = DetailUiState(
                     record = current,
                     loaded = true,
-                    canOlder = current != null && logs.neighborIdOf(current, newer = false) != null,
-                    canNewer = current != null && logs.neighborIdOf(current, newer = true) != null,
+                    canOlder = current != null &&
+                        logs.neighborIdOf(current.recordType, current.packageName, current.timestamp, current.id, newer = false) != null,
+                    canNewer = current != null &&
+                        logs.neighborIdOf(current.recordType, current.packageName, current.timestamp, current.id, newer = true) != null,
                 )
             }
         }
@@ -953,16 +1176,18 @@ class RecordDetailViewModel(
 
     private suspend fun move(newer: Boolean) {
         val current = _uiState.value.record ?: return
-        logs.neighborIdOf(current, newer)?.let { recordIdFlow.value = it }
+        logs.neighborIdOf(current.recordType, current.packageName, current.timestamp, current.id, newer)
+            ?.let { recordIdFlow.value = it }
     }
 }
 
 /**
  * 记录详情单一状态(L6 收敛):record=当前记录(null=不存在),loaded=首次真实查询
  * 结果已到达,canOlder/canNewer=同包邻接可用性。failed = 加载完成但记录缺失。
+ * V17:record 泛化为 [RecordDetailModel](算法/数据库双形态)。
  */
 data class DetailUiState(
-    val record: CryptoRecord? = null,
+    val record: RecordDetailModel? = null,
     val loaded: Boolean = false,
     val canOlder: Boolean = false,
     val canNewer: Boolean = false,

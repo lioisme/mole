@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.hook.hooks
+package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -22,7 +22,9 @@ import java.security.cert.Certificate
 import java.security.spec.AlgorithmParameterSpec
 
 /**
- * 鏁板瓧绛惧悕鎹曡幏(RSA / ECDSA 鐨?sign / verify)銆? * 鍚?initVerify(Certificate) 鍏挜鎻愬彇銆乮nt 杩斿洖鍨?sign(byte[],int,int) 鍑哄弬缂撳啿鍥炶銆? */
+ * 数字签名捕获(RSA / ECDSA 的 sign / verify)。
+ * 含 initVerify(Certificate) 公钥提取、int 返回型 sign(byte[],int,int) 出参缓冲回读。
+ */
 class SignatureHooker(
     context: ProbeContext,
 ) : BaseHooker(context, CryptoKind.SIGNATURE) {
@@ -92,7 +94,7 @@ class SignatureHooker(
     private fun afterInitVerify(invocation: Invocation) {
         val instance = invocation.thisObject ?: return
         val ctx = tracker.contextFor(instance)
-        // Certificate 閲嶈浇:鍏挜钘忎簬璇佷功鍐?蹇呴』鏄惧紡鎻愬彇
+        // Certificate 重载:公钥藏于证书内,必须显式提取
         val key = when (val arg = invocation.getArg(0)) {
             is PublicKey -> arg
             is Certificate -> runCatching { arg.publicKey }.getOrNull()
@@ -157,7 +159,7 @@ class SignatureHooker(
     private fun afterSign(invocation: Invocation, result: Any?) {
         val instance = invocation.thisObject ?: return
         val ctx = tracker.contextFor(instance)
-        // sign(byte[],int,int):result 涓虹鍚嶉暱搴?绛惧悕钀藉湪 arg0[off, off+result)
+        // sign(byte[],int,int):result 为签名长度,签名落在 arg0[off, off+result)
         val output = when {
             result is ByteArray -> result
             result is Int && invocation.getArg(0) is ByteArray -> {

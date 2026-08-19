@@ -4,10 +4,14 @@ import android.content.Context
 import android.content.SharedPreferences
 import com.lioisme.modev.core.codec.CryptoRecordCodec
 import com.lioisme.modev.core.codec.Json
+import com.lioisme.modev.core.codec.SqlRecordCodec
 import com.lioisme.modev.core.codec.WireCodec
+import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.HookSwitch
+import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.framework.RemotePrefsBridge
 import com.lioisme.modev.hook.probes.AlgorithmProbe
+import com.lioisme.modev.hook.probes.DatabaseProbe
 import java.io.File
 
 /**
@@ -25,8 +29,8 @@ class HookInstaller(
     private val processName: String,
     /** 现代变体注入:返回框架 RemotePreferences(可空);legacy 传 null,配置走 TCP 推送。 */
     private val remotePrefsProvider: (() -> SharedPreferences?)? = null,
-    /** 监听能力清单:默认含算法捕获探针,后续能力(数据库/行为/交互)在此追加。 */
-    private val probes: List<Probe> = listOf(AlgorithmProbe()),
+    /** 监听能力清单:默认含算法捕获 + 数据库监听探针,后续能力在此追加。 */
+    private val probes: List<Probe> = listOf(AlgorithmProbe(), DatabaseProbe()),
 ) {
 
     // 通道与出口存在循环依赖(channel 的 ACK 回调驱动 sink,spool 发送游标依赖 channel
@@ -54,7 +58,15 @@ class HookInstaller(
             }
         }
         RecordSink(
-            jsonOf = { record -> WireCodec.record(record.seq, record.recordType, CryptoRecordCodec.encode(record)) },
+            // 注入侧编码分派(ADR-2):监听能力模型经各自编解码器产出载荷,
+            // seq/recordType 由 WireCodec.record 强制写入信封,宿主按类型分发
+            jsonOf = { record ->
+                val payload = when (record) {
+                    is CryptoRecord -> CryptoRecordCodec.encode(record)
+                    is SqlRecord -> SqlRecordCodec.encode(record)
+                }
+                WireCodec.record(record.seq, record.recordType, payload)
+            },
             sendJson = { json -> channel.sendRecordJson(json) },
             isConnected = { channel.connected },
             spoolProvider = spoolProvider,

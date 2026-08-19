@@ -33,8 +33,8 @@ import com.lioisme.modev.core.util.BytesView
  */
 data class CryptoRecord(
     val id: Long = 0L,
-    val seq: Long = 0L,
-    val recordType: String = RecordTypes.CRYPTO,
+    override val seq: Long = 0L,
+    override val recordType: String = RecordTypes.CRYPTO,
     val packageName: String,
     val kind: CryptoKind,
     val operation: CryptoOperation,
@@ -57,4 +57,7 @@ data class CryptoRecord(
     val threadName: String,
     val stack: List<String> = emptyList(),
     val timestamp: Long = System.currentTimeMillis(),
-)
+) : MonitoredRecord {
+
+    override fun withSeq(seq: Long): CryptoRecord = copy(seq = seq)
+}

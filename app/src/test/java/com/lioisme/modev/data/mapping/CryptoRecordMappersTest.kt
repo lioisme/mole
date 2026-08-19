@@ -4,6 +4,13 @@ import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.RecordTypes
+import com.lioisme.modev.core.model.SqlBindValue
+import com.lioisme.modev.core.model.SqlKind
+import com.lioisme.modev.core.model.SqlOperation
+import com.lioisme.modev.core.model.SqlRecord
+import com.lioisme.modev.core.model.SqlResultCell
+import com.lioisme.modev.core.model.SqlResultRow
+import com.lioisme.modev.core.model.SqlValueType
 import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
@@ -88,6 +95,7 @@ class CryptoRecordMappersTest {
     fun `row projection produces preview model`() {
         val row = CryptoRecordRow(
             id = 1L,
+            recordType = RecordTypes.CRYPTO,
             packageName = "com.example.app",
             kind = CryptoKind.SIGNATURE.name,
             operation = CryptoOperation.SIGN.name,
@@ -105,20 +113,22 @@ class CryptoRecordMappersTest {
         )
         val model = row.toRowModelOrNull()
         assertNotNull(model)
-        assertEquals(CryptoKind.SIGNATURE, model!!.kind)
-        assertEquals(CryptoOperation.SIGN, model.operation)
-        assertEquals("deadbeef", model.key?.hex)
-        assertTrue(model.key!!.truncated)
-        assertEquals(4, model.key!!.totalLength)
-        assertNull(model.input)
-        assertEquals("worker", model.threadName)
-        assertNull(model.direction)
+        val crypto = (model as CryptoRow).record
+        assertEquals(CryptoKind.SIGNATURE, crypto.kind)
+        assertEquals(CryptoOperation.SIGN, crypto.operation)
+        assertEquals("deadbeef", crypto.key?.hex)
+        assertTrue(crypto.key!!.truncated)
+        assertEquals(4, crypto.key!!.totalLength)
+        assertNull(crypto.input)
+        assertEquals("worker", crypto.threadName)
+        assertNull(crypto.direction)
     }
 
     @Test
     fun `row projection drops unknown kind`() {
         val row = CryptoRecordRow(
             id = 1L,
+            recordType = RecordTypes.CRYPTO,
             packageName = "p",
             kind = "FUTURE",
             operation = CryptoOperation.SIGN.name,
@@ -154,5 +164,141 @@ class CryptoRecordMappersTest {
         assertTrue(!json.has("key"))
         assertTrue(!json.has("params"))
         assertEquals(0, json.getJSONArray("stack").length())
+    }
+
+    private fun sampleSqlRecord() = SqlRecord(
+        id = 3L,
+        seq = 11L,
+        packageName = "com.example.db",
+        kind = SqlKind.QUERY,
+        operation = SqlOperation.QUERY,
+        databaseName = "app.db",
+        provider = "SQLiteDatabase",
+        dbPath = "/data/data/com.example.db/databases/app.db",
+        sql = "SELECT * FROM t WHERE id = ?",
+        bindArgs = listOf(SqlBindValue(i = 1, t = SqlValueType.L, v = "7")),
+        rows = listOf(
+            SqlResultRow(
+                c = listOf(
+                    SqlResultCell(n = "id", t = SqlValueType.L, v = "7"),
+                    SqlResultCell(n = "blob", t = SqlValueType.B, hex = "aabb", len = 2, truncated = false),
+                ),
+            ),
+        ),
+        rowCount = 1,
+        affectedCount = null,
+        rowId = null,
+        resultText = null,
+        params = mapOf("table" to "t"),
+        processName = "com.example.db:main",
+        contextId = 5L,
+        threadName = "db-worker",
+        stack = listOf("x.y()"),
+        timestamp = 1_700_000_100_000L,
+    )
+
+    @Test
+    fun `sql record to entity preserves db columns`() {
+        val entity = sampleSqlRecord().toEntity()
+        assertEquals(RecordTypes.DATABASE, entity.recordType)
+        assertEquals("com.example.db", entity.packageName)
+        assertEquals(SqlKind.QUERY.name, entity.kind)
+        assertEquals(SqlOperation.QUERY.name, entity.operation)
+        assertEquals("app.db", entity.algorithm)
+        assertEquals("/data/data/com.example.db/databases/app.db", entity.dbPath)
+        assertEquals("SELECT * FROM t WHERE id = ?", entity.sql)
+        assertEquals(1, entity.rowCount)
+        assertNull(entity.affectedCount)
+        assertNull(entity.rowId)
+        assertNull(entity.resultText)
+        assertEquals(11L, entity.seq)
+        // bindArgsJson/rowsJson 与模型字段名同构(i/t/v/hex/len/truncated、c/n),可逆解析
+        assertTrue(entity.bindArgsJson!!.contains("\"i\":1"))
+        assertTrue(entity.bindArgsJson!!.contains("\"t\":\"L\""))
+        assertTrue(entity.bindArgsJson!!.contains("\"v\":\"7\""))
+        assertTrue(entity.rowsJson!!.contains("\"n\":\"id\""))
+        assertTrue(entity.rowsJson!!.contains("\"hex\":\"aabb\""))
+    }
+
+    @Test
+    fun `sql entity to model round trips full record`() {
+        val back = sampleSqlRecord().toEntity().toSqlModelOrNull()
+        assertNotNull(back)
+        assertEquals(sampleSqlRecord().copy(id = 0L), back)
+    }
+
+    @Test
+    fun `sql entity to detail dispatches by recordType`() {
+        val detail = sampleSqlRecord().toEntity().toRecordDetailOrNull()
+        assertNotNull(detail)
+        assertTrue(detail is SqlDetail)
+        assertEquals("app.db", (detail as SqlDetail).record.databaseName)
+        assertEquals("com.example.db", detail.packageName)
+        assertEquals(1, detail.record.rows!!.size)
+    }
+
+    @Test
+    fun `db row projection produces SqlRow`() {
+        val row = CryptoRecordRow(
+            id = 1L,
+            recordType = RecordTypes.DATABASE,
+            packageName = "com.example.db",
+            kind = SqlKind.DML.name,
+            operation = SqlOperation.UPDATE.name,
+            algorithm = "app.db",
+            sqlPreview = "UPDATE t SET a=1 WHERE id=?",
+            rowCount = null,
+            affectedCount = 2,
+            rowId = null,
+            threadName = "worker",
+            timestamp = 5L,
+        )
+        val model = row.toRowModelOrNull()
+        assertNotNull(model)
+        assertTrue(model is SqlRow)
+        val sql = model as SqlRow
+        assertEquals(SqlKind.DML, sql.kind)
+        assertEquals(SqlOperation.UPDATE, sql.operation)
+        assertEquals("app.db", sql.databaseName)
+        assertEquals("UPDATE t SET a=1 WHERE id=?", sql.sqlPreview)
+        assertEquals(2, sql.affectedCount)
+        assertNull(sql.rowCount)
+        assertEquals(1L, sql.id)
+    }
+
+    @Test
+    fun `db row projection drops unknown kind`() {
+        val row = CryptoRecordRow(
+            id = 1L,
+            recordType = RecordTypes.DATABASE,
+            packageName = "p",
+            kind = "FUTURE_KIND",
+            operation = SqlOperation.QUERY.name,
+            algorithm = "a.db",
+            threadName = "",
+            timestamp = 0L,
+        )
+        assertNull(row.toRowModelOrNull())
+    }
+
+    @Test
+    fun `sql toJson exports compact structured fields`() {
+        val json = JSONObject(sampleSqlRecord().toJson())
+        assertEquals(RecordTypes.DATABASE, json.getString("recordType"))
+        assertEquals(SqlKind.QUERY.name, json.getString("kind"))
+        assertEquals("app.db", json.getString("databaseName"))
+        assertEquals("SELECT * FROM t WHERE id = ?", json.getString("sql"))
+        val bind = json.getJSONArray("bindArgs").getJSONObject(0)
+        assertEquals(1, bind.getInt("i"))
+        assertEquals(SqlValueType.L.name, bind.getString("t"))
+        assertEquals("7", bind.getString("v"))
+        assertTrue(!bind.has("hex"))
+        val row = json.getJSONArray("rows").getJSONObject(0).getJSONArray("c")
+        assertEquals("id", row.getJSONObject(0).getString("n"))
+        assertEquals(SqlValueType.B.name, row.getJSONObject(1).getString("t"))
+        assertEquals("aabb", row.getJSONObject(1).getString("hex"))
+        assertEquals(2, row.getJSONObject(1).getInt("len"))
+        assertEquals(1, json.getInt("rowCount"))
+        assertEquals(5L, json.getLong("contextId"))
     }
 }

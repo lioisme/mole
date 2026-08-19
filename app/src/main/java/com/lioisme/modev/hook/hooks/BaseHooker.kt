@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.hook.hooks
+package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -12,7 +12,9 @@ import java.io.File
 import java.security.Provider
 
 /**
- * Hooker 鍩虹被:缁熶竴寮€鍏冲垽鏂€佽褰曠粍瑁呬笌鍫嗘爤閲囬泦銆? * 鎵€鏈夊瓙绫荤殑鎷︽埅閫昏緫鍧囧湪 [ProbeContext.engine] 鐨?PROTECTIVE 妯″紡涓嬫墽琛?寮傚父涓嶄細褰卞搷瀹夸富銆? */
+ * Hooker 基类:统一开关判断、记录组装与堆栈采集。
+ * 所有子类的拦截逻辑均在 [ProbeContext.engine] 的 PROTECTIVE 模式下执行,异常不影响宿主。
+ */
 abstract class BaseHooker(
     context: ProbeContext,
     protected val kind: CryptoKind,
@@ -24,7 +26,7 @@ abstract class BaseHooker(
     protected val sink = context.sink
     protected val packageName = context.packageName
 
-    /** 鐩爣杩涚▼鍚?娉ㄥ叆渚т綅浜庣洰鏍囪繘绋嬪唴,/proc/self/cmdline 鍗崇洰鏍囪繘绋?銆?*/
+    /** 目标进程名:注入侧位于目标进程内,/proc/self/cmdline 即目标进程名。 */
     protected val processName: String by lazy {
         runCatching { File("/proc/self/cmdline").readBytes() }
             .getOrNull()
@@ -38,14 +40,16 @@ abstract class BaseHooker(
 
     protected fun enabled(): Boolean = config().enabled(kind)
 
-    /** 閫氱敤 provider 鎻愬彇:getInstance 杩斿洖瀵硅薄鐨勬爣鍑嗛棬闈㈠潎甯?getProvider()銆?*/
+    /** 通用 provider 提取:getInstance 返回对象的标准化门面均带 getProvider()。 */
     protected fun providerOf(instance: Any?): String? =
         runCatching {
             instance?.javaClass?.getMethod("getProvider")?.invoke(instance) as? Provider
         }.getOrNull()?.name
 
     /**
-     * 鍏ㄩ噺鎹曡幏绛栫暐涓嬬殑鍙屾€佽鍥?涓婇檺闅?[HookSwitch.maxBytesPerField](榛樿 1MB,0=鏃犻檺)浼哥缉銆?     * 娉ㄥ叆渚т笉鎵挎媴 UI 鎴柇鑱岃矗,浠呭湪瓒呬繚闄╀笣鏃舵爣璁?truncated銆?     */
+     * 全量捕获策略下的双态视图:上限闸 [HookSwitch.maxBytesPerField](默认 1MB,0=无限)伸缩。
+     * 注入侧不承担 UI 截断职责,仅在超保险丝时标记 truncated。
+     */
     protected fun viewOf(bytes: ByteArray?): BytesView? {
         if (bytes == null) return null
         val max = config().maxBytesPerField
@@ -54,7 +58,8 @@ abstract class BaseHooker(
     }
 
     /**
-     * 缁勮骞跺彂閫佷竴鏉¤褰?寮€鍏冲叧闂垨鍛戒腑璋冪敤鏍?denylist 鏃剁洿鎺ヨ烦杩?闆跺紑閿€銆?     */
+     * 组装并发送一条记录:开关关闭或命中调用栈 denylist 时直接跳过(零开销)。
+     */
     protected fun emit(
         operation: CryptoOperation,
         algorithm: String,

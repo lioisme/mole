@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.hook.hooks
+package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -19,7 +19,9 @@ import java.security.Provider
 import java.security.cert.Certificate
 
 /**
- * 瀵嗛挜搴撴崟鑾?KeyStore):绫诲瀷/provider銆乴oad 鍙ｄ护銆佸埆鍚嶆煡璇€佸彇閿?鍐欓敭/鍒犻敭銆佽瘉涔﹂摼銆? * 鍙ｄ护(char[])涓庤繑鍥炲瘑閽ョ収甯告崟鑾?璋冭瘯宸ュ叿瀹氫綅,涓庡弬鑰冭蒋浠朵竴鑷?;涓嶅彲瀵煎嚭瀵嗛挜璁?alias + 鏍囪銆? */
+ * 密钥库捕获(KeyStore):类型/provider、load 口令、别名查询、取钥/写钥/删钥、证书链。
+ * 口令(char[])与返回密钥照常捕获,调试工具定位,与参考软件一致;不可导出密钥记 alias + 标记。
+ */
 class KeyStoreHooker(
     context: ProbeContext,
 ) : BaseHooker(context, CryptoKind.KEY_STORE) {
@@ -141,7 +143,7 @@ class KeyStoreHooker(
         emitKeyResult(instance, ctx, alias, password, key)
     }
 
-    /** 鍙栭敭缁撴灉缁熶竴缁勮:瀵煎嚭瀵嗛挜鍙?encoded;涓嶅彲瀵煎嚭璁?alias + 鏍囪銆?*/
+    /** 取钥结果统一组装:导出密钥取 encoded;不可导出记 alias + 标记。 */
     private fun emitKeyResult(
         instance: Any,
         ctx: CryptoContext,
@@ -160,7 +162,7 @@ class KeyStoreHooker(
             keyExportable = encoded != null,
             params = mapOf("alias" to alias),
         )
-        // 鍙ｄ护鍗曠嫭鎴愭潯(涓庡瘑閽ユ潗鏂欏垎绂?渚夸簬瀵圭収)
+        // 口令单独成条(与密钥材料分离,便于对照)
         if (password != null) {
             emit(
                 operation = CryptoOperation.GET_KEY,

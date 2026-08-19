@@ -451,6 +451,7 @@ class CryptoRecordDaoTest {
             ModevDatabase.MIGRATION_2_3,
             ModevDatabase.MIGRATION_3_4,
             ModevDatabase.MIGRATION_4_5,
+            ModevDatabase.MIGRATION_5_6,
         ).build()
         val migratedDao = migrated.cryptoRecordDao()
 
@@ -522,6 +523,7 @@ class CryptoRecordDaoTest {
             ModevDatabase.MIGRATION_2_3,
             ModevDatabase.MIGRATION_3_4,
             ModevDatabase.MIGRATION_4_5,
+            ModevDatabase.MIGRATION_5_6,
         ).build()
         val migratedDao = migrated.cryptoRecordDao()
 
@@ -651,6 +653,7 @@ class CryptoRecordDaoTest {
                 "mig-v4.db",
             ).addMigrations(
                 ModevDatabase.MIGRATION_4_5,
+                ModevDatabase.MIGRATION_5_6,
             ).build()
             val migratedDao = migrated.cryptoRecordDao()
 

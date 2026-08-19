@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.hook.hooks
+package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -18,8 +18,10 @@ import java.security.SecureRandom
 import java.security.spec.AlgorithmParameterSpec
 
 /**
- * 瀵嗛挜鐢熸垚鎹曡幏:KeyGenerator(瀵圭О闅忔満瀵嗛挜)涓?KeyPairGenerator(RSA/EC 瀵嗛挜瀵?銆? * 鍚?init 鍙傛暟鎹曡幏(keysize / AlgorithmParameterSpec / SecureRandom,鍏?8 涓噸杞?
- * 涓庡瘑閽ュ鍒嗙(绉侀挜鈫択ey銆佸叕閽モ啋publicKey)鍙?RSA/DSA/EC 缁撴瀯鍙傛暟鎻愬彇銆? */
+ * 密钥生成捕获:KeyGenerator(对称随机密钥)与 KeyPairGenerator(RSA/EC 密钥对)。
+ * 含 init 参数捕获(keysize / AlgorithmParameterSpec / SecureRandom,共 8 个重载)
+ * 与密钥对分离(私钥→key、公钥→publicKey)及 RSA/DSA/EC 结构参数提取。
+ */
 class KeyGenerationHooker(
     context: ProbeContext,
 ) : BaseHooker(context, CryptoKind.KEY_GENERATION) {
@@ -93,7 +95,7 @@ class KeyGenerationHooker(
         )
     }
 
-    /** 浠?init 棣栧弬鎻愬彇 keysize/鏇茬嚎/keystore 鍙傛暟,鍐欏叆涓婁笅鏂囧苟杩斿洖 params 鎵胯浇銆?*/
+    /** 从 init 首参提取 keysize/曲线/keystore 参数,写入上下文并返回 params 承载。 */
     private fun specParams(arg: Any?, ctx: CryptoContext): Map<String, String>? {
         if (arg == null) return null
         val params = mutableMapOf<String, String>()

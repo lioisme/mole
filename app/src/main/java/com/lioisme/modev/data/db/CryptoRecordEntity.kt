@@ -76,6 +76,32 @@ data class CryptoRecordEntity(
     @ColumnInfo(name = "verifyResult") val verifyResult: Boolean? = null,
     @ColumnInfo(name = "processName") val processName: String? = null,
 
+    // ---- 数据库监听列(v5→v6 迁移新增,recordType='db' 行承载;crypto 行为 NULL) ----
+
+    /** SQL 语句原文(上限 RecordLimits.SQL_MAX_CHARS,超限置 paramsJson["sqlTruncated"])。 */
+    @ColumnInfo(name = "sql") val sql: String? = null,
+
+    /** 数据库完整路径(打开/关联事件时写入)。 */
+    @ColumnInfo(name = "dbPath") val dbPath: String? = null,
+
+    /** 绑定参数/ContentValues 序列化 JSON(上限 RecordLimits.BIND_ARGS_MAX_CHARS)。 */
+    @ColumnInfo(name = "bindArgsJson") val bindArgsJson: String? = null,
+
+    /** 查询结果行序列化 JSON(上限 HookSwitch.maxResultRows/maxResultChars 双闸门)。 */
+    @ColumnInfo(name = "rowsJson") val rowsJson: String? = null,
+
+    /** 查询结果行数(被动获取:游标未物化时为 null)。 */
+    @ColumnInfo(name = "rowCount") val rowCount: Int? = null,
+
+    /** DML 受影响行数(update/delete/executeUpdateDelete 返回)。 */
+    @ColumnInfo(name = "affectedCount") val affectedCount: Int? = null,
+
+    /** 插入 rowId(insert/replace/executeInsert 返回)。 */
+    @ColumnInfo(name = "rowId") val rowId: Long? = null,
+
+    /** 标量查询结果(simpleQueryForLong/String)。 */
+    @ColumnInfo(name = "resultText") val resultText: String? = null,
+
     @ColumnInfo(name = "contextId") val contextId: Long = 0L,
     @ColumnInfo(name = "threadName") val threadName: String,
     @ColumnInfo(name = "stack") val stackJson: String? = null,

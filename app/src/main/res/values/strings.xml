@@ -7,7 +7,9 @@
     <string name="cd_back">Back</string>
     <string name="cd_filter">Filter</string>
     <string name="confirm">OK</string>
-    <string name="all">All</string>
+    <string name="record_types_all">All Records</string>
+    <string name="record_types_crypto">Algorithm</string>
+    <string name="record_types_db">Database</string>
     <string name="online">Running</string>
     <string name="offline">Not running</string>
     <string name="loading">Loading…</string>
@@ -54,6 +56,17 @@
     <string name="switch_random">SecureRandom</string>
     <string name="switch_base64">Base64</string>
     <string name="switch_webview">WebView JS Crypto</string>
+    <string name="switch_db_open">Database Open</string>
+    <string name="switch_db_query">Database Query</string>
+    <string name="switch_db_dml">Database Change</string>
+    <string name="switch_db_exec">SQL Exec</string>
+    <string name="switch_db_transaction">Transaction</string>
+    <string name="db_max_result_rows">Max result rows</string>
+    <string name="db_max_result_rows_hint">Rows collected per query result (0 = unlimited)</string>
+    <string name="db_max_result_rows_dialog_title">Max result rows</string>
+    <string name="db_max_result_chars">Max result bytes</string>
+    <string name="db_max_result_chars_hint">Characters stored per query result (0 = unlimited)</string>
+    <string name="db_max_result_chars_dialog_title">Max result bytes</string>
     <string name="switch_log_stack">Record Call Stack</string>
     <string name="capture_max_bytes">Max bytes per field</string>
     <string name="capture_max_bytes_hint">Bytes per field (0 = unlimited)</string>
@@ -171,6 +184,61 @@
     <string name="record_copied">Record copied</string>
     <string name="export_failed">Export failed</string>
 
+    <!-- Database monitor (V17: SQLite 监听类别/操作/详情/开关) -->
+    <string name="kind_db_open">Database Open</string>
+    <string name="kind_db_query">Database Query</string>
+    <string name="kind_db_dml">Database Change</string>
+    <string name="kind_db_exec">SQL Exec</string>
+    <string name="kind_db_transaction">Transaction</string>
+    <string name="op_db_open_database">Open database</string>
+    <string name="op_db_close_database">Close database</string>
+    <string name="op_db_open_helper">Open helper</string>
+    <string name="op_db_close_helper">Close helper</string>
+    <string name="op_db_query">Query</string>
+    <string name="op_db_raw_query">Raw query</string>
+    <string name="op_db_query_result">Query result</string>
+    <string name="op_db_statement_query_long">Query long</string>
+    <string name="op_db_statement_query_string">Query string</string>
+    <string name="op_db_insert">Insert</string>
+    <string name="op_db_replace">Replace</string>
+    <string name="op_db_update">Update</string>
+    <string name="op_db_delete">Delete</string>
+    <string name="op_db_exec_sql">Exec SQL</string>
+    <string name="op_db_statement_execute">Execute</string>
+    <string name="op_db_statement_execute_insert">Execute insert</string>
+    <string name="op_db_statement_execute_update_delete">Execute update/delete</string>
+    <string name="op_db_attach">Attach</string>
+    <string name="op_db_begin_transaction">Begin transaction</string>
+    <string name="op_db_end_transaction">End transaction</string>
+    <string name="op_db_set_transaction_successful">Mark successful</string>
+    <string name="record_data_db">db:</string>
+    <string name="record_data_sql">sql:</string>
+    <string name="record_data_rows">rows:</string>
+    <string name="record_data_affected">affected:</string>
+    <plurals name="record_data_rows_short">
+        <item quantity="one">%1$d row</item>
+        <item quantity="other">%1$d rows</item>
+    </plurals>
+    <plurals name="record_data_affected_short">
+        <item quantity="one">%1$d affected</item>
+        <item quantity="other">%1$d affected</item>
+    </plurals>
+    <string name="meta_db_name">Database</string>
+    <string name="meta_db_path">Path</string>
+    <string name="meta_thread">Thread</string>
+    <string name="meta_rows">Rows</string>
+    <string name="meta_affected">Affected</string>
+    <string name="meta_row_id">Row ID</string>
+    <string name="section_sql">SQL</string>
+    <string name="section_db_path">Database path</string>
+    <string name="section_bind_args">Bind arguments</string>
+    <string name="section_result_rows">Result rows</string>
+    <string name="section_result_text">Result</string>
+    <plurals name="rows_more">
+        <item quantity="one">+%1$d more row omitted</item>
+        <item quantity="other">+%1$d more rows omitted</item>
+    </plurals>
+
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="settings_display_section">Display</string>
@@ -180,6 +248,7 @@
     <string name="settings_service_section">Service &amp; Diagnostics</string>
     <string name="settings_about_section">About</string>
     <string name="algorithm_monitor_title">Algorithm Monitor</string>
+    <string name="database_monitor_title">Database Monitor</string>
     <string name="data_settings_title">Data Management</string>
     <string name="diagnostics_settings_title">Service &amp; Diagnostics</string>
     <string name="settings_framework_service">Framework service</string>

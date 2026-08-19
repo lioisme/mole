@@ -46,7 +46,9 @@ interface CryptoRecordDao {
                OR inputHex LIKE :query ESCAPE '\'
                OR outputText LIKE :query ESCAPE '\'
                OR outputHex LIKE :query ESCAPE '\'
-               OR threadName LIKE :query ESCAPE '\')
+               OR threadName LIKE :query ESCAPE '\'
+               OR sql LIKE :query ESCAPE '\'
+               OR resultText LIKE :query ESCAPE '\')
         ORDER BY timestamp DESC, id DESC
         LIMIT :limit OFFSET :offset
         """
@@ -67,12 +69,14 @@ interface CryptoRecordDao {
      */
     @Query(
         """
-        SELECT id, packageName, kind, operation, algorithm, threadName, direction,
+        SELECT id, recordType, packageName, kind, operation, algorithm, threadName, direction,
                timestamp, keyAlias,
                substr(keyHex, 1, :previewChars) AS keyPreview,
                substr(inputHex, 1, :previewChars) AS inputPreview,
                substr(outputHex, 1, :previewChars) AS outputPreview,
-               keyTruncated, inputTruncated, outputTruncated
+               keyTruncated, inputTruncated, outputTruncated,
+               substr(sql, 1, :previewChars) AS sqlPreview,
+               rowCount, affectedCount, rowId
         FROM crypto_records
         WHERE (:recordType IS NULL OR recordType = :recordType)
           AND (:packageName IS NULL OR packageName = :packageName)
@@ -86,7 +90,9 @@ interface CryptoRecordDao {
                OR inputHex LIKE :query ESCAPE '\'
                OR outputText LIKE :query ESCAPE '\'
                OR outputHex LIKE :query ESCAPE '\'
-               OR threadName LIKE :query ESCAPE '\')
+               OR threadName LIKE :query ESCAPE '\'
+               OR sql LIKE :query ESCAPE '\'
+               OR resultText LIKE :query ESCAPE '\')
         ORDER BY timestamp DESC, id DESC
         LIMIT :limit OFFSET :offset
         """
@@ -108,12 +114,14 @@ interface CryptoRecordDao {
      */
     @Query(
         """
-        SELECT id, packageName, kind, operation, algorithm, threadName, direction,
+        SELECT id, recordType, packageName, kind, operation, algorithm, threadName, direction,
                timestamp, keyAlias,
                substr(keyHex, 1, :previewChars) AS keyPreview,
                substr(inputHex, 1, :previewChars) AS inputPreview,
                substr(outputHex, 1, :previewChars) AS outputPreview,
-               keyTruncated, inputTruncated, outputTruncated
+               keyTruncated, inputTruncated, outputTruncated,
+               substr(sql, 1, :previewChars) AS sqlPreview,
+               rowCount, affectedCount, rowId
         FROM crypto_records
         WHERE (:typeCount = 0 OR recordType IN (:recordTypes))
           AND (:packageCount = 0 OR packageName IN (:packages))
@@ -127,7 +135,9 @@ interface CryptoRecordDao {
                OR inputHex LIKE :query ESCAPE '\'
                OR outputText LIKE :query ESCAPE '\'
                OR outputHex LIKE :query ESCAPE '\'
-               OR threadName LIKE :query ESCAPE '\')
+               OR threadName LIKE :query ESCAPE '\'
+               OR sql LIKE :query ESCAPE '\'
+               OR resultText LIKE :query ESCAPE '\')
         ORDER BY timestamp DESC, id DESC
         LIMIT :limit OFFSET :offset
         """
@@ -161,7 +171,9 @@ interface CryptoRecordDao {
                OR inputHex LIKE :query ESCAPE '\'
                OR outputText LIKE :query ESCAPE '\'
                OR outputHex LIKE :query ESCAPE '\'
-               OR threadName LIKE :query ESCAPE '\')
+               OR threadName LIKE :query ESCAPE '\'
+               OR sql LIKE :query ESCAPE '\'
+               OR resultText LIKE :query ESCAPE '\')
         """
     )
     fun observeCountByFilter(
@@ -295,6 +307,7 @@ data class RecordTypeCount(
  */
 data class CryptoRecordRow(
     val id: Long,
+    val recordType: String,
     val packageName: String,
     val kind: String,
     val operation: String,
@@ -309,4 +322,8 @@ data class CryptoRecordRow(
     @ColumnInfo(name = "keyTruncated") val keyTruncated: Boolean = false,
     @ColumnInfo(name = "inputTruncated") val inputTruncated: Boolean = false,
     @ColumnInfo(name = "outputTruncated") val outputTruncated: Boolean = false,
+    @ColumnInfo(name = "sqlPreview") val sqlPreview: String? = null,
+    @ColumnInfo(name = "rowCount") val rowCount: Int? = null,
+    @ColumnInfo(name = "affectedCount") val affectedCount: Int? = null,
+    @ColumnInfo(name = "rowId") val rowId: Long? = null,
 )

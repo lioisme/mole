@@ -6,6 +6,7 @@ import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
+import com.lioisme.modev.data.mapping.CryptoDetail
 import com.lioisme.modev.data.repo.LogRepository
 import com.lioisme.modev.data.server.ConfigServer
 import kotlinx.coroutines.runBlocking
@@ -97,7 +98,7 @@ class RecordDetailViewModelTest {
         assertNotNull(state.record)
         assertTrue(state.loaded)
         assertEquals("pkg.a", state.record?.packageName)
-        assertEquals(CryptoKind.CIPHER, state.record?.kind)
+        assertEquals(CryptoKind.CIPHER, (state.record as CryptoDetail).record.kind)
     }
 
     @Test
@@ -176,9 +177,10 @@ class RecordDetailViewModelTest {
         val record = state.record
         assertNotNull(record)
         // 全量数据保留(取证语义不变),截断标记正确
-        assertEquals(bigHex, record?.key?.hex)
-        assertFalse(record!!.key!!.truncated)
-        assertEquals(bigHex.length / 2, record.key!!.totalLength)
+        val crypto = (record as CryptoDetail).record
+        assertEquals(bigHex, crypto.key?.hex)
+        assertFalse(crypto.key!!.truncated)
+        assertEquals(bigHex.length / 2, crypto.key!!.totalLength)
         // 邻接查询仅投影 id:无邻居 → 标志为 false,不加载任何大字段
         assertFalse(state.canOlder)
         assertFalse(state.canNewer)

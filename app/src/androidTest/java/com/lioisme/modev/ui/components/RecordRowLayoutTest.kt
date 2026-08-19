@@ -17,6 +17,7 @@ import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.util.BytesView
+import com.lioisme.modev.data.mapping.CryptoRow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -60,11 +61,13 @@ class RecordRowLayoutTest {
         timestamp = 1_700_000_000_000,
     )
 
+    private fun row(rec: CryptoRecord) = CryptoRow(rec)
+
     @Test
     fun rendersOwnLines_withSecondsPrecisionTime() {
         rule.setContent {
             MaterialTheme {
-                RecordRow(record = record, onClick = {}, onLongClick = {})
+                RecordRow(record = row(record), onClick = {}, onLongClick = {})
             }
         }
         // V14 R1 层级:算法(SemiBold headline)/ 类别·操作组合行(supporting)/
@@ -84,7 +87,7 @@ class RecordRowLayoutTest {
     fun noBadgeLetterRendered() {
         rule.setContent {
             MaterialTheme {
-                RecordRow(record = record, onClick = {}, onLongClick = {})
+                RecordRow(record = row(record), onClick = {}, onLongClick = {})
             }
         }
         // V13:徽章移除,类别字母(与筛选菜单同源的首字母)不得再以独立节点渲染
@@ -96,7 +99,7 @@ class RecordRowLayoutTest {
     fun copySummary_concatenatesAllOwnLines() {
         rule.setContent {
             MaterialTheme {
-                RecordRow(record = record, onClick = {}, onLongClick = {})
+                RecordRow(record = row(record), onClick = {}, onLongClick = {})
             }
         }
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -118,11 +121,7 @@ class RecordRowLayoutTest {
         val longPressed = AtomicBoolean(false)
         rule.setContent {
             MaterialTheme {
-                RecordRow(
-                    record = record,
-                    onClick = { clicked.set(true) },
-                    onLongClick = { longPressed.set(true) },
-                )
+                RecordRow(record = row(record), onClick = { clicked.set(true) }, onLongClick = { longPressed.set(true) })
             }
         }
         rule.onNodeWithText("WebCrypto/AES-GCM").performTouchInput { longClick() }
@@ -136,7 +135,7 @@ class RecordRowLayoutTest {
         val blank = record.copy(algorithm = "   ")
         rule.setContent {
             MaterialTheme {
-                RecordRow(record = blank, onClick = {}, onLongClick = {})
+                RecordRow(record = row(blank), onClick = {}, onLongClick = {})
             }
         }
         // V16 R1:空算法不得渲染空白行,回退类别名(与详情页标题/摘要同源)
@@ -153,7 +152,7 @@ class RecordRowLayoutTest {
         )
         rule.setContent {
             MaterialTheme {
-                RecordRow(record = withKey, onClick = {}, onLongClick = {})
+                RecordRow(record = row(withKey), onClick = {}, onLongClick = {})
             }
         }
         rule.onNodeWithText(str(R.string.record_data_key) + " " + "aabbcc").assertIsDisplayed()

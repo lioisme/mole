@@ -10,6 +10,8 @@ class HookSwitchTest {
     @Test
     fun default_any_enabled() {
         assertTrue(HookSwitch.DEFAULT.anyEnabled)
+        assertTrue(HookSwitch.DEFAULT.anyCryptoEnabled)
+        assertTrue(HookSwitch.DEFAULT.anyDbEnabled)
     }
 
     @Test
@@ -18,8 +20,40 @@ class HookSwitchTest {
             messageDigest = false, cipher = false, mac = false, signature = false,
             keyParam = false, keyGeneration = false, keyFactory = false,
             keyStore = false, keyAgreement = false, random = false, base64 = false,
+            webView = false,
+            dbOpen = false, dbQuery = false, dbDml = false, dbExec = false,
+            dbTransaction = false,
         )
         assertFalse(s.anyEnabled)
+        assertFalse(s.anyCryptoEnabled)
+        assertFalse(s.anyDbEnabled)
+    }
+
+    @Test
+    fun db_only_enables_only_db_projection() {
+        val s = HookSwitch(
+            messageDigest = false, cipher = false, mac = false, signature = false,
+            keyParam = false, keyGeneration = false, keyFactory = false,
+            keyStore = false, keyAgreement = false, random = false, base64 = false,
+            webView = false,
+            dbOpen = false, dbQuery = true, dbDml = false, dbExec = false,
+            dbTransaction = false,
+        )
+        assertTrue(s.anyDbEnabled)
+        assertFalse(s.anyCryptoEnabled)
+        assertTrue(s.anyEnabled)
+    }
+
+    @Test
+    fun crypto_only_enables_only_crypto_projection() {
+        val s = HookSwitch(
+            cipher = true,
+            dbOpen = false, dbQuery = false, dbDml = false, dbExec = false,
+            dbTransaction = false,
+        )
+        assertTrue(s.anyCryptoEnabled)
+        assertFalse(s.anyDbEnabled)
+        assertTrue(s.anyEnabled)
     }
 
     @Test
@@ -27,6 +61,13 @@ class HookSwitchTest {
         assertTrue(HookSwitch.DEFAULT.enabled(CryptoKind.KEY_STORE))
         assertTrue(HookSwitch.DEFAULT.enabled(CryptoKind.KEY_AGREEMENT))
         assertTrue(HookSwitch.DEFAULT.enabled(CryptoKind.RANDOM))
+    }
+
+    @Test
+    fun db_categories_on_by_default() {
+        for (kind in SqlKind.entries) {
+            assertTrue("db category $kind should default on", HookSwitch.DEFAULT.dbEnabled(kind))
+        }
     }
 
     @Test
@@ -53,6 +94,19 @@ class HookSwitchTest {
     }
 
     @Test
+    fun db_enabled_maps_each_kind() {
+        val s = HookSwitch(
+            dbOpen = true, dbQuery = false, dbDml = true, dbExec = false,
+            dbTransaction = true,
+        )
+        assertTrue(s.dbEnabled(SqlKind.OPEN))
+        assertFalse(s.dbEnabled(SqlKind.QUERY))
+        assertTrue(s.dbEnabled(SqlKind.DML))
+        assertFalse(s.dbEnabled(SqlKind.EXEC))
+        assertTrue(s.dbEnabled(SqlKind.TRANSACTION))
+    }
+
+    @Test
     fun webview_off_by_default() {
         assertFalse(HookSwitch.DEFAULT.enabled(CryptoKind.WEB_CRYPTO))
         assertFalse(HookSwitch.DEFAULT.webView)
@@ -68,13 +122,22 @@ class HookSwitchTest {
             keyParam = false, keyGeneration = false, keyFactory = false,
             keyStore = false, keyAgreement = false, random = false, base64 = false,
             webView = false,
+            dbOpen = false, dbQuery = false, dbDml = false, dbExec = false,
+            dbTransaction = false,
         )
         assertFalse(allOff.anyEnabled)
+    }
+
+    @Test
+    fun result_caps_have_sane_defaults() {
+        assertEquals(RecordLimits.DEFAULT_MAX_RESULT_ROWS, HookSwitch.DEFAULT.maxResultRows)
+        assertEquals(RecordLimits.DEFAULT_MAX_RESULT_CHARS, HookSwitch.DEFAULT.maxResultChars)
     }
 
     @Test
     fun copy_preserves_unknown() {
         val s = HookSwitch(maxStackDepth = 5).copy(cipher = false)
         assertEquals(5, s.maxStackDepth)
+        assertTrue(s.dbQuery)
     }
 }

@@ -1,6 +1,6 @@
 package com.lioisme.modev.hook
 
-import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.MonitoredRecord
 import java.io.File
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.TimeUnit
@@ -9,7 +9,7 @@ import java.util.concurrent.atomic.AtomicLong
 /**
  * 记录出口:有界内存队列 + 异步工作线程,写前日志(WAL)保证不丢。
  *
- * - [emit] 在 Hook 线程内为记录分配进程级单调 [CryptoRecord.seq] 并入队
+ * - [emit] 在 Hook 线程内为记录分配进程级单调 [MonitoredRecord.seq] 并入队
  *   (有界 [CAPACITY],满时丢最旧并计数,防宿主进程内存膨胀);
  * - seq 单调且**跨进程重启保持递增**([seqFile] 持久化,重启续号):
  *   宿主侧以 `(packageName, processName, seq)` 唯一索引做幂等吸收,若进程重启后
@@ -23,14 +23,14 @@ import java.util.concurrent.atomic.AtomicLong
  * - [onAck] 由 [ConfigChannel] 的 ACK 回调调用,推进 spool 已确认游标。
  */
 class RecordSink(
-    private val jsonOf: (CryptoRecord) -> String,
+    private val jsonOf: (MonitoredRecord) -> String,
     private val sendJson: (String) -> Boolean,
     private val isConnected: () -> Boolean,
     private val spoolProvider: () -> RecordSpool? = { null },
     private val seqFileProvider: () -> File? = { null },
 ) {
 
-    private val queue = LinkedBlockingQueue<CryptoRecord>(CAPACITY)
+    private val queue = LinkedBlockingQueue<MonitoredRecord>(CAPACITY)
     private val dropped = AtomicLong()
     private val seqCounter = AtomicLong(restoreSeq())
 
@@ -61,19 +61,19 @@ class RecordSink(
         }
     }
 
-    fun emit(record: CryptoRecord) {
+    fun emit(record: MonitoredRecord) {
         if (!running) return
         val seq = seqCounter.incrementAndGet()
         // M14: 仅写入内存检查点(Hook 线程零 I/O);落盘由工作线程周期执行
         seqCheckpoint = seq
-        if (!queue.offer(record.copy(seq = seq))) {
+        if (!queue.offer(record.withSeq(seq))) {
             // 队列满:不阻塞 Hook 线程——直接落盘(WAL 追加,低成本),由工作线程 drain 发送;
             // 仅当 spool 尚未就绪(注入极早期)才计入丢弃
             val sp = currentSpool()
             if (sp != null) {
                 // 直落盘路径同样必须携带已分配 seq,否则载荷内 seq 为 0,
                 // 宿主唯一索引/ACK 游标与行前缀序号错位(前缀被剥除,宿主只见载荷 seq)
-                sp.append(seq, jsonOf(record.copy(seq = seq)))
+                sp.append(seq, jsonOf(record.withSeq(seq)))
             } else {
                 dropped.incrementAndGet()
             }

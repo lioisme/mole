@@ -8,15 +8,19 @@ import androidx.paging.flatMap
 import androidx.paging.map
 import com.lioisme.modev.core.codec.CryptoRecordCodec
 import com.lioisme.modev.core.codec.RecordCodecRegistry
+import com.lioisme.modev.core.codec.SqlRecordCodec
 import com.lioisme.modev.core.codec.WireRecord
-import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.RecordTypes
+import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.data.db.CryptoRecordDao
+import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
 import com.lioisme.modev.data.db.RecordTypeCount
+import com.lioisme.modev.data.mapping.RecordDetailModel
+import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.mapping.toEntity
-import com.lioisme.modev.data.mapping.toModelOrNull
+import com.lioisme.modev.data.mapping.toRecordDetailOrNull
 import com.lioisme.modev.data.mapping.toRowModelOrNull
 import com.lioisme.modev.data.server.ChannelStats
 import com.lioisme.modev.data.server.ConfigServer
@@ -136,14 +140,18 @@ class LogRepository(
     }
 
     private suspend fun writeBatch(batch: List<Pair<WireRecord, (Long) -> Unit>>) {
-        val toPersist = ArrayList<CryptoRecord>(batch.size)
+        val toPersist = ArrayList<CryptoRecordEntity>(batch.size)
         val decodableAcks = ArrayList<Pair<Long, (Long) -> Unit>>(batch.size)
         val undecodableAcks = ArrayList<Pair<Long, (Long) -> Unit>>(batch.size)
         for ((wire, ack) in batch) {
             when (val decoded = registry.decode(wire)) {
                 is CryptoRecord -> {
                     decodableAcks.add(wire.seq to ack)
-                    toPersist.add(decoded)
+                    toPersist.add(decoded.toEntity())
+                }
+                is SqlRecord -> {
+                    decodableAcks.add(wire.seq to ack)
+                    toPersist.add(decoded.toEntity())
                 }
                 else -> {
                     // 未知记录类型/畸形载荷:计数丢弃;ACK 单独回执(防注入侧 WAL 永久重放)
@@ -169,11 +177,11 @@ class LogRepository(
     }
 
     /** 批量落库,失败重试 [MAX_INSERT_ATTEMPTS] 次,全部失败返回 false。 */
-    private suspend fun persistBatch(records: List<CryptoRecord>): Boolean {
+    private suspend fun persistBatch(records: List<CryptoRecordEntity>): Boolean {
         var lastError: Throwable? = null
         repeat(MAX_INSERT_ATTEMPTS) {
             try {
-                dao.insertAll(records.map { it.toEntity() })
+                dao.insertAll(records)
                 return true
             } catch (t: Throwable) {
                 lastError = t
@@ -191,7 +199,8 @@ class LogRepository(
         if (insertedSinceTrim < TRIM_EVERY) return
         insertedSinceTrim = 0
         try {
-            val counts = dao.counts(RecordTypes.CRYPTO)
+            // V17:跨类型计数(recordType=null = 全部),每包上限与全局上限均按全类型治理
+            val counts = dao.counts(null)
             var trimmedNow = 0L
             var total = 0L
             for (c in counts) {
@@ -217,13 +226,14 @@ class LogRepository(
      * 列表走投影查询 [CryptoRecordDao.observePagedRows],仅物化展示列与 SQL 侧预览,
      * 零大字段加载;枚举未知的行按 null 丢弃(计数由 DAO 层不感知,属 Schema 漂移兜底)。
      * V17 R2:recordType 参数化(null = 全部类型,跨监听类型"整体"语义)。
+     * V17 R3:kindName 字符串化(CryptoKind.name / SqlKind.name 共用 kind 列,跨枚举过滤)。
      */
     fun pagedRecords(
         packageName: String? = null,
-        kind: CryptoKind? = null,
+        kindName: String? = null,
         query: String = "",
         recordType: String? = null,
-    ): Flow<PagingData<CryptoRecord>> {
+    ): Flow<PagingData<RowModel>> {
         val like = if (query.isBlank()) null else likePattern(query.trim())
         return Pager(
             config = PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = false),
@@ -231,7 +241,7 @@ class LogRepository(
                 dao.observePagedRows(
                     recordType = recordType,
                     packageName = packageName,
-                    kind = kind?.name,
+                    kind = kindName,
                     query = like,
                     previewChars = ROW_PREVIEW_CHARS,
                     limit = PAGE_SIZE,
@@ -254,7 +264,7 @@ class LogRepository(
      * [RecordFilter] 集合多值语义,空集/空 query = 不过滤;单值退化为与
      * [pagedRecords] 等价的 DAO 路径(IN 单元素),行为一致。
      */
-    fun paged(filter: RecordFilter): Flow<PagingData<CryptoRecord>> {
+    fun paged(filter: RecordFilter): Flow<PagingData<RowModel>> {
         val query = filter.query?.takeIf { it.isNotBlank() }?.let(::likePattern)
         return Pager(
             config = PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = false),
@@ -295,18 +305,25 @@ class LogRepository(
     fun observeRecordTypeCounts(): Flow<List<RecordTypeCount>> = dao.observeRecordTypeCounts()
 
     /** 单条记录(记录详情页),记录被清理或不可解码后返回 null。 */
-    fun observeById(id: Long): Flow<CryptoRecord?> =
-        dao.observeById(id).map { it?.toModelOrNull() }
+    fun observeById(id: Long): Flow<RecordDetailModel?> =
+        dao.observeById(id).map { it?.toRecordDetailOrNull() }
 
     /**
      * 相邻记录 id([newer]=true 取更新的、false 取更旧的),用于记录详情"上一条/下一条"。
-     * 仅投影 id,不再物化邻居全量大字段。
+     * 仅投影 id,不再物化邻居全量大字段;按 recordType 限定(算法/数据库各自邻接,
+     * 混排时跨类型的相邻在时间线语义上无意义)。
      */
-    suspend fun neighborIdOf(record: CryptoRecord, newer: Boolean): Long? =
+    suspend fun neighborIdOf(
+        recordType: String,
+        packageName: String,
+        timestamp: Long,
+        id: Long,
+        newer: Boolean,
+    ): Long? =
         if (newer) {
-            dao.neighborIdNewerThan(RecordTypes.CRYPTO, record.packageName, record.timestamp, record.id)
+            dao.neighborIdNewerThan(recordType, packageName, timestamp, id)
         } else {
-            dao.neighborIdOlderThan(RecordTypes.CRYPTO, record.packageName, record.timestamp, record.id)
+            dao.neighborIdOlderThan(recordType, packageName, timestamp, id)
         }
 
     fun observePackages(): Flow<List<String>> = dao.observePackages(RecordTypes.CRYPTO)
@@ -330,6 +347,7 @@ class LogRepository(
         private fun cryptoRegistry(): RecordCodecRegistry =
             RecordCodecRegistry().apply {
                 register(CryptoRecordCodec.RECORD_TYPE, CryptoRecordCodec::decode)
+                register(SqlRecordCodec.RECORD_TYPE, SqlRecordCodec::decode)
             }
 
         private const val MAX_RECORDS = 20_000

@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.hook.hooks
+package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -17,7 +17,9 @@ import java.nio.ByteBuffer
 import java.security.Provider
 
 /**
- * 鎽樿绠楁硶鎹曡幏(MD5 / SHA-1 / SHA-256 / SM3 绛?銆? * ByteBuffer 鍏ュ弬鍦?before 闃舵鏆傚瓨;int 杩斿洖鍨?digest(byte[],int,int) 鍑哄弬缂撳啿鍦?after 鍥炶銆? */
+ * 摘要算法捕获(MD5 / SHA-1 / SHA-256 / SM3 等)。
+ * ByteBuffer 入参在 before 阶段暂存;int 返回型 digest(byte[],int,int) 出参缓冲在 after 回读。
+ */
 class MessageDigestHooker(
     context: ProbeContext,
 ) : BaseHooker(context, CryptoKind.MESSAGE_DIGEST) {
@@ -115,7 +117,7 @@ class MessageDigestHooker(
             else -> HookerSupport.take()
         }
         ctx.inputTotal += input?.size ?: 0
-        // digest(byte[],int,int):result 涓哄啓鍏ュ瓧鑺傛暟,鎽樿钀藉湪 arg0[off, off+result)
+        // digest(byte[],int,int):result 为写入字节数,摘要落在 arg0[off, off+result)
         val output = when {
             result is ByteArray -> result
             result is ByteBuffer -> HookerSupport.bufferRemaining(result)

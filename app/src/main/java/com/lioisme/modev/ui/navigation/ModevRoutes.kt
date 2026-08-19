@@ -17,6 +17,7 @@ object ModevRoutes {
     const val RECORD_DETAIL = "record/{recordId}"
     const val SETTINGS = "settings"
     const val ALGORITHM_MONITOR = "settings/algorithm"
+    const val DATABASE_MONITOR = "settings/database"
     const val DATA_SETTINGS = "settings/data"
     const val DIAGNOSTICS_SETTINGS = "settings/diagnostics"
 

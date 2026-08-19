@@ -15,6 +15,7 @@ import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.data.server.ConfigServer
 import com.lioisme.modev.domain.capability.CapabilityRegistry
 import com.lioisme.modev.domain.capability.AlgorithmListenCapability
+import com.lioisme.modev.domain.capability.DatabaseListenCapability
 import com.lioisme.modev.domain.scope.ScopeGateway
 import com.lioisme.modev.domain.scope.ScopeRepository
 import com.lioisme.modev.domain.scope.ScopeService
@@ -111,6 +112,7 @@ class AppContainer(private val context: Context) {
     val capabilityRegistry: CapabilityRegistry by lazy {
         CapabilityRegistry().apply {
             register(AlgorithmListenCapability(settings.globalSwitch, appScope))
+            register(DatabaseListenCapability(settings.globalSwitch, appScope))
         }
     }
 

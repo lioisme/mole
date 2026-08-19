@@ -8,7 +8,10 @@ package com.lioisme.modev.core.model
  */
 enum class RecordType(val wire: String) {
     /** 算法捕获记录(JCA/WebView JS 调用)。 */
-    CRYPTO(RecordTypes.CRYPTO);
+    CRYPTO(RecordTypes.CRYPTO),
+
+    /** 数据库操作记录(SQLiteDatabase / SQLiteOpenHelper / SQLiteStatement / SQLiteCursor)。 */
+    DATABASE(RecordTypes.DATABASE);
 
     companion object {
         fun fromWire(value: String?): RecordType? = entries.firstOrNull { it.wire == value }

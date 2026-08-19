@@ -7,14 +7,17 @@ import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.lioisme.modev.R
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
 import com.lioisme.modev.data.repo.AppListSettings
@@ -76,6 +79,8 @@ class TimelineListTest {
                     record(s1, "CIPHER", "AES", "ENCRYPT"),
                     record(s2, "CIPHER", "DES", "ENCRYPT"),
                     record(d1, "MAC", "HmacSHA256", "SIGN"),
+                    // DB 行(s1 同秒,不新增组头;V17 R3 双形态行渲染)
+                    dbRecord(s1, "DML", "t14.db", "INSERT", "INSERT INTO t (name) VALUES (?)"),
                 ),
             )
             // 写回读验:与 UI 同一 DB 单例,必须即刻可见(哨兵计数语义同 DAO 契约)。
@@ -90,7 +95,7 @@ class TimelineListTest {
                     query = null,
                 )
                 .first()
-            assertEquals("种子写入须在读回中可见", 5L, seeded)
+            assertEquals("种子写入须在读回中可见", 6L, seeded)
         }
         // 被测应用默认隐藏(自身是 Xposed 模块),开启显隐使行可见。
         // 仅作用域筛选会按进程隐藏行(rootHasOnly 勾选后持久化),一并复位保证确定性。
@@ -113,6 +118,23 @@ class TimelineListTest {
             threadName = "timeline-test",
             timestamp = ts,
         )
+
+    private fun dbRecord(
+        ts: Long,
+        kind: String,
+        databaseName: String,
+        operation: String,
+        sql: String,
+    ) = CryptoRecordEntity(
+        recordType = com.lioisme.modev.core.model.RecordTypes.DATABASE,
+        packageName = packageName,
+        kind = kind,
+        operation = operation,
+        algorithm = databaseName,
+        sql = sql,
+        threadName = "timeline-test",
+        timestamp = ts,
+    )
 
     @Test
     fun timelineGroups_sameSecondSingleHeader_crossSecondAndCrossDayHeaders() {
@@ -161,5 +183,130 @@ class TimelineListTest {
             .assertCountEquals(1)
         // 跨日头带日期前缀。
         rule.onNodeWithText(groupLabelOrNull(d1, s1, locale, is24h)!!).assertIsDisplayed()
+    }
+
+    @Test
+    fun timelineGroups_dbRowRendersWithDbNameAndSqlPreview() {
+        rule.waitForIdle()
+        // 同上:等待被测包行出现并进入记录页。
+        val deadline = System.currentTimeMillis() + 10_000
+        var rowFound = false
+        while (System.currentTimeMillis() < deadline) {
+            rule.waitForIdle()
+            val scrollables = rule.onAllNodes(hasScrollAction()).fetchSemanticsNodes()
+            if (scrollables.isNotEmpty()) {
+                try {
+                    rule.onAllNodes(hasScrollAction()).onFirst()
+                        .performScrollToNode(hasText(packageName))
+                    rowFound = true
+                    break
+                } catch (_: AssertionError) {
+                }
+            }
+            Thread.sleep(100)
+        }
+        assertTrue("等待「显示 Xposed 模块」生效后被测包行应出现", rowFound)
+        rule.onNodeWithText(packageName).performClick()
+        rule.waitForIdle()
+
+        // DB 行:数据库名(元信息行)与 SQL 预览(摘要行)均可见。
+        rule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText("t14.db", substring = true))
+        rule.onNodeWithText("t14.db", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("INSERT INTO t (name) VALUES (?)", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun timelineGroups_dbTypeFilterShowsOnlyDbRows() {
+        rule.waitForIdle()
+        // 同上:等待被测包行出现并进入记录页。
+        val deadline = System.currentTimeMillis() + 10_000
+        var rowFound = false
+        while (System.currentTimeMillis() < deadline) {
+            rule.waitForIdle()
+            val scrollables = rule.onAllNodes(hasScrollAction()).fetchSemanticsNodes()
+            if (scrollables.isNotEmpty()) {
+                try {
+                    rule.onAllNodes(hasScrollAction()).onFirst()
+                        .performScrollToNode(hasText(packageName))
+                    rowFound = true
+                    break
+                } catch (_: AssertionError) {
+                }
+            }
+            Thread.sleep(100)
+        }
+        assertTrue("等待「显示 Xposed 模块」生效后被测包行应出现", rowFound)
+        rule.onNodeWithText(packageName).performClick()
+        rule.waitForIdle()
+
+        // 打开筛选菜单(折叠条内 FilterList 按钮,content-desc 固定)
+        rule.onAllNodesWithContentDescription(ctx.getString(R.string.cd_filter)).onFirst().performClick()
+        rule.waitForIdle()
+        // 记录类型 → 数据库(行为级:点击项 → 行现/行隐;只读 Radio 语义不可断言;
+        // DropdownMenuItem 与分组标题同串,用 hasClickAction 限定菜单项)
+        rule.onNode(hasText(ctx.getString(R.string.record_types_db)) and hasClickAction()).performClick()
+        rule.waitForIdle()
+
+        // 仅剩 DB 行:库名与 SQL 预览可见,算法行(SHA-256 摘要行)消失。
+        rule.onNodeWithText("t14.db", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("INSERT INTO t (name) VALUES (?)", substring = true).assertIsDisplayed()
+        rule.onAllNodes(hasText("SHA-256")).assertCountEquals(0)
+
+        // 复位全部:算法行回归。
+        rule.onAllNodesWithContentDescription(ctx.getString(R.string.cd_filter)).onFirst().performClick()
+        rule.waitForIdle()
+        rule.onNode(hasText(ctx.getString(R.string.record_types_all)) and hasClickAction()).performClick()
+        rule.waitForIdle()
+        rule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText("SHA-256"))
+        rule.onNodeWithText("SHA-256", substring = true).assertIsDisplayed()
+    }
+
+    @Test
+    fun timelineGroups_dbRowDetailShowsSqlSection() {
+        rule.waitForIdle()
+        // 同上:等待被测包行出现并进入记录页。
+        val deadline = System.currentTimeMillis() + 10_000
+        var rowFound = false
+        while (System.currentTimeMillis() < deadline) {
+            rule.waitForIdle()
+            val scrollables = rule.onAllNodes(hasScrollAction()).fetchSemanticsNodes()
+            if (scrollables.isNotEmpty()) {
+                try {
+                    rule.onAllNodes(hasScrollAction()).onFirst()
+                        .performScrollToNode(hasText(packageName))
+                    rowFound = true
+                    break
+                } catch (_: AssertionError) {
+                }
+            }
+            Thread.sleep(100)
+        }
+        assertTrue("等待「显示 Xposed 模块」生效后被测包行应出现", rowFound)
+        rule.onNodeWithText(packageName).performClick()
+        rule.waitForIdle()
+
+        // 点击 DB 行进入详情页。
+        rule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText("t14.db", substring = true))
+        rule.onNodeWithText("t14.db", substring = true).performClick()
+        rule.waitForIdle()
+
+        // 详情页 SQL 节:节标题 + 全量 SQL 可见(短文本不折叠)。
+        val sectionDeadline = System.currentTimeMillis() + 10_000
+        var sectionFound = false
+        while (System.currentTimeMillis() < sectionDeadline) {
+            rule.waitForIdle()
+            val nodes = rule.onAllNodes(hasText(ctx.getString(R.string.section_sql))).fetchSemanticsNodes()
+            if (nodes.isNotEmpty()) {
+                sectionFound = true
+                break
+            }
+            Thread.sleep(100)
+        }
+        assertTrue("详情页应渲染 SQL 节标题", sectionFound)
+        // SQL 文本同时出现在顶栏标题(sqlHeadline)与 SQL 节内,取首节点断言可见。
+        rule.onAllNodes(hasText("INSERT INTO t (name) VALUES (?)", substring = true)).onFirst().assertIsDisplayed()
     }
 }

@@ -5,6 +5,7 @@ import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.Storage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -35,6 +36,8 @@ import com.lioisme.modev.ui.navigation.slideComposable
 import com.lioisme.modev.ui.settings.AlgorithmMonitorScreen
 import com.lioisme.modev.ui.settings.AlgorithmMonitorViewModelFactory
 import com.lioisme.modev.ui.settings.CapabilityUiRegistry
+import com.lioisme.modev.ui.settings.DatabaseMonitorScreen
+import com.lioisme.modev.ui.settings.DatabaseMonitorViewModelFactory
 import com.lioisme.modev.ui.settings.DataSettingsScreen
 import com.lioisme.modev.ui.settings.DataSettingsViewModelFactory
 import com.lioisme.modev.ui.settings.DiagnosticsScreen
@@ -66,6 +69,14 @@ fun ModevNavHost(navController: NavHostController) {
                     icon = Icons.Default.Sensors,
                     titleRes = R.string.algorithm_monitor_title,
                     onClick = { navController.navigateGuarded(ModevRoutes.ALGORITHM_MONITOR) },
+                )
+            )
+            register(
+                CapabilityUiRegistry.Entry(
+                    kind = CapabilityKind.DATABASE_LISTEN,
+                    icon = Icons.Default.Storage,
+                    titleRes = R.string.database_monitor_title,
+                    onClick = { navController.navigateGuarded(ModevRoutes.DATABASE_MONITOR) },
                 )
             )
         }
@@ -179,6 +190,14 @@ fun ModevNavHost(navController: NavHostController) {
             BackGuarded(navController) {
                 AlgorithmMonitorScreen(
                     viewModel = viewModel(factory = AlgorithmMonitorViewModelFactory(app.container)),
+                    onBack = { navController.popGuarded() },
+                )
+            }
+        }
+        slideComposable(route = ModevRoutes.DATABASE_MONITOR) {
+            BackGuarded(navController) {
+                DatabaseMonitorScreen(
+                    viewModel = viewModel(factory = DatabaseMonitorViewModelFactory(app.container)),
                     onBack = { navController.popGuarded() },
                 )
             }

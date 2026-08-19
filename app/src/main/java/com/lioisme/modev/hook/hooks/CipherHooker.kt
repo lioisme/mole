@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.hook.hooks
+package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
@@ -23,21 +23,22 @@ import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.IvParameterSpec
 
 /**
- * Cipher 鍔犺В瀵嗘崟鑾?AES / DES / RSA / SM4 绛?銆? *
- * 鍏宠仈閾捐矾:getInstance(绠楁硶/provider) 鈫?init(before 閲囬泦鍏ュ弬 鈫?after 浜у嚭璁板綍骞惰嚜鍔ㄨˉ閲囬殢鏈?IV)
- * 鈫?update/updateAAD/doFinal(before 鏆傚瓨 ByteBuffer 鍏ュ弬,after 鎹曡幏杈撳嚭,鍚?int 杩斿洖鍨嬪嚭鍙傜紦鍐?銆? */
+ * Cipher 加解密捕获(AES / DES / RSA / SM4 等)。
+ * 关联链路:getInstance(算法/provider) → init(before 采集入参 → after 产出记录并自动补采随机 IV)
+ * → update/updateAAD/doFinal(before 暂存 ByteBuffer 入参,after 捕获输出,含 int 返回型出参缓冲)。
+ */
 class CipherHooker(
     context: ProbeContext,
 ) : BaseHooker(context, CryptoKind.CIPHER) {
 
     override fun install() {
         val f = MethodFinder
-        // 瀹炰緥鍖?绠楁硶 + provider)
+        // 实例化(算法 + provider)
         hookInstanceOf(f.find(CIPHER, "getInstance", String::class.java)) { inv, result -> afterGetInstance(inv, result) }
         hookInstanceOf(f.find(CIPHER, "getInstance", String::class.java, String::class.java)) { inv, result -> afterGetInstance(inv, result) }
         hookInstanceOf(f.find(CIPHER, "getInstance", String::class.java, Provider::class.java)) { inv, result -> afterGetInstance(inv, result) }
 
-        // init:before 閲囬泦鍏ュ弬,after 浜у嚭璁板綍 + 鑷姩琛ラ噰闅忔満 IV
+        // init:before 采集入参,after 产出记录 + 自动补采随机 IV
         val initOverloads = listOfNotNull(
             f.find(CIPHER, "init", Int::class.javaPrimitiveType, Key::class.java),
             f.find(CIPHER, "init", Int::class.javaPrimitiveType, Key::class.java, AlgorithmParameterSpec::class.java),
@@ -49,7 +50,7 @@ class CipherHooker(
             hookAfter(m) { inv, ctx, _ -> afterInit(inv, ctx) }
         }
 
-        // update:byte[] 鍦?after 鐩存帴璇诲彇;ByteBuffer 闇€ before 鏆傚瓨
+        // update:byte[] 在 after 直接读取;ByteBuffer 需 before 暂存
         hookAfter(f.find(CIPHER, "update", ByteArray::class.java)) { inv, ctx, _ -> afterUpdate(inv, ctx, null) }
         hookAfter(f.find(CIPHER, "update", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, ctx, _ ->
             afterUpdate(inv, ctx, null)
@@ -61,7 +62,7 @@ class CipherHooker(
         hookBefore(f.find(CIPHER, "updateAAD", ByteArray::class.java)) { inv, ctx -> beforeUpdateAad(inv, ctx) }
         hookBefore(f.find(CIPHER, "updateAAD", ByteBuffer::class.java)) { inv, ctx -> beforeUpdateAad(inv, ctx) }
 
-        // doFinal:鍏ㄩ儴閲嶈浇,鍚?int 杩斿洖鍨嬪嚭鍙傜紦鍐蹭笌 ByteBuffer 鍏ュ弬
+        // doFinal:全部重载,含 int 返回型出参缓冲与 ByteBuffer 入参
         hookAfter(f.find(CIPHER, "doFinal")) { inv, ctx, result -> afterDoFinal(inv, ctx, null, result) }
         hookAfter(f.find(CIPHER, "doFinal", ByteArray::class.java)) { inv, ctx, result -> afterDoFinal(inv, ctx, null, result) }
         hookAfter(f.find(CIPHER, "doFinal", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, ctx, result -> afterDoFinal(inv, ctx, null, result) }
@@ -70,10 +71,11 @@ class CipherHooker(
         hookBefore(f.find(CIPHER, "doFinal", ByteBuffer::class.java, ByteBuffer::class.java)) { inv, _ -> HookerSupport.stash(inv.getArg(0)) }
         hookAfter(f.find(CIPHER, "doFinal", ByteBuffer::class.java, ByteBuffer::class.java)) { inv, ctx, result -> afterDoFinal(inv, ctx, inv.getArg(1), result) }
 
-        // 鍔ㄦ€?IV
+        // 动态 IV
         hookAfter(f.find(CIPHER, "getIV")) { inv, ctx, result -> afterGetIv(inv, ctx, result) }
 
-        // clone:涓婁笅鏂囦紶鎾?        hookInstanceOf(f.find(CIPHER, "clone")) { inv, result -> afterClone(inv, result) }
+// clone:上下文传播
+        hookInstanceOf(f.find(CIPHER, "clone")) { inv, result -> afterClone(inv, result) }
     }
 
     private fun afterClone(invocation: Invocation, result: Any?) {
@@ -148,7 +150,7 @@ class CipherHooker(
 
     private fun afterInit(invocation: Invocation, ctx: CryptoContext) {
         val instance = invocation.thisObject ?: return
-        // CBC/GCM 鏃犳樉寮?spec 鏃?init 鍚庣敱瀹炵幇鑷姩鐢熸垚闅忔満 IV,涓诲姩琛ラ噰
+        // CBC/GCM 无显式 spec 时,init 后由实现自动生成随机 IV,主动补采
         if (ctx.iv == null && ctx.direction == Cipher.ENCRYPT_MODE) {
             val iv = runCatching { (instance as Cipher).iv }.getOrNull()
             if (iv != null && iv.isNotEmpty()) {
@@ -211,7 +213,7 @@ class CipherHooker(
             else -> HookerSupport.take()
         }
         ctx.inputTotal += input?.size ?: 0
-        // int 杩斿洖鍨?缁撴灉鍐欏叆鍑哄弬缂撳啿 arg0[off, off+result)
+        // int 返回型:结果写入出参缓冲 arg0[off, off+result)
         val output = when {
             result is ByteArray -> result
             result is ByteBuffer -> HookerSupport.bufferRemaining(result)
@@ -251,7 +253,8 @@ class CipherHooker(
         private const val CIPHER = "javax.crypto.Cipher"
 
         /**
-         * 鎻愬彇瀵嗛挜:浼樺厛 getEncoded();AndroidKeyStore 纭欢瀵嗛挜杩斿洖 null 鏃舵爣璁颁笉鍙鍑哄苟璁板綍鍒悕銆?         */
+         * 提取密钥:优先 getEncoded();AndroidKeyStore 硬件密钥返回 null 时标记不可导出并记录别名。
+         */
         internal fun extractKey(key: Key?, ctx: CryptoContext, toView: (ByteArray?) -> BytesView? = { BytesView.of(it) }) {
             if (key == null) {
                 ctx.key = null

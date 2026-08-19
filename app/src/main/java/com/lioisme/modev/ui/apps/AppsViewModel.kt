@@ -7,7 +7,8 @@ import androidx.paging.PagingData
 import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoKind
-import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.RecordType
+import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.repo.AppCatalogRepository
 import com.lioisme.modev.data.repo.AppCatalogSource
 import com.lioisme.modev.data.repo.AppListSettings
@@ -275,7 +276,8 @@ class AppRecordsViewModel(
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
-    private val kind = MutableStateFlow<CryptoKind?>(null)
+    private val recordType = MutableStateFlow<RecordType?>(null)
+    private val kindName = MutableStateFlow<String?>(null)
 
     /** 应用名/图标信息。 */
     val appInfo: StateFlow<AppCatalogRepository.AppInfo?> = catalog.apps
@@ -302,9 +304,14 @@ class AppRecordsViewModel(
         .map { counts -> counts[packageName] ?: 0L }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
-    /** 分页记录流(时间倒序,随搜索词 / 类别切换重建)。 */
-    val records: Flow<PagingData<CryptoRecord>> = combine(query, kind) { q, k -> q to k }
-        .flatMapLatest { (q, k) -> logs.pagedRecords(packageName, k, q) }
+    /**
+     * 分页记录流(时间倒序,随搜索词 / 记录类型 / 类别切换重建;V17 双形态 [RowModel])。
+     * kindName 承载 CryptoKind.name / SqlKind.name(共用 kind 列,跨枚举过滤)。
+     */
+    val records: Flow<PagingData<RowModel>> = combine(query, recordType, kindName) { q, t, k -> Triple(q, t, k) }
+        .flatMapLatest { (q, t, k) ->
+            logs.pagedRecords(packageName, kindName = k, query = q, recordType = t?.wire)
+        }
 
     /** 一次性提示(移出作用域 / 清空日志结果),由 UI 收集为 Snackbar。 */
     val messages = MutableSharedFlow<UiMessage>(extraBufferCapacity = 8)
@@ -313,8 +320,14 @@ class AppRecordsViewModel(
         query.value = value
     }
 
-    fun setKind(value: CryptoKind?) {
-        kind.value = value
+    /** 记录类型过滤(null = 全部;V17 R3 算法/数据库二选一)。 */
+    fun setType(value: RecordType?) {
+        recordType.value = value
+    }
+
+    /** 类别过滤(名称跨 CryptoKind/SqlKind;null = 不限)。 */
+    fun setKindName(value: String?) {
+        kindName.value = value
     }
 
     fun clearLogs() {

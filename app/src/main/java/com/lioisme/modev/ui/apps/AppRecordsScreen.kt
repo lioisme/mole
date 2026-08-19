@@ -65,7 +65,11 @@ import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoKind
-import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.RecordType
+import com.lioisme.modev.core.model.SqlKind
+import com.lioisme.modev.data.mapping.CryptoRow
+import com.lioisme.modev.data.mapping.RowModel
+import com.lioisme.modev.data.mapping.SqlRow
 import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.ui.components.AppIcon
 import com.lioisme.modev.ui.components.CollapsedSearchInput
@@ -73,11 +77,13 @@ import com.lioisme.modev.ui.components.EmptyState
 import com.lioisme.modev.ui.components.RecordRow
 import com.lioisme.modev.ui.components.SearchInputField
 import com.lioisme.modev.ui.components.StatusDot
+import com.lioisme.modev.ui.components.sqlRowSummary
 import com.lioisme.modev.ui.components.TimelineHeader
 import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.components.copySummary
 import com.lioisme.modev.ui.components.kindLabelRes
 import com.lioisme.modev.ui.components.rememberSearchController
+import com.lioisme.modev.ui.components.sqlKindLabelRes
 import com.lioisme.modev.ui.common.groupLabelOrNull
 import com.lioisme.modev.ui.common.rememberEffectiveLocale
 import com.lioisme.modev.ui.common.secondKey
@@ -118,16 +124,19 @@ fun AppRecordsScreen(
     // 搜索状态机共享封装(无参 rememberSearchBarState / 独立意图 / 唯一动画驱动 /
     // 收起后导航 / snapTo 兜底,红线全守)。
     val search = rememberSearchController<Long>(onNavigate = onOpenRecord)
-    var selectedKind by rememberSaveable { mutableStateOf<CryptoKind?>(null) }
+    // 记录类型(全部/算法/数据库)+ 类别(随类型切换:CryptoKind / SqlKind 单选)。
+    var selectedType by rememberSaveable { mutableStateOf<RecordType?>(null) }
+    var selectedKindName by rememberSaveable { mutableStateOf<String?>(null) }
     var filterMenuOpen by remember { mutableStateOf(false) }
 
     // 应用级危险操作(移出作用域 / 清空该应用日志)确认状态
     var pendingDanger by remember { mutableStateOf<DangerAction?>(null) }
 
     // 过滤条件变化 → ViewModel 重建 Paging 流(SQL 过滤)。
-    LaunchedEffect(search.queryText, selectedKind) {
+    LaunchedEffect(search.queryText, selectedType, selectedKindName) {
         viewModel.setQuery(search.queryText)
-        viewModel.setKind(selectedKind)
+        viewModel.setType(selectedType)
+        viewModel.setKindName(selectedKindName)
     }
 
     LaunchedEffect(viewModel.messages) {
@@ -138,9 +147,15 @@ fun AppRecordsScreen(
         }
     }
 
-    // 列表行长按复制记录摘要(V13,与详情页整段复制同 UX:剪贴板 + Snackbar 反馈)。
-    fun copyRecord(record: CryptoRecord) {
-        clipboard.setText(AnnotatedString(record.copySummary(context)))
+    // 列表行长按复制记录摘要(V13,与详情页整段复制同 UX:剪贴板 + Snackbar 反馈;
+    // V17 双形态:算法 / 数据库各自摘要)。
+    fun copyRecord(record: RowModel) {
+        val summary =
+            when (record) {
+                is CryptoRow -> record.record.copySummary(context)
+                is SqlRow -> record.sqlRowSummary(context)
+            }
+        clipboard.setText(AnnotatedString(summary))
         scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.record_copied)) }
     }
 
@@ -161,8 +176,10 @@ fun AppRecordsScreen(
                                     KindFilterMenu(
                                         expanded = filterMenuOpen,
                                         onExpandedChange = { filterMenuOpen = it },
-                                        selectedKind = selectedKind,
-                                        onKindSelect = { selectedKind = it },
+                                        selectedType = selectedType,
+                                        selectedKindName = selectedKindName,
+                                        onTypeSelect = { selectedType = it },
+                                        onKindSelect = { selectedKindName = it },
                                     )
                                 },
                             )
@@ -224,8 +241,10 @@ fun AppRecordsScreen(
                         KindFilterMenu(
                             expanded = filterMenuOpen,
                             onExpandedChange = { filterMenuOpen = it },
-                            selectedKind = selectedKind,
-                            onKindSelect = { selectedKind = it },
+                            selectedType = selectedType,
+                            selectedKindName = selectedKindName,
+                            onTypeSelect = { selectedType = it },
+                            onKindSelect = { selectedKindName = it },
                         )
                     },
                 )
@@ -296,9 +315,9 @@ private enum class DangerAction { REMOVE_SCOPE, CLEAR_LOGS }
 @Composable
 private fun AppRecordsContent(
     viewModel: AppRecordsViewModel,
-    records: LazyPagingItems<CryptoRecord>,
+    records: LazyPagingItems<RowModel>,
     onLaunch: (String) -> Unit,
-    onCopyRecord: (CryptoRecord) -> Unit,
+    onCopyRecord: (RowModel) -> Unit,
     onRemoveScope: () -> Unit,
     onClearLogs: () -> Unit,
     onOpenRecord: (Long) -> Unit,
@@ -579,15 +598,20 @@ private fun AppHeaderRow(
 }
 
 /**
- * 类别筛选菜单(9 项 RadioButton 单选,SearchBar trailingIcon 槽内使用)。
- * V10:底部「捕获设置」入口移除(捕获配置已全局化,入口收敛至设置页)。
+ * 记录筛选菜单(V17 R3 双组单选):
+ * - 记录类型组:全部 / 算法 / 数据库(切类型清空类别);
+ * - 类别组:随类型渲染(CryptoKind 12 项 / SqlKind 5 项,类型=全部时两组全显),
+ *   选类别不改类型(kind 列跨枚举唯一,SQL 过滤直接命中)。
+ * 只读 RadioButton(语义不可断言,行为级:点击项 → 行现/行隐)。
  */
 @Composable
 private fun KindFilterMenu(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    selectedKind: CryptoKind?,
-    onKindSelect: (CryptoKind?) -> Unit,
+    selectedType: RecordType?,
+    selectedKindName: String?,
+    onTypeSelect: (RecordType?) -> Unit,
+    onKindSelect: (String?) -> Unit,
 ) {
     Box {
         TipIconButton(tooltip = stringResource(R.string.cd_filter), onClick = { onExpandedChange(true) }) {
@@ -596,7 +620,7 @@ private fun KindFilterMenu(
                 contentDescription = stringResource(R.string.cd_filter),
                 // 筛选启用指示:有激活条件时 primary 着色,让用户感知列表被过滤。
                 tint =
-                    if (selectedKind != null) {
+                    if (selectedType != null || selectedKindName != null) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
@@ -605,25 +629,73 @@ private fun KindFilterMenu(
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { onExpandedChange(false) }) {
             DropdownMenuItem(
-                text = { Text(stringResource(R.string.all), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                leadingIcon = { RadioButton(selected = selectedKind == null, onClick = null) },
+                text = { Text(stringResource(R.string.record_types_all), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon = { RadioButton(selected = selectedType == null && selectedKindName == null, onClick = null) },
                 onClick = {
+                    onTypeSelect(null)
                     onKindSelect(null)
                     onExpandedChange(false)
                 },
             )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.record_types_crypto), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon = { RadioButton(selected = selectedType == RecordType.CRYPTO, onClick = null) },
+                onClick = {
+                    onTypeSelect(RecordType.CRYPTO)
+                    onKindSelect(null)
+                    onExpandedChange(false)
+                },
+            )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.record_types_db), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon = { RadioButton(selected = selectedType == RecordType.DATABASE, onClick = null) },
+                onClick = {
+                    onTypeSelect(RecordType.DATABASE)
+                    onKindSelect(null)
+                    onExpandedChange(false)
+                },
+            )
+            TypeHeader(R.string.record_types_crypto)
             CryptoKind.entries.forEach { kind ->
-                DropdownMenuItem(
-                    text = { Text(stringResource(kindLabelRes(kind)), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    leadingIcon = { RadioButton(selected = selectedKind == kind, onClick = null) },
-                    onClick = {
-                        onKindSelect(kind)
-                        onExpandedChange(false)
-                    },
-                )
+                val name = kind.name
+                if (selectedType == null || selectedType == RecordType.CRYPTO) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(kindLabelRes(kind)), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        leadingIcon = { RadioButton(selected = selectedKindName == name, onClick = null) },
+                        onClick = {
+                            onKindSelect(name)
+                            onExpandedChange(false)
+                        },
+                    )
+                }
+            }
+            TypeHeader(R.string.record_types_db)
+            SqlKind.entries.forEach { kind ->
+                val name = kind.name
+                if (selectedType == null || selectedType == RecordType.DATABASE) {
+                    DropdownMenuItem(
+                        text = { Text(stringResource(sqlKindLabelRes(kind)), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        leadingIcon = { RadioButton(selected = selectedKindName == name, onClick = null) },
+                        onClick = {
+                            onKindSelect(name)
+                            onExpandedChange(false)
+                        },
+                    )
+                }
             }
         }
     }
+}
+
+/** 菜单分组标题(非可选;类型组切换也经条目点击驱动,行为级可断言)。 */
+@Composable
+private fun TypeHeader(titleRes: Int) {
+    Text(
+        stringResource(titleRes),
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+    )
 }
 
 /** 重试行(Box 承载 M3 质感,error 色文本)。 */

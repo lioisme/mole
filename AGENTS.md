@@ -35,6 +35,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 | 词 | 含义 | 禁用旧词 |
 |----|------|----------|
 | 记录 record(s) | 算法监听捕获条目 | 日志 log(s) |
+| 数据库监听 | SQL 门面/语句/游标结果采集能力(5 类:open/query/DML/exec/transaction) | SQL 注入日志、db hook 日志 |
 | 运行中 Running | 进程存活态 | 在线 Online |
 | 已作用域 / 未作用域 | Hook 作用域态 | 在作用域 / 未在作用域 |
 | 已接收 / 丢弃 / 被拒 / 写入失败 / 超容量裁剪 | 统计区文案(原因括号后缀) | 队列溢出丢弃等 |
@@ -94,6 +95,15 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
     分页 prepend 边界 `prev==null` 不渲染头。插桩断言组头须
     `hasTestTag("timeline-header") and hasAnyDescendant(hasText(...))` 限定
     (同秒组头与行尾时间同串,裸 `hasText` 会多命中)。
+11. **数据库监听被动采集**:结果集逐行采集仅发生于 App 自身迭代之后;
+    hook 内**禁止**移动游标/调用 `getCount` 等探测 API(改变 App 行为);
+    行/字节闸门触发即截断补发 `QUERY_RESULT`;未迭代的游标 rowCount=null
+    且无结果记录。记录行模型 sealed 分派(`SqlRow`/`CryptoRow`),经
+    `toRowModelOrNull` 对非法 kind/operation 枚举名返回 null。
+12. **数据库监听开关契约**:5 类开关(open/query/DML/exec/transaction)默认开,
+    设置页类别开关即时广播生效;结果上限为「行数 + 字节」双闸门
+    (`IntLimitSheet` 底部输入,禁居中 Dialog);`kind` 列跨枚举共用
+    (CryptoKind.name / SqlKind.name),筛选菜单记录类型 + 类别双组单选。
 
 ## 已知工具链坑
 
@@ -107,7 +117,10 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
   `onRoot`/`printToLog`/`onFirst` 是扩展需显式 import;`onRoot()` 在弹窗打开时
   有 2 个 root 会报错,须 `onAllNodes(isPopup())`。
 - 并行跑两个 gradle 任务可能触发守护进程 OOM(「daemon disappeared」),lint 等
-  重任务串行执行。
+  重任务串行执行。多项目/IDE 守护进程滞留(Xmx8G 等)会压垮页面文件
+  (OS errno 1455/daemon 崩溃):assemble 前清理闲置守护进程,
+  重任务用 `--no-daemon --max-workers=1 -Dorg.gradle.jvmargs=-Xmx2048m` 逐变体
+  串行执行。
 
 ## 测试金字塔(新增行为必须有测试)
 

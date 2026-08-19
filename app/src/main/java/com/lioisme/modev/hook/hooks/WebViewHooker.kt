@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.hook.hooks
+package com.lioisme.modev.hook.hooks
 
 import android.content.Context
 import android.webkit.ValueCallback
@@ -20,19 +20,22 @@ import java.util.Collections
 import java.util.WeakHashMap
 
 /**
- * WebView JS 鍔犺В瀵嗙洃鍚?V12):娉ㄥ叆鎺㈤拡鍖呰 WebCrypto / CryptoJS / JSEncrypt,
- * 缁?JS 妗ュ洖浼犺褰?kind=WEB_CRYPTO)銆傛敞鍏ラ潰(D5):
- * 1. 鍩虹被 [android.webkit.WebViewClient.onPageFinished] 鈥斺€?椤甸潰鍔犺浇瀹屾垚鍚庢敞鍏ユ帰閽? *    (瑕嗙洊缁濆ぇ澶氭暟"澶嶅啓骞惰皟 super"鐨勮嚜瀹氫箟瀹㈡埛绔?;
+ * WebView JS 加解密监听(V12):注入探针包覆 WebCrypto / CryptoJS / JSEncrypt,
+ * 经 JS 桥回传记录(kind=WEB_CRYPTO)。注入面(D5):
+ * 1. 基类 [android.webkit.WebViewClient.onPageFinished] —— 页面加载完成后注入探针
+ *    (覆盖绝大多数"复写并回调 super"的自定义客户端);
  * 2. WebView.<init> / loadUrl / loadData / loadDataWithBaseURL / evaluateJavascript
- *    鈥斺€?灏芥棭娉ㄥ唽 JS 妗?SPA 鍔ㄦ€佽剼鏈笌涓嶅鍐?onPageFinished 鐨勫鎴风鍏滃簳)銆? * 鍏ㄩ儴 hook 缁?[MethodFinder] 绌哄畨鍏?+ runCatching 鍖呰９,闆跺紓甯稿娉勫涓?
- * 鎺㈤拡骞傜瓑瀹堝崼鍦?JS 渚?[WebviewProbe.IDEMPOTENCE_GUARD]),閲嶅娉ㄥ叆闆跺壇浣滅敤銆? */
+ *    —— 尽早注册 JS 桥(SPA 动态脚本与不复写 onPageFinished 的客户端兜底)。
+ * 全部 hook 经 [MethodFinder] 空安全 + runCatching 包裹,零异常外泄漏
+ * 探针幂等守卫在 JS 侧([WebviewProbe.IDEMPOTENCE_GUARD]),重复注入零副作用。
+ */
 class WebViewHooker(
     context: ProbeContext,
 ) : BaseHooker(context, CryptoKind.WEB_CRYPTO) {
 
     private val bridge by lazy { WebViewJsBridge(config, sink, packageName, processName) }
 
-    /** 宸叉敞鍐屾ˉ鐨?WebView 寮卞紩鐢ㄩ泦鍚?骞傜瓑,涓嶉樆姝?GC)銆?*/
+    /** 已注册桥的 WebView 弱引用集合,幂等,不阻止 GC)。 */
     private val bridgedViews = Collections.newSetFromMap(
         Collections.synchronizedMap(WeakHashMap<WebView, Boolean>()),
     )
@@ -65,14 +68,14 @@ class WebViewHooker(
         }
     }
 
-    /** 娉ㄥ唽 JS 妗?寮卞紩鐢ㄥ箓绛?澶辫触闈欓粯闄嶇骇鈥斺€旈〉闈粛鍙甯镐娇鐢?銆?*/
+    /** 注册 JS 桥:弱引用幂等,失败静默降级——页面仍可正常使用。 */
     private fun ensureBridge(view: WebView) {
         if (bridgedViews.contains(view)) return
         runCatching { view.addJavascriptInterface(bridge, WebviewProbe.BRIDGE_NAME) }
         bridgedViews.add(view)
     }
 
-    /** 娉ㄥ叆鎺㈤拡:妗ユ敞鍐屽箓绛?+ evaluateJavascript 澶辫触闈欓粯(椤甸潰鏃?JS 鐜鏃堕浂褰卞搷)銆?*/
+    /** 注入探针:桥注册幂等 + evaluateJavascript 失败静默(页面无 JS 环境时零影响)。 */
     private fun injectProbe(view: WebView) {
         if (!enabled()) return
         ensureBridge(view)

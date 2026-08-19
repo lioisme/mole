@@ -1,6 +1,11 @@
 package com.lioisme.modev.ui.logs
 
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.SqlBindValue
+import com.lioisme.modev.core.model.SqlRecord
+import com.lioisme.modev.core.model.SqlResultCell
+import com.lioisme.modev.core.model.SqlResultRow
+import com.lioisme.modev.core.model.SqlValueType
 import com.lioisme.modev.core.util.BytesView
 
 /**
@@ -75,6 +80,72 @@ internal fun estimateJsonChars(record: CryptoRecord): Int {
         total += salt.estimateChars()
         total += aad.estimateChars()
         total += publicKey.estimateChars()
+    }
+    return total * 2
+}
+
+/** 绑定参数渲染上限条数(防巨型 bindArgs 产生无界布局)。 */
+internal const val BIND_ARGS_MAX_ROWS = 500
+
+/** 结果集渲染上限行数(行超限仅渲染前 N 行,其余按行计数聚合省略标记)。 */
+internal const val RESULT_MAX_ROWS = 200
+
+/** 结果集单行渲染上限列数。 */
+internal const val RESULT_MAX_COLS = 50
+
+/** 绑定参数 → 有界渲染行(`#i [类型] 值`,截断标记由 UI 追加)。 */
+internal fun formatBindArgsText(args: List<SqlBindValue>): List<String> {
+    val lines = mutableListOf<String>()
+    for ((index, arg) in args.withIndex()) {
+        if (index >= BIND_ARGS_MAX_ROWS) break
+        lines += "#${arg.i} [${arg.t.name}] ${arg.renderValue()}"
+    }
+    return lines
+}
+
+/** 结果集 → 有界渲染行(`#i col=值, …`)。 */
+internal fun formatRowsText(rows: List<SqlResultRow>): List<String> {
+    val lines = mutableListOf<String>()
+    for ((rowIndex, row) in rows.withIndex()) {
+        if (rowIndex >= RESULT_MAX_ROWS) break
+        val cells = row.c.take(RESULT_MAX_COLS)
+        val truncated = row.c.size > RESULT_MAX_COLS
+        lines += "#$rowIndex " + cells.joinToString(", ") { cell ->
+            "${cell.n}=${cell.renderValue()}" + if (cell.truncated) "…" else ""
+        } + if (truncated) " …" else ""
+    }
+    return lines
+}
+
+private fun SqlBindValue.renderValue(): String = when (t) {
+    SqlValueType.L, SqlValueType.D, SqlValueType.S -> v ?: ""
+    SqlValueType.B -> hex ?: ""
+    SqlValueType.N -> "NULL"
+}
+
+private fun SqlResultCell.renderValue(): String = when (t) {
+    SqlValueType.L, SqlValueType.D, SqlValueType.S -> v ?: ""
+    SqlValueType.B -> hex ?: ""
+    SqlValueType.N -> "NULL"
+}
+
+/**
+ * SQL 记录导出 JSON 字符数保守估算(×2 倍率,与 [estimateJsonChars] 同规):
+ * sql + bindArgs + rows + 元数据,超限免构建。
+ */
+internal fun estimateSqlJsonChars(record: SqlRecord): Int {
+    var total = record.packageName.length + record.databaseName.length + 128
+    with(record) {
+        total += sql?.length ?: 0
+        total += dbPath?.length ?: 0
+        total += resultText?.length ?: 0
+        total += processName?.length ?: 0
+        bindArgs?.forEach { total += it.renderValue().length + 16 }
+        rows?.forEach { row ->
+            row.c.forEach { cell -> total += cell.n.length + cell.renderValue().length }
+        }
+        params?.forEach { (k, v) -> total += k.length + v.length }
+        stack.forEach { total += it.length }
     }
     return total * 2
 }

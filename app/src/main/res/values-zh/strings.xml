@@ -7,7 +7,9 @@
     <string name="cd_back">返回</string>
     <string name="cd_filter">筛选</string>
     <string name="confirm">确定</string>
-    <string name="all">全部</string>
+    <string name="record_types_all">全部记录</string>
+    <string name="record_types_crypto">算法</string>
+    <string name="record_types_db">数据库</string>
     <string name="online">运行中</string>
     <string name="offline">未运行</string>
     <string name="loading">加载中…</string>
@@ -54,6 +56,17 @@
     <string name="switch_random">安全随机数</string>
     <string name="switch_base64">Base64 编码</string>
     <string name="switch_webview">网页加解密 WebView</string>
+    <string name="switch_db_open">数据库打开</string>
+    <string name="switch_db_query">数据库查询</string>
+    <string name="switch_db_dml">数据库增删改</string>
+    <string name="switch_db_exec">SQL 执行</string>
+    <string name="switch_db_transaction">事务</string>
+    <string name="db_max_result_rows">结果行数上限</string>
+    <string name="db_max_result_rows_hint">每个查询结果采集的行数(0 = 不限制)</string>
+    <string name="db_max_result_rows_dialog_title">结果行数上限</string>
+    <string name="db_max_result_chars">结果字节上限</string>
+    <string name="db_max_result_chars_hint">每个查询结果存储的字符数(0 = 不限制)</string>
+    <string name="db_max_result_chars_dialog_title">结果字节上限</string>
     <string name="switch_log_stack">记录调用堆栈</string>
     <string name="capture_max_bytes">单字段字节上限</string>
     <string name="capture_max_bytes_hint">每字段字节数(0 = 不限制)</string>
@@ -170,6 +183,58 @@
     <string name="export_failed">导出失败</string>
     <string name="export_too_large">记录过大(%1$d 字符),无法导出</string>
 
+    <!-- 数据库监听(V17:SQLite 类别/操作/详情/开关) -->
+    <string name="kind_db_open">打开数据库</string>
+    <string name="kind_db_query">查询</string>
+    <string name="kind_db_dml">数据变更</string>
+    <string name="kind_db_exec">SQL 执行</string>
+    <string name="kind_db_transaction">事务</string>
+    <string name="op_db_open_database">打开数据库</string>
+    <string name="op_db_close_database">关闭数据库</string>
+    <string name="op_db_open_helper">打开辅助器</string>
+    <string name="op_db_close_helper">关闭辅助器</string>
+    <string name="op_db_query">投影查询</string>
+    <string name="op_db_raw_query">原生查询</string>
+    <string name="op_db_query_result">查询结果</string>
+    <string name="op_db_statement_query_long">标量查询(Long)</string>
+    <string name="op_db_statement_query_string">标量查询(String)</string>
+    <string name="op_db_insert">插入</string>
+    <string name="op_db_replace">替换</string>
+    <string name="op_db_update">更新</string>
+    <string name="op_db_delete">删除</string>
+    <string name="op_db_exec_sql">执行 SQL</string>
+    <string name="op_db_statement_execute">语句执行</string>
+    <string name="op_db_statement_execute_insert">插入执行</string>
+    <string name="op_db_statement_execute_update_delete">更新/删除执行</string>
+    <string name="op_db_attach">附加库</string>
+    <string name="op_db_begin_transaction">开启事务</string>
+    <string name="op_db_end_transaction">结束事务</string>
+    <string name="op_db_set_transaction_successful">标记成功</string>
+    <string name="record_data_db">数据库:</string>
+    <string name="record_data_sql">SQL:</string>
+    <string name="record_data_rows">结果行:</string>
+    <string name="record_data_affected">受影响:</string>
+    <plurals name="record_data_rows_short">
+        <item quantity="other">%1$d 行</item>
+    </plurals>
+    <plurals name="record_data_affected_short">
+        <item quantity="other">%1$d 行受影响</item>
+    </plurals>
+    <string name="meta_db_name">数据库</string>
+    <string name="meta_db_path">路径</string>
+    <string name="meta_thread">线程</string>
+    <string name="meta_rows">结果行数</string>
+    <string name="meta_affected">受影响行数</string>
+    <string name="meta_row_id">行 ID</string>
+    <string name="section_sql">SQL 语句</string>
+    <string name="section_db_path">数据库路径</string>
+    <string name="section_bind_args">绑定参数</string>
+    <string name="section_result_rows">结果行</string>
+    <string name="section_result_text">结果</string>
+    <plurals name="rows_more">
+        <item quantity="other">+%1$d 行已省略</item>
+    </plurals>
+
     <!-- 设置页 -->
     <string name="settings_title">设置</string>
     <string name="settings_display_section">显示</string>
@@ -179,6 +244,7 @@
     <string name="settings_service_section">服务与诊断</string>
     <string name="settings_about_section">关于</string>
     <string name="algorithm_monitor_title">算法监听</string>
+    <string name="database_monitor_title">数据库监听</string>
     <string name="data_settings_title">数据管理</string>
     <string name="diagnostics_settings_title">服务与诊断</string>
     <string name="settings_framework_service">框架服务</string>
