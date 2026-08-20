@@ -1,10 +1,18 @@
 package com.lioisme.modev.core.model
 
+import com.google.gson.Gson
+import com.google.gson.JsonObject
+
 /**
- * 全局捕获配置(V10:全应用共享一份,与包名解耦;V17 数据库监听扩展)。
+ * 全局捕获配置(V10:全应用共享一份,与包名解耦;V17 数据库监听扩展;
+ * V18 算法/数据库监听全局总开关)。
  * 宿主 App 持久化于 `switch_global` 并经通道推送,注入进程实时读取更新。
  */
 data class HookSwitch(
+    /** 算法监听全局总开关:false = 全部算法类别停用(分开关保留原态,重开即恢复)。 */
+    val cryptoListen: Boolean = true,
+    /** 数据库监听全局总开关:false = 全部数据库类别停用(分开关保留原态,重开即恢复)。 */
+    val dbListen: Boolean = true,
     val messageDigest: Boolean = true,
     val cipher: Boolean = true,
     val mac: Boolean = true,
@@ -47,16 +55,16 @@ data class HookSwitch(
     val anyEnabled: Boolean
         get() = anyCryptoEnabled || anyDbEnabled
 
-    /** 算法捕获相关类别是否任一启用(能力投影,供算法监听能力判定)。 */
+    /** 算法捕获相关类别是否任一启用(含全局总开关投影,供算法监听能力判定)。 */
     val anyCryptoEnabled: Boolean
-        get() = messageDigest || cipher || mac || signature || keyParam || keyGeneration ||
-            keyFactory || keyStore || keyAgreement || random || base64 || webView
+        get() = cryptoListen && (messageDigest || cipher || mac || signature || keyParam || keyGeneration ||
+            keyFactory || keyStore || keyAgreement || random || base64 || webView)
 
-    /** 数据库监听相关类别是否任一启用(能力投影,供数据库监听能力判定)。 */
+    /** 数据库监听相关类别是否任一启用(含全局总开关投影,供数据库监听能力判定)。 */
     val anyDbEnabled: Boolean
-        get() = dbOpen || dbQuery || dbDml || dbExec || dbTransaction
+        get() = dbListen && (dbOpen || dbQuery || dbDml || dbExec || dbTransaction)
 
-    fun enabled(kind: CryptoKind): Boolean = when (kind) {
+    fun enabled(kind: CryptoKind): Boolean = cryptoListen && when (kind) {
         CryptoKind.MESSAGE_DIGEST -> messageDigest
         CryptoKind.CIPHER -> cipher
         CryptoKind.MAC -> mac
@@ -71,7 +79,7 @@ data class HookSwitch(
         CryptoKind.WEB_CRYPTO -> webView
     }
 
-    fun dbEnabled(kind: SqlKind): Boolean = when (kind) {
+    fun dbEnabled(kind: SqlKind): Boolean = dbListen && when (kind) {
         SqlKind.OPEN -> dbOpen
         SqlKind.QUERY -> dbQuery
         SqlKind.DML -> dbDml
@@ -81,5 +89,19 @@ data class HookSwitch(
 
     companion object {
         val DEFAULT = HookSwitch()
+
+        /**
+         * Gson 反序列化 + 缺字段默认值补齐:新增字段(cryptoListen/dbListen 等)
+         * 在旧配置 JSON 中缺失时,Gson 的 Unsafe 实例化会给 JVM 默认值(false),
+         * 会误把历史配置判为「全部停用」。此处按 JsonObject 键存在性补齐默认值。
+         */
+        fun fromJson(gson: Gson, json: String): HookSwitch? = runCatching {
+            val base = gson.fromJson(json, HookSwitch::class.java) ?: return null
+            val obj = gson.fromJson(json, JsonObject::class.java)
+            base.copy(
+                cryptoListen = obj?.get("cryptoListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
+                dbListen = obj?.get("dbListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
+            )
+        }.getOrNull()
     }
 }

@@ -11,13 +11,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * 算法监听页(V10 全局化;V14 R5 更名自「捕获设置」):全局算法监听开关 +
- * 记录选项(最大字节 / 忽略堆栈)。
+ * 监听设置页(V19 T4,合并自算法/数据库监听两页):
+ * 四分区单一页(算法监听 / 记录选项 / 数据库监听 / 结果闸门)。
  * 单一事实源 = SettingsRepository.globalSwitch(镜像 switch_global,
  * 读优先已注入作用域客户端,无则回退本地,变更广播全量客户端)。
- * V11 M4:依赖收窄为 [SettingsRepository],不再持有整个容器。
  */
-class AlgorithmMonitorViewModel(
+class MonitorSettingsViewModel(
     private val settings: SettingsRepository,
 ) : ViewModel() {
 
@@ -29,11 +28,11 @@ class AlgorithmMonitorViewModel(
     }
 }
 
-class AlgorithmMonitorViewModelFactory(
+class MonitorSettingsViewModelFactory(
     private val container: AppContainer,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return AlgorithmMonitorViewModel(container.settings) as T
+        return MonitorSettingsViewModel(container.settings) as T
     }
 }

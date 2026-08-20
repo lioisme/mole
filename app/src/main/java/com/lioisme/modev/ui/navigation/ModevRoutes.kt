@@ -4,24 +4,33 @@ import android.net.Uri
 
 /**
  * 路由常量与参数编解码单一事实源(2026-08-17 V10 设置分级;
- * 2026-08-18 V14 R5 更名):APPS(根页) → APP_RECORDS(每应用记录)→ RECORD_DETAIL(每条记录);
- * SETTINGS → ALGORITHM_MONITOR(算法监听)/ DATA_SETTINGS(数据管理)/
- * DIAGNOSTICS_SETTINGS(服务与诊断)。
+ * 2026-08-18 V14 R5 更名;V18 应用监听入口;V19 T4 监听设置合并;
+ * V20 记录列表单应用语境化,「查看记录」界面退役):
+ * APPS(根页) → APP_MONITOR(每应用监听入口:算法记录 / 数据库记录)
+ * → RECORD_DETAIL(每条记录);
+ * SETTINGS → MONITOR_SETTINGS(监听设置,算法/数据库合并单页)/ DATA_SETTINGS
+ * (数据管理)/ DIAGNOSTICS_SETTINGS(服务与诊断)。
  * 路由字符串(apps/{packageName}、record/{recordId})自 V3 起保持稳定;
- * 算法监听设置自 V10 起全局化,路由由 apps/{packageName}/capture 迁移为
- * settings/algorithm(V14 R5 由 settings/capture 更名,旧路由无存量引用)。
+ * records/algorithm、records/database 于 V20 带包名参数化(单应用记录列表);
+ * settings/algorithm、settings/database 于 V19 合并为 settings/monitor
+ * (旧两路由无存量引用)。
  */
 object ModevRoutes {
     const val APPS = "apps"
-    const val APP_RECORDS = "apps/{packageName}"
+    const val APP_MONITOR = "apps/{packageName}/monitor"
     const val RECORD_DETAIL = "record/{recordId}"
     const val SETTINGS = "settings"
-    const val ALGORITHM_MONITOR = "settings/algorithm"
-    const val DATABASE_MONITOR = "settings/database"
+    const val MONITOR_SETTINGS = "settings/monitor"
     const val DATA_SETTINGS = "settings/data"
     const val DIAGNOSTICS_SETTINGS = "settings/diagnostics"
+    const val ALGORITHM_RECORDS = "records/algorithm/{packageName}"
+    const val DATABASE_RECORDS = "records/database/{packageName}"
 
-    fun appRecords(packageName: String): String = "apps/${enc(packageName)}"
+    fun appMonitor(packageName: String): String = "apps/${enc(packageName)}/monitor"
+
+    fun algorithmRecords(packageName: String): String = "records/algorithm/${enc(packageName)}"
+
+    fun databaseRecords(packageName: String): String = "records/database/${enc(packageName)}"
 
     fun recordDetail(recordId: Long): String = "record/${enc(recordId.toString())}"
 

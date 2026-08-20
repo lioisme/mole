@@ -41,6 +41,8 @@ class StringResourceParityTest {
         "record_data_out",
         "record_data_in",
         "section_iv",
+        "section_repr_base64",
+        "section_repr_hex",
         "version",
     )
 

@@ -2,6 +2,7 @@ package com.lioisme.modev.ui.logs
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -11,17 +12,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowDownward
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -31,8 +36,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -45,8 +54,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
@@ -361,6 +372,20 @@ private fun CryptoLoadedContent(
         expandedSections = if (value) expandedSections + (sectionKey to true) else expandedSections - sectionKey
     }
 
+    // 字节区块表示记忆(V19 T5):按 sectionKey 记住所选表示(rememberSaveable
+    // 进程重建保持),缺省回落 [BytesView.defaultRepresentation]。
+    var byteRepresentations by rememberSaveable { mutableStateOf(mapOf<String, ByteRepresentation>()) }
+    fun sectionRepresentation(
+        sectionKey: String,
+        view: BytesView,
+    ): ByteRepresentation = byteRepresentations[sectionKey] ?: view.defaultRepresentation()
+    fun setSectionRepresentation(
+        sectionKey: String,
+        representation: ByteRepresentation,
+    ) {
+        byteRepresentations = byteRepresentations + (sectionKey to representation)
+    }
+
     // V16 R2:params 护栏化文本(纯函数 + 本地化省略标记,组合上下文完成,DSL 内只消费)。
     val res = LocalContext.current.resources
     val paramsValue: String? = remember(record) {
@@ -390,85 +415,127 @@ private fun CryptoLoadedContent(
         item(key = "divider") {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
         }
-        record.key?.let { key ->
-            byteSectionItems(
-                sectionKey = "key",
-                titleRes = R.string.section_key,
-                view = key,
-                expanded = sectionExpanded("key"),
-                onExpandedChange = { setSectionExpanded("key", it) },
-                copyFull = copyFull,
-            )
+        // V20 R4 数据关系分区:输入 → 流向箭头 → 输出(角色标签由 cryptoFlowRoles 解析,
+        // 未命中回落通用 Input/Output);仅一侧有数据(如密钥生成仅输出)不构成数据流,
+        // 分区头与流向箭头不渲染,孤侧区块独立渲染。
+        val (inputRoleRes, outputRoleRes) = cryptoFlowRoles(record.kind, record.operation, record.direction)
+        val hasInput = record.input != null
+        val hasOutput = record.output != null
+        val hasFlowZone = hasInput && hasOutput
+        if (hasFlowZone) {
+            item(key = "zone-dataflow") {
+                ZoneHeader(icon = Icons.Filled.SwapVert, titleRes = R.string.section_zone_data_flow)
+            }
         }
-        record.keyAlias?.let { alias ->
-            textSectionItems(
-                sectionKey = "key-alias",
-                titleRes = R.string.section_key_alias,
-                value = alias,
-                expanded = sectionExpanded("key-alias"),
-                onExpandedChange = { setSectionExpanded("key-alias", it) },
-                copyFull = copyFull,
-            )
+        if (hasInput) {
+            record.input!!.let { input ->
+                byteSectionItems(
+                    sectionKey = "input",
+                    titleRes = inputRoleRes ?: R.string.section_input,
+                    view = input,
+                    expanded = sectionExpanded("input"),
+                    onExpandedChange = { setSectionExpanded("input", it) },
+                    copyFull = copyFull,
+                    representation = sectionRepresentation("input", input),
+                    onRepresentationChange = { setSectionRepresentation("input", it) },
+                )
+            }
         }
-        record.iv?.let { iv ->
-            byteSectionItems(
-                sectionKey = "iv",
-                titleRes = R.string.section_iv,
-                view = iv,
-                expanded = sectionExpanded("iv"),
-                onExpandedChange = { setSectionExpanded("iv", it) },
-                copyFull = copyFull,
-            )
+        if (hasFlowZone) {
+            item(key = "flow-arrow") { FlowArrow() }
         }
-        record.salt?.let { salt ->
-            byteSectionItems(
-                sectionKey = "salt",
-                titleRes = R.string.section_salt,
-                view = salt,
-                expanded = sectionExpanded("salt"),
-                onExpandedChange = { setSectionExpanded("salt", it) },
-                copyFull = copyFull,
-            )
+        if (hasOutput) {
+            record.output!!.let { output ->
+                byteSectionItems(
+                    sectionKey = "output",
+                    titleRes = outputRoleRes ?: R.string.section_output,
+                    view = output,
+                    expanded = sectionExpanded("output"),
+                    onExpandedChange = { setSectionExpanded("output", it) },
+                    copyFull = copyFull,
+                    representation = sectionRepresentation("output", output),
+                    onRepresentationChange = { setSectionRepresentation("output", it) },
+                )
+            }
         }
-        record.aad?.let { aad ->
-            byteSectionItems(
-                sectionKey = "aad",
-                titleRes = R.string.section_aad,
-                view = aad,
-                expanded = sectionExpanded("aad"),
-                onExpandedChange = { setSectionExpanded("aad", it) },
-                copyFull = copyFull,
-            )
-        }
-        record.publicKey?.let { pk ->
-            byteSectionItems(
-                sectionKey = "publicKey",
-                titleRes = R.string.section_public_key,
-                view = pk,
-                expanded = sectionExpanded("publicKey"),
-                onExpandedChange = { setSectionExpanded("publicKey", it) },
-                copyFull = copyFull,
-            )
-        }
-        record.input?.let { input ->
-            byteSectionItems(
-                sectionKey = "input",
-                titleRes = R.string.section_input,
-                view = input,
-                expanded = sectionExpanded("input"),
-                onExpandedChange = { setSectionExpanded("input", it) },
-                copyFull = copyFull,
-            )
-        }
-        record.output?.let { output ->
-            byteSectionItems(
-                sectionKey = "output",
-                titleRes = R.string.section_output,
-                view = output,
-                expanded = sectionExpanded("output"),
-                onExpandedChange = { setSectionExpanded("output", it) },
-                copyFull = copyFull,
-            )
+        // 密钥材料分区:key / keyAlias / iv / salt / aad / publicKey 归组(无数据不渲染分区头)。
+        val hasKeyMaterial =
+            record.key != null || record.keyAlias != null || record.iv != null ||
+                record.salt != null || record.aad != null || record.publicKey != null
+        if (hasKeyMaterial) {
+            item(key = "zone-keymaterial") {
+                ZoneHeader(icon = Icons.Filled.Key, titleRes = R.string.section_zone_key_material)
+            }
+            record.key?.let { key ->
+                byteSectionItems(
+                    sectionKey = "key",
+                    titleRes = R.string.section_key,
+                    view = key,
+                    expanded = sectionExpanded("key"),
+                    onExpandedChange = { setSectionExpanded("key", it) },
+                    copyFull = copyFull,
+                    representation = sectionRepresentation("key", key),
+                    onRepresentationChange = { setSectionRepresentation("key", it) },
+                )
+            }
+            record.keyAlias?.let { alias ->
+                textSectionItems(
+                    sectionKey = "key-alias",
+                    titleRes = R.string.section_key_alias,
+                    value = alias,
+                    expanded = sectionExpanded("key-alias"),
+                    onExpandedChange = { setSectionExpanded("key-alias", it) },
+                    copyFull = copyFull,
+                )
+            }
+            record.iv?.let { iv ->
+                byteSectionItems(
+                    sectionKey = "iv",
+                    titleRes = R.string.section_iv,
+                    view = iv,
+                    expanded = sectionExpanded("iv"),
+                    onExpandedChange = { setSectionExpanded("iv", it) },
+                    copyFull = copyFull,
+                    representation = sectionRepresentation("iv", iv),
+                    onRepresentationChange = { setSectionRepresentation("iv", it) },
+                )
+            }
+            record.salt?.let { salt ->
+                byteSectionItems(
+                    sectionKey = "salt",
+                    titleRes = R.string.section_salt,
+                    view = salt,
+                    expanded = sectionExpanded("salt"),
+                    onExpandedChange = { setSectionExpanded("salt", it) },
+                    copyFull = copyFull,
+                    representation = sectionRepresentation("salt", salt),
+                    onRepresentationChange = { setSectionRepresentation("salt", it) },
+                )
+            }
+            record.aad?.let { aad ->
+                byteSectionItems(
+                    sectionKey = "aad",
+                    titleRes = R.string.section_aad,
+                    view = aad,
+                    expanded = sectionExpanded("aad"),
+                    onExpandedChange = { setSectionExpanded("aad", it) },
+                    copyFull = copyFull,
+                    representation = sectionRepresentation("aad", aad),
+                    onRepresentationChange = { setSectionRepresentation("aad", it) },
+                )
+            }
+            record.publicKey?.let { pk ->
+                byteSectionItems(
+                    sectionKey = "publicKey",
+                    titleRes = R.string.section_public_key,
+                    view = pk,
+                    expanded = sectionExpanded("publicKey"),
+                    onExpandedChange = { setSectionExpanded("publicKey", it) },
+                    copyFull = copyFull,
+                    representation = sectionRepresentation("publicKey", pk),
+                    onRepresentationChange = { setSectionRepresentation("publicKey", it) },
+                )
+            }
         }
         if (paramsValue != null) {
             textSectionItems(
@@ -717,6 +784,7 @@ private fun MetadataBlock(record: CryptoRecord) {
                 stringResource(kindLabelRes(record.kind)),
                 valueColor = kindColor(record.kind),
             )
+            MetadataRow(stringResource(R.string.meta_algorithm), record.displayAlgorithm())
             MetadataRow(stringResource(R.string.meta_operation), operationLabel(record.operation))
             MetadataRow(stringResource(R.string.meta_time), timeFmt.format(Date(record.timestamp)))
             MetadataRow(stringResource(R.string.meta_context), "#${record.contextId}")
@@ -741,6 +809,55 @@ private fun MetadataBlock(record: CryptoRecord) {
             }
             Spacer(Modifier.height(12.dp))
         }
+    }
+}
+
+/**
+ * 详情分区头(V20 R4):通栏 tonal 条(图标 + titleSmall SemiBold),
+ * 与区块标题(titleSmall primary 文字)形成两级标题层级。
+ * 独立 LazyColumn item(不包裹整区,保持虚拟化)。
+ */
+@Composable
+private fun ZoneHeader(icon: ImageVector, titleRes: Int) {
+    Spacer(Modifier.height(12.dp))
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
+        shape = MaterialTheme.shapes.medium,
+        modifier = Modifier.fillMaxWidth().testTag("detail-zone"),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(titleRes),
+                style = MaterialTheme.typography.titleSmall,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+            )
+        }
+    }
+}
+
+/** 数据流流向箭头(V20 R4):输入块与输出块之间,语义 contentDescription = cd_flow。 */
+@Composable
+private fun FlowArrow() {
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.ArrowDownward,
+            contentDescription = stringResource(R.string.cd_flow),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -770,19 +887,24 @@ private fun MetadataRow(
 }
 
 /**
- * 字节区块头部(V14:恒展示,不随折叠态变化;V16 R3 复制菜单化):
- * 标题 + footer(字节数(含捕获侧截断标记)+ 复制菜单按钮)。
- * 复制菜单 = 文本 / Hex / 文本+Hex 三选(V16 R3:文本与 Hex 双承载,
- * Tier B 分块无法跨块框选,复制菜单是全量复制唯一入口);
- * 文本缺失或目标超 [COPY_MAX_CHARS] 的项隐藏(不留空白项,不产生死按钮)。
+ * 字节区块头部(V14:恒展示,不随折叠态变化;V16 R3 复制菜单化;V19 T5 三态分段):
+ * 标题 + 表示分段(SingleChoiceSegmentedButtonRow,按可用表示收敛:无文本隐藏
+ * 文本段、旧记录无 Base64 隐藏 Base64 段)+ footer(字节数(含捕获侧截断标记)
+ * + 复制菜单按钮)。
+ * 复制菜单 = 文本 / Base64 / Hex 三项(V19 T5:移除「文本+Hex」合并项;文本/Base64
+ * 缺失或超 [COPY_MAX_CHARS] 的项隐藏,不留空白项,不产生死按钮;Hex 恒在)。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ByteSectionHeader(
     title: String,
     view: BytesView,
+    representation: ByteRepresentation,
+    available: List<ByteRepresentation>,
+    onRepresentationChange: (ByteRepresentation) -> Unit,
     onCopyText: (() -> Unit)?,
+    onCopyBase64: (() -> Unit)?,
     onCopyHex: () -> Unit,
-    onCopyAll: (() -> Unit)?,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     Spacer(Modifier.height(12.dp))
@@ -793,6 +915,27 @@ internal fun ByteSectionHeader(
         color = MaterialTheme.colorScheme.primary,
     )
     Spacer(Modifier.height(4.dp))
+    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+        available.forEachIndexed { index, repr ->
+            SegmentedButton(
+                selected = representation == repr,
+                onClick = { onRepresentationChange(repr) },
+                shape = SegmentedButtonDefaults.itemShape(index = index, count = available.size),
+            ) {
+                Text(
+                    stringResource(
+                        when (repr) {
+                            ByteRepresentation.TEXT -> R.string.section_repr_text
+                            ByteRepresentation.BASE64 -> R.string.section_repr_base64
+                            ByteRepresentation.HEX -> R.string.section_repr_hex
+                        }
+                    ),
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+    Spacer(Modifier.height(4.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
             stringResource(R.string.bytes_count, view.totalLength) +
@@ -801,17 +944,26 @@ internal fun ByteSectionHeader(
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f, fill = false),
         )
-        if (onCopyText != null || onCopyAll != null) {
-            TipIconButton(tooltip = stringResource(R.string.section_copy), onClick = { menuOpen = true }) {
-                Icon(
-                    Icons.Filled.ContentCopy,
-                    contentDescription = stringResource(R.string.section_copy),
-                )
-            }
-            DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+        // Hex 恒可复制,复制入口恒展示(菜单内按表示缺失/超护栏隐藏条目)。
+        TipIconButton(tooltip = stringResource(R.string.section_copy), onClick = { menuOpen = true }) {
+            Icon(
+                Icons.Filled.ContentCopy,
+                contentDescription = stringResource(R.string.section_copy),
+            )
+        }
+        DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                 onCopyText?.let { copy ->
                     DropdownMenuItem(
                         text = { Text(stringResource(R.string.section_copy_text)) },
+                        onClick = {
+                            menuOpen = false
+                            copy()
+                        },
+                    )
+                }
+                onCopyBase64?.let { copy ->
+                    DropdownMenuItem(
+                        text = { Text(stringResource(R.string.section_copy_base64)) },
                         onClick = {
                             menuOpen = false
                             copy()
@@ -825,29 +977,21 @@ internal fun ByteSectionHeader(
                         onCopyHex()
                     },
                 )
-                onCopyAll?.let { copy ->
-                    DropdownMenuItem(
-                        text = { Text(stringResource(R.string.section_copy_all)) },
-                        onClick = {
-                            menuOpen = false
-                            copy()
-                        },
-                    )
-                }
-            }
         }
     }
 }
 
 /**
- * 在宿主 LazyColumn 中组合字节区块全部条目(V14 R3/V15 双层渲染):
+ * 在宿主 LazyColumn 中组合字节区块全部条目(V14 R3/V15 双层渲染;V19 T5 三态):
+ * - 内容 = 所选表示(文本/Base64/Hex)单一路径,折叠判定与分档以
+ *   [BytesView.representationChars] 为基准(短 text 恒全量,不回退折叠预览);
  * - 短内容(≤ 4096 字符):头部单条 + 整段单 Text(Tier A 无折叠控件,恒全量);
  * - 长内容(> 4096 字符):默认收起——头部 + 单条预览(前 4096 字符有界文本,
  *   ReadMoreText 组件库渲染「… 展开更多」内联链接);展开后按 [sectionRenderMode]:
  *   Tier A(≤ 128K 字符)= 整段单 [SelectionContainer] 原生选择,系统「全选」一次覆盖
- *   整段;Tier B(> 128K 字符)= text/hex 分块(惰性,仅可视块组合,[ChunkedText]
+ *   整段;Tier B(> 128K 字符)= 所选表示分块(惰性,仅可视块组合,[ChunkedText]
  *   O(1) 取块,零物化)+ 尾部「收起」按钮。
- * 复制:footer 复制菜单(V16 R3)= 文本 / Hex / 文本+Hex 三选(超 4M 或文本缺失项
+ * 复制:footer 复制菜单(V16 R3;V19 T5 三项 = 文本/Base64/Hex,超 4M 或表示缺失项
  * 隐藏);Tier A 整段原生选择;Tier B 分块原生选择(V14 R2 替代 V13 长按整段复制)。
  */
 internal fun LazyListScope.byteSectionItems(
@@ -857,46 +1001,46 @@ internal fun LazyListScope.byteSectionItems(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
     copyFull: (titleRes: Int, fullText: String) -> Unit,
+    representation: ByteRepresentation,
+    onRepresentationChange: (ByteRepresentation) -> Unit,
 ) {
     item(key = "section-$sectionKey-header") {
-        val allText = buildString {
-            view.text?.let { append(it).append('\n') }
-            append(view.hex)
-        }
         ByteSectionHeader(
             title = stringResource(titleRes),
             view = view,
-            // V16 R3:菜单项按可用性收敛——文本缺失 / 超复制护栏的项隐藏
+            representation = representation,
+            available = view.availableRepresentations(),
+            onRepresentationChange = onRepresentationChange,
+            // V16 R3:菜单项按可用性收敛——表示缺失 / 超复制护栏的项隐藏
             onCopyText =
                 view.text
                     ?.takeIf { it.length <= COPY_MAX_CHARS }
                     ?.let { text -> { copyFull(titleRes, text) } },
+            onCopyBase64 =
+                view.base64
+                    ?.takeIf { it.length <= COPY_MAX_CHARS }
+                    ?.let { b64 -> { copyFull(titleRes, b64) } },
             onCopyHex = { copyFull(titleRes, view.hex) },
-            onCopyAll =
-                if (allText.length <= COPY_MAX_CHARS) {
-                    { copyFull(titleRes, allText) }
-                } else {
-                    null
-                },
         )
     }
-    val exceeds = view.hex.length > ChunkedText.DEFAULT_CHUNK_CHARS
+    val reprChars = view.representationChars(representation)
+    val exceeds = reprChars > ChunkedText.DEFAULT_CHUNK_CHARS
     if (!exceeds) {
         // 短内容:整段单 Text 恒全量展示(Tier A),无折叠控件。
-        item(key = "section-$sectionKey-content") { SelectableSectionContent(view) }
+        item(key = "section-$sectionKey-content") { SelectableSectionContent(view, representation) }
         return
     }
     if (!expanded) {
         item(key = "section-$sectionKey-preview") {
-            SectionPreview(titleRes = titleRes, view = view, onExpand = { onExpandedChange(true) })
+            SectionPreview(view = view, representation = representation, onExpand = { onExpandedChange(true) })
         }
     } else {
-        if (sectionRenderMode(view.hex.length) == SectionRenderMode.SINGLE_SELECTABLE) {
+        if (sectionRenderMode(reprChars) == SectionRenderMode.SINGLE_SELECTABLE) {
             // Tier A:整段单 SelectionContainer,一次手势选中全部。
-            item(key = "section-$sectionKey-content") { SelectableSectionContent(view) }
+            item(key = "section-$sectionKey-content") { SelectableSectionContent(view, representation) }
         } else {
             // Tier B:分块虚拟化(跨 item 连续选择为平台限制,复制按钮承载全选语义)。
-            byteSectionChunks(sectionKey, view)
+            byteSectionChunks(sectionKey, view, representation)
         }
         item(key = "section-$sectionKey-collapse") {
             TextButton(onClick = { onExpandedChange(false) }) {
@@ -907,62 +1051,58 @@ internal fun LazyListScope.byteSectionItems(
 }
 
 /**
- * 整段可选中内容(Tier A,V15):单一 [SelectionContainer] 包裹 text + hex 单 Text,
- * 系统长按手柄 / 「全选」一次覆盖整段(满足「同一段文本可选中全部」);
+ * 整段可选中内容(Tier A,V15;V19 T5 单表示):单一 [SelectionContainer] 包裹所选
+ * 表示单 Text,系统长按手柄 / 「全选」一次覆盖整段(满足「同一段文本可选中全部」);
  * 字符数由 [sectionRenderMode] 保证有界(≤ [SELECTABLE_CAP_CHARS]),
  * 单 Text 布局一次性成本可控,不引入分块碎片化选择。
  */
 @Composable
-private fun SelectableSectionContent(view: BytesView) {
+private fun SelectableSectionContent(view: BytesView, representation: ByteRepresentation) {
+    val content = view.representationText(representation) ?: return
+    val mono = representation != ByteRepresentation.TEXT
     SelectionContainer {
-        Column {
-            view.text?.let {
-                Text(
-                    text = it,
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(vertical = 2.dp),
-                )
-            }
-            Text(
-                text = view.hex,
-                style =
+        Text(
+            text = content,
+            style =
+                if (mono) {
                     MaterialTheme.typography.bodySmall.copy(
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    ),
-            )
-        }
+                    )
+                } else {
+                    MaterialTheme.typography.bodyMedium
+                },
+            modifier = Modifier.padding(vertical = 2.dp),
+        )
     }
 }
 
 /**
- * 字节区块 Tier B 展开态分块(text 优先,hex 随后):每块包 [SelectionContainer] 提供
- * 原生选择(跨 LazyColumn item 连续选择为平台限制,Tier A 整段选择承载全量框选)。
+ * 字节区块 Tier B 展开态分块(V19 T5 单表示):所选表示按 [ChunkedText] 分块,
+ * 每块包 [SelectionContainer] 提供原生选择(跨 LazyColumn item 连续选择为
+ * 平台限制,Tier A 整段选择承载全量框选);块 key 含表示名,切换表示即换键重组。
  */
 private fun LazyListScope.byteSectionChunks(
     sectionKey: String,
     view: BytesView,
+    representation: ByteRepresentation,
 ) {
-    view.text?.let { text ->
-        val textChunks = ChunkedText(text)
-        items(textChunks.size, key = { i -> "section-$sectionKey-text-chunk-$i" }) { i ->
-            SelectionContainer {
-                Text(
-                    text = textChunks[i],
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.animateItem(),
-                )
-            }
-        }
-    }
-    val hexChunks = ChunkedText(view.hex)
-    items(hexChunks.size, key = { i -> "section-$sectionKey-hex-chunk-$i" }) { i ->
+    val content = view.representationText(representation) ?: return
+    val chunks = ChunkedText(content)
+    val mono = representation != ByteRepresentation.TEXT
+    items(chunks.size, key = { i -> "section-$sectionKey-${representation.name.lowercase()}-chunk-$i" }) { i ->
         SelectionContainer {
             Text(
-                text = hexChunks[i],
-                style = MaterialTheme.typography.bodySmall,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                text = chunks[i],
+                style =
+                    if (mono) {
+                        MaterialTheme.typography.bodySmall.copy(
+                            fontFamily = FontFamily.Monospace,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        MaterialTheme.typography.bodyMedium
+                    },
                 modifier = Modifier.animateItem(),
             )
         }
@@ -970,30 +1110,26 @@ private fun LazyListScope.byteSectionChunks(
 }
 
 /**
- * 长区块收起态预览(V14 R3):仅喂前 [ChunkedText.DEFAULT_CHUNK_CHARS] 字符
- * 有界文本(text 优先,无 text 用 hex),ReadMoreText(collapsedMaxLines=4)
+ * 长区块收起态预览(V14 R3;V19 T5 单表示):仅喂所选表示前
+ * [ChunkedText.DEFAULT_CHUNK_CHARS] 字符有界文本,ReadMoreText(collapsedMaxLines=4)
  * 渲染「… [record_see_more]」内联链接,点按即展开——预览零大布局、零性能回退。
  * 预览不包 SelectionContainer(原生选择仅在展开态分块上,避免手势冲突)。
  */
 @Composable
 private fun SectionPreview(
-    titleRes: Int,
     view: BytesView,
+    representation: ByteRepresentation,
     onExpand: () -> Unit,
 ) {
     val limit = ChunkedText.DEFAULT_CHUNK_CHARS
-    val hasText = view.text != null
-    val preview: String =
-        if (hasText) {
-            view.text!!.take(limit)
-        } else {
-            view.hex.take(limit)
-        }
+    val content = view.representationText(representation) ?: return
+    val mono = representation != ByteRepresentation.TEXT
+    val preview = content.take(limit)
     val style =
-        if (hasText) {
-            MaterialTheme.typography.bodyMedium
-        } else {
+        if (mono) {
             MaterialTheme.typography.bodySmall.copy(fontFamily = FontFamily.Monospace, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            MaterialTheme.typography.bodyMedium
         }
     ReadMoreText(
         text = preview,

@@ -12,7 +12,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -55,6 +56,7 @@ import java.util.Locale
  *   数据库形态数据段 = SQL 预览,行数元数据并入操作行尾部(rows/affected);
  *   尾部时间(秒级精度,labelSmall onSurfaceVariant,尊重系统 12/24h 时制);
  * - 单击进详情;长按复制记录摘要([copySummary]),回调由宿主接线。
+ * V20:移除 showPackage(单应用语境化,列表页不再需要行内包名)。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -93,7 +95,7 @@ fun RecordRow(
             // 主体:每参数独立成行(V13:无徽章,内容顶对齐、高度自适应)。
             Column(Modifier.weight(1f)) {
                 when (record) {
-                    is CryptoRow -> CryptoRowContent(record)
+                    is CryptoRow -> CryptoRowContent(record, rowOnClick = onClick)
                     is SqlRow -> SqlRowContent(record)
                 }
             }
@@ -110,7 +112,7 @@ fun RecordRow(
 
 /** 算法形态行内容(headline / 类别·操作 / 方向 / 最有价值数据段)。 */
 @Composable
-private fun CryptoRowContent(record: CryptoRow) {
+private fun CryptoRowContent(record: CryptoRow, rowOnClick: () -> Unit) {
     val r = record.record
     Text(
         text = r.displayAlgorithm(),
@@ -137,6 +139,7 @@ private fun CryptoRowContent(record: CryptoRow) {
         DirectionChip(
             text = directionLabel(direction),
             kind = r.kind,
+            onClick = rowOnClick,
         )
     }
     val dataSnippet = r.valuableDataSnippet()
@@ -214,22 +217,30 @@ private fun SqlRow.sqlRowMetaSuffix(): String {
     }
 }
 
-/** 方向胶囊:类别色淡底 + 类别色小字(方向是加密流关键信息)。 */
+/**
+ * 方向胶囊(V19 T6 矩阵 M8:M3 [AssistChip] 承载,类别色淡底 + 类别色小字;
+ * 方向是加密流关键信息,点击 = 行点击(进详情,与原行内区域行为一致)):
+ * AssistChip 由 M3 原生组件提供,不再手搓 Surface+Text。
+ */
 @Composable
-private fun DirectionChip(text: String, kind: CryptoKind) {
+private fun DirectionChip(text: String, kind: CryptoKind, onClick: () -> Unit) {
     val color = kindColor(kind)
-    Surface(
-        shape = RoundedCornerShape(KIND_BADGE_CORNER),
-        color = color.copy(alpha = KIND_BADGE_ALPHA),
-    ) {
-        Text(
-            text = text,
-            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall,
-            color = color,
-            maxLines = 1,
-        )
-    }
+    AssistChip(
+        onClick = onClick,
+        label = {
+            Text(
+                text = text,
+                style = MaterialTheme.typography.labelSmall,
+                color = color,
+                maxLines = 1,
+            )
+        },
+        colors =
+            AssistChipDefaults.assistChipColors(
+                containerColor = color.copy(alpha = KIND_BADGE_ALPHA),
+                labelColor = color,
+            ),
+    )
 }
 
 /**
@@ -283,9 +294,6 @@ fun CryptoRecord.copySummary(context: Context): String {
 
 /** 方向胶囊淡底透明度(类别色 alpha,淡色底 + 类别色小字)。 */
 private const val KIND_BADGE_ALPHA = 0.15f
-
-/** 方向胶囊圆角(与 LIDE LevelBadge 同款 6dp,勿用 shapes.small=8dp)。 */
-private val KIND_BADGE_CORNER = 6.dp
 
 /**
  * 最有价值数据段(单段展示不堆叠,优先级 密钥 > 别名 > 输出 > 输入):

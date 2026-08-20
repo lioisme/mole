@@ -452,6 +452,7 @@ class CryptoRecordDaoTest {
             ModevDatabase.MIGRATION_3_4,
             ModevDatabase.MIGRATION_4_5,
             ModevDatabase.MIGRATION_5_6,
+            ModevDatabase.MIGRATION_6_7,
         ).build()
         val migratedDao = migrated.cryptoRecordDao()
 
@@ -524,6 +525,7 @@ class CryptoRecordDaoTest {
             ModevDatabase.MIGRATION_3_4,
             ModevDatabase.MIGRATION_4_5,
             ModevDatabase.MIGRATION_5_6,
+            ModevDatabase.MIGRATION_6_7,
         ).build()
         val migratedDao = migrated.cryptoRecordDao()
 
@@ -654,6 +656,7 @@ class CryptoRecordDaoTest {
             ).addMigrations(
                 ModevDatabase.MIGRATION_4_5,
                 ModevDatabase.MIGRATION_5_6,
+                ModevDatabase.MIGRATION_6_7,
             ).build()
             val migratedDao = migrated.cryptoRecordDao()
 
@@ -669,6 +672,64 @@ class CryptoRecordDaoTest {
             sqlite.query("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'crypto_records'")
                 .use { c -> while (c.moveToNext()) names.add(c.getString(0)) }
             assertTrue(names.contains("index_crypto_records_timestamp"))
+
+            migrated.close()
+            dbFile.delete()
+        }
+    }
+
+    @Test
+    fun `migration from v6 to v7 keeps data and adds base64 columns`() {
+        runBlocking {
+            val dbFile = RuntimeEnvironment.getApplication().getDatabasePath("mig-v6.db")
+            dbFile.delete()
+            val oldHelper = createV6Helper(dbFile)
+            oldHelper.writableDatabase.execSQL(
+                """
+                INSERT INTO crypto_records
+                    (recordType, packageName, kind, operation, algorithm, threadName, timestamp,
+                     keyTruncated, ivTruncated, keyExportable, inputTruncated, outputTruncated,
+                     saltTruncated, aadTruncated, publicKeyTruncated, contextId, processName,
+                     keyHex, inputHex, outputHex)
+                VALUES ('crypto', 'pkg.v6', 'cipher', 'encrypt', 'AES', 'main', 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 'pkg.v6',
+                        'aabb', 'deadbeef', '00ff')
+                """.trimIndent()
+            )
+            oldHelper.close()
+
+            val migrated = Room.databaseBuilder(
+                RuntimeEnvironment.getApplication(),
+                ModevDatabase::class.java,
+                "mig-v6.db",
+            ).addMigrations(
+                ModevDatabase.MIGRATION_6_7,
+            ).build()
+            val migratedDao = migrated.cryptoRecordDao()
+
+            // v6 存量数据完整保留,hex 不变,新 b64 列为 NULL(旧记录降级双态)
+            val row = migratedDao.observeById(1).first()
+            assertNotNull(row)
+            assertEquals("pkg.v6", row!!.packageName)
+            assertEquals("aabb", row.keyHex)
+            assertNull(row.keyB64)
+            assertNull(row.inputB64)
+            assertNull(row.outputB64)
+            assertNull(row.ivB64)
+            assertNull(row.saltB64)
+            assertNull(row.aadB64)
+            assertNull(row.publicKeyB64)
+
+            // 新列可写可读(三态落库)
+            val withB64 = entity("pkg.v7", "cipher", "encrypt", "AES", 2).copy(
+                keyHex = "aabb",
+                keyB64 = "qrs=",
+                inputHex = "deadbeef",
+                inputB64 = "3q2+7w==",
+            )
+            val newId = migratedDao.insertReturningId(withB64)
+            val back = migratedDao.observeById(newId).first()
+            assertEquals("qrs=", back!!.keyB64)
+            assertEquals("3q2+7w==", back.inputB64)
 
             migrated.close()
             dbFile.delete()
@@ -716,6 +777,72 @@ class CryptoRecordDaoTest {
                             db.execSQL(
                                 "ALTER TABLE crypto_records ADD COLUMN recordType TEXT NOT NULL DEFAULT 'crypto'"
                             )
+                        }
+
+                        override fun onUpgrade(
+                            db: androidx.sqlite.db.SupportSQLiteDatabase,
+                            oldVersion: Int,
+                            newVersion: Int,
+                        ) {
+                        }
+                    }
+                ).build()
+        )
+    }
+
+    private fun createV6Helper(dbFile: java.io.File): androidx.sqlite.db.SupportSQLiteOpenHelper {
+        // 严格复刻 v6 表结构(v5 全列 + 8 个数据库监听列),供 v6→v7 迁移测试
+        val factory = androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory()
+        return factory.create(
+            androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(
+                RuntimeEnvironment.getApplication()
+            ).name(dbFile.path)
+                .callback(
+                    object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(6) {
+                        override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                            db.execSQL(V1_TABLE_DDL)
+                            db.execSQL(
+                                "CREATE INDEX index_crypto_records_packageName_timestamp " +
+                                    "ON crypto_records (packageName, timestamp)"
+                            )
+                            db.execSQL(
+                                "CREATE INDEX index_crypto_records_packageName_kind " +
+                                    "ON crypto_records (packageName, kind)"
+                            )
+                            val v2Columns = listOf(
+                                "saltHex TEXT", "saltText TEXT", "saltLength INTEGER",
+                                "saltTruncated INTEGER NOT NULL DEFAULT 0",
+                                "aadHex TEXT", "aadText TEXT", "aadLength INTEGER",
+                                "aadTruncated INTEGER NOT NULL DEFAULT 0",
+                                "publicKeyHex TEXT", "publicKeyText TEXT", "publicKeyLength INTEGER",
+                                "publicKeyTruncated INTEGER NOT NULL DEFAULT 0",
+                                "paramsJson TEXT", "verifyResult INTEGER", "processName TEXT",
+                            )
+                            for (column in v2Columns) {
+                                db.execSQL("ALTER TABLE crypto_records ADD COLUMN $column")
+                            }
+                            db.execSQL(
+                                "ALTER TABLE crypto_records ADD COLUMN seq INTEGER"
+                            )
+                            db.execSQL(
+                                "CREATE UNIQUE INDEX index_crypto_records_packageName_processName_seq " +
+                                    "ON crypto_records (packageName, processName, seq)"
+                            )
+                            db.execSQL(
+                                "ALTER TABLE crypto_records ADD COLUMN recordType TEXT NOT NULL DEFAULT 'crypto'"
+                            )
+                            db.execSQL(
+                                "CREATE INDEX index_crypto_records_timestamp " +
+                                    "ON crypto_records (timestamp)"
+                            )
+                            val v6Columns = listOf(
+                                "sql TEXT", "dbPath TEXT", "bindArgsJson TEXT", "rowsJson TEXT",
+                                "rowCount INTEGER", "affectedCount INTEGER", "rowId INTEGER",
+                                "resultText TEXT",
+                            )
+                            for (column in v6Columns) {
+                                db.execSQL("ALTER TABLE crypto_records ADD COLUMN $column")
+                            }
                         }
 
                         override fun onUpgrade(

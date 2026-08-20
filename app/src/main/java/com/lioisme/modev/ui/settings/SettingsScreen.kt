@@ -27,17 +27,19 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Inventory
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PushPin
-import androidx.compose.material.icons.filled.Storage
+import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
@@ -84,14 +86,13 @@ import kotlinx.coroutines.launch
 private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
 
 /**
- * 设置页(V10 设置分级,通用设置收敛本页):
+ * 设置页(V10 设置分级,通用设置收敛本页;V19 T4 功能收敛):
  * 卡片式分区(SettingsSection = surfaceContainerLow 卡),仅通用设置 + 入口:
  * - 显示:外观模式 sheet + 主题色 sheet(跟随壁纸 / 20 色预设网格);
  * - 语言与地区:语言 sheet(LocaleManager 热切换,零重建);
- * - 功能:能力注册表驱动(CapabilityRegistry 单一事实源),当前为「算法监听」
- *   (全局算法监听,自注册的 AlgorithmListenCapability),新增能力自动出现入口;
- * - 数据与服务:数据管理(记录总量 / 清空全部)、服务与诊断(框架/端口/统计)
- *   ——两者为二级设置页入口(V10 分级,配置/数据/诊断类均不直占主设置页);
+ * - 功能:监听设置(算法/数据库合并单一入口,副标题 = 启用态组合文案)、
+ *   数据管理(记录总量 / 清空全部)、服务与诊断(框架/端口/统计)
+ *   ——三者为二级页入口(V10 分级,配置/数据/诊断类均不直占主设置页);
  * - 关于:版本 + 关于 Dialog。
  * 本页经应用列表筛选菜单「设置」项进入(唯一入口),返回箭头常显。
  */
@@ -99,8 +100,8 @@ private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
 @Composable
 fun SettingsScreen(
     viewModel: SettingsViewModel,
-    capabilityUi: CapabilityUiRegistry,
     onBack: () -> Unit = {},
+    onOpenMonitorSettings: () -> Unit = {},
     onOpenDataSettings: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
 ) {
@@ -192,25 +193,28 @@ fun SettingsScreen(
                 )
             }
 
-            // V10 能力注册表驱动:M19 起呈现经 CapabilityUiRegistry(图标/标题/导航),
-            // 本行仅投影领域能力 + 启用态——新增能力不改本文件。
+            // V19 T4:功能收敛三入口——监听设置(单一入口,副标题 = 算法/数据库
+            // 启用态组合文案)/ 数据管理 / 服务与诊断(能力注册表 UI 呈现已退场)。
             Spacer(Modifier.height(24.dp))
             SettingsSection(stringResource(R.string.settings_features_section)) {
-                viewModel.capabilities.forEach { capability ->
-                    val entry = capabilityUi.entryFor(capability.kind) ?: return@forEach
-                    val enabled by capability.enabled.collectAsStateWithLifecycle()
-                    SettingsItem(
-                        icon = entry.icon,
-                        title = stringResource(entry.titleRes),
-                        subtitle = stringResource(
-                            if (enabled) R.string.settings_capability_enabled else R.string.settings_capability_disabled
+                val switch by viewModel.switchState.collectAsStateWithLifecycle()
+                SettingsItem(
+                    icon = Icons.Default.Sensors,
+                    title = stringResource(R.string.monitor_settings_title),
+                    subtitle = stringResource(
+                        R.string.settings_monitor_summary,
+                        stringResource(
+                            if (switch.cryptoListen) R.string.settings_capability_enabled else R.string.settings_capability_disabled
                         ),
-                        onClick = entry.onClick,
-                    )
-                }
+                        stringResource(
+                            if (switch.dbListen) R.string.settings_capability_enabled else R.string.settings_capability_disabled
+                        ),
+                    ),
+                    onClick = onOpenMonitorSettings,
+                )
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
                 SettingsItem(
-                    icon = Icons.Default.Storage,
+                    icon = Icons.Default.Inventory,
                     title = stringResource(R.string.data_settings_title),
                     onClick = onOpenDataSettings,
                 )
@@ -305,8 +309,6 @@ fun SettingsScreen(
     }
 }
 
-/** 能力图标呈现已收敛至 CapabilityUiRegistry(M19)。 */
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun LanguageSheet(
@@ -335,35 +337,38 @@ private fun LanguageSheet(
             localeData.forEach { (tag, icon, labelRes) ->
                 val label = stringResource(labelRes)
                 val selected = tag == currentTag
-                Row(
+                // V19 T6 矩阵 M10:单选行收敛为 M3 ListItem + selectable(RadioButton 角色);
+                // 外留 8dp 使有效留白保持 24dp,与 sheet 标题/网格对齐。
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            icon,
+                            null,
+                            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    },
+                    trailingContent = {
+                        if (selected) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    },
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            // 单选行语义(选中态 + RadioButton 角色):TalkBack 读「已选中」。
+                            .padding(horizontal = 8.dp)
                             .selectable(
                                 selected = selected,
                                 role = Role.RadioButton,
                                 onClick = { onSelect(tag) },
-                            )
-                            .padding(horizontal = 24.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(
-                        icon,
-                        null,
-                        tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp),
-                    )
-                    Spacer(Modifier.width(16.dp))
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (selected) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                }
+                            ),
+                )
             }
         }
     }
@@ -399,29 +404,32 @@ private fun AppearanceSheet(
                         AppearanceMode.DARK -> stringResource(R.string.dark_mode)
                     }
                 val selected = mode == current
-                Row(
+                // V19 T6 矩阵 M10:单选行收敛为 M3 ListItem + selectable(RadioButton 角色)。
+                ListItem(
+                    headlineContent = {
+                        Text(
+                            label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        )
+                    },
+                    leadingContent = {
+                        Icon(icon, null, tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+                    },
+                    trailingContent = {
+                        if (selected) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    },
                     modifier =
                         Modifier
                             .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
                             .selectable(
                                 selected = selected,
                                 role = Role.RadioButton,
                                 onClick = { onSelect(mode) },
-                            )
-                            .padding(horizontal = 24.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Icon(icon, null, tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-                    Spacer(Modifier.width(16.dp))
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f),
-                    )
-                    if (selected) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                }
+                            ),
+                )
             }
         }
     }
@@ -446,35 +454,37 @@ private fun ColorSheet(
             )
             Spacer(Modifier.height(8.dp))
 
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .selectable(
-                            selected = useWallpaper,
-                            role = Role.RadioButton,
-                            onClick = { onSelectWallpaper() },
-                        )
-                        .padding(horizontal = 24.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(
-                    Icons.Default.Wallpaper,
-                    null,
-                    tint = if (useWallpaper) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(24.dp),
-                )
-                Spacer(Modifier.width(16.dp))
-                Column(modifier = Modifier.weight(1f)) {
+            // V19 T6 矩阵 M10:单选行收敛为 M3 ListItem + selectable(RadioButton 角色)。
+            ListItem(
+                headlineContent = {
                     Text(
                         stringResource(R.string.system_wallpaper),
                         style = MaterialTheme.typography.bodyLarge,
                         fontWeight = if (useWallpaper) FontWeight.SemiBold else FontWeight.Normal,
                         color = if (useWallpaper) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
                     )
-                }
-                if (useWallpaper) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-            }
+                },
+                leadingContent = {
+                    Icon(
+                        Icons.Default.Wallpaper,
+                        null,
+                        tint = if (useWallpaper) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(24.dp),
+                    )
+                },
+                trailingContent = {
+                    if (useWallpaper) Icon(Icons.Default.Check, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                },
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 8.dp)
+                        .selectable(
+                            selected = useWallpaper,
+                            role = Role.RadioButton,
+                            onClick = { onSelectWallpaper() },
+                        ),
+            )
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 24.dp), color = MaterialTheme.colorScheme.outlineVariant)
 

@@ -37,12 +37,13 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 秒级时间线分组验收(V17 R3):
- * 种子数据 = 同秒 3 行 + 跨秒 1 行 + 跨日 1 行,进入被测应用记录页断言:
+ * 秒级时间线分组验收(V17 R3;V20 单应用语境化,算法/数据库列表分路径):
+ * 种子数据 = 同秒 3 行 + 跨秒 1 行 + 跨日 1 行 + DB 行 1 条,断言:
  * - 首项(r4)恒有组头 = 日期 + 秒级时间;
  * - 跨秒新头 = 同日仅秒级时间;
  * - 同秒 3 行仅 1 个头(单头不重复);
- * - 跨日头带日期前缀。
+ * - 跨日头带日期前缀;
+ * - DB 行渲染(库名 + SQL 预览 + 详情 SQL 节)。
  * 前置:被测应用自身是 Xposed 模块(默认隐藏),@Before 开启「显示 Xposed 模块」
  * 使行可见,@After 复位(与单元测试同源,避免污染其他用例)。
  * 期望文案经 TimelineGroup 纯函数以设备 locale / 12-24h 时制复算,与生产同源。
@@ -109,6 +110,48 @@ class TimelineListTest {
         AppListSettings.setShowModules(false, ctx)
     }
 
+    /**
+     * V18:等待被测包行出现(目录异步加载 + 模块显隐传播,滚动惰性列表查找,
+     * 找不到超时即失败——种子数据恒在,仅目录加载有延迟),点击进入应用监听
+     * 入口页。V20:入口页两记录入口直通单应用列表,不再有「查看记录」。
+     */
+    private fun openMonitorEntry() {
+        val deadline = System.currentTimeMillis() + 10_000
+        var rowFound = false
+        while (System.currentTimeMillis() < deadline) {
+            rule.waitForIdle()
+            val scrollables = rule.onAllNodes(hasScrollAction()).fetchSemanticsNodes()
+            if (scrollables.isNotEmpty()) {
+                try {
+                    rule.onAllNodes(hasScrollAction()).onFirst()
+                        .performScrollToNode(hasText(packageName))
+                    rowFound = true
+                    break
+                } catch (_: AssertionError) {
+                    // 目标行未加载/被模块显隐过滤,下一轮重试。
+                }
+            }
+            Thread.sleep(100)
+        }
+        assertTrue("等待「显示 Xposed 模块」生效后被测包行应出现", rowFound)
+        rule.onNodeWithText(packageName).performClick()
+        rule.waitForIdle()
+    }
+
+    /** 进入单应用算法记录列表(入口页 → 算法记录)。 */
+    private fun openAlgorithmList() {
+        openMonitorEntry()
+        rule.onNodeWithText(ctx.getString(R.string.algorithm_records_title)).performClick()
+        rule.waitForIdle()
+    }
+
+    /** 进入单应用数据库记录列表(入口页 → 数据库记录)。 */
+    private fun openDatabaseList() {
+        openMonitorEntry()
+        rule.onNodeWithText(ctx.getString(R.string.database_records_title)).performClick()
+        rule.waitForIdle()
+    }
+
     private fun record(ts: Long, kind: String, algorithm: String, operation: String) =
         CryptoRecordEntity(
             packageName = packageName,
@@ -139,28 +182,7 @@ class TimelineListTest {
     @Test
     fun timelineGroups_sameSecondSingleHeader_crossSecondAndCrossDayHeaders() {
         rule.waitForIdle()
-        // 目录异步加载 + 模块显隐传播,轮询等待被测包行出现(滚动惰性列表查找),
-        // 找不到超时即失败(种子数据恒在,仅目录加载有延迟)。
-        val deadline = System.currentTimeMillis() + 10_000
-        var rowFound = false
-        while (System.currentTimeMillis() < deadline) {
-            rule.waitForIdle()
-            val scrollables = rule.onAllNodes(hasScrollAction()).fetchSemanticsNodes()
-            if (scrollables.isNotEmpty()) {
-                try {
-                    rule.onAllNodes(hasScrollAction()).onFirst()
-                        .performScrollToNode(hasText(packageName))
-                    rowFound = true
-                    break
-                } catch (_: AssertionError) {
-                    // 目标行未加载/被模块显隐过滤,下一轮重试。
-                }
-            }
-            Thread.sleep(100)
-        }
-        assertTrue("等待「显示 Xposed 模块」生效后被测包行应出现", rowFound)
-        rule.onNodeWithText(packageName).performClick()
-        rule.waitForIdle()
+        openAlgorithmList()
 
         val locale: Locale =
             LocaleManager.wrap(ctx).resources.configuration.locales[0] ?: Locale.getDefault()
@@ -188,104 +210,42 @@ class TimelineListTest {
     @Test
     fun timelineGroups_dbRowRendersWithDbNameAndSqlPreview() {
         rule.waitForIdle()
-        // 同上:等待被测包行出现并进入记录页。
-        val deadline = System.currentTimeMillis() + 10_000
-        var rowFound = false
-        while (System.currentTimeMillis() < deadline) {
-            rule.waitForIdle()
-            val scrollables = rule.onAllNodes(hasScrollAction()).fetchSemanticsNodes()
-            if (scrollables.isNotEmpty()) {
-                try {
-                    rule.onAllNodes(hasScrollAction()).onFirst()
-                        .performScrollToNode(hasText(packageName))
-                    rowFound = true
-                    break
-                } catch (_: AssertionError) {
-                }
-            }
-            Thread.sleep(100)
-        }
-        assertTrue("等待「显示 Xposed 模块」生效后被测包行应出现", rowFound)
-        rule.onNodeWithText(packageName).performClick()
-        rule.waitForIdle()
+        openDatabaseList()
 
-        // DB 行:数据库名(元信息行)与 SQL 预览(摘要行)均可见。
+        // DB 行:数据库名(元信息行)与 SQL 预览(摘要行)均可见;算法行不出现。
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText("t14.db", substring = true))
         rule.onNodeWithText("t14.db", substring = true).assertIsDisplayed()
         rule.onNodeWithText("INSERT INTO t (name) VALUES (?)", substring = true).assertIsDisplayed()
+        rule.onAllNodes(hasText("SHA-256")).assertCountEquals(0)
     }
 
     @Test
-    fun timelineGroups_dbTypeFilterShowsOnlyDbRows() {
+    fun timelineGroups_dbKindFilterShowsOnlyDbKinds() {
         rule.waitForIdle()
-        // 同上:等待被测包行出现并进入记录页。
-        val deadline = System.currentTimeMillis() + 10_000
-        var rowFound = false
-        while (System.currentTimeMillis() < deadline) {
-            rule.waitForIdle()
-            val scrollables = rule.onAllNodes(hasScrollAction()).fetchSemanticsNodes()
-            if (scrollables.isNotEmpty()) {
-                try {
-                    rule.onAllNodes(hasScrollAction()).onFirst()
-                        .performScrollToNode(hasText(packageName))
-                    rowFound = true
-                    break
-                } catch (_: AssertionError) {
-                }
-            }
-            Thread.sleep(100)
-        }
-        assertTrue("等待「显示 Xposed 模块」生效后被测包行应出现", rowFound)
-        rule.onNodeWithText(packageName).performClick()
-        rule.waitForIdle()
+        openDatabaseList()
+        rule.onNodeWithText("t14.db", substring = true).assertIsDisplayed()
 
-        // 打开筛选菜单(折叠条内 FilterList 按钮,content-desc 固定)
+        // 类别筛选(行为级):点击「数据库打开」→ DML 行隐(只读 Radio 语义不可断言;
+        // DropdownMenuItem 与分组标题同串,用 hasClickAction 限定菜单项)。
         rule.onAllNodesWithContentDescription(ctx.getString(R.string.cd_filter)).onFirst().performClick()
         rule.waitForIdle()
-        // 记录类型 → 数据库(行为级:点击项 → 行现/行隐;只读 Radio 语义不可断言;
-        // DropdownMenuItem 与分组标题同串,用 hasClickAction 限定菜单项)
-        rule.onNode(hasText(ctx.getString(R.string.record_types_db)) and hasClickAction()).performClick()
+        rule.onNode(hasText(ctx.getString(R.string.kind_db_open)) and hasClickAction()).performClick()
         rule.waitForIdle()
+        rule.onAllNodes(hasText("t14.db", substring = true)).assertCountEquals(0)
 
-        // 仅剩 DB 行:库名与 SQL 预览可见,算法行(SHA-256 摘要行)消失。
-        rule.onNodeWithText("t14.db", substring = true).assertIsDisplayed()
-        rule.onNodeWithText("INSERT INTO t (name) VALUES (?)", substring = true).assertIsDisplayed()
-        rule.onAllNodes(hasText("SHA-256")).assertCountEquals(0)
-
-        // 复位全部:算法行回归。
+        // 复位全部类别:DML 行回归。
         rule.onAllNodesWithContentDescription(ctx.getString(R.string.cd_filter)).onFirst().performClick()
         rule.waitForIdle()
         rule.onNode(hasText(ctx.getString(R.string.record_types_all)) and hasClickAction()).performClick()
         rule.waitForIdle()
-        rule.onAllNodes(hasScrollAction()).onFirst()
-            .performScrollToNode(hasText("SHA-256"))
-        rule.onNodeWithText("SHA-256", substring = true).assertIsDisplayed()
+        rule.onNodeWithText("t14.db", substring = true).assertIsDisplayed()
     }
 
     @Test
     fun timelineGroups_dbRowDetailShowsSqlSection() {
         rule.waitForIdle()
-        // 同上:等待被测包行出现并进入记录页。
-        val deadline = System.currentTimeMillis() + 10_000
-        var rowFound = false
-        while (System.currentTimeMillis() < deadline) {
-            rule.waitForIdle()
-            val scrollables = rule.onAllNodes(hasScrollAction()).fetchSemanticsNodes()
-            if (scrollables.isNotEmpty()) {
-                try {
-                    rule.onAllNodes(hasScrollAction()).onFirst()
-                        .performScrollToNode(hasText(packageName))
-                    rowFound = true
-                    break
-                } catch (_: AssertionError) {
-                }
-            }
-            Thread.sleep(100)
-        }
-        assertTrue("等待「显示 Xposed 模块」生效后被测包行应出现", rowFound)
-        rule.onNodeWithText(packageName).performClick()
-        rule.waitForIdle()
+        openDatabaseList()
 
         // 点击 DB 行进入详情页。
         rule.onAllNodes(hasScrollAction()).onFirst()

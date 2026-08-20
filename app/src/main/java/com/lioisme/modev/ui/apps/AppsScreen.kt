@@ -28,6 +28,7 @@ import androidx.compose.material3.ExpandedFullScreenSearchBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
@@ -72,21 +73,19 @@ import com.lioisme.modev.ui.theme.StatusKind
 internal sealed interface AppsNavTarget {
     /// 应用详情页。
     data class App(val packageName: String) : AppsNavTarget
-    /// 全局设置页。
-    data object Settings : AppsNavTarget
 }
 
 /**
- * 应用列表页(2026-08-16 V3,四界面重构,根页):
+ * 应用列表页(2026-08-16 V3,四界面重构,根页;V18 设置入口归位搜索条左上角):
  * 全量已安装应用,勾选 = LSPosed 作用域(单一事实源)。
  * - 顶栏:CenterAlignedTopAppBar + SearchBar(折叠条,单击展开全屏 SearchView);
  *   AppBar 内仅此一个元素(硬性规范),禁止放置其他按钮;
- * - SearchBar 内仅筛选按钮:「仅已作用域 / 系统应用」DropdownMenu(Checkbox 复选),
- *   菜单底部含「设置」项——全局设置页的唯一规范入口(菜单内容不受按钮数限制);
+ * - SearchBar 内:左上角设置按钮(与右下角筛选按钮对称,V18 自筛选菜单迁出),
+ *   右下角仅筛选按钮:「仅已作用域 / 系统应用」DropdownMenu(Checkbox 复选);
  * - 搜索状态机由共享封装 rememberSearchController 提供(红线全守);
 * - 应用行:ProjectList 行规范(AppIcon 40dp + 名称 bodyLarge Medium + 包名
- *   bodySmall + 记录数 secondaryContainer 徽标,行尾 Checkbox 作用域勾选,
- *   padding h16/v12,行间 outlineVariant 分隔线;V7 起无运行按钮);
+ *  bodySmall + 记录数 secondaryContainer 徽标,行尾 Checkbox 作用域勾选,
+ *  padding h16/v12,行间 outlineVariant 分隔线;V7 起无运行按钮);
  * - 下拉刷新(PullToRefreshBox);空态用 EmptyState。
  * 返回语义:根页空闲返回由导航层抛回系统退出;全屏 SearchView 返回只收状态。
  */
@@ -106,12 +105,11 @@ fun AppsScreen(
     // 单一事实源,排序流水线直接消费,变更即重排,跨页返回不滞留旧序。
 
     // 搜索状态机共享封装(无参 rememberSearchBarState / 独立意图 / 唯一动画驱动 /
-    // 收起后导航 / snapTo 兜底,红线全守)。T = 导航目标(应用详情 / 设置)。
+    // 收起后导航 / snapTo 兜底,红线全守)。T = 导航目标(应用详情)。
     val search = rememberSearchController<AppsNavTarget>(
         onNavigate = { target ->
             when (target) {
                 is AppsNavTarget.App -> onOpen(target.packageName)
-                AppsNavTarget.Settings -> onOpenSettings()
             }
         },
     )
@@ -131,17 +129,8 @@ fun AppsScreen(
         viewModel.setQuery(search.queryText)
     }
 
-    // 设置入口统一先收后导(Q2 交互统一):展开态进入设置前必须走收起动画,
-    // 导航由动画唯一驱动协程在动画完成后执行;若直接 navigate,动画协程随
-    // 组合销毁被打断,currentValue 卡在 Expanded,返回时全屏搜索视图重新弹出
-    // (2026-08-16 实机走查发现的回归,见 SearchBarState.currentValue = progress==0)。
-    val openSettings: () -> Unit = {
-        if (search.searchActive) {
-            search.collapseWithNavigation(AppsNavTarget.Settings)
-        } else {
-            onOpenSettings()
-        }
-    }
+    // 设置入口:折叠态位于搜索条左上角(与筛选按钮对称),直接导航。
+    val openSettings: () -> Unit = { onOpenSettings() }
 
     Scaffold(
         topBar = {
@@ -152,11 +141,23 @@ fun AppsScreen(
                         inputField = {
 CollapsedSearchInput(
                                 query = search.queryText,
-                                // 根页无返回语义,返回按钮隐藏(二级页才有)。
+                                // 根页无返回语义,返回按钮隐藏(二级页才有);
+                                // 左上角 = 设置按钮(V18,与右下角筛选按钮对称)。
                                 onBack = null,
                                 onClear = { search.queryText = "" },
                                 onTapToExpand = { search.searchActive = true },
                                 placeholder = stringResource(R.string.apps_search),
+                                leadingContent = {
+                                    TipIconButton(
+                                        tooltip = stringResource(R.string.cd_settings),
+                                        onClick = openSettings,
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Settings,
+                                            contentDescription = stringResource(R.string.cd_settings),
+                                        )
+                                    }
+                                },
                                 filterSlot = {
                                     ScopeFilterMenu(
                                         expanded = filterMenuOpen,
@@ -167,7 +168,6 @@ CollapsedSearchInput(
                                         onShowSystemChange = { AppListSettings.setShowSystem(it, context) },
                                         showModules = state.showModules,
                                         onShowModulesChange = { AppListSettings.setShowModules(it, context) },
-                                        onOpenSettings = openSettings,
                                     )
                                 },
                             )
@@ -276,7 +276,6 @@ items(state.rows, key = { it.packageName }) { row ->
                             onShowSystemChange = { AppListSettings.setShowSystem(it, context) },
                             showModules = state.showModules,
                             onShowModulesChange = { AppListSettings.setShowModules(it, context) },
-                            onOpenSettings = openSettings,
                         )
                     },
                 )
@@ -323,10 +322,11 @@ items(state.rows, key = { it.packageName }) { row ->
 
 /**
  * 作用域筛选菜单(2026-08-16 V3;2026-08-17 V10 置顶入菜单;2026-08-18 V14 R7
- * 置顶收敛通用设置页;V17 R1 新增「Xposed 模块」显隐):
+ * 置顶收敛通用设置页;V17 R1 新增「Xposed 模块」显隐;V18 移除「设置」项,
+ * 设置入口归位搜索条左上角):
  * SearchBar trailingIcon 槽内,
  * 「仅已作用域」/「系统应用」/「Xposed 模块」Checkbox 复选(状态持久化,
- * AppListSettings 单一事实源)+ 底部「设置」项(全局设置页唯一规范入口)。
+ * AppListSettings 单一事实源)。
  * 有激活条件时筛选按钮 primary 着色(筛选启用指示)。
  */
 @Composable
@@ -339,7 +339,6 @@ private fun ScopeFilterMenu(
     onShowSystemChange: (Boolean) -> Unit,
     showModules: Boolean,
     onShowModulesChange: (Boolean) -> Unit,
-    onOpenSettings: () -> Unit,
 ) {
     // 筛选槽可组合进 Dialog 窗口(展开态 trailingIcon),文本经语言状态驱动解析。
     val res = rememberLocaleAwareResources()
@@ -381,34 +380,20 @@ private fun ScopeFilterMenu(
                     onExpandedChange(false)
                 },
             )
-            HorizontalDivider()
-            DropdownMenuItem(
-                text = { Text(res.getString(R.string.settings_title), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                leadingIcon = {
-                    Icon(
-                        Icons.Default.Settings,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                },
-                onClick = {
-                    onExpandedChange(false)
-                    onOpenSettings()
-                },
-            )
         }
     }
 }
 
 /**
  * 应用行(2026-08-15 UI 重构 Phase 5,对齐 LIDE ProjectList 行规范;2026-08-17 V7;
- * 2026-08-18 V14 R4 状态角标化):
- * AppIcon 40dp + 名称 bodyLarge Medium + 记录数 secondaryContainer 徽标 +
- * 包名 bodySmall + 状态角标(已作用域时:在线=绿色圆点/未运行=灰色圆点,
- * 完整语义进 contentDescription 与长按 tooltip),行尾 Checkbox(作用域勾选,
- * V7 起置于右侧,无运行按钮);
- * padding h16/v12,行间 outlineVariant 分隔线(列表外侧,行内不分隔)。
+ * 2026-08-18 V14 R4 状态角标化;V19 T6 矩阵 M6:M3 [ListItem] 承载):
+ * leading AppIcon 40dp + headline 名称 bodyLarge Medium + 记录数 secondaryContainer
+ * 徽标 + supporting 包名 bodySmall + 状态角标(已作用域时:运行中=绿色圆点/
+ * 未运行=灰色圆点,完整语义进 contentDescription 与长按 tooltip),
+ * trailing Checkbox(作用域勾选,V7 起置于右侧,无运行按钮);
+ * 行间 outlineVariant 分隔线(列表外侧,行内不分隔)。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AppRowItem(
     row: AppsViewModel.AppRow,
@@ -417,19 +402,8 @@ private fun AppRowItem(
     onToggle: () -> Unit,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                // 测试锚点:导航级 UI 测试经 testTag 定位应用行(Google 惯例)。
-                .testTag("app-row")
-                .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        AppIcon(packageName = row.packageName, size = 40.dp)
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
+    ListItem(
+        headlineContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     row.label,
@@ -455,7 +429,8 @@ private fun AppRowItem(
                     }
                 }
             }
-            Spacer(Modifier.height(2.dp))
+        },
+        supportingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     row.packageName,
@@ -483,14 +458,22 @@ private fun AppRowItem(
                     )
                 }
             }
-        }
-        Spacer(Modifier.width(8.dp))
-        Checkbox(
-            checked = row.scoped,
-            onCheckedChange = { onToggle() },
-            enabled = scopeReady && !pending,
-        )
-    }
+        },
+        leadingContent = { AppIcon(packageName = row.packageName, size = 40.dp) },
+        trailingContent = {
+            Checkbox(
+                checked = row.scoped,
+                onCheckedChange = { onToggle() },
+                enabled = scopeReady && !pending,
+            )
+        },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                // 测试锚点:导航级 UI 测试经 testTag 定位应用行(Google 惯例)。
+                .testTag("app-row")
+                .clickable(onClick = onClick),
+    )
 }
 
 @Composable

@@ -63,9 +63,8 @@ class LanguageHotSwitchTest {
             }
         app.registerActivityLifecycleCallbacks(callback)
         try {
-            // 应用列表 → 设置(唯一入口)。
-            rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
-            rule.onNodeWithText(str(R.string.settings_title)).performClick()
+            // 应用列表 → 设置(搜索条左上角设置按钮,V18 唯一入口)。
+            rule.onNodeWithContentDescription(str(R.string.cd_settings)).performClick()
             rule.waitForIdle()
 
             // 语言 → English。

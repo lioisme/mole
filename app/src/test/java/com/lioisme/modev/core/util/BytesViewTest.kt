@@ -23,6 +23,7 @@ class BytesViewTest {
     fun of_plain_ascii() {
         val view = BytesView.of("hello".toByteArray(Charsets.UTF_8))
         assertEquals("68656c6c6f", view!!.hex)
+        assertEquals("aGVsbG8=", view.base64)
         assertEquals("hello", view.text)
         assertEquals(5, view.totalLength)
         assertFalse(view.truncated)
@@ -40,7 +41,43 @@ class BytesViewTest {
     fun of_binary_no_text() {
         val view = BytesView.of(byteArrayOf(0x00, 0x01, 0x02, 0xFF.toByte()))
         assertEquals("000102ff", view!!.hex)
+        assertEquals("AAEC/w==", view.base64)
         assertNull(view.text)
+    }
+
+    @Test
+    fun of_base64_round_trips_original_bytes() {
+        val bytes = byteArrayOf(0x00, 0x01, 0x02, 0x03, 0x7F, 0x80.toByte(), 0xFF.toByte(), 0x41, 0x42)
+        val view = BytesView.of(bytes)
+        assertTrue(java.util.Arrays.equals(bytes, Base64Util.decode(view!!.base64!!)))
+    }
+
+    @Test
+    fun of_b64_truncation_bounds_to_byte_budget() {
+        val bytes = ByteArray(200) { 0x41 } // 200 字节 → base64 268 字符 > 40 上限
+        val view = BytesView.of(bytes, maxHexChars = 64, maxB64Chars = 40)
+        assertEquals("41".repeat(32), view!!.hex)
+        // 40 字符上限 → 30 字节前缀(40/4*3),编码恰好 40 字符(≤ 上限)
+        assertEquals(40, view.base64!!.length)
+        assertEquals("QUFB".repeat(10), view.base64)
+        assertTrue(view.truncated)
+    }
+
+    @Test
+    fun of_b64_no_truncation_when_within_cap() {
+        val view = BytesView.of("abc".toByteArray(), maxB64Chars = 32)
+        assertEquals("YWJj", view!!.base64)
+        assertFalse(view.truncated)
+    }
+
+    @Test
+    fun of_hard_b64_cap_bounds_unlimited_request() {
+        // 硬保险丝:base64 与 hex 同字节预算(×2/3 膨胀率),超限物化被截断
+        val bytes = ByteArray(9 * 1024 * 1024) { 0x41 }
+        val view = BytesView.of(bytes, maxHexChars = Int.MAX_VALUE, maxB64Chars = Int.MAX_VALUE)
+        assertTrue(view!!.truncated)
+        // 上限向下取整到 4 的倍数(完整 base64 字符组)
+        assertEquals((BytesView.HARD_MAX_B64_CHARS / 4) * 4, view.base64!!.length)
     }
 
     @Test

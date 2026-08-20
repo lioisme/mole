@@ -244,7 +244,7 @@ class LogRepository(
                     kind = kindName,
                     query = like,
                     previewChars = ROW_PREVIEW_CHARS,
-                    limit = PAGE_SIZE,
+                    limit = PAGING_WINDOW_CAP,
                     offset = 0,
                 )
             },
@@ -278,7 +278,7 @@ class LogRepository(
                     kindCount = filter.kinds?.size ?: 0,
                     query = query,
                     previewChars = ROW_PREVIEW_CHARS,
-                    limit = PAGE_SIZE,
+                    limit = PAGING_WINDOW_CAP,
                     offset = 0,
                 )
             },
@@ -330,6 +330,9 @@ class LogRepository(
 
     suspend fun clear(packageName: String) = dao.clearPackage(packageName)
 
+    /** 按记录类型清理(V19 T7 数据管理按类型清理)。 */
+    suspend fun clearByType(recordType: String) = dao.clearByType(recordType)
+
     suspend fun clearAll() = dao.clearAll()
 
     /** SQL LIKE 模式转义(% / _ / \)。 */
@@ -352,6 +355,15 @@ class LogRepository(
 
         private const val MAX_RECORDS = 20_000
         private const val PAGE_SIZE = 60
+
+        /**
+         * DAO paging 查询的 LIMIT 窗口上限(Room 2.7.2 LimitOffsetPagingSource
+         * 契约):生成式计数 = COUNT(*) FROM (<原 SQL>),原 SQL 的 LIMIT 绑定值
+         * 会钳制 itemCount → 固定小 limit 时 Refresh 后 nextKey=null,分页死锁
+         * 于第一页(V20 R3 设备测试实锤:120 条种子只显示 60 条)。外层实际
+         * loadSize 由 Room 动态注入,此值仅作窗口上限,取 MAX_RECORDS 即可)。
+         */
+        private const val PAGING_WINDOW_CAP = MAX_RECORDS
 
         /** 单包容量上限(每包治理)。 */
         private const val PER_PACKAGE_MAX = 5_000

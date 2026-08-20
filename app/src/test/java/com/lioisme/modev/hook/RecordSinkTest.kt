@@ -68,37 +68,48 @@ class RecordSinkTest {
         return sink
     }
 
+    /**
+     * 有界轮询等待 seq 检查点落盘为 [expected](异步工作线程写盘,固定 sleep 在
+     * 并行 CI/重负载下会竞态;轮询直至断言成立或超时)。
+     */
+    private fun awaitSeqFile(file: File, expected: Long, timeoutMs: Long = 10_000) {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            runCatching { file.readText().trim().toLong() }
+                .getOrNull()
+                ?.takeIf { it == expected }
+                ?.let { return }
+            Thread.sleep(100)
+        }
+        val actual = runCatching { file.readText().trim().toLong() }.getOrNull()
+        assertEquals("seq 检查点应在 $timeoutMs ms 内持久化为 $expected", expected, actual)
+    }
+
     @Test
     fun `seq persists and resumes after process restart`() {
         val seqFile = File(dir, "seq.dat")
         val s1 = sinkWith(seqFile, emitCount = 300)
-        Thread.sleep(1100) // 等待持久化检查点(条数窗口 100 触发,第 300 条必已持久化)
-        assertTrue("seq checkpoint file should exist", seqFile.exists())
-        val persisted = seqFile.readText().trim().toLong()
-        assertEquals(300L, persisted)
+        awaitSeqFile(seqFile, 300L) // 等待持久化检查点(条数窗口 100 触发,第 300 条必已持久化)
 
         // 模拟进程重启:新实例从持久化值继续(续号,不撞库内旧记录)
         val s2 = sinkWith(seqFile)
         s2.emit(record("resumed"))
-        Thread.sleep(1100)
-        assertEquals(persisted + 1, seqFile.readText().trim().toLong())
+        awaitSeqFile(seqFile, 301L)
     }
 
     @Test
     fun `missing seq file starts at zero`() {
         val seqFile = File(dir, "absent.dat")
-        val s = sinkWith(seqFile, emitCount = 1)
-        Thread.sleep(1100)
-        assertEquals(1L, seqFile.readText().trim().toLong())
+        sinkWith(seqFile, emitCount = 1)
+        awaitSeqFile(seqFile, 1L)
     }
 
     @Test
     fun `corrupt seq file starts at zero`() {
         val seqFile = File(dir, "bad.dat")
         seqFile.writeText("not-a-number")
-        val s = sinkWith(seqFile, emitCount = 1)
-        Thread.sleep(1100)
-        assertEquals(1L, seqFile.readText().trim().toLong())
+        sinkWith(seqFile, emitCount = 1)
+        awaitSeqFile(seqFile, 1L)
     }
 
     @Test
@@ -115,7 +126,12 @@ class RecordSinkTest {
         sink.start()
         // 同步连发远超队列容量(2048)的记录:溢出部分走直落盘路径
         repeat(4000) { sink.emit(record("burst-$it")) }
-        Thread.sleep(2500) // 等工作线程消费完
+        // 有界轮询等工作线程消费完(负载下固定 sleep 会竞态)
+        val deadline = System.currentTimeMillis() + 10_000
+        while (System.currentTimeMillis() < deadline) {
+            if (File(dir, "spool.dat").readLines().size >= 4000) break
+            Thread.sleep(100)
+        }
         val lines = File(dir, "spool.dat").readLines()
         assertTrue("全部 4000 行应已落盘,实际 ${lines.size}", lines.size >= 4000)
         val bad = lines.filter { line ->

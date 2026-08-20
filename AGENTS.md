@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名/密钥/BASE64/WebView)+ 宿主双进程日志。
-构建与质量契约(2026-08-19 审计沉淀,V17)。
+构建与质量契约(2026-08-20 审计沉淀,V20)。
 
 ## 构建 / 测试(Windows,gradlew.bat)
 
@@ -52,11 +52,13 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 2. **数值格式**:记录数/统计用 `AppCountFormat`(locale 驱动;zh ≥1万、其他 ≥1K
    平台紧凑格式 ≤1 位小数,以下千分位)。禁止自造单位(万+/千+/K+ 后缀)。
    资源格式串大数用 `%1$,d`。
-3. **详情页双层渲染**:字节区块按 `sectionRenderMode(hexChars)` 分档——
-   ≤128 KiB 字符 = 整段单 `SelectionContainer`(Tier A);超过 = 分块虚拟化
-   (Tier B,`ChunkedText` O(1) 取块)。`BytesView.of` 有硬保险丝
-   (16M hex / 8M text 字符),截断 hex 恒为纯前缀(截断标记由 UI 资源渲染);
-   复制 >4M 字符、导出 >32M 字符拒绝并提示。
+3. **详情页三态双层渲染**:字节区块 = SegmentedButton 三态(文本/Base64/Hex,
+   `rememberSaveable` 每区块记忆,无文本时隐藏文本段),内容按所选表示渲染;
+   分档按所选表示字符数 `sectionRenderMode(...)`——≤128 KiB 字符 = 整段单
+   `SelectionContainer`(Tier A);超过 = 分块虚拟化(Tier B,`ChunkedText`
+   O(1) 取块,Tier B 三表示均走分块);摘要/列表行保持 hex 首 24 字符不膨胀。
+   `BytesView.of` 有硬保险丝(16M hex / 8M text 字符),截断 hex 恒为纯前缀
+   (截断标记由 UI 资源渲染);复制 >4M 字符、导出 >32M 字符拒绝并提示。
    **ReadMoreText(com.webtoonscorp)预览的语义文本仅含可见片段且「… 展开更多」
    并入同一节点**——插桩断言用短前缀 substring 匹配,勿对全量内容做精确匹配;
    长区块「收起」按钮在内容末尾,断言/点击前须 `performScrollToNode`。
@@ -104,6 +106,37 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
     设置页类别开关即时广播生效;结果上限为「行数 + 字节」双闸门
     (`IntLimitSheet` 底部输入,禁居中 Dialog);`kind` 列跨枚举共用
     (CryptoKind.name / SqlKind.name),筛选菜单记录类型 + 类别双组单选。
+13. **MD3 组件契约 + 设置页功能区**:设置类控件一律 M3 组件
+    (`ListItem`/`AssistChip`/`TextButton`/`DropdownMenuItem`…),
+    `CollapsedSearchInput` 为唯一例外(KDoc 固化,经 D4 单向决策);
+    M3 1.4.0 `ListItem` 内容槽**合并为单一语义节点**(文本节点 = 整行高、
+    节点 Text 列表含全部槽文本)——插桩勿对行内文本独立测距,锚定断言用
+    `onNodeWithText` 精确匹配合并节点即可。设置页功能区三入口:
+    监听设置(`settings/monitor`,合并算法/数据库,旧
+    `settings/algorithm`/`settings/database` 已退役)/ 数据管理
+    (`settings/data`)/ 服务与诊断(`settings/diagnostics`,三分区 +
+    复制诊断信息);全局列表页 `records/algorithm`/`records/database`;
+    危险清理(按类型/全部)一律居中 `AlertDialog` 确认,无回收站;
+    计数/存储值断言必须资源驱动(`getString` 带格式参,zh 渲染 "2 条"
+    非 "2")。
+14. **分页流契约(V20 R3.1 设备测试实锤,两条)**:Room 2.7.2 生成式
+    `LimitOffsetPagingSource` 的计数查询 = `COUNT(*) FROM (<原 SQL>)`,
+    原 SQL 自带固定 `LIMIT :limit OFFSET :offset` 会钳制 itemCount →
+    固定小 limit 时 Refresh 后 nextKey=null、分页死锁于第一页(任何 >60 条
+    列表只显示 60 条)。**DAO 分页查询的 `limit` 参数必须传大窗口上限**
+    (仓库 `PAGING_WINDOW_CAP = MAX_RECORDS`,外层 loadSize 由 Room 动态
+    注入),禁止传 pageSize。列表页 `records` 流一律 `cachedIn(viewModelScope)`
+    多播缓存(`PagingData` 每实例单收集:同一实例被第二个 LazyPagingItems
+    收集即抛 `Attempt to collect twice from pageEventFlow`——冷流重收集/
+    StateFlow WhileSubscribed 热流在详情往返重组合时都会触发;cachedIn 包装
+    MulticastedPagingData 为官方解法)。回归测试:`RecordPagingProbeTest`
+    (直驱 DAO PagingSource Refresh/Append + 固定小 limit 警戒断言)。
+15. **Android 组件契约(Compose 列表)**:`LazyPagingItems` 手动索引循环
+    (`for (index in 0 until items.itemCount)`)+ VM 级 `LazyListState`
+    承载滚动保持;`LazyPagingItems.get(index)` 内建 accessHint 触发分页
+    (无需额外 onLoadAround 接线);`enablePlaceholders=false` 时
+    `itemCount` = 已加载数。分页翻页验证须种子数据 > 2 页(如 120 条),
+    否则分页路径永不触达(旧测试盲区)。
 
 ## 已知工具链坑
 
@@ -116,6 +149,11 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
   `SemanticsProperties.OnClick`(用 `SemanticsActions.OnClick`);
   `onRoot`/`printToLog`/`onFirst` 是扩展需显式 import;`onRoot()` 在弹窗打开时
   有 2 个 root 会报错,须 `onAllNodes(isPopup())`。
+- 断言计数/数值文案须资源驱动:zh 设备渲染 "2 条"(`settings_total_records_value`
+  zh 带后缀),裸数字精确匹配失败;存储值断言防「Room 首查才建库文件」竞态
+  (生产 `remember` 快照取 0 B)——测试先 `openOrCreateDatabase` 预建文件。
+- 模拟器偶发 ADB `Connection reset`/`Failed to start Emulator console`(测试
+  本身 XML 全绿但 Gradle 报驱动失败):重跑即可;跑前 `adb devices` 确认设备在线。
 - 并行跑两个 gradle 任务可能触发守护进程 OOM(「daemon disappeared」),lint 等
   重任务串行执行。多项目/IDE 守护进程滞留(Xmx8G 等)会压垮页面文件
   (OS errno 1455/daemon 崩溃):assemble 前清理闲置守护进程,

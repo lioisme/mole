@@ -3,12 +3,8 @@ package com.lioisme.modev.ui.apps
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import androidx.paging.PagingData
 import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
-import com.lioisme.modev.core.model.CryptoKind
-import com.lioisme.modev.core.model.RecordType
-import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.repo.AppCatalogRepository
 import com.lioisme.modev.data.repo.AppCatalogSource
 import com.lioisme.modev.data.repo.AppListSettings
@@ -20,14 +16,12 @@ import com.lioisme.modev.domain.server.ConnectionMonitor
 import com.lioisme.modev.i18n.LocaleManager
 import com.lioisme.modev.ui.common.UiMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -260,100 +254,6 @@ private fun scopeFailedMessage(packageName: String, failed: ScopeChangeResult.Fa
             UiMessage(R.string.apps_scope_failed_remove, listOf(packageName))
     }
 
-/**
- * 应用记录页(2026-08-16 V3 四界面重构;2026-08-17 V10 更名,去算法中心化):
- * 单一职责 = 某应用的记录列表。
- * 数据流:分页记录(时间倒序,随搜索词/类别重建)+ 应用信息/连接状态/作用域状态
- * + 应用级操作(移出作用域 + 清空该应用日志)。
- * 捕获配置(V10 全局化)不再属于本页,见设置页「捕获设置」。
- */
-class AppRecordsViewModel(
-    val packageName: String,
-    private val catalog: AppCatalogRepository,
-    server: ConnectionMonitor,
-    private val logs: LogRepository,
-    private val scopeRepository: ScopeRepository,
-) : ViewModel() {
-
-    private val query = MutableStateFlow("")
-    private val recordType = MutableStateFlow<RecordType?>(null)
-    private val kindName = MutableStateFlow<String?>(null)
-
-    /** 应用名/图标信息。 */
-    val appInfo: StateFlow<AppCatalogRepository.AppInfo?> = catalog.apps
-        .map { list -> list.firstOrNull { it.packageName == packageName } }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
-
-    private val launchableState = MutableStateFlow<Boolean?>(null)
-    /** 启动入口解析结果(null = 解析中;V16 R4 惰性单次解析 + 缓存)。 */
-    val launchable: StateFlow<Boolean?> = launchableState
-
-    init {
-        viewModelScope.launch {
-            launchableState.value = catalog.resolveLaunchable(packageName)
-        }
-    }
-
-    val connected: StateFlow<Boolean> = server.connectedPackagesFlow
-        .map { set -> packageName in set }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), false)
-
-    val scopeState: StateFlow<ScopeState> = scopeRepository.state
-
-    val recordCount: StateFlow<Long> = logs.observeRecordCounts()
-        .map { counts -> counts[packageName] ?: 0L }
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
-
-    /**
-     * 分页记录流(时间倒序,随搜索词 / 记录类型 / 类别切换重建;V17 双形态 [RowModel])。
-     * kindName 承载 CryptoKind.name / SqlKind.name(共用 kind 列,跨枚举过滤)。
-     */
-    val records: Flow<PagingData<RowModel>> = combine(query, recordType, kindName) { q, t, k -> Triple(q, t, k) }
-        .flatMapLatest { (q, t, k) ->
-            logs.pagedRecords(packageName, kindName = k, query = q, recordType = t?.wire)
-        }
-
-    /** 一次性提示(移出作用域 / 清空日志结果),由 UI 收集为 Snackbar。 */
-    val messages = MutableSharedFlow<UiMessage>(extraBufferCapacity = 8)
-
-    fun setQuery(value: String) {
-        query.value = value
-    }
-
-    /** 记录类型过滤(null = 全部;V17 R3 算法/数据库二选一)。 */
-    fun setType(value: RecordType?) {
-        recordType.value = value
-    }
-
-    /** 类别过滤(名称跨 CryptoKind/SqlKind;null = 不限)。 */
-    fun setKindName(value: String?) {
-        kindName.value = value
-    }
-
-    fun clearLogs() {
-        viewModelScope.launch {
-            logs.clear(packageName)
-            messages.emit(UiMessage(R.string.apps_records_cleared, listOf(packageName)))
-        }
-    }
-
-/** 移出作用域(等价于 LSPosed 作用域取消勾选)。 */
-    fun removeScope() {
-        viewModelScope.launch {
-            val result = scopeRepository.remove(packageName)
-            messages.emit(
-                when (result) {
-                    is ScopeChangeResult.ScopeRemoved ->
-                        UiMessage(R.string.apps_scope_removed, listOf(packageName))
-                    is ScopeChangeResult.ScopeRequested ->
-                        UiMessage(R.string.apps_scope_requested, listOf(packageName))
-                    is ScopeChangeResult.Failed -> scopeFailedMessage(packageName, result)
-                }
-            )
-        }
-    }
-}
-
 /** 简单工厂,避免在 Compose 中手动拼参。 */
 class AppsViewModelFactory(
     private val container: AppContainer,
@@ -364,23 +264,6 @@ class AppsViewModelFactory(
             catalog = container.catalog,
             logs = container.logs,
             server = container.server,
-            scopeRepository = container.scopeRepository,
-        ) as T
-    }
-}
-
-/** 简单工厂,避免在 Compose 中手动拼参。 */
-class AppRecordsViewModelFactory(
-    private val packageName: String,
-    private val container: AppContainer,
-) : ViewModelProvider.Factory {
-    @Suppress("UNCHECKED_CAST")
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return AppRecordsViewModel(
-            packageName = packageName,
-            catalog = container.catalog,
-            server = container.server,
-            logs = container.logs,
             scopeRepository = container.scopeRepository,
         ) as T
     }

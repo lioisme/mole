@@ -36,32 +36,39 @@ internal fun CryptoRecord.toEntity() = CryptoRecordEntity(
     provider = provider,
     direction = direction,
     keyHex = key?.hex,
+    keyB64 = key?.base64,
     keyText = key?.text,
     keyLength = key?.totalLength,
     keyTruncated = key?.truncated ?: false,
     ivHex = iv?.hex,
+    ivB64 = iv?.base64,
     ivText = iv?.text,
     ivLength = iv?.totalLength,
     ivTruncated = iv?.truncated ?: false,
     keyAlias = keyAlias,
     keyExportable = keyExportable,
     inputHex = input?.hex,
+    inputB64 = input?.base64,
     inputText = input?.text,
     inputLength = input?.totalLength,
     inputTruncated = input?.truncated ?: false,
     outputHex = output?.hex,
+    outputB64 = output?.base64,
     outputText = output?.text,
     outputLength = output?.totalLength,
     outputTruncated = output?.truncated ?: false,
     saltHex = salt?.hex,
+    saltB64 = salt?.base64,
     saltText = salt?.text,
     saltLength = salt?.totalLength,
     saltTruncated = salt?.truncated ?: false,
     aadHex = aad?.hex,
+    aadB64 = aad?.base64,
     aadText = aad?.text,
     aadLength = aad?.totalLength,
     aadTruncated = aad?.truncated ?: false,
     publicKeyHex = publicKey?.hex,
+    publicKeyB64 = publicKey?.base64,
     publicKeyText = publicKey?.text,
     publicKeyLength = publicKey?.totalLength,
     publicKeyTruncated = publicKey?.truncated ?: false,
@@ -88,15 +95,15 @@ internal fun CryptoRecordEntity.toModelOrNull(): CryptoRecord? {
         algorithm = algorithm,
         provider = provider,
         direction = direction,
-        key = view(keyHex, keyText, keyLength, keyTruncated),
-        iv = view(ivHex, ivText, ivLength, ivTruncated),
+        key = view(keyHex, keyB64, keyText, keyLength, keyTruncated),
+        iv = view(ivHex, ivB64, ivText, ivLength, ivTruncated),
         keyAlias = keyAlias,
         keyExportable = keyExportable,
-        input = view(inputHex, inputText, inputLength, inputTruncated),
-        output = view(outputHex, outputText, outputLength, outputTruncated),
-        salt = view(saltHex, saltText, saltLength, saltTruncated),
-        aad = view(aadHex, aadText, aadLength, aadTruncated),
-        publicKey = view(publicKeyHex, publicKeyText, publicKeyLength, publicKeyTruncated),
+        input = view(inputHex, inputB64, inputText, inputLength, inputTruncated),
+        output = view(outputHex, outputB64, outputText, outputLength, outputTruncated),
+        salt = view(saltHex, saltB64, saltText, saltLength, saltTruncated),
+        aad = view(aadHex, aadB64, aadText, aadLength, aadTruncated),
+        publicKey = view(publicKeyHex, publicKeyB64, publicKeyText, publicKeyLength, publicKeyTruncated),
         params = paramsJson?.let { json ->
             runCatching { Json.gson.fromJson(json, Map::class.java) as Map<String, String> }
                 .onFailure { Log.w("Modev", "paramsJson parse failed: $it") }
@@ -217,8 +224,8 @@ private fun parseRows(json: String): List<SqlResultRow>? =
         .onFailure { Log.w("Modev", "rowsJson parse failed: $it") }
         .getOrNull()
 
-private fun view(hex: String?, text: String?, length: Int?, truncated: Boolean): BytesView? =
-    if (hex == null) null else BytesView(hex = hex, text = text, totalLength = length ?: 0, truncated = truncated)
+private fun view(hex: String?, base64: String?, text: String?, length: Int?, truncated: Boolean): BytesView? =
+    if (hex == null) null else BytesView(hex = hex, base64 = base64, text = text, totalLength = length ?: 0, truncated = truncated)
 
 /** 投影预览 → 展示 BytesView(仅存在于列表行;totalLength 由 hex 长度推断,仅供摘要展示)。 */
 private fun previewView(hex: String?, truncated: Boolean): BytesView? =
@@ -258,6 +265,7 @@ internal fun CryptoRecord.toJson(): String = org.json.JSONObject().apply {
 private fun BytesView.toJsonObject(name: String): org.json.JSONObject = org.json.JSONObject().apply {
     put("name", name)
     put("hex", hex)
+    base64?.let { put("base64", it) }
     text?.let { put("text", it) }
     put("totalLength", totalLength)
     put("truncated", truncated)

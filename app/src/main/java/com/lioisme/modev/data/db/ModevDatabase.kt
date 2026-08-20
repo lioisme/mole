@@ -17,10 +17,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * v4 → v5:新增 timestamp 单列索引(时间倒序热路径:全局裁剪/每包裁剪/邻接/分页)。
  * v5 → v6:数据库监听(T17)新增 8 个可空列:sql / dbPath / bindArgsJson / rowsJson /
  *   rowCount / affectedCount / rowId / resultText,recordType='db' 行承载。
+ * v6 → v7:三态视图(V19)7 个字节字段各增 Base64 列(keyB64/ivB64/inputB64/outputB64/
+ *   saltB64/aadB64/publicKeyB64),存量行 NULL = 旧记录降级双态。
  */
 @Database(
     entities = [CryptoRecordEntity::class],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class ModevDatabase : RoomDatabase() {
@@ -99,6 +101,23 @@ abstract class ModevDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v6 → v7:三态视图(V19)7 个字节字段各增 Base64 列;
+         * 纯 ALTER TABLE ADD COLUMN,存量行 NULL = 旧记录降级双态(不触碰数据)。
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val table = "crypto_records"
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `keyB64` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `ivB64` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `inputB64` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `outputB64` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `saltB64` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `aadB64` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `publicKeyB64` TEXT")
+            }
+        }
+
         @Volatile
         private var instance: ModevDatabase? = null
 
@@ -107,15 +126,18 @@ abstract class ModevDatabase : RoomDatabase() {
                 instance ?: Room.databaseBuilder(
                     context.applicationContext,
                     ModevDatabase::class.java,
-                    "modev.db",
+                    NAME,
                 )
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                        MIGRATION_5_6,
+                        MIGRATION_5_6, MIGRATION_6_7,
                     )
                     .fallbackToDestructiveMigration(false)
                     .build()
                     .also { instance = it }
             }
+
+        /** 数据库文件名(存储占用统计/测试同源)。 */
+        const val NAME = "modev.db"
     }
 }

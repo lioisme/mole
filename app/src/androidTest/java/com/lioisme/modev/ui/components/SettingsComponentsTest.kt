@@ -115,7 +115,9 @@ class SettingsComponentsTest {
     @Test
     fun infoItem_longValue_doesNotSqueezeTitle() {
         // V11 回归:长 Value 曾按内容全宽测量,把标题挤压成逐字折行(「框架」竖排错位)。
-        // 修复后 Value 有界测量(≤50% 行宽省略),标题恒保持单行(bodyLarge lineHeight=24dp)。
+        // 修复后 Value 有界测量(widthIn 160dp 上限省略,≤2 行),标题恒保持单行。
+        // V19 T6:ListItem 内容槽合并为单一语义节点(文本节点 = 整行),标题折行
+        // 会把行高从 56dp 撑高,故改断整行高度 56dp + 长值可见。
         val longValue = "V".repeat(200)
         rule.setContent {
             MaterialTheme {
@@ -126,8 +128,7 @@ class SettingsComponentsTest {
                 )
             }
         }
-        // 标题单行完整显示(折行则为 48dp,断言失败);长值以两行省略呈现
-        rule.onNodeWithText("框架").assertHeightIsEqualTo(24.dp)
+        rule.onNodeWithText("框架").assertHeightIsEqualTo(56.dp)
         rule.onNodeWithText(longValue).assertIsDisplayed()
     }
 }

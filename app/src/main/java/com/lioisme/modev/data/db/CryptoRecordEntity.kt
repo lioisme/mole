@@ -7,7 +7,8 @@ import androidx.room.PrimaryKey
 import com.lioisme.modev.core.model.RecordTypes
 
 /**
- * 算法记录实体。BytesView 双态视图展开为独立列,枚举以名称字符串存储,堆栈以 JSON 存储。
+ * 算法记录实体。BytesView 三态视图(V19:hex/Base64/文本)展开为独立列,
+ * 枚举以名称字符串存储,堆栈以 JSON 存储。
  */
 @Entity(
     tableName = "crypto_records",
@@ -35,11 +36,13 @@ data class CryptoRecordEntity(
     @ColumnInfo(name = "direction") val direction: Int? = null,
 
     @ColumnInfo(name = "keyHex") val keyHex: String? = null,
+    @ColumnInfo(name = "keyB64") val keyB64: String? = null,
     @ColumnInfo(name = "keyText") val keyText: String? = null,
     @ColumnInfo(name = "keyLength") val keyLength: Int? = null,
     @ColumnInfo(name = "keyTruncated") val keyTruncated: Boolean = false,
 
     @ColumnInfo(name = "ivHex") val ivHex: String? = null,
+    @ColumnInfo(name = "ivB64") val ivB64: String? = null,
     @ColumnInfo(name = "ivText") val ivText: String? = null,
     @ColumnInfo(name = "ivLength") val ivLength: Int? = null,
     @ColumnInfo(name = "ivTruncated") val ivTruncated: Boolean = false,
@@ -48,26 +51,31 @@ data class CryptoRecordEntity(
     @ColumnInfo(name = "keyExportable") val keyExportable: Boolean = true,
 
     @ColumnInfo(name = "inputHex") val inputHex: String? = null,
+    @ColumnInfo(name = "inputB64") val inputB64: String? = null,
     @ColumnInfo(name = "inputText") val inputText: String? = null,
     @ColumnInfo(name = "inputLength") val inputLength: Int? = null,
     @ColumnInfo(name = "inputTruncated") val inputTruncated: Boolean = false,
 
     @ColumnInfo(name = "outputHex") val outputHex: String? = null,
+    @ColumnInfo(name = "outputB64") val outputB64: String? = null,
     @ColumnInfo(name = "outputText") val outputText: String? = null,
     @ColumnInfo(name = "outputLength") val outputLength: Int? = null,
     @ColumnInfo(name = "outputTruncated") val outputTruncated: Boolean = false,
 
     @ColumnInfo(name = "saltHex") val saltHex: String? = null,
+    @ColumnInfo(name = "saltB64") val saltB64: String? = null,
     @ColumnInfo(name = "saltText") val saltText: String? = null,
     @ColumnInfo(name = "saltLength") val saltLength: Int? = null,
     @ColumnInfo(name = "saltTruncated") val saltTruncated: Boolean = false,
 
     @ColumnInfo(name = "aadHex") val aadHex: String? = null,
+    @ColumnInfo(name = "aadB64") val aadB64: String? = null,
     @ColumnInfo(name = "aadText") val aadText: String? = null,
     @ColumnInfo(name = "aadLength") val aadLength: Int? = null,
     @ColumnInfo(name = "aadTruncated") val aadTruncated: Boolean = false,
 
     @ColumnInfo(name = "publicKeyHex") val publicKeyHex: String? = null,
+    @ColumnInfo(name = "publicKeyB64") val publicKeyB64: String? = null,
     @ColumnInfo(name = "publicKeyText") val publicKeyText: String? = null,
     @ColumnInfo(name = "publicKeyLength") val publicKeyLength: Int? = null,
     @ColumnInfo(name = "publicKeyTruncated") val publicKeyTruncated: Boolean = false,

@@ -217,6 +217,10 @@ interface CryptoRecordDao {
     @Query("DELETE FROM crypto_records WHERE packageName = :packageName")
     suspend fun clearPackage(packageName: String)
 
+    /** 按记录类型清理(V19 T7 数据管理按类型清理)。 */
+    @Query("DELETE FROM crypto_records WHERE recordType = :recordType")
+    suspend fun clearByType(recordType: String)
+
     @Query("DELETE FROM crypto_records")
     suspend fun clearAll()
 

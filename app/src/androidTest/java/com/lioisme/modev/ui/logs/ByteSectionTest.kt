@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.ui.logs
+package com.lioisme.modev.ui.logs
 
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,7 +32,8 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 定向测试(ByteSection,2026-08-18 V14 R2/R3 + V15 双层渲染契约):
+ * 定向测试(ByteSection,2026-08-18 V14 R2/R3 + V15 双层渲染契约;
+ * V19 T5 三态分段):
  * ①短内容(≤4096 字符)无折叠控件,整段单 Text 全量可见;
  * ②>4096 字符默认收起:预览(ReadMoreText,「… 展开更多」)在树、分块不在;
  * ③点「展开更多」→ Tier A(≤128K 字符)整段单 Text 组合(整段可选中),「收起」出现;
@@ -40,7 +41,9 @@ import org.junit.runner.RunWith
  * ⑤Tier A 长按整段 → 不触发整段复制回调(SelectionContainer 原生选择);
  * ⑥footer 复制按钮仍复制完整 hex;
  * ⑦>128K 字符(Tier B)展开 → 分块惰性组合,无整段单 Text;
- * ⑧300K hex/text 惰性滚动回归(V11 性能防线:末块未滚动不在树,滚动后组合成功)。
+ * ⑧300K hex/text 惰性滚动回归(V11 性能防线:末块未滚动不在树,滚动后组合成功);
+ * ⑨V19 T5 三态:分段按钮切换渲染、旧记录(base64=null)隐藏 Base64 段、
+ *   Tier B Base64 分块惰性组合。
  * 实机 100K 字符单 Text 展开 26s ANR 的回归防线(收起预览有界 + 展开惰性分块)。
  */
 @RunWith(AndroidJUnit4::class)
@@ -55,8 +58,9 @@ class ByteSectionTest {
     private fun str(id: Int, vararg args: Any) =
         InstrumentationRegistry.getInstrumentation().targetContext.getString(id, *args)
 
-    private fun view(hex: String, text: String? = "plain text") = BytesView(
+    private fun view(hex: String, text: String? = "plain text", base64: String? = null) = BytesView(
         hex = hex,
+        base64 = base64,
         text = text,
         totalLength = hex.length / 2,
         truncated = false,
@@ -73,22 +77,27 @@ class ByteSectionTest {
     private fun setSection(
         hex: String,
         text: String? = "plain text",
+        base64: String? = null,
         initiallyExpanded: Boolean = false,
     ) {
         lastCopied = null
+        val v = view(hex, text, base64)
         rule.setContent {
             MaterialTheme {
                 var copied by remember { mutableStateOf<String?>(null) }
                 lastCopied = copied
                 var expanded by remember { mutableStateOf(initiallyExpanded) }
+                var representation by remember { mutableStateOf(v.defaultRepresentation()) }
                 LazyColumn(Modifier.fillMaxSize()) {
                     byteSectionItems(
                         sectionKey = "test",
                         titleRes = R.string.section_key,
-                        view = view(hex, text),
+                        view = v,
                         expanded = expanded,
                         onExpandedChange = { expanded = it },
                         copyFull = { _, fullText -> copied = fullText },
+                        representation = representation,
+                        onRepresentationChange = { representation = it },
                     )
                 }
             }
@@ -174,11 +183,12 @@ class ByteSectionTest {
     }
 
     @Test
-    fun copyMenu_copiesTextAndAll_whenTextPresent() {
-        // V16 R3:文本存在时菜单含「复制文本/复制 Hex/复制文本+Hex」三项;
-        // 文本项复制纯文本,全部项复制 文本\nhex 拼接。
+    fun copyMenu_copiesTextAndBase64_whenPresent() {
+        // V19 T5:表示齐全时菜单含「复制文本/复制 Base64/复制 Hex」三项;
+        // 文本项复制纯文本,Base64 项复制 Base64 串(移除 V16 的「文本+Hex」合并项)。
         val full = "ab".repeat(5_000)
-        setSection(full, text = "plain text")
+        val b64 = "YWJhYmFiYWJhYmFiYWJhYmFiYWI="
+        setSection(full, text = "plain text", base64 = b64)
         rule.onNodeWithContentDescription(str(R.string.section_copy)).performClick()
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.section_copy_text)).performClick()
@@ -187,21 +197,79 @@ class ByteSectionTest {
 
         rule.onNodeWithContentDescription(str(R.string.section_copy)).performClick()
         rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.section_copy_all)).performClick()
+        rule.onNodeWithText(str(R.string.section_copy_base64)).performClick()
         rule.waitForIdle()
-        assertEquals("plain text\n$full", lastCopied)
+        assertEquals(b64, lastCopied)
     }
 
     @Test
-    fun copyMenu_hidesTextItem_whenTextAbsent() {
-        // V16 R3:文本缺失时「复制文本」项隐藏(不留空白项)。
+    fun copyMenu_hidesTextAndBase64Items_whenAbsent() {
+        // V19 T5:文本缺失 + Base64 缺失(旧记录)时「复制文本/复制 Base64」项隐藏
+        // (不留空白项),Hex 恒在。
         val full = "ab".repeat(5_000)
         setSection(full, text = null)
         rule.onNodeWithContentDescription(str(R.string.section_copy)).performClick()
         rule.waitForIdle()
         rule.onAllNodesWithText(str(R.string.section_copy_text)).assertCountEquals(0)
+        rule.onAllNodesWithText(str(R.string.section_copy_base64)).assertCountEquals(0)
         rule.onNodeWithText(str(R.string.section_copy_hex)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.section_copy_all)).assertIsDisplayed()
+    }
+
+    @Test
+    fun segmentedButton_threeStates_switchRendersSelectedOnly() {
+        // ⑨V19 T5 三态:默认 TEXT(文本内容在树);切 Base64 → 仅 b64 内容;
+        // 切 Hex → 仅 hex 内容;非选中表示内容不在树。
+        val hex = "cd".repeat(20)
+        val b64 = "YWJhYmFiYWJhYmFiYWJhYmFiYWI="
+        val text = "abababababababababababababababababababab"
+        setSection(hex = hex, text = text, base64 = b64)
+        rule.onNodeWithText(text, substring = false).assertIsDisplayed()
+        rule.onAllNodesWithText(hex, substring = false).assertCountEquals(0)
+        rule.onAllNodesWithText(b64, substring = false).assertCountEquals(0)
+
+        rule.onNodeWithText(str(R.string.section_repr_base64)).performClick()
+        rule.waitForIdle()
+        rule.onAllNodesWithText(b64, substring = false).assertCountEquals(1)
+        rule.onAllNodesWithText(text, substring = false).assertCountEquals(0)
+
+        rule.onNodeWithText(str(R.string.section_repr_hex)).performClick()
+        rule.waitForIdle()
+        rule.onAllNodesWithText(hex, substring = false).assertCountEquals(1)
+        rule.onAllNodesWithText(b64, substring = false).assertCountEquals(0)
+    }
+
+    @Test
+    fun segmentedButton_oldRecord_hidesBase64Segment() {
+        // ⑨V19 T5 旧记录(base64=null)降级双态:分段行仅文本/Hex,复制菜单无 Base64。
+        setSection(hex = "ab".repeat(20), text = null)
+        rule.onAllNodesWithText(str(R.string.section_repr_base64)).assertCountEquals(0)
+        rule.onAllNodesWithText(str(R.string.section_repr_text)).assertCountEquals(0)
+        rule.onNodeWithText(str(R.string.section_repr_hex)).assertIsDisplayed()
+        rule.onNodeWithContentDescription(str(R.string.section_copy)).performClick()
+        rule.waitForIdle()
+        rule.onAllNodesWithText(str(R.string.section_copy_base64)).assertCountEquals(0)
+        rule.onNodeWithText(str(R.string.section_copy_hex)).assertIsDisplayed()
+    }
+
+    @Test
+    fun oversizedBytes_base64AboveCap_keepsChunkedTier() {
+        // ⑨V19 T5 Tier B Base64 分块:100K 字节(hex 200K 字符 / b64 ≈ 133K 字符
+        // > SELECTABLE_CAP_CHARS)→ 切 Base64 + 展开 → 分块惰性组合,无整段单 Text。
+        val hex = "ab".repeat(100_000)
+        val bytes = ByteArray(100_000) { 0xAB.toByte() }
+        val b64 = android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+        setSection(hex = hex, text = null, base64 = b64)
+        rule.onNodeWithText(str(R.string.section_repr_base64)).performClick()
+        rule.waitForIdle()
+        // 「展开更多」并入预览节点,substring 命中唯一含它的节点;点击即展开。
+        rule.onNodeWithText(str(R.string.record_see_more), substring = true).performClick()
+        rule.waitForIdle()
+        rule.onAllNodesWithText(b64, substring = false).assertCountEquals(0)
+        val chunks = ChunkedText(b64)
+        rule.onAllNodesWithText(chunks[0], substring = false).assertCountEquals(1)
+        // 「收起」在 Tier B 内容末尾,先滚动至可见再断言。
+        rule.onNode(hasScrollToNodeAction()).performScrollToNode(hasText(str(R.string.section_collapse)))
+        rule.onNodeWithText(str(R.string.section_collapse)).assertIsDisplayed()
     }
 
     @Test

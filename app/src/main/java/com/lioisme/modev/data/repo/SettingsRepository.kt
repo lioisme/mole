@@ -79,8 +79,7 @@ class MirroredConfigWriter(
     private fun legacyKeys(): List<String> =
         prefs.all.keys.filter { it.startsWith(PREFIX) && it != KEY }.sorted()
 
-    private fun parse(json: String): HookSwitch? =
-        runCatching { gson.fromJson(json, HookSwitch::class.java) }.getOrNull()
+    private fun parse(json: String): HookSwitch? = HookSwitch.fromJson(gson, json)
 
     companion object {
         /** 全局捕获配置键(V10):全应用共享一份,注入侧与宿主侧同键读写。 */

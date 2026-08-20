@@ -106,11 +106,14 @@ fun SearchInputField(
 /**
  * 折叠态搜索条(AppBar 内):仅单击进入 SearchView。
  *
- * 不挂载 SearchBarDefaults.InputField——其 BasicTextField 内部
+ * **MD3 例外项(V19 T6 矩阵 M12,经 D4 单向决策):** 不替换为 M3 SearchBar——
+ * SearchBarDefaults.InputField 的 BasicTextField 内部
  * `onFocusChanged { if (isFocused) onExpandedChange(true) }` 由"获得焦点"驱动展开,
  * 而长按(文本选择/光标)同样会请求焦点,导致长按也进入 SearchView。
  * 本组件用 [detectTapGestures] 区分单击(展开)与长按(无副作用);
  * 首尾图标按钮(返回 [onBack] 可空 / 清除 / 筛选槽)各自保留单击语义与长按 tooltip。
+ * [leadingContent] 优先于 [onBack] 渲染(根页无返回语义时,左上角可放其他入口,
+ * 如应用列表页的设置按钮——与右侧筛选按钮对称)。
  * 展开后的输入、焦点与键盘由 ExpandedFullScreenSearchBar 的 focusRequester 自动接管。
  */
 @OptIn(ExperimentalFoundationApi::class)
@@ -122,6 +125,7 @@ fun CollapsedSearchInput(
     onTapToExpand: () -> Unit,
     placeholder: String,
     filterSlot: @Composable () -> Unit,
+    leadingContent: (@Composable () -> Unit)? = null,
 ) {
     val container = MaterialTheme.colorScheme.surfaceContainerHigh
     Row(
@@ -134,7 +138,9 @@ fun CollapsedSearchInput(
                 .padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (onBack != null) {
+        if (leadingContent != null) {
+            leadingContent()
+        } else if (onBack != null) {
             TipIconButton(tooltip = stringResource(R.string.cd_back), onClick = onBack) {
                 Icon(
                     Icons.AutoMirrored.Filled.ArrowBack,

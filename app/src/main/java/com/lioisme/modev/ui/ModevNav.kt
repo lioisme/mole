@@ -3,12 +3,8 @@ package com.lioisme.modev.ui
 import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.BackHandler
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Sensors
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -18,10 +14,9 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.navArgument
-import com.lioisme.modev.R
-import com.lioisme.modev.domain.capability.CapabilityKind
-import com.lioisme.modev.ui.apps.AppRecordsScreen
-import com.lioisme.modev.ui.apps.AppRecordsViewModelFactory
+import com.lioisme.modev.core.model.RecordType
+import com.lioisme.modev.ui.apps.AppMonitorScreen
+import com.lioisme.modev.ui.apps.AppMonitorViewModelFactory
 import com.lioisme.modev.ui.apps.AppsScreen
 import com.lioisme.modev.ui.apps.AppsViewModelFactory
 import com.lioisme.modev.ui.logs.RecordDetailScreen
@@ -33,23 +28,25 @@ import com.lioisme.modev.ui.navigation.navigateGuarded
 import com.lioisme.modev.ui.navigation.popGuarded
 import com.lioisme.modev.ui.navigation.popWhenReady
 import com.lioisme.modev.ui.navigation.slideComposable
-import com.lioisme.modev.ui.settings.AlgorithmMonitorScreen
-import com.lioisme.modev.ui.settings.AlgorithmMonitorViewModelFactory
-import com.lioisme.modev.ui.settings.CapabilityUiRegistry
-import com.lioisme.modev.ui.settings.DatabaseMonitorScreen
-import com.lioisme.modev.ui.settings.DatabaseMonitorViewModelFactory
+import com.lioisme.modev.ui.records.AlgorithmRecordsScreen
+import com.lioisme.modev.ui.records.DatabaseRecordsScreen
+import com.lioisme.modev.ui.records.MonitorRecordsViewModelFactory
 import com.lioisme.modev.ui.settings.DataSettingsScreen
 import com.lioisme.modev.ui.settings.DataSettingsViewModelFactory
 import com.lioisme.modev.ui.settings.DiagnosticsScreen
 import com.lioisme.modev.ui.settings.DiagnosticsViewModelFactory
+import com.lioisme.modev.ui.settings.MonitorSettingsScreen
+import com.lioisme.modev.ui.settings.MonitorSettingsViewModelFactory
 import com.lioisme.modev.ui.settings.SettingsScreen
 import com.lioisme.modev.ui.settings.SettingsViewModelFactory
 
 /**
- * 单栈导航宿主(2026-08-16 V4,五界面收敛;2026-08-17 V10 设置分级):
- * 信息架构 = 应用列表(根页) → 应用记录(每应用,含应用级危险操作)→ 记录详情;
- * 设置页 = 通用设置,入口 = 应用列表筛选菜单底部;二级设置页(算法监听 / 数据管理 /
- * 服务与诊断)经设置页进入(算法监听 V10 全局化,V14 R5 更名)。
+ * 单栈导航宿主(2026-08-16 V4,五界面收敛;2026-08-17 V10 设置分级;V18 应用监听入口;
+ * V19 T4 监听设置合并;V20 记录列表单应用语境化 + 「查看记录」界面退役):
+ * 信息架构 = 应用列表(根页) → 应用监听入口(应用头部 + 算法记录 / 数据库记录)
+ * → 记录详情;
+ * 设置页 = 通用设置,入口 = 应用列表搜索条左上角设置按钮;二级设置页(监听设置 /
+ * 数据管理 / 服务与诊断)经设置页进入(监听设置 = 算法/数据库合并单页,V19)。
  * 全部目的地 slideComposable(编译器层杜绝 fade)+ 返回键统一过门控。
  * 根页(APPS)空闲返回抛回系统退出;次级页返回一律 popGuarded 回退上级。
  */
@@ -59,28 +56,6 @@ fun ModevNavHost(navController: NavHostController) {
     // L4:防御性转型——预览/测试替身 Application 下渲染空壳,不崩溃
     val app = context.applicationContext as? com.lioisme.modev.ModevApp
     if (app == null) return
-
-    // M19:能力 → UI 呈现注册(导航动作在此绑定,设置页零 when(CapabilityKind))。
-    val capabilityUi = remember {
-        CapabilityUiRegistry().apply {
-            register(
-                CapabilityUiRegistry.Entry(
-                    kind = CapabilityKind.ALGORITHM_LISTEN,
-                    icon = Icons.Default.Sensors,
-                    titleRes = R.string.algorithm_monitor_title,
-                    onClick = { navController.navigateGuarded(ModevRoutes.ALGORITHM_MONITOR) },
-                )
-            )
-            register(
-                CapabilityUiRegistry.Entry(
-                    kind = CapabilityKind.DATABASE_LISTEN,
-                    icon = Icons.Default.Storage,
-                    titleRes = R.string.database_monitor_title,
-                    onClick = { navController.navigateGuarded(ModevRoutes.DATABASE_MONITOR) },
-                )
-            )
-        }
-    }
 
     // 一键启动作用域应用:getLaunchIntentForPackage(全 API 稳定,无弃用重载)取入口,加 NEW_TASK 从宿主前台启动。
     val launchApp: (String) -> Unit = { pkg ->
@@ -121,7 +96,7 @@ fun ModevNavHost(navController: NavHostController) {
             AppsScreen(
                 viewModel = viewModel(factory = AppsViewModelFactory(app.container)),
                 onOpen = { pkg ->
-                    navController.navigateGuarded(ModevRoutes.appRecords(pkg))
+                    navController.navigateGuarded(ModevRoutes.appMonitor(pkg))
                 },
                 onOpenSettings = {
                     navController.navigateGuarded(ModevRoutes.SETTINGS)
@@ -129,7 +104,7 @@ fun ModevNavHost(navController: NavHostController) {
             )
         }
         slideComposable(
-            route = ModevRoutes.APP_RECORDS,
+            route = ModevRoutes.APP_MONITOR,
             arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
         ) { entry ->
             val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
@@ -138,14 +113,17 @@ fun ModevNavHost(navController: NavHostController) {
                 return@slideComposable
             }
             BackGuarded(navController) {
-                AppRecordsScreen(
+                AppMonitorScreen(
                     viewModel = viewModel(
-                        key = "records-$pkg",
-                        factory = AppRecordsViewModelFactory(pkg, app.container),
+                        key = "monitor-$pkg",
+                        factory = AppMonitorViewModelFactory(pkg, app.container),
                     ),
                     onBack = { navController.popGuarded() },
-                    onOpenRecord = { id ->
-                        navController.navigateGuarded(ModevRoutes.recordDetail(id))
+                    onOpenAlgorithm = {
+                        navController.navigateGuarded(ModevRoutes.algorithmRecords(pkg))
+                    },
+                    onOpenDatabase = {
+                        navController.navigateGuarded(ModevRoutes.databaseRecords(pkg))
                     },
                     onLaunch = launchApp,
                 )
@@ -155,7 +133,7 @@ fun ModevNavHost(navController: NavHostController) {
             route = ModevRoutes.RECORD_DETAIL,
             arguments = listOf(navArgument("recordId") { type = NavType.LongType }),
         ) { entry ->
-            // 参数缺失兜底:popWhenReady 在转场/队列空闲后出栈(与 APP_RECORDS 同款),
+            // 参数缺失兜底:popWhenReady 在转场/队列空闲后出栈(与 APP_MONITOR 同款),
             // 杜绝「recordId 为 null → 返回空屏 + 返回键死循环」。
             val recordId = entry.arguments?.getLong("recordId") ?: run {
                 LaunchedEffect(Unit) { navController.popWhenReady() }
@@ -171,12 +149,58 @@ fun ModevNavHost(navController: NavHostController) {
                 )
             }
         }
+        slideComposable(
+            route = ModevRoutes.ALGORITHM_RECORDS,
+            arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
+        ) { entry ->
+            val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
+            if (pkg.isBlank()) {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
+            BackGuarded(navController) {
+                AlgorithmRecordsScreen(
+                    viewModel = viewModel(
+                        key = "records-algorithm-$pkg",
+                        factory = MonitorRecordsViewModelFactory(RecordType.CRYPTO, pkg, app.container),
+                    ),
+                    onBack = { navController.popGuarded() },
+                    onOpenRecord = { id ->
+                        navController.navigateGuarded(ModevRoutes.recordDetail(id))
+                    },
+                )
+            }
+        }
+        slideComposable(
+            route = ModevRoutes.DATABASE_RECORDS,
+            arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
+        ) { entry ->
+            val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
+            if (pkg.isBlank()) {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
+            BackGuarded(navController) {
+                DatabaseRecordsScreen(
+                    viewModel = viewModel(
+                        key = "records-database-$pkg",
+                        factory = MonitorRecordsViewModelFactory(RecordType.DATABASE, pkg, app.container),
+                    ),
+                    onBack = { navController.popGuarded() },
+                    onOpenRecord = { id ->
+                        navController.navigateGuarded(ModevRoutes.recordDetail(id))
+                    },
+                )
+            }
+        }
         slideComposable(route = ModevRoutes.SETTINGS) {
             BackGuarded(navController) {
                 SettingsScreen(
                     viewModel = viewModel(factory = SettingsViewModelFactory(app.container)),
-                    capabilityUi = capabilityUi,
                     onBack = { navController.popGuarded() },
+                    onOpenMonitorSettings = {
+                        navController.navigateGuarded(ModevRoutes.MONITOR_SETTINGS)
+                    },
                     onOpenDataSettings = {
                         navController.navigateGuarded(ModevRoutes.DATA_SETTINGS)
                     },
@@ -186,18 +210,10 @@ fun ModevNavHost(navController: NavHostController) {
                 )
             }
         }
-        slideComposable(route = ModevRoutes.ALGORITHM_MONITOR) {
+        slideComposable(route = ModevRoutes.MONITOR_SETTINGS) {
             BackGuarded(navController) {
-                AlgorithmMonitorScreen(
-                    viewModel = viewModel(factory = AlgorithmMonitorViewModelFactory(app.container)),
-                    onBack = { navController.popGuarded() },
-                )
-            }
-        }
-        slideComposable(route = ModevRoutes.DATABASE_MONITOR) {
-            BackGuarded(navController) {
-                DatabaseMonitorScreen(
-                    viewModel = viewModel(factory = DatabaseMonitorViewModelFactory(app.container)),
+                MonitorSettingsScreen(
+                    viewModel = viewModel(factory = MonitorSettingsViewModelFactory(app.container)),
                     onBack = { navController.popGuarded() },
                 )
             }

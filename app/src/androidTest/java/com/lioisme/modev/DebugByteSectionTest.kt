@@ -16,6 +16,7 @@ import androidx.compose.ui.test.printToString
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.ui.logs.byteSectionItems
+import com.lioisme.modev.ui.logs.defaultRepresentation
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -31,6 +32,7 @@ class DebugByteSectionTest {
         text: String? = null,
         initiallyExpanded: Boolean = false,
     ) {
+        val v = BytesView(hex = hex, text = text, totalLength = hex.length / 2, truncated = false)
         rule.setContent {
             MaterialTheme {
                 var expanded by remember { mutableStateOf(initiallyExpanded) }
@@ -38,10 +40,12 @@ class DebugByteSectionTest {
                     byteSectionItems(
                         sectionKey = "test",
                         titleRes = com.lioisme.modev.R.string.section_key,
-                        view = BytesView(hex = hex, text = text, totalLength = hex.length / 2, truncated = false),
+                        view = v,
                         expanded = expanded,
                         onExpandedChange = { expanded = it },
                         copyFull = { _, _ -> },
+                        representation = v.defaultRepresentation(),
+                        onRepresentationChange = {},
                     )
                 }
             }

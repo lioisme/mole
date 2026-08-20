@@ -65,7 +65,7 @@ object WireCodec {
     fun pong(): String = envelope(WireProtocol.TYPE_PONG, null)
 
     fun configOf(payload: JsonObject?): HookSwitch? =
-        payload?.get("switch")?.let { runCatching { Json.gson.fromJson(it, HookSwitch::class.java) }.getOrNull() }
+        payload?.get("switch")?.let { runCatching { HookSwitch.fromJson(Json.gson, it.toString()) }.getOrNull() }
 
     /** 读取 ack 载荷中的确认游标;缺失或非法时返回 null。 */
     fun seqOf(payload: JsonObject?): Long? =

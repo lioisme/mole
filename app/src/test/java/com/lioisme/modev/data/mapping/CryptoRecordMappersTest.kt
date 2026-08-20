@@ -40,14 +40,14 @@ class CryptoRecordMappersTest {
         algorithm = "AES/GCM/NoPadding",
         provider = "AndroidKeyStoreBCWorkaround",
         direction = 1,
-        key = BytesView(hex = "aabb", text = null, totalLength = 2, truncated = false),
-        iv = BytesView(hex = "cafebabe", text = null, totalLength = 4, truncated = false),
+        key = BytesView(hex = "aabb", base64 = "qrs=", text = null, totalLength = 2, truncated = false),
+        iv = BytesView(hex = "cafebabe", base64 = "yvq6vg==", text = null, totalLength = 4, truncated = false),
         keyAlias = "alias_1",
         keyExportable = false,
-        input = BytesView(hex = "deadbeef", text = "secret", totalLength = 4, truncated = false),
-        output = BytesView(hex = "00ff", text = null, totalLength = 2, truncated = true),
+        input = BytesView(hex = "deadbeef", base64 = "3q2+7w==", text = "secret", totalLength = 4, truncated = false),
+        output = BytesView(hex = "00ff", base64 = "AP8=", text = null, totalLength = 2, truncated = true),
         salt = null,
-        aad = BytesView(hex = "a1b2", text = null, totalLength = 2, truncated = false),
+        aad = BytesView(hex = "a1b2", base64 = "obI=", text = null, totalLength = 2, truncated = false),
         publicKey = null,
         params = mapOf("mode" to "GCM"),
         verifyResult = true,
@@ -67,11 +67,14 @@ class CryptoRecordMappersTest {
         assertEquals("AES/GCM/NoPadding", entity.algorithm)
         assertEquals(1, entity.direction)
         assertEquals("aabb", entity.keyHex)
+        assertEquals("qrs=", entity.keyB64)
         assertEquals(2, entity.keyLength)
         assertEquals("alias_1", entity.keyAlias)
         assertEquals("deadbeef", entity.inputHex)
+        assertEquals("3q2+7w==", entity.inputB64)
         assertEquals("secret", entity.inputText)
         assertEquals("00ff", entity.outputHex)
+        assertEquals("AP8=", entity.outputB64)
         assertTrue(entity.outputTruncated)
         assertEquals("{\"mode\":\"GCM\"}", entity.paramsJson)
         assertEquals("[\"a.b.c()\",\"d.e.f()\"]", entity.stackJson)
@@ -83,6 +86,20 @@ class CryptoRecordMappersTest {
         val model = sampleRecord().toEntity().toModelOrNull()
         assertNotNull(model)
         assertEquals(sampleRecord().copy(id = 0L), model)
+    }
+
+    @Test
+    fun `legacy entity without base64 yields null base64 views`() {
+        val legacy = sampleRecord().toEntity().copy(
+            keyB64 = null, inputB64 = null, outputB64 = null,
+            ivB64 = null, aadB64 = null,
+        )
+        val model = legacy.toModelOrNull()
+        assertNotNull(model)
+        assertEquals("aabb", model!!.key?.hex)
+        assertNull(model.key!!.base64)
+        assertNull(model.input?.base64)
+        assertEquals("secret", model.input?.text)
     }
 
     @Test
@@ -145,7 +162,9 @@ class CryptoRecordMappersTest {
         assertEquals("com.example.app", json.getString("packageName"))
         assertEquals(CryptoKind.CIPHER.name, json.getString("kind"))
         assertEquals(2, json.getJSONObject("key").getInt("totalLength"))
+        assertEquals("qrs=", json.getJSONObject("key").getString("base64"))
         assertEquals("secret", json.getJSONObject("input").getString("text"))
+        assertEquals("3q2+7w==", json.getJSONObject("input").getString("base64"))
         assertEquals("GCM", json.getJSONObject("params").getString("mode"))
         assertEquals(JSONArray(listOf("a.b.c()", "d.e.f()")).toString(), json.getJSONArray("stack").toString())
         assertEquals(1_700_000_000_000L, json.getLong("timestamp"))

@@ -6,10 +6,9 @@
     <!-- 通用 -->
     <string name="cd_back">返回</string>
     <string name="cd_filter">筛选</string>
+    <string name="cd_settings">设置</string>
     <string name="confirm">确定</string>
     <string name="record_types_all">全部记录</string>
-    <string name="record_types_crypto">算法</string>
-    <string name="record_types_db">数据库</string>
     <string name="online">运行中</string>
     <string name="offline">未运行</string>
     <string name="loading">加载中…</string>
@@ -40,10 +39,20 @@
     <string name="detail_framework_no_service">框架服务未连接</string>
     <string name="detail_framework_error">框架异常:%1$s</string>
     <string name="detail_reading_scope">正在读取作用域…</string>
-    <string name="detail_search">搜索记录…</string>
+    <string name="algorithm_records_title">算法记录</string>
+    <string name="database_records_title">数据库记录</string>
+    <string name="algorithm_records_search">搜索算法记录…</string>
+    <string name="database_records_search">搜索数据库记录…</string>
     <string name="detail_empty">暂无记录</string>
     <string name="section_monitor_kinds">监听类别</string>
     <string name="section_record_options">记录选项</string>
+    <string name="algorithm_monitor_master">启用算法监听</string>
+    <string name="algorithm_monitor_master_hint">全局总开关;分开关保留原态,重开即恢复</string>
+    <string name="database_monitor_master">启用数据库监听</string>
+    <string name="database_monitor_master_hint">全局总开关;分开关保留原态,重开即恢复</string>
+    <string name="monitor_settings_title">监听设置</string>
+    <string name="section_db_result_limits">结果闸门</string>
+    <string name="settings_monitor_summary">算法监听 %1$s · 数据库监听 %2$s</string>
     <string name="switch_cipher">加解密 Cipher</string>
     <string name="switch_message_digest">摘要 MessageDigest</string>
     <string name="switch_mac">MAC (HMAC)</string>
@@ -151,6 +160,26 @@
     <string name="meta_verify">验签结果</string>
     <string name="verify_ok">✓ 通过</string>
     <string name="verify_fail">✗ 失败</string>
+
+    <!-- 记录详情分区(V20:数据关系可视化) -->
+    <string name="meta_algorithm">算法</string>
+    <string name="section_zone_data_flow">数据流</string>
+    <string name="section_zone_key_material">密钥材料</string>
+    <string name="cd_flow">数据流</string>
+    <string name="role_input_plaintext">输入(明文)</string>
+    <string name="role_output_ciphertext">输出(密文)</string>
+    <string name="role_input_ciphertext">输入(密文)</string>
+    <string name="role_output_plaintext">输出(明文)</string>
+    <string name="role_input_message">输入(消息)</string>
+    <string name="role_output_digest">输出(摘要)</string>
+    <string name="role_output_mac">输出(MAC)</string>
+    <string name="role_output_signature">输出(签名)</string>
+    <string name="role_output_verify">输出(验签数据)</string>
+    <string name="role_input_data">输入(数据)</string>
+    <string name="role_output_data">输出(数据)</string>
+    <string name="role_output_base64">输出(Base64)</string>
+    <string name="role_input_base64">输入(Base64)</string>
+    <string name="role_output_key">输出(密钥)</string>
     <string name="section_key">密钥</string>
     <string name="section_key_alias">密钥别名(硬件密钥,不可导出)</string>
     <string name="section_iv">IV</string>
@@ -167,8 +196,11 @@
     <string name="section_collapse">收起</string>
     <string name="section_copy">复制</string>
     <string name="section_copy_text">复制文本</string>
+    <string name="section_copy_base64">复制 Base64</string>
     <string name="section_copy_hex">复制 Hex</string>
-    <string name="section_copy_all">复制文本 + Hex</string>
+    <string name="section_repr_text">文本</string>
+    <string name="section_repr_base64">Base64</string>
+    <string name="section_repr_hex">Hex</string>
     <plurals name="params_omitted">
         <item quantity="other">另有 %1$d 个参数被省略</item>
     </plurals>
@@ -241,7 +273,8 @@
     <string name="settings_language_section">语言与地区</string>
     <string name="settings_features_section">功能</string>
     <string name="settings_data_section">数据</string>
-    <string name="settings_service_section">服务与诊断</string>
+    <string name="settings_framework_section">框架与作用域</string>
+    <string name="settings_server_section">通信服务</string>
     <string name="settings_about_section">关于</string>
     <string name="algorithm_monitor_title">算法监听</string>
     <string name="database_monitor_title">数据库监听</string>
@@ -263,7 +296,18 @@
     <string name="settings_clear_all_records">清空全部记录</string>
     <string name="settings_total_records">总记录数</string>
     <string name="settings_total_records_value">%1$,d 条</string>
+    <string name="settings_type_counts_section">记录分类</string>
+    <string name="settings_records_algorithm">算法记录</string>
+    <string name="settings_records_database">数据库记录</string>
+    <string name="settings_storage_section">存储占用</string>
+    <string name="settings_storage_db">数据库文件</string>
+    <string name="settings_clear_algorithm_records">清理算法记录</string>
+    <string name="settings_clear_database_records">清理数据库记录</string>
+    <string name="danger_clear_algorithm_msg">清空全部算法记录?此操作不可撤销。</string>
+    <string name="danger_clear_database_msg">清空全部数据库记录?此操作不可撤销。</string>
     <string name="settings_stats_section">管道统计</string>
+    <string name="diagnostics_copy">复制诊断信息</string>
+    <string name="diagnostics_copied">诊断信息已复制</string>
     <string name="stats_received">已接收</string>
     <string name="stats_dropped">队列已满丢弃</string>
     <string name="stats_write_failures">写库失败</string>

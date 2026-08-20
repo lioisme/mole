@@ -123,5 +123,5 @@ class HookInstaller(
     }.getOrNull()
 
     private fun parseSwitch(json: String?): HookSwitch? =
-        json?.let { runCatching { Json.gson.fromJson(it, HookSwitch::class.java) }.getOrNull() }
+        json?.let { HookSwitch.fromJson(Json.gson, it) }
 }
