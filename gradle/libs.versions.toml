@@ -18,6 +18,7 @@ libxposedService = "101.0.0"
 xposedApi = "82"
 paging = "3.3.6"
 readmore = "1.7.5"
+aboutLibraries = "12.2.4"
 junit = "4.13.2"
 robolectric = "4.14.1"
 coroutinesTest = "1.10.2"
@@ -50,6 +51,7 @@ xposed-api = { group = "de.robv.android.xposed", name = "api", version.ref = "xp
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
 androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 readmore-material3 = { group = "com.webtoonscorp.android", name = "readmore-material3", version.ref = "readmore" }
+aboutlibraries-core = { group = "com.mikepenz", name = "aboutlibraries-core", version.ref = "aboutLibraries" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4", version = "1.8.3" }
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -62,3 +64,4 @@ android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+aboutlibraries-plugin = { id = "com.mikepenz.aboutlibraries.plugin", version.ref = "aboutLibraries" }

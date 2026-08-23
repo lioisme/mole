@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Modev</string>
-    <string name="app_description">An Xposed module that monitors target apps through scoped instrumentation: algorithm listening (digest/encryption/signature/MAC/keys/encoding), with more monitoring capabilities in development. Supports both Vector (libxposed 102) and legacy LSPosed.</string>
+    <string name="app_description">Monitor target apps\' algorithm and database operations via scoped Xposed hooks.</string>
 
     <!-- Common -->
     <string name="cd_back">Back</string>
@@ -17,7 +17,6 @@
 
     <!-- Apps screen -->
     <string name="apps_search">Search app name / package…</string>
-    <string name="apps_only_scoped">Scoped only</string>
     <string name="apps_system">System apps</string>
     <string name="apps_modules">Xposed modules</string>
     <string name="apps_empty_no_match">No matching apps</string>
@@ -50,9 +49,7 @@
     <string name="algorithm_monitor_master_hint">Global switch; per-kind switches keep their state</string>
     <string name="database_monitor_master">Enable Database Listen</string>
     <string name="database_monitor_master_hint">Global switch; per-kind switches keep their state</string>
-    <string name="monitor_settings_title">Listen Settings</string>
     <string name="section_db_result_limits">Result Limits</string>
-    <string name="settings_monitor_summary">Algorithm %1$s · Database %2$s</string>
     <string name="switch_cipher">Cipher</string>
     <string name="switch_message_digest">MessageDigest</string>
     <string name="switch_mac">MAC</string>
@@ -337,5 +334,9 @@
     <string name="lang_zh">中文</string>
     <string name="about">About</string>
     <string name="version">%1$s v%2$s</string>
+    <string name="about_version">Version</string>
+    <string name="licenses_title">Open source licenses</string>
+    <string name="licenses_subtitle">Third-party components used by %1$s</string>
+    <string name="licenses_row_format">%1$s · %2$s</string>
     <string name="clear_search">Clear search</string>
 </resources>

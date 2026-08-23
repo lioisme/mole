@@ -1,20 +1,21 @@
-package com.lioisme.modev.ui.settings
+﻿package com.lioisme.modev.ui.settings
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import androidx.compose.foundation.layout.size
 import com.lioisme.modev.ui.components.SettingsToggleItem
 
-/** 开关行(对齐 LIDE SettingsToggleItem 语义,参数名本地化;算法/数据库监听页共用)。 */
+/** 开关行(对齐 LIDE SettingsToggleItem 语义,参数名本地化;算法/数据库监听页共用)。*/
 @Composable
 internal fun SwitchRowItem(
     icon: ImageVector,
@@ -49,6 +50,7 @@ internal fun OptionRowItem(
     onClick: () -> Unit,
 ) {
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         headlineContent = {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
         },

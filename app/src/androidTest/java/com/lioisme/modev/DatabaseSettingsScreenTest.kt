@@ -29,16 +29,16 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 监听设置合并页验收(V19 T4,合并自算法/数据库监听两页):
- * - 设置页「功能」区单入口「监听设置」,副标题 = 算法/数据库启用态组合文案
- *   (随开关实时变化,与 SettingsRepository 单一事实源同源);
- * - 合并页四分区(算法监听 / 记录选项 / 数据库监听 / 结果闸门)齐全;
- * - 记录选项 sheet 编辑(MaxBytes)回写并展示;
- * - 返回栈:设置页 → 监听设置 → 设置页。
- * 开关态持久化(SharedPreferences + 远端镜像),@Before 快照 @After 还原防跨用例污染。
+ * 数据库监听设置页验收(V21 T3,自合并页拆分还原):
+ * - 设置页「功能」区入口「数据库监听」,副标题 = 数据库启用词(随开关实时变化,
+ *   与 SettingsRepository 单一事实源同源);
+ * - 页面两分区(监听类别 = 总开关 + 5 类别 / 结果闸门)齐全;
+ * - 结果闸门 sheet 编辑(行数上限)回写并展示;
+ * - 返回栈:设置页 → 数据库监听 → 设置页。
+ * 开关态持久化,@Before 快照 @After 还原防跨用例污染。
  */
 @RunWith(AndroidJUnit4::class)
-class MonitorSettingsScreenTest {
+class DatabaseSettingsScreenTest {
 
     @get:Rule
     val rule = createAndroidComposeRule<MainActivity>()
@@ -51,18 +51,6 @@ class MonitorSettingsScreenTest {
     private var initialSwitch: HookSwitch? = null
 
     private fun str(id: Int) = ctx.getString(id)
-
-    /** 期望副标题 = 当前开关态的启用词组合(与生产渲染同源)。 */
-    private fun expectedSummary(s: HookSwitch): String =
-        ctx.getString(
-            R.string.settings_monitor_summary,
-            ctx.getString(
-                if (s.cryptoListen) R.string.settings_capability_enabled else R.string.settings_capability_disabled
-            ),
-            ctx.getString(
-                if (s.dbListen) R.string.settings_capability_enabled else R.string.settings_capability_disabled
-            ),
-        )
 
     @Before
     fun snapshot() {
@@ -89,7 +77,7 @@ class MonitorSettingsScreenTest {
         rule.waitForIdle()
         rule.onNodeWithContentDescription(str(R.string.cd_settings)).performClick()
         rule.waitForIdle()
-        waitForVisible(str(R.string.monitor_settings_title))
+        waitForVisible(str(R.string.database_monitor_title))
     }
 
     private fun scrollTo(text: String) {
@@ -98,67 +86,70 @@ class MonitorSettingsScreenTest {
     }
 
     @Test
-    fun entry_subtitleFollowsSwitch_andPageHasFourSections() {
-        // 设置页:单入口「监听设置」+ 组合副标题(当前开关态)。
+    fun entrySubtitleFollowsSwitch_andPageHasTwoSections() {
+        // 设置页:入口「数据库监听」+ 独立入口「算法监听」。
         openSettingsPage()
-        waitForVisible(expectedSummary(settings.switch))
-        rule.onAllNodes(hasText(str(R.string.algorithm_monitor_title))).assertCountEquals(0)
+        waitForVisible(
+            str(
+                if (settings.switch.dbListen) R.string.settings_capability_enabled else R.string.settings_capability_disabled
+            ),
+        )
+        rule.onNodeWithText(str(R.string.algorithm_monitor_title)).assertIsDisplayed()
+        // 数据库入口行在小屏(360x640dp)落在折叠区,滚动至可见后断言。
+        scrollTo(str(R.string.database_monitor_title))
+        rule.onNodeWithText(str(R.string.database_monitor_title)).assertIsDisplayed()
 
-        // 进入合并页:四分区齐全(逐区滚动断言)。
-        rule.onNodeWithText(str(R.string.monitor_settings_title)).performClick()
+        // 进入数据库页:①监听类别(总开关 + 5 类别)。
+        rule.onNodeWithText(str(R.string.database_monitor_title)).performClick()
         rule.waitForIdle()
         rule.onAllNodesWithContentDescription(str(R.string.cd_back)).assertCountEquals(1)
         rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(0)
-
-        // ①算法监听:总开关 + 类别开关。
-        waitForVisible(str(R.string.algorithm_monitor_master))
-        rule.onNodeWithText(str(R.string.switch_cipher)).assertIsDisplayed()
-        // ②记录选项。
-        scrollTo(str(R.string.section_record_options))
-        rule.onNodeWithText(str(R.string.switch_log_stack)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.capture_max_bytes)).assertIsDisplayed()
-        // ③数据库监听。
-        scrollTo(str(R.string.database_monitor_master))
+        waitForVisible(str(R.string.database_monitor_master))
+        rule.onNodeWithText(str(R.string.switch_db_open)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.switch_db_query)).assertIsDisplayed()
-        // ④结果闸门。
+        rule.onNodeWithText(str(R.string.switch_db_dml)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.switch_db_exec)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.switch_db_transaction)).assertIsDisplayed()
+        // ②结果闸门。
         scrollTo(str(R.string.db_max_result_rows))
+        rule.onNodeWithText(str(R.string.db_max_result_rows)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.db_max_result_chars)).assertIsDisplayed()
     }
 
     @Test
-    fun masterToggleUpdatesSubtitle_andSheetsEditRowValue() {
-        // 设置页 → 监听设置。
+    fun masterToggleUpdatesSubtitle_andSheetEditsRowValue() {
+        // 设置页 → 数据库监听(入口行在小屏折叠区,先滚动至可见再点击)。
         openSettingsPage()
-        rule.onNodeWithText(str(R.string.monitor_settings_title)).performClick()
+        scrollTo(str(R.string.database_monitor_title))
+        rule.onNodeWithText(str(R.string.database_monitor_title)).performClick()
         rule.waitForIdle()
 
-        // 算法总开关:关 → 返回设置页,副标题算法位变为「未启用」。
-        waitForVisible(str(R.string.algorithm_monitor_master))
-        rule.onNodeWithText(str(R.string.algorithm_monitor_master)).performClick()
+        // 数据库总开关:关 → 返回设置页,副标题变为「未启用」。
+        waitForVisible(str(R.string.database_monitor_master))
+        rule.onNodeWithText(str(R.string.database_monitor_master)).performClick()
         rule.waitForIdle()
         rule.onNodeWithContentDescription(str(R.string.cd_back)).performClick()
         rule.waitForIdle()
-        val disabledSummary = expectedSummary(settings.switch)
-        assertTrue("关闭总开关后副标题应联动", !settings.switch.cryptoListen)
-        waitForVisible(disabledSummary)
+        assertTrue("关闭总开关后数据库位应联动", !settings.switch.dbListen)
+        waitForVisible(str(R.string.settings_capability_disabled))
 
-        // 再进:记录选项 sheet 编辑 MaxBytes(1234)回写行值。
-        rule.onNodeWithText(str(R.string.monitor_settings_title)).performClick()
+        // 再进:结果闸门 sheet 编辑行数上限(4321)回写行值。
+        rule.onNodeWithText(str(R.string.database_monitor_title)).performClick()
         rule.waitForIdle()
-        scrollTo(str(R.string.capture_max_bytes))
-        rule.onNodeWithText(str(R.string.capture_max_bytes)).performClick()
+        scrollTo(str(R.string.db_max_result_rows))
+        rule.onNodeWithText(str(R.string.db_max_result_rows)).performClick()
         rule.waitForIdle()
-        waitForVisible(str(R.string.capture_max_bytes_dialog_title))
+        waitForVisible(str(R.string.db_max_result_rows_dialog_title))
         rule.onNode(hasSetTextAction()).performTextClearance()
-        rule.onNode(hasSetTextAction()).performTextInput("1234")
+        rule.onNode(hasSetTextAction()).performTextInput("4321")
         rule.onNodeWithText(str(R.string.confirm)).performClick()
         rule.waitForIdle()
-        waitForVisible("1234")
-        assertTrue("sheet 确认后配置应落库", settings.switch.maxBytesPerField == 1234)
+        waitForVisible("4321")
+        assertTrue("sheet 确认后配置应落库", settings.switch.maxResultRows == 4321)
 
-        // 返回设置页:副标题仍显示算法「未启用」(开关态未被 sheet 编辑污染)。
+        // 返回设置页:副标题仍显示数据库「未启用」(开关态未被 sheet 编辑污染)。
         rule.onNodeWithContentDescription(str(R.string.cd_back)).performClick()
         rule.waitForIdle()
-        waitForVisible(expectedSummary(settings.switch))
+        waitForVisible(str(R.string.settings_capability_disabled))
     }
 }

@@ -1,4 +1,4 @@
-package com.lioisme.modev.ui.components
+﻿package com.lioisme.modev.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -15,6 +15,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -30,10 +31,18 @@ import androidx.compose.ui.unit.dp
 
 /**
  * 设置页组件集(2026-08-15 UI 重构 Phase 2,移植自 LIDE SettingsScreen;
- * V19 T6 矩阵 M2/M3/M4:全部行组件收敛为 M3 [ListItem]):
- * 分区标题 + 卡片(SurfaceContainerLow)/ 可点击项 / 开关项 / 只读信息行。
+ * V19 T6 矩阵 M2/M3/M4:全部行组件收敛为 M3 [ListItem];
+ * V21 T1 决策记录 + E1 修订:卡片容器 surfaceContainerLow(与 LIDE 逐字一致)):
+ * 分区标题 + 卡片 / 可点击项 / 开关项 / 只读信息行。
  * 视觉 token 与 LIDE 逐项一致:icon 24dp、间距 16dp、ChevronRight@50% alpha、
  * 禁用态 onSurface@38%。
+ *
+ * 卡片容器决策(V21 修订,SettingsThemeContrastTest 数据驱动):materialkolor
+ * TONAL_SPOT 下 surface 与 surfaceContainerLow 对比度实测仅 1.047~1.10:1
+ * (亮/暗),「背景与卡片同色」不可辨;曾升为 surfaceContainerHighest(M3
+ * Filled 卡语义,实测亮 1.222:1 / 暗 1.494:1)应对雷电转译渲染问题;
+ * 后经 ListItem 显式容器色修复(雷电 Unspecified Surface 嵌套 bug),
+ * 最终对齐 LIDE 契约回退 surfaceContainerLow——仍为 M3 tonal surface 家族 token。
  */
 
 @Composable
@@ -51,13 +60,14 @@ fun SettingsSection(
     Card(
         colors =
             CardDefaults.cardColors(
+                // 与 LIDE SettingsSection 逐字一致:surfaceContainerLow(E1 决策)。
                 containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
             ),
         shape = MaterialTheme.shapes.medium,
     ) { Column { content() } }
 }
 
-/** 可点击项(M3 ListItem 承载):icon + 标题(+ 副标题)+ 尾部 chevron。 */
+/** 可点击项(M3 ListItem 承载):icon + 标题(+ 副标题)+ 尾部 chevron。*/
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsItem(
@@ -67,6 +77,7 @@ fun SettingsItem(
     onClick: () -> Unit,
 ) {
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         headlineContent = {
             Text(
                 title,
@@ -124,6 +135,7 @@ fun SettingsToggleItem(
             MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
         }
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         headlineContent = {
             Text(title, style = MaterialTheme.typography.bodyLarge, color = titleColor)
         },
@@ -173,8 +185,8 @@ fun SettingsToggleItem(
 }
 
 /**
- * 只读信息行(M3 ListItem 承载):icon + 标题 + 值(无点击、无 chevron,
- * 服务状态等静态信息)。值以 [MAX_VALUE_WIDTH] 上限有界测量
+ * 只读信息行(M3 ListItem 承载):icon + 标题 + 值,无点击、无 chevron,
+ * 服务状态等静态信息。值以 [MAX_VALUE_WIDTH] 上限有界测量
  * (V11 修复延续:无界时 Row 按内容全宽测量长值,标题被挤压逐字折行;
  * 值最多两行,超界省略,Key 位置恒定)。
  */
@@ -186,6 +198,7 @@ fun SettingsInfoItem(
     value: String,
 ) {
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         headlineContent = {
             Text(
                 title,
@@ -211,5 +224,5 @@ fun SettingsInfoItem(
     )
 }
 
-/** 只读值上限宽度(约行宽 50%,V11 长值挤压标题回归防线)。 */
+/** 只读值上限宽度(约行宽 50%,V11 长值挤压标题回归防线)。*/
 private val MAX_VALUE_WIDTH = 160.dp

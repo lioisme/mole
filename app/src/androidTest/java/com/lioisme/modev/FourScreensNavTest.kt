@@ -37,7 +37,7 @@ import org.junit.runner.RunWith
  * 界面导航验收测试(T4,2026-08-16 V3;2026-08-17 V7 五需求同步;V10 设置分级同步;
  * V14 R5/R7 同步;V20 单应用语境化:入口页头部整合 + 两记录入口直通单应用列表):
  * R1(信息架构:应用列表→应用监听入口→算法/数据库记录列表→记录详情;设置页→
- * 二级设置页:监听设置/数据管理/服务与诊断,往返可达)、
+ * 二级设置页:算法监听/数据库监听/数据管理/服务与诊断,往返可达)、
  * R2(应用列表/记录列表 AppBar 内仅一个 SearchBar)、
  * R3(SearchBar 内仅一个筛选按钮,无返回/清除)、
  * V7 变更:应用行无运行按钮(根页 app-launch=0)、详情页顶栏更多菜单承载导出,
@@ -57,13 +57,13 @@ class FourScreensNavTest {
     private fun str(id: Int) = ctx.getString(id)
 
     /**
-     * V18:首个用例勾选「仅作用域」后持久化,会过滤后续用例的应用行(雷电等
+     * V18:首个用例勾选筛选项后持久化,会过滤后续用例的应用行(雷电等
      * 无 LSPosed 作用域环境藏行致 assumeTrue 跳过),@After 统一复位。
      * 模块显隐开关同理复位,防跨用例污染(与单元测试同源契约)。
+     * V22 R1:仅作用域筛选项已退役,无复位需要。
      */
     @After
     fun restoreFilters() {
-        AppListSettings.setOnlyScoped(false, ctx)
         AppListSettings.setShowModules(false, ctx)
     }
 
@@ -84,11 +84,13 @@ class FourScreensNavTest {
         // V7/V20:根页应用行无运行按钮(启动入口仅保留于应用监听入口页头部)。
         rule.onAllNodesWithTag("app-launch").assertCountEquals(0)
 
-        // 筛选菜单:含「仅作用域 / 系统应用 / Xposed 模块」三项(V14 R7:置顶项已收敛
-        // 至通用设置页「应用列表」分区;V18:设置项迁出至搜索条左上角)。
+        // 筛选菜单:仅含「系统应用 / Xposed 模块」两项(V14 R7:置顶项已收敛
+        // 至通用设置页「应用列表」分区;V18:设置项迁出至搜索条左上角;
+        // V22 R1:仅作用域筛选项退役,置顶为其替代品)。
         rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
-        rule.onNodeWithText(str(R.string.apps_only_scoped)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.apps_system)).assertIsDisplayed()
+        rule.onAllNodes(hasText(str(R.string.apps_system)) and hasAnyAncestor(isPopup())).assertCountEquals(1)
+        rule.onAllNodes(hasText(str(R.string.apps_modules)) and hasAnyAncestor(isPopup())).assertCountEquals(1)
         // V17 R1:模块显隐默认关,行为级验证 = 勾选后被测包行出现(自身是 Xposed
         // 模块,默认隐藏),取消后行消失。菜单项整项合并语义(M3 DropdownMenuItem
         // MergeDescendants),Checkbox 只读无 ToggleableState,故不走勾选态断言。
@@ -130,16 +132,22 @@ class FourScreensNavTest {
             Thread.sleep(100)
         }
         assertTrue("取消勾选后被测包行应消失", moduleRowHidden)
-        // 恢复菜单打开态,衔接原流程(仅作用域点击 / 设置入口)。
+        // 恢复菜单打开态,衔接原流程(设置入口)。
         rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
         rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.settings_pin_scoped)).assertDoesNotExist()
+        // V22 R2:置顶开关已迁回筛选菜单(设置页「应用列表」分区退役),
+        // 菜单内应含「已作用域应用置顶」且可点击切换(点击即收起)。
+        rule.onNodeWithText(str(R.string.settings_pin_scoped)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.settings_pin_scoped)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.settings_pin_scoped)).assertIsDisplayed()
+        // 还原默认开,避免污染后续用例。
+        rule.onNodeWithText(str(R.string.settings_pin_scoped)).performClick()
+        rule.waitForIdle()
         // V18:设置入口已迁出筛选菜单(搜索条左上角),菜单内无「设置」项。
         rule.onAllNodes(hasText(str(R.string.settings_title)) and hasAnyAncestor(isPopup())).assertCountEquals(0)
-
-        // 仅作用域筛选生效后菜单关闭(过滤语义无异常即可)。
-        rule.onNodeWithText(str(R.string.apps_only_scoped)).performClick()
-        rule.waitForIdle()
 
         // 设置入口:搜索条左上角设置按钮(与筛选按钮对称)→ 设置页(端到端可达)。
         rule.onNodeWithContentDescription(str(R.string.cd_settings)).performClick()
@@ -235,8 +243,13 @@ class FourScreensNavTest {
         rule.waitForIdle()
         rule.onNodeWithContentDescription(str(R.string.cd_settings)).performClick()
         rule.waitForIdle()
-        // V19 T4:功能收敛单入口「监听设置」(合并算法/数据库,旧两入口已退役)。
-        rule.onNodeWithText(str(R.string.monitor_settings_title)).assertIsDisplayed()
+        // V21 T3:功能四入口——算法监听 / 数据库监听(V19 合并单页拆分还原)/
+        // 数据管理 / 服务与诊断。数据库入口行在小屏(360x640dp)落在折叠区,
+        // 滚动至可见后断言。
+        rule.onNodeWithText(str(R.string.algorithm_monitor_title)).assertIsDisplayed()
+        rule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText(str(R.string.database_monitor_title)))
+        rule.onNodeWithText(str(R.string.database_monitor_title)).assertIsDisplayed()
         // 小屏(雷电等)「数据管理」入口位于折叠区,滚动至可见后断言。
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.data_settings_title)))
@@ -245,22 +258,13 @@ class FourScreensNavTest {
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.diagnostics_settings_title)))
         rule.onNodeWithText(str(R.string.diagnostics_settings_title)).assertIsDisplayed()
-        // 回到列表顶部,保证「应用列表」分区断言与入口点击可见。
+        // 回到列表顶部,保证功能入口点击可见。
         rule.onAllNodes(hasScrollAction()).onFirst()
-            .performScrollToNode(hasText(str(R.string.monitor_settings_title)))
+            .performScrollToNode(hasText(str(R.string.algorithm_monitor_title)))
         rule.waitForIdle()
 
-        // V14 R7:设置页「应用列表」分区含置顶开关(唯一入口),可切换并还原。
-        rule.onNodeWithText(str(R.string.settings_apps_section)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.settings_pin_scoped)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.settings_pin_scoped)).performClick()
-        rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.settings_pin_scoped)).performClick()
-        rule.waitForIdle()
-
-        // 监听设置合并页(V19 T4):①算法总开关 + 类别;②记录选项;③数据库总开关;
-        // ④结果闸门;无筛选按钮。
-        rule.onNodeWithText(str(R.string.monitor_settings_title)).performClick()
+        // 算法监听页(V21 T3):①监听类别(算法总开关 + 12 类别)②记录选项;无筛选按钮。
+        rule.onNodeWithText(str(R.string.algorithm_monitor_title)).performClick()
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.algorithm_monitor_master)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.switch_cipher)).assertIsDisplayed()
@@ -268,9 +272,15 @@ class FourScreensNavTest {
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.switch_log_stack)))
         rule.onNodeWithText(str(R.string.switch_log_stack)).assertIsDisplayed()
-        // 数据库分区 + 结果闸门继续滚动断言。
+        rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(0)
+        pressBack()
+
+        // 数据库监听页(V21 T3):①监听类别(数据库总开关 + 5 类别)②结果闸门;无筛选按钮。
+        // 数据库入口行在小屏(360x640dp)落在折叠区,先滚动至可见再点击。
         rule.onAllNodes(hasScrollAction()).onFirst()
-            .performScrollToNode(hasText(str(R.string.database_monitor_master)))
+            .performScrollToNode(hasText(str(R.string.database_monitor_title)))
+        rule.onNodeWithText(str(R.string.database_monitor_title)).performClick()
+        rule.waitForIdle()
         rule.onNodeWithText(str(R.string.database_monitor_master)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.switch_db_query)).assertIsDisplayed()
         rule.onAllNodes(hasScrollAction()).onFirst()
@@ -281,6 +291,9 @@ class FourScreensNavTest {
         pressBack()
 
         // 返回设置页 → 数据管理页:总记录行 + 清空全部日志(危险块),不触发。
+        // 数据管理入口在小屏折叠区,先滚动至可见再点击。
+        rule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText(str(R.string.data_settings_title)))
         rule.onNodeWithText(str(R.string.data_settings_title)).performClick()
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.settings_total_records)).assertIsDisplayed()

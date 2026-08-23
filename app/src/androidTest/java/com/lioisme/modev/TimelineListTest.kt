@@ -99,8 +99,6 @@ class TimelineListTest {
             assertEquals("种子写入须在读回中可见", 6L, seeded)
         }
         // 被测应用默认隐藏(自身是 Xposed 模块),开启显隐使行可见。
-        // 仅作用域筛选会按进程隐藏行(rootHasOnly 勾选后持久化),一并复位保证确定性。
-        AppListSettings.setOnlyScoped(false, ctx)
         AppListSettings.setShowModules(true, ctx)
         rule.waitForIdle()
     }

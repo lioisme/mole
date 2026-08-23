@@ -1,4 +1,4 @@
-package com.lioisme.modev.ui.apps
+﻿package com.lioisme.modev.ui.apps
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -29,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
@@ -77,17 +78,18 @@ internal sealed interface AppsNavTarget {
 
 /**
  * 应用列表页(2026-08-16 V3,四界面重构,根页;V18 设置入口归位搜索条左上角):
- * 全量已安装应用,勾选 = LSPosed 作用域(单一事实源)。
+ * 全量已安装应用,勾选 = LSPosed 作用域,单一事实源。
  * - 顶栏:CenterAlignedTopAppBar + SearchBar(折叠条,单击展开全屏 SearchView);
- *   AppBar 内仅此一个元素(硬性规范),禁止放置其他按钮;
- * - SearchBar 内:左上角设置按钮(与右下角筛选按钮对称,V18 自筛选菜单迁出),
- *   右下角仅筛选按钮:「仅已作用域 / 系统应用」DropdownMenu(Checkbox 复选);
+ *   AppBar 内仅此一个元素,硬性规则,禁止放置其他按钮;
+ * - SearchBar 内:左上角设置按钮与右下角筛选按钮对称(V18 自筛选菜单迁出),
+ *   右下角仅筛选按钮:「已作用域置顶 / 系统应用 / Xposed 模块」DropdownMenu
+ *   (Checkbox 复选,V22 R2 置顶开关迁回本菜单);
  * - 搜索状态机由共享封装 rememberSearchController 提供(红线全守);
-* - 应用行:ProjectList 行规范(AppIcon 40dp + 名称 bodyLarge Medium + 包名
+ * - 应用表:ProjectList 行规范:AppIcon 40dp + 名称 bodyLarge Medium + 包名
  *  bodySmall + 记录数 secondaryContainer 徽标,行尾 Checkbox 作用域勾选,
- *  padding h16/v12,行间 outlineVariant 分隔线;V7 起无运行按钮);
+ *  padding h16/v12,行间 outlineVariant 分隔线(V7 起无运行按钮);
  * - 下拉刷新(PullToRefreshBox);空态用 EmptyState。
- * 返回语义:根页空闲返回由导航层抛回系统退出;全屏 SearchView 返回只收状态。
+ * 返回语义:根页空闲返回由导航层抛回系统退出,全屏 SearchView 返回只收状态。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -101,8 +103,8 @@ fun AppsScreen(
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
 
-    // 已作用域应用置顶(V14 R7 自筛选菜单收敛至通用设置页):AppListSettings
-    // 单一事实源,排序流水线直接消费,变更即重排,跨页返回不滞留旧序。
+    // 已作用域应用置顶(V22 R2 自通用设置页迁回筛选菜单,与系统应用 / 模块同列):
+    // AppListSettings 单一事实源,排序流水线直接消费,变更即重排,跨页返回不滞留旧序。
 
     // 搜索状态机共享封装(无参 rememberSearchBarState / 独立意图 / 唯一动画驱动 /
     // 收起后导航 / snapTo 兜底,红线全守)。T = 导航目标(应用详情)。
@@ -113,8 +115,10 @@ fun AppsScreen(
             }
         },
     )
-    // 作用域筛选菜单开合(折叠条与全屏 SearchView 共用同一状态,单源驱动)。
+    // 作用域筛选菜单开关:折叠条与全屏 SearchView 共用同一状态,单源驱动)。
     var filterMenuOpen by remember { mutableStateOf(false) }
+    // 已作用域置顶开关(V22 R2 迁回筛选菜单):AppListSettings 单一事实源。
+    val pinScoped by AppListSettings.pinScoped.collectAsStateWithLifecycle()
 
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { message ->
@@ -124,12 +128,12 @@ fun AppsScreen(
         }
     }
 
-    // 查询词变化 → ViewModel 过滤(内存过滤,语义不变,UI 层持有状态)。
+    // 查询词变更 → ViewModel 过滤(内存过滤,语义不变,UI 层持有状态)。
     LaunchedEffect(search.queryText) {
         viewModel.setQuery(search.queryText)
     }
 
-    // 设置入口:折叠态位于搜索条左上角(与筛选按钮对称),直接导航。
+    // 设置入口:折叠态位于搜索条左上角,与筛选按钮对称,直接导航。
     val openSettings: () -> Unit = { onOpenSettings() }
 
     Scaffold(
@@ -162,8 +166,8 @@ CollapsedSearchInput(
                                     ScopeFilterMenu(
                                         expanded = filterMenuOpen,
                                         onExpandedChange = { filterMenuOpen = it },
-                                        onlyScoped = state.onlyScoped,
-                                        onOnlyScopedChange = { AppListSettings.setOnlyScoped(it, context) },
+                                        pinScoped = pinScoped,
+                                        onPinScopedChange = { AppListSettings.setPinScoped(it, context) },
                                         showSystem = state.showSystem,
                                         onShowSystemChange = { AppListSettings.setShowSystem(it, context) },
                                         showModules = state.showModules,
@@ -207,7 +211,7 @@ Column(Modifier.fillMaxSize()) {
                     EmptyState(
                         icon = Icons.Outlined.Android,
                         message =
-                            if (search.queryText.isNotBlank() || state.onlyScoped) {
+                            if (search.queryText.isNotBlank()) {
                                 stringResource(R.string.apps_empty_no_match)
                             } else {
                                 stringResource(R.string.apps_empty_no_apps)
@@ -224,7 +228,7 @@ items(state.rows, key = { it.packageName }) { row ->
                                 pending = row.packageName in state.pending,
                                 onToggle = { viewModel.toggle(row.packageName) },
                                 // 折叠态点击直接导航(无 Dialog 可收起);
-                                // 展开态点击先收后导(见全屏 SearchView 内 onClick)。
+                                // 展开态点击先收后导,见全屏 SearchView 内 onClick)。
                                 onClick = { onOpen(row.packageName) },
                             )
                             if (row != state.rows.last()) {
@@ -240,7 +244,7 @@ items(state.rows, key = { it.packageName }) { row ->
         }
     }
 
-    // 全屏搜索视图:Dialog 新窗口承载(官方组件,返回键/缩放动画/键盘管理内置)。
+// 全屏搜索视图:Dialog 新窗口承载,官方组件,返回键/缩放动画/键盘管理内置)。
     // 内容直接渲染 ViewModel 过滤结果(state.rows),不做二次内存过滤(数据流单一事实源)。
     if (search.searchBarState.currentValue == SearchBarValue.Expanded) {
         // V16 R5/R6:官方 ExpandedFullScreenSearchBar 为独立 Dialog 窗口,窗口组合
@@ -260,7 +264,7 @@ items(state.rows, key = { it.packageName }) { row ->
                         search.collapse()
                         focusManager.clearFocus()
                     },
-                    // 展开态返回语义=退出搜索(与 LIDE 同款:返回键等价收起)。
+                    // 展开态返回语义:退出搜索,与 LIDE 同款:返回键等价收起。
                     onBack = {
                         search.collapse()
                         focusManager.clearFocus()
@@ -270,8 +274,8 @@ items(state.rows, key = { it.packageName }) { row ->
                         ScopeFilterMenu(
                             expanded = filterMenuOpen,
                             onExpandedChange = { filterMenuOpen = it },
-                            onlyScoped = state.onlyScoped,
-                            onOnlyScopedChange = { AppListSettings.setOnlyScoped(it, context) },
+                            pinScoped = pinScoped,
+                            onPinScopedChange = { AppListSettings.setPinScoped(it, context) },
                             showSystem = state.showSystem,
                             onShowSystemChange = { AppListSettings.setShowSystem(it, context) },
                             showModules = state.showModules,
@@ -281,7 +285,7 @@ items(state.rows, key = { it.packageName }) { row ->
                 )
             },
         ) {
-            // Dialog 内返回键:收起 + 显式清焦点(防焦点回落折叠条重新展开死循环)。
+            // Dialog 内返回键:收起 + 显式清焦点,防焦点回落折叠条重新展开死循环。
             androidx.activity.compose.BackHandler(enabled = true) {
                 search.collapse()
                 focusManager.clearFocus()
@@ -322,19 +326,20 @@ items(state.rows, key = { it.packageName }) { row ->
 
 /**
  * 作用域筛选菜单(2026-08-16 V3;2026-08-17 V10 置顶入菜单;2026-08-18 V14 R7
- * 置顶收敛通用设置页;V17 R1 新增「Xposed 模块」显隐;V18 移除「设置」项,
- * 设置入口归位搜索条左上角):
- * SearchBar trailingIcon 槽内,
- * 「仅已作用域」/「系统应用」/「Xposed 模块」Checkbox 复选(状态持久化,
- * AppListSettings 单一事实源)。
- * 有激活条件时筛选按钮 primary 着色(筛选启用指示)。
+ * 置顶收敛通用设置页;V17 R1 新增「Xposed 模块」显示;V18 移除「设置」项,
+ * 设置入口归位搜索条左上角;V22 R1 移除「仅作用域」;V22 R2 置顶开关迁回本菜单,
+ * 与系统应用 / 模块并列):
+ * SearchBar trailingIcon 槽内,三项 Checkbox 复选(只读 Checkbox + 整项 OnClick,
+ * 契约 8 勾选态断言不可行,改行为级断言),状态持久化,
+ * AppListSettings 单一事实源。
+ * 有激活条件时筛选按钮 primary 着色,筛选启用指示。
  */
 @Composable
 private fun ScopeFilterMenu(
     expanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    onlyScoped: Boolean,
-    onOnlyScopedChange: (Boolean) -> Unit,
+    pinScoped: Boolean,
+    onPinScopedChange: (Boolean) -> Unit,
     showSystem: Boolean,
     onShowSystemChange: (Boolean) -> Unit,
     showModules: Boolean,
@@ -348,7 +353,7 @@ private fun ScopeFilterMenu(
                 Icons.Default.FilterList,
                 contentDescription = res.getString(R.string.cd_filter),
                 tint =
-                    if (onlyScoped || !showSystem || !showModules) {
+                    if (!showSystem || !showModules) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant
@@ -357,10 +362,10 @@ private fun ScopeFilterMenu(
         }
         DropdownMenu(expanded = expanded, onDismissRequest = { onExpandedChange(false) }) {
             DropdownMenuItem(
-                text = { Text(res.getString(R.string.apps_only_scoped), maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                leadingIcon = { Checkbox(checked = onlyScoped, onCheckedChange = null) },
+                text = { Text(res.getString(R.string.settings_pin_scoped), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                leadingIcon = { Checkbox(checked = pinScoped, onCheckedChange = null) },
                 onClick = {
-                    onOnlyScopedChange(!onlyScoped)
+                    onPinScopedChange(!pinScoped)
                     onExpandedChange(false)
                 },
             )
@@ -391,7 +396,7 @@ private fun ScopeFilterMenu(
  * 徽标 + supporting 包名 bodySmall + 状态角标(已作用域时:运行中=绿色圆点/
  * 未运行=灰色圆点,完整语义进 contentDescription 与长按 tooltip),
  * trailing Checkbox(作用域勾选,V7 起置于右侧,无运行按钮);
- * 行间 outlineVariant 分隔线(列表外侧,行内不分隔)。
+ * 行间 outlineVariant 分隔线,列表外侧,行内不分割。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -403,6 +408,7 @@ private fun AppRowItem(
     onClick: () -> Unit,
 ) {
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
         headlineContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
@@ -470,7 +476,7 @@ private fun AppRowItem(
         modifier =
             Modifier
                 .fillMaxWidth()
-                // 测试锚点:导航级 UI 测试经 testTag 定位应用行(Google 惯例)。
+                // 测试锚点:导航行 UI 测试用 testTag 定位应用行(Google 惯例)。
                 .testTag("app-row")
                 .clickable(onClick = onClick),
     )
@@ -478,10 +484,10 @@ private fun AppRowItem(
 
 @Composable
 private fun countText(count: Long): String {
-    // V13:按应用实际生效 locale 判定(与 stringResource 解析同源)——跟随系统
-    // 时 LocaleManager.currentLanguageTag = "system" 会误判为英文(万/千错位)。
-    // V15:locale 驱动 NumberFormat(zh ≥1万紧凑 / 其他 ≥1千;以下千分位)。
-    // V16 R5:热切换下 LocalConfiguration 陈旧,一律经包过 Context 解析(effectiveLocale)。
+// V13:按应用实际生效 locale 判定(与 stringResource 解析同源)——跟随系统
+    // 时,LocaleManager.currentLanguageTag = "system" 会误判为英文(与千错位)。
+    // V15:locale 驱动 NumberFormat(zh ≥1 万紧凑 / 其他 ≥1K,以下千分位)。
+    // V16 R5:热切换下 LocalConfiguration 陈旧,一律经包装 Context 解析(effectiveLocale)。
     val locale = rememberEffectiveLocale()
     return AppCountFormat.compact(count, locale)
 }

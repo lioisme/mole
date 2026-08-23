@@ -13,8 +13,8 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * AppListSettings 偏好契约(V14 R7/R8):
- * - 默认值:pinScoped=true(置顶默认开)/ onlyScoped=false / showSystem=true;
+ * AppListSettings 偏好契约(V14 R7/R8;V22 R1 仅作用域退役):
+ * - 默认值:pinScoped=true(置顶默认开)/ showSystem=true;
  * - set → 内存 StateFlow 即时更新(排序流水线消费);
  * - set → SharedPreferences 落盘 → init 重载回读一致(杀进程重启等价)。
  */
@@ -39,10 +39,9 @@ class AppListSettingsTest {
     }
 
     @Test
-    fun `defaults pinScoped true onlyScoped false showSystem true`() {
+    fun `defaults pinScoped true showSystem true`() {
         AppListSettings.init(context)
         assertTrue(AppListSettings.pinScoped.value)
-        assertFalse(AppListSettings.onlyScoped.value)
         assertTrue(AppListSettings.showSystem.value)
         // V17 R1:模块默认隐藏
         assertFalse(AppListSettings.showModules.value)
@@ -63,21 +62,16 @@ class AppListSettingsTest {
     }
 
     @Test
-    fun `set onlyScoped and showSystem persist and reload`() {
+    fun `set showSystem persists and reloads`() {
         AppListSettings.init(context)
-        AppListSettings.setOnlyScoped(true, context)
         AppListSettings.setShowSystem(false, context)
-        assertTrue(AppListSettings.onlyScoped.value)
         assertFalse(AppListSettings.showSystem.value)
         AppListSettings.init(context)
-        assertTrue(AppListSettings.onlyScoped.value)
         assertFalse(AppListSettings.showSystem.value)
         // 还原默认
-        AppListSettings.setOnlyScoped(false, context)
         AppListSettings.setShowSystem(true, context)
         AppListSettings.init(context)
-        assertEquals(false, AppListSettings.onlyScoped.value)
-        assertEquals(true, AppListSettings.showSystem.value)
+        assertTrue(AppListSettings.showSystem.value)
     }
 
     @Test

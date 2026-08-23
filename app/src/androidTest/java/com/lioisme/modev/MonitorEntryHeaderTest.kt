@@ -46,7 +46,6 @@ class MonitorEntryHeaderTest {
     @After
     fun restore() {
         AppListSettings.setShowModules(false, ctx)
-        AppListSettings.setOnlyScoped(false, ctx)
     }
 
     private fun pressBack() {
@@ -56,7 +55,6 @@ class MonitorEntryHeaderTest {
 
     /** 等待被测包行出现并进入应用监听入口页(与 MonitorListScreensTest 同款轮询)。 */
     private fun openMonitorEntry() {
-        AppListSettings.setOnlyScoped(false, ctx)
         AppListSettings.setShowModules(true, ctx)
         rule.waitForIdle()
         val deadline = System.currentTimeMillis() + 10_000

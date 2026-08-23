@@ -31,12 +31,17 @@ import com.lioisme.modev.ui.navigation.slideComposable
 import com.lioisme.modev.ui.records.AlgorithmRecordsScreen
 import com.lioisme.modev.ui.records.DatabaseRecordsScreen
 import com.lioisme.modev.ui.records.MonitorRecordsViewModelFactory
+import com.lioisme.modev.ui.settings.AboutScreen
+import com.lioisme.modev.ui.settings.AlgorithmSettingsScreen
+import com.lioisme.modev.ui.settings.AlgorithmSettingsViewModelFactory
 import com.lioisme.modev.ui.settings.DataSettingsScreen
 import com.lioisme.modev.ui.settings.DataSettingsViewModelFactory
+import com.lioisme.modev.ui.settings.DatabaseSettingsScreen
+import com.lioisme.modev.ui.settings.DatabaseSettingsViewModelFactory
 import com.lioisme.modev.ui.settings.DiagnosticsScreen
 import com.lioisme.modev.ui.settings.DiagnosticsViewModelFactory
-import com.lioisme.modev.ui.settings.MonitorSettingsScreen
-import com.lioisme.modev.ui.settings.MonitorSettingsViewModelFactory
+import com.lioisme.modev.ui.settings.LicenseDetailScreen
+import com.lioisme.modev.ui.settings.LicensesScreen
 import com.lioisme.modev.ui.settings.SettingsScreen
 import com.lioisme.modev.ui.settings.SettingsViewModelFactory
 
@@ -45,8 +50,8 @@ import com.lioisme.modev.ui.settings.SettingsViewModelFactory
  * V19 T4 监听设置合并;V20 记录列表单应用语境化 + 「查看记录」界面退役):
  * 信息架构 = 应用列表(根页) → 应用监听入口(应用头部 + 算法记录 / 数据库记录)
  * → 记录详情;
- * 设置页 = 通用设置,入口 = 应用列表搜索条左上角设置按钮;二级设置页(监听设置 /
- * 数据管理 / 服务与诊断)经设置页进入(监听设置 = 算法/数据库合并单页,V19)。
+ * 设置页 = 通用设置,入口 = 应用列表搜索条左上角设置按钮;二级设置页(算法监听 /
+ * 数据库监听 / 数据管理 / 服务与诊断)经设置页进入(V21 T3 拆分还原,V19 合并单页退役)。
  * 全部目的地 slideComposable(编译器层杜绝 fade)+ 返回键统一过门控。
  * 根页(APPS)空闲返回抛回系统退出;次级页返回一律 popGuarded 回退上级。
  */
@@ -198,8 +203,11 @@ fun ModevNavHost(navController: NavHostController) {
                 SettingsScreen(
                     viewModel = viewModel(factory = SettingsViewModelFactory(app.container)),
                     onBack = { navController.popGuarded() },
-                    onOpenMonitorSettings = {
-                        navController.navigateGuarded(ModevRoutes.MONITOR_SETTINGS)
+                    onOpenAlgorithmSettings = {
+                        navController.navigateGuarded(ModevRoutes.ALGORITHM_SETTINGS)
+                    },
+                    onOpenDatabaseSettings = {
+                        navController.navigateGuarded(ModevRoutes.DATABASE_SETTINGS)
                     },
                     onOpenDataSettings = {
                         navController.navigateGuarded(ModevRoutes.DATA_SETTINGS)
@@ -207,13 +215,60 @@ fun ModevNavHost(navController: NavHostController) {
                     onOpenDiagnostics = {
                         navController.navigateGuarded(ModevRoutes.DIAGNOSTICS_SETTINGS)
                     },
+                    onOpenAbout = {
+                        navController.navigateGuarded(ModevRoutes.ABOUT)
+                    },
                 )
             }
         }
-        slideComposable(route = ModevRoutes.MONITOR_SETTINGS) {
+        slideComposable(route = ModevRoutes.ABOUT) {
             BackGuarded(navController) {
-                MonitorSettingsScreen(
-                    viewModel = viewModel(factory = MonitorSettingsViewModelFactory(app.container)),
+                AboutScreen(
+                    onBack = { navController.popGuarded() },
+                    onOpenLicenses = {
+                        navController.navigateGuarded(ModevRoutes.LICENSES)
+                    },
+                )
+            }
+        }
+        slideComposable(route = ModevRoutes.LICENSES) {
+            BackGuarded(navController) {
+                LicensesScreen(
+                    onBack = { navController.popGuarded() },
+                    onOpenDetail = { index ->
+                        navController.navigateGuarded(ModevRoutes.licenseDetail(index))
+                    },
+                )
+            }
+        }
+        slideComposable(
+            route = ModevRoutes.LICENSE_DETAIL,
+            arguments = listOf(navArgument("index") { type = NavType.IntType }),
+        ) { entry ->
+            val index = entry.arguments?.getInt("index") ?: run {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
+            BackGuarded(navController) {
+                LicenseDetailScreen(
+                    index = index,
+                    onBack = { navController.popGuarded() },
+                    onInvalid = { navController.popGuarded() },
+                )
+            }
+        }
+        slideComposable(route = ModevRoutes.ALGORITHM_SETTINGS) {
+            BackGuarded(navController) {
+                AlgorithmSettingsScreen(
+                    viewModel = viewModel(factory = AlgorithmSettingsViewModelFactory(app.container)),
+                    onBack = { navController.popGuarded() },
+                )
+            }
+        }
+        slideComposable(route = ModevRoutes.DATABASE_SETTINGS) {
+            BackGuarded(navController) {
+                DatabaseSettingsScreen(
+                    viewModel = viewModel(factory = DatabaseSettingsViewModelFactory(app.container)),
                     onBack = { navController.popGuarded() },
                 )
             }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Modev</string>
-    <string name="app_description">通过作用域注入监听目标 App 行为的 Xposed 模块:当前能力为算法监听(摘要/加解密/签名/MAC/密钥/编码),更多监听能力开发中。支持 Vector(libxposed 102)与旧版 LSPosed 双框架。</string>
+    <string name="app_description">通过作用域 Xposed 钩子程序监听目标 App 的算法与数据库行为。</string>
 
     <!-- 通用 -->
     <string name="cd_back">返回</string>
@@ -17,7 +17,6 @@
 
     <!-- 应用列表页 -->
     <string name="apps_search">搜索应用名称 / 包名…</string>
-    <string name="apps_only_scoped">仅已作用域</string>
     <string name="apps_system">系统应用</string>
     <string name="apps_modules">Xposed 模块</string>
     <string name="apps_empty_no_match">没有匹配的应用</string>
@@ -50,9 +49,7 @@
     <string name="algorithm_monitor_master_hint">全局总开关;分开关保留原态,重开即恢复</string>
     <string name="database_monitor_master">启用数据库监听</string>
     <string name="database_monitor_master_hint">全局总开关;分开关保留原态,重开即恢复</string>
-    <string name="monitor_settings_title">监听设置</string>
     <string name="section_db_result_limits">结果闸门</string>
-    <string name="settings_monitor_summary">算法监听 %1$s · 数据库监听 %2$s</string>
     <string name="switch_cipher">加解密 Cipher</string>
     <string name="switch_message_digest">摘要 MessageDigest</string>
     <string name="switch_mac">MAC (HMAC)</string>
@@ -333,5 +330,9 @@
     <string name="lang_zh">中文</string>
     <string name="about">关于</string>
     <string name="version">%1$s v%2$s</string>
+    <string name="about_version">版本</string>
+    <string name="licenses_title">开源许可</string>
+    <string name="licenses_subtitle">%1$s 使用的第三方组件</string>
+    <string name="licenses_row_format">%1$s · %2$s</string>
     <string name="clear_search">清除搜索</string>
 </resources>

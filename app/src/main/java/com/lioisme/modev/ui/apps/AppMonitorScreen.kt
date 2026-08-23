@@ -1,4 +1,4 @@
-package com.lioisme.modev.ui.apps
+﻿package com.lioisme.modev.ui.apps
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +26,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -81,7 +82,7 @@ import kotlinx.coroutines.launch
  * 应用监听入口页(V18 单击应用先到本页;V20 整合「查看记录」头部职责并退役该界面):
  * - 顶部:AppHeaderRow(应用名 + 包名 + 双状态点 + 一键启动 + 更多菜单 =
  *   移出作用域 / 清空该应用记录,均居中 AlertDialog 确认);
- * - 入口卡片:算法记录 / 数据库记录(单应用记录列表,副标题 = 每类型计数)。
+ * - 入口卡片:算法记录 / 数据库记录,单应用记录列表,副标题 = 每类型计数。
  * 单一事实源 = AppCatalogRepository(应用信息)+ SettingsRepository.globalSwitch
  * (监听总开关态)+ ScopeRepository / ConnectionMonitor(状态角标)+ LogRepository(计数)。
  */
@@ -138,7 +139,7 @@ fun AppMonitorScreen(
                 connected = connected,
                 scopeState = scopeState,
                 scoped = scoped,
-                // 仅存在启动入口时展示「启动」按钮(解析完成前不渲染,防闪变)。
+                // 仅存在启动入口时展示「启动」按钮,解析完成前不渲染,防闪烁。
                 onLaunch =
                     if (launchable == true) {
                         { onLaunch(viewModel.packageName) }
@@ -226,6 +227,7 @@ private fun AppHeaderRow(
     onClearLogs: (() -> Unit)? = null,
 ) {
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surface),
         headlineContent = {
             Text(
                 label,
@@ -357,7 +359,7 @@ private fun countText(count: Long): String {
 /**
  * 应用监听入口页数据(V18;V20 整合「查看记录」头部职责):
  * 应用信息 / 在线 / 作用域 / 启动入口 / 每类型记录计数 / 监听总开关态
- * + 应用级操作(移出作用域 + 清空该应用记录)。
+ * + 应用级操作:移出作用域 + 清空该应用记录。
  */
 class AppMonitorViewModel(
     val packageName: String,
@@ -368,7 +370,7 @@ class AppMonitorViewModel(
     settings: SettingsRepository,
 ) : ViewModel() {
 
-    /** 应用名/图标信息。 */
+    /** 应用名+图标信息。*/
     val appInfo: StateFlow<AppCatalogRepository.AppInfo?> = catalog.apps
         .map { list -> list.firstOrNull { it.packageName == packageName } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
@@ -381,7 +383,7 @@ class AppMonitorViewModel(
 
     private val launchableState = MutableStateFlow<Boolean?>(null)
 
-    /** 启动入口解析结果(null = 解析中;V16 R4 惰性单次解析 + 缓存)。 */
+    /** 启动入口解析结果(null = 解析中,V16 R4 惰性单次解析 + 缓存)。*/
     val launchable: StateFlow<Boolean?> = launchableState
 
     init {
@@ -390,20 +392,20 @@ class AppMonitorViewModel(
         }
     }
 
-    /** 该应用算法记录数(入口副标题,AppCountFormat 紧凑格式)。 */
+    /** 该应用算法记录数(入口副标题,AppCountFormat 紧凑格式)。*/
     val cryptoCount: StateFlow<Long> = logs.observeRecordCounts(RecordTypes.CRYPTO)
         .map { counts -> counts[packageName] ?: 0L }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
-    /** 该应用数据库记录数(入口副标题,AppCountFormat 紧凑格式)。 */
+    /** 该应用数据库记录数(入口副标题,AppCountFormat 紧凑格式)。*/
     val dbCount: StateFlow<Long> = logs.observeRecordCounts(RecordTypes.DATABASE)
         .map { counts -> counts[packageName] ?: 0L }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
-    /** 全局监听配置(算法/数据库总开关态,入口副标题语义来源)。 */
+    /** 全局监听配置(算法/数据库总开关态,入口副标题语义来源)。*/
     val globalSwitch: StateFlow<HookSwitch> = settings.globalSwitch
 
-    /** 一次性提示(移出作用域 / 清空记录结果),由 UI 收集为 Snackbar。 */
+    /** 一次性提示(移出作用域 / 清空记录结果),由 UI 收集发 Snackbar。*/
     val messages = MutableSharedFlow<UiMessage>(extraBufferCapacity = 8)
 
     fun clearLogs() {
@@ -413,7 +415,7 @@ class AppMonitorViewModel(
         }
     }
 
-    /** 移出作用域(等价于 LSPosed 作用域取消勾选)。 */
+    /** 移出作用域,等价于 LSPosed 作用域取消勾选。*/
     fun removeScope() {
         viewModelScope.launch {
             val result = scopeRepository.remove(packageName)
@@ -430,7 +432,7 @@ class AppMonitorViewModel(
     }
 }
 
-/** M17:失败错误码 → 本地化文案(domain 零硬编码,Snackbar 语义由 UI 层承担)。 */
+/** M17:失败错误码 → 本地化文案,domain 零硬编码,Snackbar 语义由 UI 层承担。*/
 private fun scopeFailedMessage(packageName: String, failed: ScopeChangeResult.Failed): UiMessage =
     when (failed) {
         ScopeChangeResult.Failed.FrameworkNotReady ->
@@ -445,7 +447,7 @@ private fun scopeFailedMessage(packageName: String, failed: ScopeChangeResult.Fa
             UiMessage(R.string.apps_scope_failed_remove, listOf(packageName))
     }
 
-/** 简单工厂,避免在 Compose 中手动拼参。 */
+/** 简单工厂,避免在 Compose 中手动拼参。*/
 class AppMonitorViewModelFactory(
     private val packageName: String,
     private val container: AppContainer,

@@ -1,16 +1,17 @@
-package com.lioisme.modev.ui.settings
+﻿package com.lioisme.modev.ui.settings
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Storage
@@ -18,9 +19,10 @@ import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,7 +30,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -41,7 +42,7 @@ import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsInfoItem
 import com.lioisme.modev.ui.components.SettingsSection
 
-/** 待确认的清理目标(按类型 / 全部,危险 AlertDialog 确认)。 */
+/** 待确认的清理目标(按类型 / 全部,危险 AlertDialog 确认)。*/
 private enum class ClearTarget {
     ALGORITHM,
     DATABASE,
@@ -68,6 +69,7 @@ fun DataSettingsScreen(
     val dbSizeBytes = remember(context) { context.getDatabasePath(ModevDatabase.NAME).length().toLong() }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             ModevTopBar(
                 title = stringResource(R.string.data_settings_title),
@@ -130,6 +132,7 @@ fun DataSettingsScreen(
     pendingClear?.let { target ->
         AlertDialog(
             onDismissRequest = { pendingClear = null },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             icon = { Icon(Icons.Default.Delete, null) },
             title = { Text(stringResource(R.string.danger_title)) },
             text = {
@@ -164,29 +167,32 @@ fun DataSettingsScreen(
     }
 }
 
-/** 危险操作行(errorContainer 质感,点击唤起确认对话框)。 */
+/**
+ * 危险操作行(V21 T4:整块 errorContainer 色块 → 标准 M3 [ListItem],
+ * leading `Delete` 图标 error 色 + 标题 onSurface + chevron@50%,
+ * 点击唤起居中 AlertDialog 确认,契约 13 保留)。
+ */
 @Composable
 private fun DangerRow(
     text: String,
     onClick: () -> Unit,
 ) {
-    Surface(
-        onClick = onClick,
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.errorContainer,
-        modifier = Modifier.fillMaxWidth(),
-    ) {
-        Row(
-            Modifier.padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(Icons.Filled.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.onErrorContainer)
-            Spacer(Modifier.width(12.dp))
-            Text(
-                text,
-                color = MaterialTheme.colorScheme.onErrorContainer,
-                style = MaterialTheme.typography.bodyLarge,
+    ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        headlineContent = {
+            Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+        },
+        leadingContent = {
+            Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
+        },
+        trailingContent = {
+            Icon(
+                Icons.Default.ChevronRight,
+                null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                modifier = Modifier.size(20.dp),
             )
-        }
-    }
+        },
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+    )
 }

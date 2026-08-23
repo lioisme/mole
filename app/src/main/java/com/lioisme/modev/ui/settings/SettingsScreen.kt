@@ -1,4 +1,4 @@
-package com.lioisme.modev.ui.settings
+﻿package com.lioisme.modev.ui.settings
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,20 +32,19 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Sensors
+import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Wallpaper
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -69,12 +68,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.BuildConfig
 import com.lioisme.modev.R
-import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.i18n.LocaleManager
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsItem
 import com.lioisme.modev.ui.components.SettingsSection
-import com.lioisme.modev.ui.components.SettingsToggleItem
 import com.lioisme.modev.ui.theme.AppearanceMode
 import com.lioisme.modev.ui.theme.LocalIsDarkTheme
 import com.lioisme.modev.ui.theme.ThemeConfig
@@ -86,14 +83,13 @@ import kotlinx.coroutines.launch
 private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
 
 /**
- * 设置页(V10 设置分级,通用设置收敛本页;V19 T4 功能收敛):
+ * 设置页(V10 设置分级,通用设置收敛本页;V19 T4 功能收敛;V21 T3 功能四入口):
  * 卡片式分区(SettingsSection = surfaceContainerLow 卡),仅通用设置 + 入口:
  * - 显示:外观模式 sheet + 主题色 sheet(跟随壁纸 / 20 色预设网格);
  * - 语言与地区:语言 sheet(LocaleManager 热切换,零重建);
- * - 功能:监听设置(算法/数据库合并单一入口,副标题 = 启用态组合文案)、
- *   数据管理(记录总量 / 清空全部)、服务与诊断(框架/端口/统计)
- *   ——三者为二级页入口(V10 分级,配置/数据/诊断类均不直占主设置页);
- * - 关于:版本 + 关于 Dialog。
+ * - 功能四入口:算法监听 / 数据库监听(V19 合并单页拆分还原,副标题 = 各自
+ *   能力启用词)/ 数据管理(记录总量 / 清空全部)/ 服务与诊断(框架/端口/统计);
+ * - 关于:版本行 → 独立关于页(V22 R2 升级,弃用 AlertDialog,内含开源许可入口)。
  * 本页经应用列表筛选菜单「设置」项进入(唯一入口),返回箭头常显。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -101,9 +97,11 @@ private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit = {},
-    onOpenMonitorSettings: () -> Unit = {},
+    onOpenAlgorithmSettings: () -> Unit = {},
+    onOpenDatabaseSettings: () -> Unit = {},
     onOpenDataSettings: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
+    onOpenAbout: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val config by ThemeSettingsManager.themeConfig.collectAsState()
@@ -111,10 +109,9 @@ fun SettingsScreen(
     var showAppearanceSheet by remember { mutableStateOf(false) }
     var showColorSheet by remember { mutableStateOf(false) }
     var showLanguageSheet by remember { mutableStateOf(false) }
-    var showAboutDialog by remember { mutableStateOf(false) }
 
     // 语言 sheet 状态(V9.1):点选语言先播退场动画再切换,动画期间语言不变,
-    // 避免「sheet 瞬时消失 + 全屏文本同帧切换」叠影闪烁。
+    // 避免「sheet 瞬间消失 + 全屏文本同帧切换」叠影闪烁。
     val scope = rememberCoroutineScope()
     val languageSheetState = rememberModalBottomSheetState()
 
@@ -129,6 +126,7 @@ fun SettingsScreen(
         }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             ModevTopBar(
                 title = stringResource(R.string.settings_title),
@@ -179,40 +177,28 @@ fun SettingsScreen(
                 )
             }
 
-            // V14 R7:应用列表分区——置顶开关唯一入口(筛选菜单已移除该项),
-            // AppListSettings 单一事实源,开关即时重排。
-            Spacer(Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_apps_section)) {
-                val pinScoped by AppListSettings.pinScoped.collectAsStateWithLifecycle()
-                SettingsToggleItem(
-                    icon = Icons.Default.PushPin,
-                    title = stringResource(R.string.settings_pin_scoped),
-                    subtitle = stringResource(R.string.settings_pin_scoped_hint),
-                    checked = pinScoped,
-                    onCheckedChange = { AppListSettings.setPinScoped(it, context) },
-                )
-            }
-
-            // V19 T4:功能收敛三入口——监听设置(单一入口,副标题 = 算法/数据库
-            // 启用态组合文案)/ 数据管理 / 服务与诊断(能力注册表 UI 呈现已退场)。
+            // V21 T3:功能四入口——算法监听 / 数据库监听(V19 合并单页拆分还原,
+            // 副标题 = 各能力启用词)/ 数据管理 / 服务与诊断(能力注册表 UI 呈现已退役)。
+            // 已作用域应用置顶开关于 V22 R2 迁回筛选菜单(应用列表搜索条筛选按钮)。
             Spacer(Modifier.height(24.dp))
             SettingsSection(stringResource(R.string.settings_features_section)) {
                 val switch by viewModel.switchState.collectAsStateWithLifecycle()
                 SettingsItem(
                     icon = Icons.Default.Sensors,
-                    title = stringResource(R.string.monitor_settings_title),
+                    title = stringResource(R.string.algorithm_monitor_title),
                     subtitle = stringResource(
-                        R.string.settings_monitor_summary,
-                        stringResource(
-                            if (switch.cryptoListen) R.string.settings_capability_enabled else R.string.settings_capability_disabled
-                        ),
-                        stringResource(
-                            if (switch.dbListen) R.string.settings_capability_enabled else R.string.settings_capability_disabled
-                        ),
+                        if (switch.cryptoListen) R.string.settings_capability_enabled else R.string.settings_capability_disabled
                     ),
-                    onClick = onOpenMonitorSettings,
+                    onClick = onOpenAlgorithmSettings,
                 )
-                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                SettingsItem(
+                    icon = Icons.Default.TableChart,
+                    title = stringResource(R.string.database_monitor_title),
+                    subtitle = stringResource(
+                        if (switch.dbListen) R.string.settings_capability_enabled else R.string.settings_capability_disabled
+                    ),
+                    onClick = onOpenDatabaseSettings,
+                )
                 SettingsItem(
                     icon = Icons.Default.Inventory,
                     title = stringResource(R.string.data_settings_title),
@@ -231,7 +217,7 @@ fun SettingsScreen(
                     icon = Icons.Default.Info,
                     title = stringResource(R.string.about),
                     subtitle = stringResource(R.string.version, stringResource(R.string.app_name), BuildConfig.VERSION_NAME),
-                    onClick = { showAboutDialog = true },
+                    onClick = onOpenAbout,
                 )
             }
             Spacer(Modifier.height(24.dp))
@@ -284,29 +270,6 @@ fun SettingsScreen(
             onDismiss = { showLanguageSheet = false },
         )
     }
-
-    if (showAboutDialog) {
-        AlertDialog(
-            onDismissRequest = { showAboutDialog = false },
-            icon = { Icon(Icons.Default.Info, null) },
-            title = { Text(stringResource(R.string.about)) },
-            text = {
-                Column {
-                    Text(stringResource(R.string.app_name), style = MaterialTheme.typography.titleMedium)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        stringResource(R.string.version, stringResource(R.string.app_name), BuildConfig.VERSION_NAME),
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { showAboutDialog = false }) {
-                    Text(stringResource(R.string.confirm))
-                }
-            },
-        )
-    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -317,7 +280,11 @@ private fun LanguageSheet(
     onSelect: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
         Column(modifier = Modifier.padding(bottom = 32.dp)) {
             Text(
                 stringResource(R.string.language),
@@ -340,6 +307,7 @@ private fun LanguageSheet(
                 // V19 T6 矩阵 M10:单选行收敛为 M3 ListItem + selectable(RadioButton 角色);
                 // 外留 8dp 使有效留白保持 24dp,与 sheet 标题/网格对齐。
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                     headlineContent = {
                         Text(
                             label,
@@ -381,7 +349,10 @@ private fun AppearanceSheet(
     onSelect: (AppearanceMode) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
         Column(modifier = Modifier.padding(bottom = 32.dp)) {
             Text(
                 stringResource(R.string.appearance),
@@ -406,6 +377,7 @@ private fun AppearanceSheet(
                 val selected = mode == current
                 // V19 T6 矩阵 M10:单选行收敛为 M3 ListItem + selectable(RadioButton 角色)。
                 ListItem(
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                     headlineContent = {
                         Text(
                             label,
@@ -444,7 +416,10 @@ private fun ColorSheet(
     onSelectColor: (Long) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    ModalBottomSheet(onDismissRequest = onDismiss) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+    ) {
         Column(modifier = Modifier.padding(bottom = 32.dp)) {
             Text(
                 stringResource(R.string.theme_color),
@@ -456,6 +431,7 @@ private fun ColorSheet(
 
             // V19 T6 矩阵 M10:单选行收敛为 M3 ListItem + selectable(RadioButton 角色)。
             ListItem(
+                colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
                 headlineContent = {
                     Text(
                         stringResource(R.string.system_wallpaper),
@@ -510,7 +486,7 @@ private fun ColorSheet(
                 items(colorOptions) { argb ->
                     val color = Color(argb)
                     val isSelected = !useWallpaper && color == selectedColor
-                    // 选中标记色:暗色恒白、亮色恒黑(任意 seed 下清晰可见)。
+                    // 选中标记色:暗色恒白、亮色恒黑,任意 seed 下清晰可见。
                     val markColor = selectedMarkColor(LocalIsDarkTheme.current)
                     Box(
                         modifier =
@@ -526,7 +502,7 @@ private fun ColorSheet(
                                     },
                                 ).semantics {
                                     selected = isSelected
-                                    // 色块朗读自身十六进制值(自描述,替代泛泛的「色块」)。
+                                    // 色块朗读自身十六进制值(自描述,替代泛滥的「色块」)。
                                     contentDescription = "#%06X".format(argb and 0xFFFFFF)
                                 }
                                 .clickable { onSelectColor(argb) },
@@ -547,7 +523,7 @@ private fun ColorSheet(
     }
 }
 
-/** 选中标记色:暗色模式恒白、亮色模式恒黑(与 LIDE 同规,中灰 seed 下不消失)。 */
+/** 选中标记色:暗色模式恒白、亮色模式恒黑(与 LIDE 同规,中灰 seed 下不消失)。*/
 private fun selectedMarkColor(
     isDark: Boolean,
 ): Color = if (isDark) Color.White else Color.Black

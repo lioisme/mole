@@ -104,7 +104,6 @@ class CryptoDetailZonesTest {
                 .first()
             assertEquals("种子写入须在读回中可见", 2L, seeded)
         }
-        AppListSettings.setOnlyScoped(false, ctx)
         AppListSettings.setShowModules(true, ctx)
         rule.waitForIdle()
     }
@@ -112,7 +111,6 @@ class CryptoDetailZonesTest {
     @After
     fun restore() {
         AppListSettings.setShowModules(false, ctx)
-        AppListSettings.setOnlyScoped(false, ctx)
     }
 
     private fun pressBack() {

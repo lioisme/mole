@@ -1,4 +1,4 @@
-package com.lioisme.modev.ui.settings
+﻿package com.lioisme.modev.ui.settings
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
@@ -14,15 +14,24 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Apps
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.SwapVert
+import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -52,10 +61,11 @@ import com.lioisme.modev.ui.common.rememberEffectiveLocale
 import kotlinx.coroutines.launch
 
 /**
- * 服务与诊断页(V10 设置分级;V19 T8 分区化):
+ * 服务与诊断页(V10 设置分级;V19 T8 分区化;V21 T5 重新设计):
  * 三分区——框架与作用域 / 通信服务 / 管道统计(折叠卡,默认收起,
- * AnimatedVisibility,状态 rememberSaveable)+ 页面底部「复制诊断信息」
- * 动作(剪贴板快照 + Snackbar 反馈,与记录长按复制同 UX)。
+ * AnimatedVisibility,状态 rememberSaveable;统计行图标语义分组:
+ * 拒绝类 Block / 流向 SwapHoriz·SwapVert)+ 底部「复制诊断信息」
+ * 动作卡(剪贴板快照 + Snackbar 反馈,与记录长按复制同 UX)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,11 +78,11 @@ fun DiagnosticsScreen(
     val pipelineStats by viewModel.pipelineStats.collectAsStateWithLifecycle()
 
     // V15:统计数值按应用实际生效 locale 千分位分组(与 stringResource 解析同源)。
-    // V16 R5:热切换下 LocalConfiguration 陈旧,一律经包过 Context 解析(effectiveLocale)。
+    // V16 R5:热切换下 LocalConfiguration 陈旧,一律经包装 Context 解析(effectiveLocale)。
     val locale = rememberEffectiveLocale()
     fun stat(value: Long): String = AppCountFormat.grouped(value, locale)
 
-    // 管道统计折叠态(跨重建存活:展开/收起不因重组复位)。
+    // 管道统计折叠态:跨重建存活,展开/收起不因重组复位。
     var statsExpanded by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
@@ -117,6 +127,7 @@ fun DiagnosticsScreen(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             ModevTopBar(
                 title = stringResource(R.string.diagnostics_settings_title),
@@ -189,67 +200,92 @@ fun DiagnosticsScreen(
                 )
             }
             Spacer(Modifier.height(24.dp))
-            // 管道统计分区:折叠头行即分区标题(标题唯一,不与 Section 重复)。
+            // 管道统计分区(V21 T5:卡片化,与 Data 页分区视觉对齐;折叠头行
+            // 即分区标题——标题唯一,不与 Section 重复;卡片 token 与
+            // SettingsSection 同源 surfaceContainerLow)。
             Spacer(Modifier.padding(top = 8.dp))
-            StatsToggleRow(expanded = statsExpanded, onClick = { statsExpanded = !statsExpanded })
-            AnimatedVisibility(visible = statsExpanded) {
+            Card(
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    ),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                StatsToggleRow(expanded = statsExpanded, onClick = { statsExpanded = !statsExpanded })
+                AnimatedVisibility(visible = statsExpanded) {
                     Column {
+                        // V21 T5 图标语义化(消除 7× Dns 重复):
+                        // 接收/丢弃=流方向(SwapHoriz/SwapVert)、写入失败=Warning、
+                        // 超容量裁剪=ContentCut、通道队列溢出丢弃=FilterAltOff、
+                        // 拒绝(握手/记录)=Block。
                         SettingsInfoItem(
-                            icon = Icons.Default.Dns,
+                            icon = Icons.Default.SwapHoriz,
                             title = stringResource(R.string.stats_received),
                             value = stat(pipelineStats.received),
                         )
                         SettingsInfoItem(
-                            icon = Icons.Default.Dns,
+                            icon = Icons.Default.SwapVert,
                             title = stringResource(R.string.stats_dropped),
                             value = stat(pipelineStats.dropped),
                         )
                         SettingsInfoItem(
-                            icon = Icons.Default.Dns,
+                            icon = Icons.Default.Warning,
                             title = stringResource(R.string.stats_write_failures),
                             value = stat(pipelineStats.writeFailures),
                         )
                         SettingsInfoItem(
-                            icon = Icons.Default.Dns,
+                            icon = Icons.Default.ContentCut,
                             title = stringResource(R.string.stats_trimmed),
                             value = stat(pipelineStats.trimmed),
                         )
                         SettingsInfoItem(
-                            icon = Icons.Default.Dns,
+                            icon = Icons.Default.Block,
                             title = stringResource(R.string.stats_rejected_hellos),
                             value = stat(pipelineStats.channel.rejectedHellos),
                         )
                         SettingsInfoItem(
-                            icon = Icons.Default.Dns,
+                            icon = Icons.Default.FilterAltOff,
                             title = stringResource(R.string.stats_dropped_records),
                             value = stat(pipelineStats.channel.droppedRecords),
                         )
                         SettingsInfoItem(
-                            icon = Icons.Default.Dns,
+                            icon = Icons.Default.Block,
                             title = stringResource(R.string.stats_rejected_records),
                             value = stat(pipelineStats.channel.rejectedRecords),
                         )
                     }
                 }
+            }
             Spacer(Modifier.height(24.dp))
-            ListItem(
-                headlineContent = {
-                    Text(
-                        stringResource(R.string.diagnostics_copy),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurface,
-                    )
-                },
-                leadingContent = {
-                    Icon(
-                        Icons.Default.ContentCopy,
-                        null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp),
-                    )
-                },
-                modifier = Modifier.fillMaxWidth().clickable(onClick = ::copyDiagnostics),
-            )
+            // 复制诊断信息(V21 T5:标准 M3 动作行卡片化,点击 = 剪贴板快照 +
+            // Snackbar 反馈,与记录长按复制同 UX)。
+            Card(
+                colors =
+                    CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    ),
+                shape = MaterialTheme.shapes.medium,
+            ) {
+                ListItem(
+                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+                    headlineContent = {
+                        Text(
+                            stringResource(R.string.diagnostics_copy),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    },
+                    leadingContent = {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth().clickable(onClick = ::copyDiagnostics),
+                )
+            }
             Spacer(Modifier.height(24.dp))
         }
     }
@@ -267,6 +303,7 @@ private fun StatsToggleRow(
     onClick: () -> Unit,
 ) {
     ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         headlineContent = {
             Text(
                 stringResource(R.string.settings_stats_section),

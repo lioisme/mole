@@ -58,7 +58,6 @@ data class AppRow(
         /** 变更进行中的包(防重复点击)。 */
         val pending: Set<String> = emptySet(),
         val refreshing: Boolean = false,
-        val onlyScoped: Boolean = false,
         val showSystem: Boolean = true,
         val showModules: Boolean = false,
     )
@@ -71,7 +70,6 @@ private data class CatalogBase(
     /** 排序/筛选流水线偏好(S2:与计数/连接态分离,变化才触发重排)。 */
     private data class SortPrefs(
         val query: String,
-        val onlyScoped: Boolean,
         val showSystem: Boolean,
         val showModules: Boolean,
         val pinScoped: Boolean,
@@ -89,14 +87,12 @@ private data class CatalogBase(
     /** uiState 投影所需筛选偏好(与 SortPrefs 分离:不触发重排的仅投影字段)。 */
     private data class UiFilterPrefs(
         val query: String,
-        val onlyScoped: Boolean,
         val showSystem: Boolean,
         val showModules: Boolean,
     )
 
     private data class UiPrefs(
         val query: String,
-        val onlyScoped: Boolean,
         val showSystem: Boolean,
         val showModules: Boolean,
         val pending: Set<String>,
@@ -122,7 +118,6 @@ private val query = MutableStateFlow("")
         combine(
             combine(
                 query,
-                AppListSettings.onlyScoped,
                 AppListSettings.showSystem,
                 AppListSettings.showModules,
                 ::UiFilterPrefs,
@@ -130,7 +125,7 @@ private val query = MutableStateFlow("")
             AppListSettings.pinScoped,
             LocaleManager.localeFlow,
         ) { f, pin, locale ->
-            SortPrefs(f.query, f.onlyScoped, f.showSystem, f.showModules, pin, locale)
+            SortPrefs(f.query, f.showSystem, f.showModules, pin, locale)
         },
     ) { base, prefs ->
         val scopedSet = (base.scopeState as? ScopeState.Ready)?.scope ?: emptySet()
@@ -138,7 +133,6 @@ private val query = MutableStateFlow("")
         val rows = base.apps
             .filter { prefs.showSystem || !it.system }
             .filter { prefs.showModules || !it.isXposedModule }
-            .filter { !prefs.onlyScoped || it.packageName in scopedSet }
             .filter {
                 prefs.query.isBlank() ||
                     it.label.contains(prefs.query, ignoreCase = true) ||
@@ -161,14 +155,13 @@ private val query = MutableStateFlow("")
         sortedRows,
         combine(logs.observeRecordCounts(), server.connectedPackagesFlow) { counts, connected -> counts to connected },
         combine(
-            combine(query, AppListSettings.onlyScoped, AppListSettings.showSystem, AppListSettings.showModules, ::UiFilterPrefs),
+            combine(query, AppListSettings.showSystem, AppListSettings.showModules, ::UiFilterPrefs),
             combine(pending, refreshing, catalog.loading) { p, r, l -> Triple(p, r, l) },
-        ) { prefs4, state3 ->
+        ) { prefs3, state3 ->
             UiPrefs(
-                query = prefs4.query,
-                onlyScoped = prefs4.onlyScoped,
-                showSystem = prefs4.showSystem,
-                showModules = prefs4.showModules,
+                query = prefs3.query,
+                showSystem = prefs3.showSystem,
+                showModules = prefs3.showModules,
                 pending = state3.first,
                 refreshing = state3.second,
                 loading = state3.third,
@@ -192,7 +185,6 @@ private val query = MutableStateFlow("")
             scopeReady = scopeState is ScopeState.Ready,
             pending = prefs.pending,
             refreshing = prefs.refreshing,
-            onlyScoped = prefs.onlyScoped,
             showSystem = prefs.showSystem,
             showModules = prefs.showModules,
         )

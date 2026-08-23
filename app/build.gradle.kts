@@ -14,6 +14,17 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    // V22 R2:开源许可元数据生成(aboutlibraries;Android 模块自动注册生成任务,
+    // 产物落入 res/raw/aboutlibraries.json,随变体构建自动更新)。
+    alias(libs.plugins.aboutlibraries.plugin)
+}
+
+// 拉取 SPDX 许可全文并内嵌(离线后 UI 回退显示 SPDX 标识;许可全文属法律合规数据,
+// 内容为规范权威文本,构建期拉取一次即缓存)。
+aboutLibraries {
+    collect {
+        fetchRemoteLicense = true
+    }
 }
 
 android {
@@ -144,6 +155,8 @@ dependencies {
     implementation(libs.androidx.paging.compose)
     // 详情页过长文本「展开/收起」组件(WEBTOON ReadMoreTextView,Apache-2.0)
     implementation(libs.readmore.material3)
+    // 开源许可数据 core(编译期元数据,零运行时开销;UI 自建 M3 页面)
+    implementation(libs.aboutlibraries.core)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)

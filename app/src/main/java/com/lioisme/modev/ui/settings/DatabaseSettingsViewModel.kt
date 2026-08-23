@@ -11,12 +11,11 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * 监听设置页(V19 T4,合并自算法/数据库监听两页):
- * 四分区单一页(算法监听 / 记录选项 / 数据库监听 / 结果闸门)。
+ * 数据库监听设置页(V21 T3,自合并页拆分还原):总开关 + 5 类别 + 结果闸门。
  * 单一事实源 = SettingsRepository.globalSwitch(镜像 switch_global,
  * 读优先已注入作用域客户端,无则回退本地,变更广播全量客户端)。
  */
-class MonitorSettingsViewModel(
+class DatabaseSettingsViewModel(
     private val settings: SettingsRepository,
 ) : ViewModel() {
 
@@ -28,11 +27,11 @@ class MonitorSettingsViewModel(
     }
 }
 
-class MonitorSettingsViewModelFactory(
+class DatabaseSettingsViewModelFactory(
     private val container: AppContainer,
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return MonitorSettingsViewModel(container.settings) as T
+        return DatabaseSettingsViewModel(container.settings) as T
     }
 }

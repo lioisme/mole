@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名/密钥/BASE64/WebView)+ 宿主双进程日志。
-构建与质量契约(2026-08-20 审计沉淀,V20)。
+构建与质量契约(2026-08-20 审计沉淀,V21)。
 
 ## 构建 / 测试(Windows,gradlew.bat)
 
@@ -63,7 +63,10 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
    并入同一节点**——插桩断言用短前缀 substring 匹配,勿对全量内容做精确匹配;
    长区块「收起」按钮在内容末尾,断言/点击前须 `performScrollToNode`。
 4. **输入即底部 sheet**:带键盘输入的弹层一律 `ModalBottomSheet`
-   (`imePadding` + `navigationBarsPadding`,hide 动画后回调);
+   (`imePadding` 即可——M3 已内部消费导航栏 inset,**禁止再叠
+   `navigationBarsPadding`**,双内边距叠加 = 弹窗底部黑带根因 V21 T2;
+   弹窗显式 `containerColor = surfaceContainerHigh`、宿主页 Scaffold 显式
+   `containerColor = surface`,hide 动画后回调);
    仅危险确认/关于类保留居中 `AlertDialog`。
 5. **弃用 API 零容忍**:新增源码一律不得引入已弃用 API;`getInstalledApplications`
    走 `core/util/PackageManagerCompat.kt` 统一入口(API 33+ `ApplicationInfoFlags`,
@@ -111,14 +114,24 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
     `CollapsedSearchInput` 为唯一例外(KDoc 固化,经 D4 单向决策);
     M3 1.4.0 `ListItem` 内容槽**合并为单一语义节点**(文本节点 = 整行高、
     节点 Text 列表含全部槽文本)——插桩勿对行内文本独立测距,锚定断言用
-    `onNodeWithText` 精确匹配合并节点即可。设置页功能区三入口:
-    监听设置(`settings/monitor`,合并算法/数据库,旧
-    `settings/algorithm`/`settings/database` 已退役)/ 数据管理
+    `onNodeWithText` 精确匹配合并节点即可。设置页功能区四入口:
+    算法监听(`settings/algorithm`,总开关 + 12 类别 + 记录选项)/
+    数据库监听(`settings/database`,总开关 + 5 类别 + 结果闸门)
+    (V21 拆分还原,旧合并页 `settings/monitor` 已退役)/ 数据管理
     (`settings/data`)/ 服务与诊断(`settings/diagnostics`,三分区 +
     复制诊断信息);全局列表页 `records/algorithm`/`records/database`;
     危险清理(按类型/全部)一律居中 `AlertDialog` 确认,无回收站;
     计数/存储值断言必须资源驱动(`getString` 带格式参,zh 渲染 "2 条"
-    非 "2")。
+    非 "2")。设置页卡片容器色 = `surfaceContainerLow`(V21 T1 决策经
+    E1/R1 修订最终定档,与 LIDE SettingsSection 逐字一致;T1 曾升
+    `surfaceContainerHighest` 应对雷电 ListItem 渲染缺陷——根因 = M3 1.4.0
+    ListItem 内部 Surface 默认容器色 Unspecified,嵌套卡内触发雷电转译 bug
+    吞掉卡片色;**所有 ListItem 必须显式
+    `colors = ListItemDefaults.colors(containerColor = <所在容器色>)`**
+    (卡内 = Low / sheet 行 = High / 无容器列表 = surface),显式色后雷电
+    渲染修复,卡片回退 Low;`SettingsThemeContrastTest` 纯 JVM 全 20 seed ×
+    亮/暗强制:卡片/背景 ≥1.046(亮)/1.078(暗)、onSurface-on-卡片 ≥4.5、
+    primary-on-surface ≥4.5,禁止改回 surfaceContainerHighest)。
 14. **分页流契约(V20 R3.1 设备测试实锤,两条)**:Room 2.7.2 生成式
     `LimitOffsetPagingSource` 的计数查询 = `COUNT(*) FROM (<原 SQL>)`,
     原 SQL 自带固定 `LIMIT :limit OFFSET :offset` 会钳制 itemCount →
@@ -145,10 +158,16 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
   方案:紧凑数字用 `android.icu.text.CompactDecimalFormat`(API 24+);
   相关单测须 Robolectric(纯 JVM 下 android.icu 是桩)。
 - 新增 Java 源:AGP javac 同样受 `--system jdkImage` 限制,勿依赖 JDK 12+ 平台 API。
-- 本 Compose 测试库无 `hasToggleableState`/`waitUntil`/`hasText(Regex)` 与
-  `SemanticsProperties.OnClick`(用 `SemanticsActions.OnClick`);
-  `onRoot`/`printToLog`/`onFirst` 是扩展需显式 import;`onRoot()` 在弹窗打开时
-  有 2 个 root 会报错,须 `onAllNodes(isPopup())`。
+- 本 Compose 测试库无 `hasToggleableState`/`waitUntil`/`hasText(Regex)`/
+  `assertExists`/`performScrollBy` 与 `SemanticsProperties.OnClick`
+  (用 `SemanticsActions.OnClick`);`onRoot`/`printToLog`/`onFirst` 是扩展需
+  显式 import;`onRoot()` 在弹窗打开时有 2 个 root 会报错,须
+  `onAllNodes(isPopup())`;节点存在断言用
+  `onAllNodesWithText(...).fetchSemanticsNodes().isNotEmpty()`。
+- **单一 LazyColumn item(整段 `SettingsSection` 为一个 item)内,段内行
+  `performScrollToNode` 不可靠**(实测滚动停在 161px、目标行仍在组合窗口外,
+  仅跨 item 滚动稳定);整段 item 会整段组合,段内行断言存在即可;段尾行先
+  滚动到相邻 item 再断言存在/可见。
 - 断言计数/数值文案须资源驱动:zh 设备渲染 "2 条"(`settings_total_records_value`
   zh 带后缀),裸数字精确匹配失败;存储值断言防「Room 首查才建库文件」竞态
   (生产 `remember` 快照取 0 B)——测试先 `openOrCreateDatabase` 预建文件。

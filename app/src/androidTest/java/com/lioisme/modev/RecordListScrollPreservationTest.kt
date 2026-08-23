@@ -79,7 +79,6 @@ class RecordListScrollPreservationTest {
                 .first()
             assertEquals("种子写入须在读回中可见", 120L, seeded)
         }
-        AppListSettings.setOnlyScoped(false, ctx)
         AppListSettings.setShowModules(true, ctx)
         rule.waitForIdle()
     }
@@ -87,7 +86,6 @@ class RecordListScrollPreservationTest {
     @After
     fun restore() {
         AppListSettings.setShowModules(false, ctx)
-        AppListSettings.setOnlyScoped(false, ctx)
     }
 
     private fun pressBack() {
