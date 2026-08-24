@@ -26,7 +26,7 @@ import kotlinx.coroutines.flow.update
  *
  * - 接受注入进程 TCP 连接,握手后登记 (socket → 包名);
  * - 接收 [WireProtocol.TYPE_RECORD] 并回调 [onRecord];
- * - 对指定包名的所有连接广播 [WireProtocol.TYPE_CONFIG];
+ * - 配置下发(V23 per-session):握手与广播时按会话包名 resolve 有效配置推送;
  * - 心跳应答、断连清理、优雅停止。
  */
 class ConfigServer(
@@ -69,11 +69,12 @@ class ConfigServer(
     }
 
     /**
-     * 新客户端握手时查询其全局配置(由 SettingsRepository 注入,V10:与包名解耦)。
-     * 为 null 表示尚无配置,注入侧继续使用内存默认值。
+     * 按包解析有效配置(V23):宿主侧接线 [com.lioisme.modev.data.repo.SettingsRepository.effectiveSwitch]
+     * (全局 ⊕ 单应用三态覆盖)。为 null(未装配)表示不推送,注入侧继续使用内存默认值。
+     * 取代 V10 的全局 `configProvider`:每会话按其包名独立取数,协议与注入侧零感知覆盖模型。
      */
     @Volatile
-    var configProvider: (() -> HookSwitch?)? = null
+    var effectiveResolver: ((String) -> HookSwitch?)? = null
 
     /**
      * 握手令牌要求:
@@ -183,10 +184,10 @@ class ConfigServer(
         session.processName = processName
         registeredPackages[packageName] = (registeredPackages[packageName] ?: 0) + 1
         _connectedPackages.value = connectedPackages()
-        // 握手后立即推送全局配置;未配置时由注入侧使用默认值
-        val pushed = configProvider?.invoke()?.let { cfg ->
-            broadcastConfig(cfg)
-            cfg
+        // 握手后立即推送该包的有效配置(V23 per-session resolve);未装配时由注入侧使用默认值
+        val pushed = effectiveConfigFor(packageName)?.let { config ->
+            pushConfig(session, packageName, config)
+            config
         }
         android.util.Log.i(
             "Modev",
@@ -233,23 +234,50 @@ class ConfigServer(
         }
     }
 
-    /**
-     * 向全部已注册客户端广播全局配置(V10:配置全局唯一,不再按包过滤)。
-     * 载荷仍携带会话包名(协议兼容,注入侧只读 switch 字段)。
-     */
-    fun broadcastConfig(switch: HookSwitch) {
-        for ((socket, session) in clients) {
-            val packageName = session.packageName ?: continue
-            synchronized(session) {
-                runCatching {
-                    session.writer?.apply {
-                        write(WireCodec.config(packageName, switch))
-                        newLine()
-                        flush()
-                    }
+    /** 按包取有效配置快照(未装配 resolver 时为 null)。 */
+    private fun effectiveConfigFor(packageName: String): HookSwitch? =
+        effectiveResolver?.invoke(packageName)
+
+    /** 向单个会话推送配置消息(协议载荷携带会话包名,注入侧只读 switch 字段)。 */
+    private fun pushConfig(session: ClientSession, packageName: String, config: HookSwitch) {
+        synchronized(session) {
+            runCatching {
+                session.writer?.apply {
+                    write(WireCodec.config(packageName, config))
+                    newLine()
+                    flush()
                 }
             }
         }
+    }
+
+    /**
+     * 向全部已握手客户端广播各自的有效配置(V23):
+     * 每个会话按其包名独立 resolve —— 全局变更传导至未覆盖应用,
+     * 已覆盖应用保持自身有效配置不被全局值冲刷。
+     */
+    fun broadcastEffectiveConfig() {
+        for ((_, session) in clients) {
+            val packageName = session.packageName ?: continue
+            val config = effectiveConfigFor(packageName) ?: continue
+            pushConfig(session, packageName, config)
+        }
+    }
+
+    /**
+     * 向指定包名的全部会话定向推送其有效配置(V23):
+     * 单应用覆盖增删后调用;该包无在线会话时 no-op。
+     * @return 实际推送的会话数(诊断/测试用)。
+     */
+    fun pushToPackage(packageName: String): Int {
+        var pushed = 0
+        for ((_, session) in clients) {
+            if (session.packageName != packageName) continue
+            val config = effectiveConfigFor(packageName) ?: continue
+            pushConfig(session, packageName, config)
+            pushed++
+        }
+        return pushed
     }
 
     private fun removeClient(socket: Socket) {

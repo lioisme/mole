@@ -119,18 +119,27 @@ class DataSettingsScreenTest {
     fun storageValue_andDangerCancelPath() {
         val container = (ctx.applicationContext as ModevApp).container
         val vm = DataSettingsViewModelFactory(container).create(DataSettingsViewModel::class.java)
-        // 预建 DB 文件:Room 首查才建文件,remember 快照会取到 0 B;
-        // 先落盘(4096 B 头页,只读查询不增长)再断言,生产渲染值与测试值同源。
+        // V23 存储占用口径 = DB + -wal + -shm 三文件和(LogRepository.storageUsage 同源);
+        // 预建 DB 文件防「Room 首查才建文件」竞态取 0 B。
         val dbPath = ctx.getDatabasePath(ModevDatabase.NAME)
         dbPath.parentFile?.mkdirs()
         ctx.openOrCreateDatabase(ModevDatabase.NAME, Context.MODE_PRIVATE, null).close()
-        val expectedSize = StorageFormat.formatBytes(dbPath.length().toLong())
+        fun sizeOf(name: String): Long {
+            val f = java.io.File(dbPath.parentFile, name)
+            return if (f.exists()) f.length() else 0L
+        }
+        val expectedSize = StorageFormat.formatBytes(
+            sizeOf(ModevDatabase.NAME) +
+                sizeOf(ModevDatabase.NAME + "-wal") +
+                sizeOf(ModevDatabase.NAME + "-shm"),
+        )
 
         rule.setContent { MaterialTheme { DataSettingsScreen(vm, onBack = {}) } }
 
         rule.onNodeWithText(str(R.string.settings_records_algorithm)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.settings_records_database)).assertIsDisplayed()
-        // 存储占用 = 生产同源计算(DB 文件大小格式化);小屏折叠区先滚动。
+        // 存储占用为 VM 异步快照流(V23):先有界轮询等值出现,再滚动至可见。
+        waitForVisible(expectedSize)
         scrollTo(expectedSize)
         rule.onNodeWithText(expectedSize).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.settings_storage_db)).assertIsDisplayed()

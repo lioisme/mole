@@ -361,6 +361,9 @@ class CryptoRecordDaoTest {
             .use { c -> while (c.moveToNext()) names.add(c.getString(0)) }
         assertTrue(names.contains("index_crypto_records_packageName_timestamp"))
         assertTrue(names.contains("index_crypto_records_packageName_kind"))
+        // v8:多维筛选复合索引
+        assertTrue(names.contains("index_crypto_records_recordType_kind"))
+        assertTrue(names.contains("index_crypto_records_recordType_packageName_timestamp"))
         // v3:重放幂等唯一索引
         assertTrue(names.contains("index_crypto_records_packageName_processName_seq"))
         // v5:timestamp 单列索引(时间倒序热路径)
@@ -453,6 +456,7 @@ class CryptoRecordDaoTest {
             ModevDatabase.MIGRATION_4_5,
             ModevDatabase.MIGRATION_5_6,
             ModevDatabase.MIGRATION_6_7,
+            ModevDatabase.MIGRATION_7_8,
         ).build()
         val migratedDao = migrated.cryptoRecordDao()
 
@@ -526,6 +530,7 @@ class CryptoRecordDaoTest {
             ModevDatabase.MIGRATION_4_5,
             ModevDatabase.MIGRATION_5_6,
             ModevDatabase.MIGRATION_6_7,
+            ModevDatabase.MIGRATION_7_8,
         ).build()
         val migratedDao = migrated.cryptoRecordDao()
 
@@ -657,6 +662,7 @@ class CryptoRecordDaoTest {
                 ModevDatabase.MIGRATION_4_5,
                 ModevDatabase.MIGRATION_5_6,
                 ModevDatabase.MIGRATION_6_7,
+            ModevDatabase.MIGRATION_7_8,
             ).build()
             val migratedDao = migrated.cryptoRecordDao()
 
@@ -703,6 +709,7 @@ class CryptoRecordDaoTest {
                 "mig-v6.db",
             ).addMigrations(
                 ModevDatabase.MIGRATION_6_7,
+            ModevDatabase.MIGRATION_7_8,
             ).build()
             val migratedDao = migrated.cryptoRecordDao()
 
@@ -734,6 +741,121 @@ class CryptoRecordDaoTest {
             migrated.close()
             dbFile.delete()
         }
+    }
+
+    @Test
+    fun `migration from v7 to v8 adds composite indexes`() = runBlocking {
+        val dbFile = RuntimeEnvironment.getApplication().getDatabasePath("mig-v7.db")
+        dbFile.delete()
+        val oldHelper = createV7Helper(dbFile)
+        oldHelper.writableDatabase.execSQL(
+            """
+            INSERT INTO crypto_records
+                (recordType, packageName, kind, operation, algorithm, threadName, timestamp,
+                 keyTruncated, ivTruncated, keyExportable, inputTruncated, outputTruncated,
+                 saltTruncated, aadTruncated, publicKeyTruncated, contextId, processName,
+                 keyHex, inputHex, outputHex)
+            VALUES ('crypto', 'pkg.v7', 'cipher', 'encrypt', 'AES', 'main', 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 'pkg.v7',
+                    'aabb', 'deadbeef', '00ff')
+            """.trimIndent(),
+        )
+        oldHelper.close()
+
+        val migrated = Room.databaseBuilder(
+            RuntimeEnvironment.getApplication(),
+            ModevDatabase::class.java,
+            "mig-v7.db",
+        ).addMigrations(ModevDatabase.MIGRATION_7_8).build()
+        val migratedDao = migrated.cryptoRecordDao()
+
+        // v7 存量数据完整保留
+        val row = migratedDao.observeById(1).first()
+        assertNotNull(row)
+        assertEquals("pkg.v7", row!!.packageName)
+        assertEquals("aabb", row.keyHex)
+
+        // v8 复合索引已就位且命名与实体生成一致
+        val sqlite: SupportSQLiteDatabase = migrated.openHelper.writableDatabase
+        val names = mutableListOf<String>()
+        sqlite.query("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'crypto_records'")
+            .use { c -> while (c.moveToNext()) names.add(c.getString(0)) }
+        assertTrue(names.contains("index_crypto_records_recordType_kind"))
+        assertTrue(names.contains("index_crypto_records_recordType_packageName_timestamp"))
+
+        migrated.close()
+        dbFile.delete()
+        Unit
+    }
+
+    private fun createV7Helper(dbFile: java.io.File): androidx.sqlite.db.SupportSQLiteOpenHelper {
+        // 严格复刻 v7 表结构(v6 全列 + 7 个三态 Base64 列),供 v7→v8 迁移测试
+        val factory = androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory()
+        return factory.create(
+            androidx.sqlite.db.SupportSQLiteOpenHelper.Configuration.builder(
+                RuntimeEnvironment.getApplication(),
+            ).name(dbFile.path)
+                .callback(
+                    object : androidx.sqlite.db.SupportSQLiteOpenHelper.Callback(7) {
+                        override fun onCreate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                            db.execSQL(V1_TABLE_DDL)
+                            db.execSQL(
+                                "CREATE INDEX index_crypto_records_packageName_timestamp " +
+                                    "ON crypto_records (packageName, timestamp)",
+                            )
+                            db.execSQL(
+                                "CREATE INDEX index_crypto_records_packageName_kind " +
+                                    "ON crypto_records (packageName, kind)",
+                            )
+                            val v2Columns = listOf(
+                                "saltHex TEXT", "saltText TEXT", "saltLength INTEGER",
+                                "saltTruncated INTEGER NOT NULL DEFAULT 0",
+                                "aadHex TEXT", "aadText TEXT", "aadLength INTEGER",
+                                "aadTruncated INTEGER NOT NULL DEFAULT 0",
+                                "publicKeyHex TEXT", "publicKeyText TEXT", "publicKeyLength INTEGER",
+                                "publicKeyTruncated INTEGER NOT NULL DEFAULT 0",
+                                "paramsJson TEXT", "verifyResult INTEGER", "processName TEXT",
+                            )
+                            for (column in v2Columns) {
+                                db.execSQL("ALTER TABLE crypto_records ADD COLUMN $column")
+                            }
+                            db.execSQL("ALTER TABLE crypto_records ADD COLUMN seq INTEGER")
+                            db.execSQL(
+                                "CREATE UNIQUE INDEX index_crypto_records_packageName_processName_seq " +
+                                    "ON crypto_records (packageName, processName, seq)",
+                            )
+                            db.execSQL(
+                                "ALTER TABLE crypto_records ADD COLUMN recordType TEXT NOT NULL DEFAULT 'crypto'",
+                            )
+                            db.execSQL(
+                                "CREATE INDEX index_crypto_records_timestamp " +
+                                    "ON crypto_records (timestamp)",
+                            )
+                            val v6Columns = listOf(
+                                "sql TEXT", "dbPath TEXT", "bindArgsJson TEXT", "rowsJson TEXT",
+                                "rowCount INTEGER", "affectedCount INTEGER", "rowId INTEGER",
+                                "resultText TEXT",
+                            )
+                            for (column in v6Columns) {
+                                db.execSQL("ALTER TABLE crypto_records ADD COLUMN $column")
+                            }
+                            val v7Columns = listOf(
+                                "keyB64 TEXT", "ivB64 TEXT", "inputB64 TEXT", "outputB64 TEXT",
+                                "saltB64 TEXT", "aadB64 TEXT", "publicKeyB64 TEXT",
+                            )
+                            for (column in v7Columns) {
+                                db.execSQL("ALTER TABLE crypto_records ADD COLUMN $column")
+                            }
+                        }
+
+                        override fun onUpgrade(
+                            db: androidx.sqlite.db.SupportSQLiteDatabase,
+                            oldVersion: Int,
+                            newVersion: Int,
+                        ) {
+                        }
+                    }
+                ).build()
+        )
     }
 
     private fun createV4Helper(dbFile: java.io.File): androidx.sqlite.db.SupportSQLiteOpenHelper {

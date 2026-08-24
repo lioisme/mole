@@ -17,6 +17,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Android
@@ -51,6 +52,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.lioisme.modev.i18n.LocaleManager
+import com.lioisme.modev.ui.common.connectionStatus
 import com.lioisme.modev.ui.common.rememberEffectiveLocale
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
 import androidx.compose.ui.platform.LocalFocusManager
@@ -61,7 +63,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
-import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.ui.components.AppIcon
 import com.lioisme.modev.ui.components.CollapsedSearchInput
 import com.lioisme.modev.ui.components.EmptyState
@@ -69,7 +70,6 @@ import com.lioisme.modev.ui.components.SearchInputField
 import com.lioisme.modev.ui.components.StatusDot
 import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.components.rememberSearchController
-import com.lioisme.modev.ui.theme.StatusKind
 /// 搜索收起动画完成后的导航目标(先收后导,单一事实源)。
 internal sealed interface AppsNavTarget {
     /// 应用详情页。
@@ -97,6 +97,7 @@ fun AppsScreen(
     viewModel: AppsViewModel,
     onOpen: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenRecords: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -117,8 +118,6 @@ fun AppsScreen(
     )
     // 作用域筛选菜单开关:折叠条与全屏 SearchView 共用同一状态,单源驱动)。
     var filterMenuOpen by remember { mutableStateOf(false) }
-    // 已作用域置顶开关(V22 R2 迁回筛选菜单):AppListSettings 单一事实源。
-    val pinScoped by AppListSettings.pinScoped.collectAsStateWithLifecycle()
 
     LaunchedEffect(viewModel) {
         viewModel.messages.collect { message ->
@@ -152,26 +151,38 @@ CollapsedSearchInput(
                                 onTapToExpand = { search.searchActive = true },
                                 placeholder = stringResource(R.string.apps_search),
                                 leadingContent = {
-                                    TipIconButton(
-                                        tooltip = stringResource(R.string.cd_settings),
-                                        onClick = openSettings,
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Settings,
-                                            contentDescription = stringResource(R.string.cd_settings),
-                                        )
+                                    Row {
+                                        TipIconButton(
+                                            tooltip = stringResource(R.string.cd_settings),
+                                            onClick = openSettings,
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Settings,
+                                                contentDescription = stringResource(R.string.cd_settings),
+                                            )
+                                        }
+                                        // 全部记录入口(V23 R1/G1:全局统一记录页,单一入口)。
+                                        TipIconButton(
+                                            tooltip = stringResource(R.string.records_all_title),
+                                            onClick = onOpenRecords,
+                                        ) {
+                                            Icon(
+                                                Icons.AutoMirrored.Filled.ListAlt,
+                                                contentDescription = stringResource(R.string.cd_records_all),
+                                            )
+                                        }
                                     }
                                 },
                                 filterSlot = {
                                     ScopeFilterMenu(
                                         expanded = filterMenuOpen,
                                         onExpandedChange = { filterMenuOpen = it },
-                                        pinScoped = pinScoped,
-                                        onPinScopedChange = { AppListSettings.setPinScoped(it, context) },
+                                        pinScoped = state.pinScoped,
+                                        onPinScopedChange = viewModel::setPinScoped,
                                         showSystem = state.showSystem,
-                                        onShowSystemChange = { AppListSettings.setShowSystem(it, context) },
+                                        onShowSystemChange = viewModel::setShowSystem,
                                         showModules = state.showModules,
-                                        onShowModulesChange = { AppListSettings.setShowModules(it, context) },
+                                        onShowModulesChange = viewModel::setShowModules,
                                     )
                                 },
                             )
@@ -274,12 +285,12 @@ items(state.rows, key = { it.packageName }) { row ->
                         ScopeFilterMenu(
                             expanded = filterMenuOpen,
                             onExpandedChange = { filterMenuOpen = it },
-                            pinScoped = pinScoped,
-                            onPinScopedChange = { AppListSettings.setPinScoped(it, context) },
+                            pinScoped = state.pinScoped,
+                            onPinScopedChange = viewModel::setPinScoped,
                             showSystem = state.showSystem,
-                            onShowSystemChange = { AppListSettings.setShowSystem(it, context) },
+                            onShowSystemChange = viewModel::setShowSystem,
                             showModules = state.showModules,
-                            onShowModulesChange = { AppListSettings.setShowModules(it, context) },
+                            onShowModulesChange = viewModel::setShowModules,
                         )
                     },
                 )
@@ -448,19 +459,10 @@ private fun AppRowItem(
                 )
                 if (row.scoped) {
                     Spacer(Modifier.width(6.dp))
+                    val status = connectionStatus(row.connected)
                     StatusDot(
-                        kind =
-                            if (row.connected) {
-                                StatusKind.ONLINE
-                            } else {
-                                StatusKind.OFFLINE
-                            },
-                        label =
-                            if (row.connected) {
-                                stringResource(R.string.online)
-                            } else {
-                                stringResource(R.string.offline)
-                            },
+                        kind = status.kind,
+                        label = stringResource(status.labelRes),
                     )
                 }
             }

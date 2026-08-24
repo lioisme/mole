@@ -46,7 +46,15 @@ class DatabaseProbeTest {
 
     @Before
     fun setUp() {
-        configVar = HookSwitch()
+        // V18 噪点类别默认关(dbOpen=false)后,全链探针测试须显式全开:
+        // 关闭态零产出由 `db_switches_off_emits_nothing` 用例单独覆盖。
+        configVar = HookSwitch(
+            dbOpen = true,
+            dbQuery = true,
+            dbDml = true,
+            dbExec = true,
+            dbTransaction = true,
+        )
         platform = FakePlatform()
         captured = Collections.synchronizedList(ArrayList())
         sink = RecordSink(

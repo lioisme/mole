@@ -59,16 +59,45 @@ class HookSwitchTest {
     }
 
     @Test
-    fun new_domains_on_by_default() {
-        assertTrue(HookSwitch.DEFAULT.enabled(CryptoKind.KEY_STORE))
-        assertTrue(HookSwitch.DEFAULT.enabled(CryptoKind.KEY_AGREEMENT))
-        assertTrue(HookSwitch.DEFAULT.enabled(CryptoKind.RANDOM))
+    fun noise_categories_off_by_default() {
+        // 噪点算法类别默认关(与 CategoryTaxonomy.defaultEnabledIds(CRYPTO) 一致)
+        for (kind in listOf(
+            CryptoKind.KEY_PARAM, CryptoKind.KEY_GENERATION, CryptoKind.KEY_FACTORY,
+            CryptoKind.KEY_STORE, CryptoKind.KEY_AGREEMENT, CryptoKind.RANDOM,
+            CryptoKind.BASE64, CryptoKind.WEB_CRYPTO,
+        )) {
+            assertFalse("noise crypto category $kind should default off", HookSwitch.DEFAULT.enabled(kind))
+        }
+        // 高信号算法类别默认开
+        for (kind in listOf(CryptoKind.CIPHER, CryptoKind.MESSAGE_DIGEST, CryptoKind.MAC, CryptoKind.SIGNATURE)) {
+            assertTrue("signal crypto category $kind should default on", HookSwitch.DEFAULT.enabled(kind))
+        }
+        // 噪点数据库类别默认关
+        assertFalse(HookSwitch.DEFAULT.dbEnabled(SqlKind.OPEN))
+        assertFalse(HookSwitch.DEFAULT.dbEnabled(SqlKind.TRANSACTION))
+        // 高信号数据库类别默认开
+        for (kind in listOf(SqlKind.QUERY, SqlKind.DML, SqlKind.EXEC)) {
+            assertTrue("signal db category $kind should default on", HookSwitch.DEFAULT.dbEnabled(kind))
+        }
     }
 
     @Test
-    fun db_categories_on_by_default() {
+    fun defaults_align_with_category_taxonomy() {
+        val crypto = CategoryTaxonomy.defaultEnabledIds(RecordType.CRYPTO)
+        val db = CategoryTaxonomy.defaultEnabledIds(RecordType.DATABASE)
+        for (kind in CryptoKind.entries) {
+            assertEquals(
+                "crypto $kind default mismatch with taxonomy",
+                crypto.contains(kind.name),
+                HookSwitch.DEFAULT.enabled(kind),
+            )
+        }
         for (kind in SqlKind.entries) {
-            assertTrue("db category $kind should default on", HookSwitch.DEFAULT.dbEnabled(kind))
+            assertEquals(
+                "db $kind default mismatch with taxonomy",
+                db.contains(kind.name),
+                HookSwitch.DEFAULT.dbEnabled(kind),
+            )
         }
     }
 
@@ -150,7 +179,7 @@ class HookSwitchTest {
         assertFalse(cryptoOff.anyCryptoEnabled)
         assertFalse(cryptoOff.enabled(CryptoKind.CIPHER))
         assertFalse(cryptoOff.enabled(CryptoKind.MESSAGE_DIGEST))
-        assertTrue(cryptoOff.dbEnabled(SqlKind.OPEN))
+        assertTrue(cryptoOff.copy(dbOpen = true).dbEnabled(SqlKind.OPEN))
         assertTrue(cryptoOff.anyDbEnabled)
         // 恢复总开关:分开关原态仍生效。
         assertTrue(cryptoOff.copy(cryptoListen = true).enabled(CryptoKind.CIPHER))

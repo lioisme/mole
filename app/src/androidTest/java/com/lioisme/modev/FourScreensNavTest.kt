@@ -15,9 +15,11 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.swipeUp
@@ -64,7 +66,7 @@ class FourScreensNavTest {
      */
     @After
     fun restoreFilters() {
-        AppListSettings.setShowModules(false, ctx)
+        AppListSettings.setShowModules(false)
     }
 
     /** 零依赖返回键(avoid espresso-core,与现有 androidTest 依赖集一致)。 */
@@ -207,14 +209,15 @@ class FourScreensNavTest {
         assumeTrue(openedLaunchable)
         rule.onAllNodesWithTag("app-launch").assertCountEquals(1)
 
-        // 更多菜单:应用级危险操作(移出作用域仅对已作用域应用出现;清空该应用记录恒在),
-        // 仅断言存在不触发(V20:危险操作迁至入口页头部)。
-        rule.onNodeWithContentDescription(str(R.string.record_more)).performClick()
-        rule.onNodeWithText(str(R.string.detail_clear_records)).assertIsDisplayed()
-        if (rule.onAllNodesWithText(str(R.string.detail_remove_scope)).fetchSemanticsNodes().isNotEmpty()) {
-            rule.onNodeWithText(str(R.string.detail_remove_scope)).assertIsDisplayed()
-        }
-        pressBack()
+        // V23 重构:更多菜单退役,清空记录归位操作卡(error 行,仅断言存在不触发);
+        // 移出作用域升级为 Hero 卡作用域 Switch(app-scope-row)。
+        // (旧版此处 pressBack 用于关闭 DropdownMenu 弹层,V23 无弹层,不再退页。)
+        rule.onNodeWithText(str(R.string.detail_clear_records))
+            .performScrollTo()
+            .assertIsDisplayed()
+        rule.onNodeWithTag("app-scope-row")
+            .performScrollTo()
+            .assertIsDisplayed()
 
         // 两记录入口:算法记录 / 数据库记录(单应用列表)。
         rule.onNodeWithText(str(R.string.algorithm_records_title)).assertIsDisplayed()

@@ -31,13 +31,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.RecordType
-import com.lioisme.modev.data.db.ModevDatabase
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsInfoItem
 import com.lioisme.modev.ui.components.SettingsSection
@@ -63,10 +61,9 @@ fun DataSettingsScreen(
 ) {
     val totalRecords by viewModel.totalRecords.collectAsStateWithLifecycle()
     val typeCounts by viewModel.typeCounts.collectAsStateWithLifecycle()
+    // 存储占用:仓库唯一出口(V23 R4,DB+wal+shm;清理动作后 VM 自动重取)
+    val storageBytes by viewModel.storageBytes.collectAsStateWithLifecycle()
     var pendingClear by remember { mutableStateOf<ClearTarget?>(null) }
-    val context = LocalContext.current
-    // 存储占用:DB 文件大小(SQLite 清理后页不回收,静态值即可,remember 一次)。
-    val dbSizeBytes = remember(context) { context.getDatabasePath(ModevDatabase.NAME).length().toLong() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -102,7 +99,7 @@ fun DataSettingsScreen(
                 SettingsInfoItem(
                     icon = Icons.Default.Storage,
                     title = stringResource(R.string.settings_storage_db),
-                    value = StorageFormat.formatBytes(dbSizeBytes),
+                    value = StorageFormat.formatBytes(storageBytes),
                 )
             }
             Spacer(Modifier.height(24.dp))

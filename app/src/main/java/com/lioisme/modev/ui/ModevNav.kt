@@ -19,6 +19,8 @@ import com.lioisme.modev.ui.apps.AppMonitorScreen
 import com.lioisme.modev.ui.apps.AppMonitorViewModelFactory
 import com.lioisme.modev.ui.apps.AppsScreen
 import com.lioisme.modev.ui.apps.AppsViewModelFactory
+import com.lioisme.modev.ui.apps.PerAppListenSettingsScreen
+import com.lioisme.modev.ui.apps.PerAppListenSettingsViewModelFactory
 import com.lioisme.modev.ui.logs.RecordDetailScreen
 import com.lioisme.modev.ui.logs.RecordDetailViewModelFactory
 import com.lioisme.modev.ui.navigation.ModevRoutes
@@ -30,7 +32,8 @@ import com.lioisme.modev.ui.navigation.popWhenReady
 import com.lioisme.modev.ui.navigation.slideComposable
 import com.lioisme.modev.ui.records.AlgorithmRecordsScreen
 import com.lioisme.modev.ui.records.DatabaseRecordsScreen
-import com.lioisme.modev.ui.records.MonitorRecordsViewModelFactory
+import com.lioisme.modev.ui.records.GlobalRecordsScreen
+import com.lioisme.modev.ui.records.RecordsViewModelFactory
 import com.lioisme.modev.ui.settings.AboutScreen
 import com.lioisme.modev.ui.settings.AlgorithmSettingsScreen
 import com.lioisme.modev.ui.settings.AlgorithmSettingsViewModelFactory
@@ -106,6 +109,9 @@ fun ModevNavHost(navController: NavHostController) {
                 onOpenSettings = {
                     navController.navigateGuarded(ModevRoutes.SETTINGS)
                 },
+                onOpenRecords = {
+                    navController.navigateGuarded(ModevRoutes.RECORDS_ALL)
+                },
             )
         }
         slideComposable(
@@ -130,7 +136,29 @@ fun ModevNavHost(navController: NavHostController) {
                     onOpenDatabase = {
                         navController.navigateGuarded(ModevRoutes.databaseRecords(pkg))
                     },
+                    onOpenListenSettings = {
+                        navController.navigateGuarded(ModevRoutes.appListenSettings(pkg))
+                    },
                     onLaunch = launchApp,
+                )
+            }
+        }
+        slideComposable(
+            route = ModevRoutes.APP_LISTEN_SETTINGS,
+            arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
+        ) { entry ->
+            val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
+            if (pkg.isBlank()) {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
+            BackGuarded(navController) {
+                PerAppListenSettingsScreen(
+                    viewModel = viewModel(
+                        key = "listen-settings-$pkg",
+                        factory = PerAppListenSettingsViewModelFactory(pkg, app.container),
+                    ),
+                    onBack = { navController.popGuarded() },
                 )
             }
         }
@@ -154,6 +182,20 @@ fun ModevNavHost(navController: NavHostController) {
                 )
             }
         }
+        slideComposable(route = ModevRoutes.RECORDS_ALL) {
+            BackGuarded(navController) {
+                GlobalRecordsScreen(
+                    viewModel = viewModel(
+                        key = "records-all",
+                        factory = RecordsViewModelFactory(null, null, app.container),
+                    ),
+                    onBack = { navController.popGuarded() },
+                    onOpenRecord = { id ->
+                        navController.navigateGuarded(ModevRoutes.recordDetail(id))
+                    },
+                )
+            }
+        }
         slideComposable(
             route = ModevRoutes.ALGORITHM_RECORDS,
             arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
@@ -167,7 +209,7 @@ fun ModevNavHost(navController: NavHostController) {
                 AlgorithmRecordsScreen(
                     viewModel = viewModel(
                         key = "records-algorithm-$pkg",
-                        factory = MonitorRecordsViewModelFactory(RecordType.CRYPTO, pkg, app.container),
+                        factory = RecordsViewModelFactory(RecordType.CRYPTO, pkg, app.container),
                     ),
                     onBack = { navController.popGuarded() },
                     onOpenRecord = { id ->
@@ -189,7 +231,7 @@ fun ModevNavHost(navController: NavHostController) {
                 DatabaseRecordsScreen(
                     viewModel = viewModel(
                         key = "records-database-$pkg",
-                        factory = MonitorRecordsViewModelFactory(RecordType.DATABASE, pkg, app.container),
+                        factory = RecordsViewModelFactory(RecordType.DATABASE, pkg, app.container),
                     ),
                     onBack = { navController.popGuarded() },
                     onOpenRecord = { id ->

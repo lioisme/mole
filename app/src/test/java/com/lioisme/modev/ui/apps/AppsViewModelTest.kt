@@ -90,7 +90,7 @@ class AppsViewModelTest {
     @After
     fun tearDown() {
         // AppListSettings 单例跨测试存活,复位模块显隐开关防串扰
-        AppListSettings.setShowModules(false, RuntimeEnvironment.getApplication())
+        AppListSettings.setShowModules(false)
         db.close()
     }
 
@@ -146,7 +146,7 @@ class AppsViewModelTest {
         }
         assertEquals(listOf("com.plain.app"), hidden.rows.map { it.packageName })
 
-        AppListSettings.setShowModules(true, RuntimeEnvironment.getApplication())
+        AppListSettings.setShowModules(true)
         val shown = awaitState { it.rows.any { r -> r.packageName == "com.module.app" } }
         assertEquals(
             listOf("com.module.app", "com.plain.app"),

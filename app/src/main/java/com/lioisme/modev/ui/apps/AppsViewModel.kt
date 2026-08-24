@@ -15,6 +15,7 @@ import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.domain.server.ConnectionMonitor
 import com.lioisme.modev.i18n.LocaleManager
 import com.lioisme.modev.ui.common.UiMessage
+import com.lioisme.modev.ui.common.scopeChangeMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -58,6 +59,7 @@ data class AppRow(
         /** 变更进行中的包(防重复点击)。 */
         val pending: Set<String> = emptySet(),
         val refreshing: Boolean = false,
+        val pinScoped: Boolean = true,
         val showSystem: Boolean = true,
         val showModules: Boolean = false,
     )
@@ -87,12 +89,14 @@ private data class CatalogBase(
     /** uiState 投影所需筛选偏好(与 SortPrefs 分离:不触发重排的仅投影字段)。 */
     private data class UiFilterPrefs(
         val query: String,
+        val pinScoped: Boolean,
         val showSystem: Boolean,
         val showModules: Boolean,
     )
 
     private data class UiPrefs(
         val query: String,
+        val pinScoped: Boolean,
         val showSystem: Boolean,
         val showModules: Boolean,
         val pending: Set<String>,
@@ -120,12 +124,11 @@ private val query = MutableStateFlow("")
                 query,
                 AppListSettings.showSystem,
                 AppListSettings.showModules,
-                ::UiFilterPrefs,
-            ),
+            ) { q, system, modules -> Triple(q, system, modules) },
             AppListSettings.pinScoped,
             LocaleManager.localeFlow,
-        ) { f, pin, locale ->
-            SortPrefs(f.query, f.showSystem, f.showModules, pin, locale)
+        ) { prefs3, pin, locale ->
+            SortPrefs(prefs3.first, prefs3.second, prefs3.third, pin, locale)
         },
     ) { base, prefs ->
         val scopedSet = (base.scopeState as? ScopeState.Ready)?.scope ?: emptySet()
@@ -155,11 +158,19 @@ private val query = MutableStateFlow("")
         sortedRows,
         combine(logs.observeRecordCounts(), server.connectedPackagesFlow) { counts, connected -> counts to connected },
         combine(
-            combine(query, AppListSettings.showSystem, AppListSettings.showModules, ::UiFilterPrefs),
+            combine(
+                query,
+                AppListSettings.pinScoped,
+                AppListSettings.showSystem,
+                AppListSettings.showModules,
+            ) { q, pin, system, modules ->
+                UiFilterPrefs(q, pin, system, modules)
+            },
             combine(pending, refreshing, catalog.loading) { p, r, l -> Triple(p, r, l) },
         ) { prefs3, state3 ->
             UiPrefs(
                 query = prefs3.query,
+                pinScoped = prefs3.pinScoped,
                 showSystem = prefs3.showSystem,
                 showModules = prefs3.showModules,
                 pending = state3.first,
@@ -185,6 +196,7 @@ private val query = MutableStateFlow("")
             scopeReady = scopeState is ScopeState.Ready,
             pending = prefs.pending,
             refreshing = prefs.refreshing,
+            pinScoped = prefs.pinScoped,
             showSystem = prefs.showSystem,
             showModules = prefs.showModules,
         )
@@ -193,6 +205,22 @@ private val query = MutableStateFlow("")
 
     fun setQuery(value: String) {
         query.value = value
+    }
+
+    /**
+     * 列表偏好变更(V23 R4 解耦契约):UI 不直触持久化单例([AppListSettings]),
+     * 读经 [uiState] 投影、写统一经本组方法下发。
+     */
+    fun setPinScoped(value: Boolean) {
+        AppListSettings.setPinScoped(value)
+    }
+
+    fun setShowSystem(value: Boolean) {
+        AppListSettings.setShowSystem(value)
+    }
+
+    fun setShowModules(value: Boolean) {
+        AppListSettings.setShowModules(value)
     }
 
     /** 下拉刷新:重扫应用列表 + 重读框架作用域(无论成败均复位刷新态)。 */
@@ -215,36 +243,13 @@ private val query = MutableStateFlow("")
             pending.value = pending.value + packageName
             try {
                 val result = scopeRepository.toggle(packageName)
-                messages.emit(messageFor(packageName, result))
+                messages.emit(scopeChangeMessage(packageName, result))
             } finally {
                 pending.value = pending.value - packageName
             }
         }
     }
-
-    private fun messageFor(packageName: String, result: ScopeChangeResult): UiMessage = when (result) {
-        is ScopeChangeResult.ScopeRequested ->
-            UiMessage(R.string.apps_scope_requested, listOf(packageName))
-        is ScopeChangeResult.ScopeRemoved ->
-            UiMessage(R.string.apps_scope_removed, listOf(packageName))
-        is ScopeChangeResult.Failed -> scopeFailedMessage(packageName, result)
-    }
 }
-
-/** M17:失败错误码 → 本地化文案(domain 零硬编码,Snackbar 语义由 UI 层承担)。 */
-private fun scopeFailedMessage(packageName: String, failed: ScopeChangeResult.Failed): UiMessage =
-    when (failed) {
-        ScopeChangeResult.Failed.FrameworkNotReady ->
-            UiMessage(R.string.apps_scope_failed_not_ready)
-        ScopeChangeResult.Failed.ServiceNotConnected ->
-            UiMessage(R.string.apps_scope_failed_service)
-        ScopeChangeResult.Failed.UserRejected ->
-            UiMessage(R.string.apps_scope_failed_rejected)
-        ScopeChangeResult.Failed.Timeout ->
-            UiMessage(R.string.apps_scope_failed_timeout)
-        ScopeChangeResult.Failed.RemoveFailed ->
-            UiMessage(R.string.apps_scope_failed_remove, listOf(packageName))
-    }
 
 /** 简单工厂,避免在 Compose 中手动拼参。 */
 class AppsViewModelFactory(

@@ -31,8 +31,14 @@ object ModevRoutes {
     const val LICENSE_DETAIL = "settings/licenses/{index}"
     const val ALGORITHM_RECORDS = "records/algorithm/{packageName}"
     const val DATABASE_RECORDS = "records/database/{packageName}"
+    /** 全局统一记录页(V23):无参数,跨应用跨类型。 */
+    const val RECORDS_ALL = "records/all"
+    /** 每应用监听设置页(V23 三态继承)。 */
+    const val APP_LISTEN_SETTINGS = "apps/{packageName}/listen-settings"
 
     fun appMonitor(packageName: String): String = "apps/${enc(packageName)}/monitor"
+
+    fun appListenSettings(packageName: String): String = "apps/${enc(packageName)}/listen-settings"
 
     fun algorithmRecords(packageName: String): String = "records/algorithm/${enc(packageName)}"
 

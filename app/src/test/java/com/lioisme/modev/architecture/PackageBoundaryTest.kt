@@ -6,11 +6,13 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 包边界架构测试(P5-1,2026-08-17):源码 import 扫描,防止依赖侵蚀。
+ * 包边界架构测试(P5-1,2026-08-17;V23 R4 增补 R3):
  *
  * 规则(与 docs §3 P5-1 一致):
  *  R1:ui 子树不得依赖注入侧(hook)与传输实现(data.server)——经 domain 抽象(ConnectionMonitor 等)交互。
  *  R2:domain 子树不得依赖 android 框架(文案/资源)与 ui 层——纯 Kotlin 领域逻辑。
+ *  R3(V23):ui 子树不得依赖 data.db(Room 实体/DAO/库名)——存储细节由仓库出口承担
+ *    (如存储占用走 LogRepository.storageUsage),为 MCP 服务层复用同一契约面兜底。
  *
  * 扫描基准为模块内 src/main/java;全部通过才允许新增豁免(注释说明理由)。
  */
@@ -64,6 +66,24 @@ class PackageBoundaryTest {
             }
         }
         assertEquals("domain 层依赖 android/ui,应保持纯 Kotlin:\n${violations.joinToString("\n")}", emptyList<String>(), violations)
+    }
+
+    @Test
+    fun `ui does not depend on room database internals`() {
+        val violations = mutableListOf<String>()
+        for (file in scan()) {
+            if (!file.packageName.startsWith("com.lioisme.modev.ui.")) continue
+            for (imp in file.imports) {
+                if (imp == "com.lioisme.modev.data.db" || imp.startsWith("com.lioisme.modev.data.db.")) {
+                    violations += "${file.path} -> $imp"
+                }
+            }
+        }
+        assertEquals(
+            "UI 层依赖 Room 内部(实体/DAO/库名),存储细节应由仓库出口承担:\n${violations.joinToString("\n")}",
+            emptyList<String>(),
+            violations,
+        )
     }
 
     @Test

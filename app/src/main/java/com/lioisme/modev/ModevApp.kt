@@ -85,11 +85,16 @@ class AppContainer(private val context: Context) {
                 gson = Gson(),
                 remotePrefs = { RemotePrefsBridge.prefs() },
             ),
-        ).also { server.configProvider = { it.switch } }
+            gson = Gson(),
+        ).also { server.effectiveResolver = { pkg -> it.effectiveSwitch(pkg) } }
     }
 
     val logs: LogRepository by lazy {
-        LogRepository(dao = dao, server = server)
+        LogRepository(
+            dao = dao,
+            server = server,
+            databaseFile = { context.getDatabasePath(ModevDatabase.NAME) },
+        )
     }
 
     /** 框架作用域网关:现代框架服务 → 领域抽象。
@@ -125,7 +130,7 @@ class AppContainer(private val context: Context) {
     init {
         // 进程启动即接线记录回调(并启动服务器),避免 UI 未访问日志页时记录被丢弃
         logs.start()
-        // 进程启动即初始化设置仓库:configProvider(握手后立即推送全局配置)与
+        // 进程启动即初始化设置仓库:effectiveResolver(握手后立即按包推送有效配置)与
         // capabilityRegistry 依赖 settings 惰性实例,若仅等 UI 打开设置页才初始化,
         // 注入进程握手的配置推送将永远缺席(客户端 60s 读超时 → 无限重连)。
         settings

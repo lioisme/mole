@@ -19,10 +19,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *   rowCount / affectedCount / rowId / resultText,recordType='db' 行承载。
  * v6 → v7:三态视图(V19)7 个字节字段各增 Base64 列(keyB64/ivB64/inputB64/outputB64/
  *   saltB64/aadB64/publicKeyB64),存量行 NULL = 旧记录降级双态。
+ * v7 → v8:多维筛选复合索引([recordType]+[kind]、[recordType]+[packageName]+[timestamp]),
+ *   纯 CREATE INDEX,不触碰存量数据(与实体声明索引命名一致,运行时 schema 校验通过)。
  */
 @Database(
     entities = [CryptoRecordEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = true,
 )
 abstract class ModevDatabase : RoomDatabase() {
@@ -118,6 +120,25 @@ abstract class ModevDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v7 → v8:多维筛选复合索引(纯 CREATE INDEX,不触碰存量数据)。
+         * 索引命名须与实体 [@Index] 生成命名一致,否则运行时 schema 校验抛异常:
+         * index_{table}_{col1}_{col2} / index_{table}_{col1}_{col2}_{col3}。
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val table = "crypto_records"
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_${table}_recordType_kind` " +
+                        "ON `$table` (`recordType`, `kind`)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_${table}_recordType_packageName_timestamp` " +
+                        "ON `$table` (`recordType`, `packageName`, `timestamp`)",
+                )
+            }
+        }
+
         @Volatile
         private var instance: ModevDatabase? = null
 
@@ -128,9 +149,12 @@ abstract class ModevDatabase : RoomDatabase() {
                     ModevDatabase::class.java,
                     NAME,
                 )
+                    // V23 T6.1:显式 WAL(写并发读、批量落库 fsync 摊薄;
+                    // AUTOMATIC 在 API 16+ 实际同为 WAL,显式化表达意图并防 OEM 差异)
+                    .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                        MIGRATION_5_6, MIGRATION_6_7,
+                        MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
                     )
                     .fallbackToDestructiveMigration(false)
                     .build()

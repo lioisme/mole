@@ -44,6 +44,8 @@ class StringResourceParityTest {
         "section_repr_base64",
         "section_repr_hex",
         "version",
+        // 纯占位符拼接格式串(locale 无关,V22 许可列表行;V23 补录豁免)
+        "licenses_row_format",
     )
 
     @Test

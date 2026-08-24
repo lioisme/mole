@@ -50,13 +50,13 @@ class AppListSettingsTest {
     @Test
     fun `set pinScoped persists and reloads`() {
         AppListSettings.init(context)
-        AppListSettings.setPinScoped(false, context)
+        AppListSettings.setPinScoped(false)
         assertFalse(AppListSettings.pinScoped.value)
         // 进程重启等价:重新 init 从 SharedPreferences 回读
         AppListSettings.init(context)
         assertFalse(AppListSettings.pinScoped.value)
         // 还原默认
-        AppListSettings.setPinScoped(true, context)
+        AppListSettings.setPinScoped(true)
         AppListSettings.init(context)
         assertTrue(AppListSettings.pinScoped.value)
     }
@@ -64,12 +64,12 @@ class AppListSettingsTest {
     @Test
     fun `set showSystem persists and reloads`() {
         AppListSettings.init(context)
-        AppListSettings.setShowSystem(false, context)
+        AppListSettings.setShowSystem(false)
         assertFalse(AppListSettings.showSystem.value)
         AppListSettings.init(context)
         assertFalse(AppListSettings.showSystem.value)
         // 还原默认
-        AppListSettings.setShowSystem(true, context)
+        AppListSettings.setShowSystem(true)
         AppListSettings.init(context)
         assertTrue(AppListSettings.showSystem.value)
     }
@@ -78,13 +78,13 @@ class AppListSettingsTest {
     fun `set showModules persists and reloads`() {
         AppListSettings.init(context)
         assertFalse(AppListSettings.showModules.value)
-        AppListSettings.setShowModules(true, context)
+        AppListSettings.setShowModules(true)
         assertTrue(AppListSettings.showModules.value)
         // 进程重启等价:重新 init 从 SharedPreferences 回读
         AppListSettings.init(context)
         assertTrue(AppListSettings.showModules.value)
         // 还原默认
-        AppListSettings.setShowModules(false, context)
+        AppListSettings.setShowModules(false)
         AppListSettings.init(context)
         assertFalse(AppListSettings.showModules.value)
     }

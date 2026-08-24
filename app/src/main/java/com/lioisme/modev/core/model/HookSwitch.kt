@@ -17,25 +17,38 @@ data class HookSwitch(
     val cipher: Boolean = true,
     val mac: Boolean = true,
     val signature: Boolean = true,
-    val keyParam: Boolean = true,
-    val keyGeneration: Boolean = true,
-    val keyFactory: Boolean = true,
-    val keyStore: Boolean = true,
-    val keyAgreement: Boolean = true,
-    val random: Boolean = true,
+    /** 密钥参数构造:高频、逆向价值低,默认关(噪点类别,见 [CategoryTaxonomy])。 */
+    val keyParam: Boolean = false,
+    /** 密钥生成:高频、逆向价值低,默认关(噪点类别)。 */
+    val keyGeneration: Boolean = false,
+    /** 密钥还原:高频、逆向价值低,默认关(噪点类别)。 */
+    val keyFactory: Boolean = false,
+    /** 密钥库:高频、逆向价值低,默认关(噪点类别)。 */
+    val keyStore: Boolean = false,
+    /** 密钥协商:高频、逆向价值低,默认关(噪点类别)。 */
+    val keyAgreement: Boolean = false,
+    /** 随机数:极高频、逆向价值低,默认关(噪点类别)。 */
+    val random: Boolean = false,
+    /** Base64 编码:纯编码噪声,默认关(噪点类别,与 webView 同先例)。 */
     val base64: Boolean = false,
     /** WebView JS 加解密监听(WebCrypto / CryptoJS / JSEncrypt,V12 起;默认关,同 base64 先例)。 */
     val webView: Boolean = false,
-    /** 数据库监听:打开/关闭(openDatabase/openOrCreateDatabase/SQLiteOpenHelper;「常用类别默认启用」)。 */
-    val dbOpen: Boolean = true,
-    /** 数据库监听:查询(query/rawQuery,含结果集被动采集)。 */
+    /**
+     * 数据库监听:打开/关闭(openDatabase/openOrCreateDatabase/SQLiteOpenHelper)。
+     * 高频、信号弱(仅生命周期),默认关(噪点类别,见 [CategoryTaxonomy])。
+     */
+    val dbOpen: Boolean = false,
+    /** 数据库监听:查询(query/rawQuery,含结果集被动采集)。高信号,默认启用。 */
     val dbQuery: Boolean = true,
-    /** 数据库监听:增删改便捷方法(insert/replace/update/delete)。 */
+    /** 数据库监听:增删改便捷方法(insert/replace/update/delete)。高信号,默认启用。 */
     val dbDml: Boolean = true,
-    /** 数据库监听:原生 SQL 执行(execSQL / SQLiteStatement.execute* / attach)。 */
+    /** 数据库监听:原生 SQL 执行(execSQL / SQLiteStatement.execute* / attach)。高信号,默认启用。 */
     val dbExec: Boolean = true,
-    /** 数据库监听:事务(begin/end/setTransactionSuccessful)。 */
-    val dbTransaction: Boolean = true,
+    /**
+     * 数据库监听:事务(begin/end/setTransactionSuccessful)。
+     * 高频、信号弱,默认关(噪点类别)。
+     */
+    val dbTransaction: Boolean = false,
     /** 数据库监听:单条查询结果行数上限;0 = 不限制(不推荐,结果闸门双保险)。 */
     val maxResultRows: Int = RecordLimits.DEFAULT_MAX_RESULT_ROWS,
     /** 数据库监听:单条查询结果序列化字符上限;0 = 不限制(不推荐)。 */

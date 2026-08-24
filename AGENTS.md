@@ -150,6 +150,38 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
     (无需额外 onLoadAround 接线);`enablePlaceholders=false` 时
     `itemCount` = 已加载数。分页翻页验证须种子数据 > 2 页(如 120 条),
     否则分页路径永不触达(旧测试盲区)。
+16. **三态继承每应用监听(V23)**:覆盖模型 =
+    `TriState{INHERIT,ON,OFF}` + `AppListenOverride`(总开关×2 + 类别×17
+    逐项三态),`EffectiveSwitch.resolve(global, override)` 产出普通
+    `HookSwitch` —— wire 协议/注入侧**零感知** TriState(VERSION 恒 4);
+    存储 = 每包一键 `override_{pkg}`(`ConfigKeys.OVERRIDE_PREFIX`,
+    与 V10 已清理的 `switch_{pkg}` 隔离),惰性创建、全 INHERIT 即删键;
+    覆盖键读本地权威(`getLocal`,只由宿主写),全局键维持读优先远程;
+    下发 = ConfigServer per-session resolve(`effectiveResolver` 回调 +
+    `pushToPackage(pkg)` 定向推送;全局变更 `broadcastEffectiveConfig()`
+    对每会话各自 resolve,**禁止恢复「同一份广播全量」**——会冲刷已覆盖
+    应用的有效配置);注入侧兜底(HookInstaller)直读 `switch_global` +
+    `override_{pkg}` 后 resolve;测试种子数据 hook 开关默认值见 V18
+    (dbOpen 等噪点类别默认关),集成测试 setUp 须显式开。
+17. **统一记录页与列表收敛(V23)**:全部记录浏览走 `records/all`
+    (`GlobalRecordsScreen`,入口仅应用列表顶栏);三页共享
+    `RecordTimelineList` + `RecordsViewModel`(presetTypes/presetPackages
+    锁定单应用语境);D6:类别筛选仅在生效记录类型唯一时可选
+    (`KindFilterMenu(enabled=...)`,VM `buildFilter` 归一化兜底),
+    类型切换自动失效已选类别。
+18. **解耦契约(V23 R4)**:`PackageBoundaryTest` 新增规则——ui 子树禁
+    import `data.db.*`(存储细节由仓库出口承担,如存储占用 =
+    `LogRepository.storageUsage()`,DB+wal+shm 三文件和);UI 变更
+    应用列表偏好一律经 `AppsViewModel.setPinScoped/setShowSystem/
+    setShowModules`(UI 零 import `AppListSettings`,其 init 缓存
+    applicationContext,setX 无 Context 参数);作用域变更提示文案
+    统一 `ui/common/scopeChangeMessage`,状态语义分派统一
+    `ui/common/connectionStatus/scopeStatus`;Room 显式 WAL
+    (`ModevDatabase.get`)、批量插入显式 `@Transaction`;
+    lint 基线更新:**38 → 37 warnings / 0 errors**(V23 清理死资源键
+    detail_remove_scope/listen_settings_title/record_copied/
+    settings_pin_scoped_hint/settings_apps_section/detail_framework_error,
+    新增计数文案必须 plurals 如 listen_settings_custom_n)。
 
 ## 已知工具链坑
 
@@ -178,6 +210,17 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
   (OS errno 1455/daemon 崩溃):assemble 前清理闲置守护进程,
   重任务用 `--no-daemon --max-workers=1 -Dorg.gradle.jvmargs=-Xmx2048m` 逐变体
   串行执行。
+- **Robolectric 双模式均不支持 `EXPLAIN QUERY PLAN`**(legacy/native shadow
+  都剥离 EXPLAIN 前缀直接执行原查询,返回普通结果集)——查询计划级验证留待
+  真机插桩;JVM 门禁用「sqlite_master 索引存在性 + 行为对账」组合
+  (`ExplainQueryPlanProbeTest`)。
+- **PowerShell 管道处理含中文源码会毁文件**:`Get-Content | -replace |
+  Set-Content` 以系统 ANSI 解码 UTF-8,中文注释乱码且尾字节可吞换行把下一行
+  代码并入注释(V23 实锤)。改文件一律用 edit 工具或 .NET API 字节级读写
+  (`[IO.File]::ReadAllBytes/WriteAllBytes + Encoding.UTF8`)。
+- androidx.sqlite `SimpleSQLiteQuery` 不解析 `:name` 命名参数(手写 SQL 直绑
+  需用 `?` 占位);Robolectric 下 `?N` 编号占位触发 SQLITE_MISMATCH,用纯 `?`
+  按序绑定。
 
 ## 测试金字塔(新增行为必须有测试)
 

@@ -13,4 +13,13 @@ object ConfigKeys {
 
     /** 全局捕获配置键(V10):全应用共享一份,与包名解耦。 */
     const val GLOBAL_SWITCH = SWITCH_PREFIX + "global"
+
+    /** 单应用监听覆盖键前缀(V23 三态继承,惰性创建;与已清理的旧 `switch_{pkg}` 前缀隔离)。 */
+    const val OVERRIDE_PREFIX = "override_"
+
+    /**
+     * 包名 → 覆盖存储键。
+     * @param packageName 已作用域应用的包名(调用方保证非空)。
+     */
+    fun overrideKey(packageName: String): String = OVERRIDE_PREFIX + packageName
 }

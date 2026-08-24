@@ -36,14 +36,43 @@
     <string name="detail_not_listening">未作用域</string>
     <string name="detail_clear_records">清空该应用的记录</string>
     <string name="detail_framework_no_service">框架服务未连接</string>
-    <string name="detail_framework_error">框架异常:%1$s</string>
     <string name="detail_reading_scope">正在读取作用域…</string>
     <string name="algorithm_records_title">算法记录</string>
     <string name="database_records_title">数据库记录</string>
     <string name="algorithm_records_search">搜索算法记录…</string>
     <string name="database_records_search">搜索数据库记录…</string>
+
+    <!-- All records (V23 global unified records) -->
+    <string name="records_all_title">全部记录</string>
+    <string name="records_all_search">搜索全部记录…</string>
+    <string name="filter_type_all">全部类型</string>
+    <string name="filter_type_crypto">算法</string>
+    <string name="filter_type_database">数据库</string>
+    <string name="filter_apps_any">应用</string>
+    <plurals name="filter_apps_selected">
+        <item quantity="other">已选 %1$d 个应用</item>
+    </plurals>
+    <string name="cd_filter_apps">按应用筛选</string>
+    <string name="cd_records_all">查看全部记录</string>
+    <string name="app_picker_title">选择应用</string>
+    <string name="app_picker_search">搜索包名…</string>
+    <string name="app_picker_clear">清除</string>
+    <string name="app_picker_done">完成</string>
     <string name="detail_empty">暂无记录</string>
     <string name="section_monitor_kinds">监听类别</string>
+    <string name="app_monitor_scope_row">监听此应用</string>
+    <string name="listen_settings_entry">监听设置</string>
+    <string name="listen_settings_follow_global">跟随全局</string>
+    <plurals name="listen_settings_custom_n">
+        <item quantity="other">%1$d 项自定义</item>
+    </plurals>
+    <string name="app_monitor_actions_section">操作</string>
+    <string name="listen_settings_hint">未覆盖的类别跟随全局设置;变更对该应用即时生效</string>
+    <string name="tri_inherit">跟随全局</string>
+    <string name="tri_on">强制开</string>
+    <string name="tri_off">强制关</string>
+    <string name="listen_reset_action">重置为全局设置</string>
+    <string name="danger_reset_listen_msg">将清除对 %1$s 的全部监听覆盖,该应用回落为纯全局设置。</string>
     <string name="section_record_options">记录选项</string>
     <string name="algorithm_monitor_master">启用算法监听</string>
     <string name="algorithm_monitor_master_hint">全局总开关;分开关保留原态,重开即恢复</string>
@@ -81,7 +110,6 @@
     <string name="capture_ignore_stack_hint">调用栈命中任一前缀即跳过该记录</string>
     <string name="capture_ignore_stack_dialog_title">忽略调用栈前缀</string>
     <string name="capture_ignore_stack_dialog_hint">每行一个类前缀,例如 com.google.gson</string>
-    <string name="detail_remove_scope">移出作用域</string>
 
     <!-- 危险操作确认 -->
     <string name="danger_title">确认操作</string>
@@ -208,7 +236,6 @@
     <string name="record_see_more">展开更多</string>
     <string name="record_copy_done">已复制%1$s:共 %2$d 字符</string>
     <string name="record_copy_too_large">内容过大(%1$d 字符)无法整段复制,请长按选中或复制区块 hex</string>
-    <string name="record_copied">已复制记录文本</string>
     <string name="export_failed">导出失败</string>
     <string name="export_too_large">记录过大(%1$d 字符),无法导出</string>
 
@@ -313,8 +340,6 @@
     <string name="stats_dropped_records">畸形记录丢弃</string>
     <string name="stats_rejected_records">包名不符被拒</string>
     <string name="settings_pin_scoped">已作用域应用置顶</string>
-    <string name="settings_pin_scoped_hint">已作用域应用始终排在前面</string>
-    <string name="settings_apps_section">应用列表</string>
     <string name="appearance">外观</string>
     <string name="follow_system">跟随系统</string>
     <string name="light_mode">浅色</string>

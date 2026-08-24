@@ -36,14 +36,46 @@
     <string name="detail_not_listening">Out of scope</string>
     <string name="detail_clear_records">Clear this app\'s records</string>
     <string name="detail_framework_no_service">Framework service not connected</string>
-    <string name="detail_framework_error">Framework error: %1$s</string>
     <string name="detail_reading_scope">Reading scope…</string>
     <string name="algorithm_records_title">Algorithm Records</string>
     <string name="database_records_title">Database Records</string>
     <string name="algorithm_records_search">Search algorithm records…</string>
     <string name="database_records_search">Search database records…</string>
+
+    <!-- All records (V23 global unified records) -->
+    <string name="records_all_title">All records</string>
+    <string name="records_all_search">Search all records…</string>
+    <string name="filter_type_all">All types</string>
+    <string name="filter_type_crypto">Crypto</string>
+    <string name="filter_type_database">Database</string>
+    <string name="filter_apps_any">Apps</string>
+    <plurals name="filter_apps_selected">
+        <item quantity="one">%1$d app selected</item>
+        <item quantity="other">%1$d apps selected</item>
+    </plurals>
+    <string name="cd_filter_apps">Filter by app</string>
+    <string name="cd_records_all">View all records</string>
+    <string name="app_picker_title">Select apps</string>
+    <string name="app_picker_search">Search package name…</string>
+    <string name="app_picker_clear">Clear</string>
+    <string name="app_picker_done">Done</string>
+
     <string name="detail_empty">No records yet</string>
     <string name="section_monitor_kinds">Monitor Kinds</string>
+    <string name="app_monitor_scope_row">Monitor this app</string>
+    <string name="listen_settings_entry">Listen settings</string>
+    <string name="listen_settings_follow_global">Follow global</string>
+    <plurals name="listen_settings_custom_n">
+        <item quantity="one">%1$d override</item>
+        <item quantity="other">%1$d overrides</item>
+    </plurals>
+    <string name="app_monitor_actions_section">Actions</string>
+    <string name="listen_settings_hint">Kinds not overridden follow the global settings; changes apply instantly to this app</string>
+    <string name="tri_inherit">Follow global</string>
+    <string name="tri_on">Force on</string>
+    <string name="tri_off">Force off</string>
+    <string name="listen_reset_action">Reset to global settings</string>
+    <string name="danger_reset_listen_msg">Remove all listen overrides for %1$s? The app will fall back to global settings.</string>
     <string name="section_record_options">Record Options</string>
     <string name="algorithm_monitor_master">Enable Algorithm Listen</string>
     <string name="algorithm_monitor_master_hint">Global switch; per-kind switches keep their state</string>
@@ -81,7 +113,6 @@
     <string name="capture_ignore_stack_hint">Skip records whose call stack matches any prefix</string>
     <string name="capture_ignore_stack_dialog_title">Ignore stack prefixes</string>
     <string name="capture_ignore_stack_dialog_hint">One class prefix per line, e.g. com.google.gson</string>
-    <string name="detail_remove_scope">Remove scope</string>
 
     <!-- Danger confirmations -->
     <string name="danger_title">Confirm operation</string>
@@ -210,7 +241,6 @@
     <string name="record_see_more">See more</string>
     <string name="record_copy_done">Copied %1$s: %2$d chars</string>
     <string name="record_copy_too_large">Too large to copy (%1$d chars). Long-press or copy the hex of a section instead.</string>
-    <string name="record_copied">Record copied</string>
     <string name="export_failed">Export failed</string>
 
     <!-- Database monitor (V17: SQLite 监听类别/操作/详情/开关) -->
@@ -317,8 +347,6 @@
     <string name="stats_dropped_records">Dropped (malformed)</string>
     <string name="stats_rejected_records">Rejected (package mismatch)</string>
     <string name="settings_pin_scoped">Pin scoped apps on top</string>
-    <string name="settings_pin_scoped_hint">Scoped apps always stay on top</string>
-    <string name="settings_apps_section">App List</string>
     <string name="appearance">Appearance</string>
     <string name="follow_system">Follow system</string>
     <string name="light_mode">Light</string>

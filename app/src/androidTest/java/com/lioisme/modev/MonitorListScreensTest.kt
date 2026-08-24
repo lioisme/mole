@@ -96,13 +96,13 @@ class MonitorListScreensTest {
             assertEquals("种子写入须在读回中可见", 4L, seeded)
         }
         // 被测应用默认隐藏(自身是 Xposed 模块),开启显隐使行可见。
-        AppListSettings.setShowModules(true, ctx)
+        AppListSettings.setShowModules(true)
         rule.waitForIdle()
     }
 
     @After
     fun restore() {
-        AppListSettings.setShowModules(false, ctx)
+        AppListSettings.setShowModules(false)
     }
 
     private fun record(pkg: String, kind: String, algorithm: String, operation: String, ts: Long) =

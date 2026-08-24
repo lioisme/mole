@@ -6,7 +6,10 @@ import com.lioisme.modev.core.codec.CryptoRecordCodec
 import com.lioisme.modev.core.codec.Json
 import com.lioisme.modev.core.codec.SqlRecordCodec
 import com.lioisme.modev.core.codec.WireCodec
+import com.lioisme.modev.core.model.AppListenOverride
+import com.lioisme.modev.core.model.ConfigKeys
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.framework.RemotePrefsBridge
@@ -86,16 +89,29 @@ class HookInstaller(
         installed = true
 
         // M3-1/M3-4: 现代变体默认配置兜底 = RemotePreferences 直读(无宿主也可用),
-        // 并注册变更监听即时生效;TCP 推送仍可用(与远程值一致,且是 legacy 唯一路径)
-        // V10:配置全局唯一(switch_global),与包名解耦
+        // 并注册变更监听即时生效;TCP 推送仍可用(与远程值一致,且是 legacy 唯一路径)。
+        // V10:全局配置 switch_global;V23(D4):叠加本包覆盖键 resolve 出有效配置 ——
+        // 模块 App 未运行时 per-app 监听设置依然生效,legacy 变体(无远程偏好)自然跳过。
         remotePrefsProvider?.invoke()?.let { remote ->
-            val key = RemotePrefsBridge.GLOBAL_SWITCH_KEY
-            parseSwitch(remote.getString(key, null))?.let { channel.updateConfig(it) }
+            val globalKey = RemotePrefsBridge.GLOBAL_SWITCH_KEY
+            val overrideKey = ConfigKeys.overrideKey(packageName)
+
+            fun effectiveFromRemote(): HookSwitch? {
+                val global = parseSwitch(remote.getString(globalKey, null))
+                val overrideJson = remote.getString(overrideKey, null)
+                if (global == null && overrideJson == null) return null
+                return EffectiveSwitch.resolve(
+                    global ?: HookSwitch.DEFAULT,
+                    AppListenOverride.fromJson(Json.gson, overrideJson),
+                )
+            }
+
+            effectiveFromRemote()?.let { channel.updateConfig(it) }
             runCatching {
-                remote.registerOnSharedPreferenceChangeListener { prefs, changedKey ->
-                    if (changedKey == key) {
-                        parseSwitch(prefs.getString(changedKey, null))?.let { channel.updateConfig(it) }
-                    }
+                remote.registerOnSharedPreferenceChangeListener { prefs, _ ->
+                    // 不按 changedKey 过滤:远程偏好对新增键的事件粒度不可靠,
+                    // 任一变化一律全量重读本包相关键(resolve 幂等,开销为内存级 SP 读)
+                    effectiveFromRemote()?.let { channel.updateConfig(it) }
                 }
             }
         }

@@ -44,7 +44,7 @@ class SettingsRepositoryTest {
         MirroredConfigWriter(prefs, Gson(), remotePrefs = { null })
 
     private fun repo(): SettingsRepository =
-        SettingsRepository(server, writer())
+        SettingsRepository(server, writer(), Gson())
 
     @Test
     fun `legacy per-package keys migrate to global key and are cleaned`() {

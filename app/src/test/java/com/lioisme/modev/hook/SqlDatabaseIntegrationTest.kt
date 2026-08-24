@@ -47,7 +47,15 @@ class SqlDatabaseIntegrationTest {
 
     @Before
     fun setUp() {
-        configVar = HookSwitch()
+        // V18 噪点类别默认关(dbOpen 等 = false)后,集成测试须显式全开:
+        // 本类验证「全链产出」,开关关闭态由 `db 开关全关时零产出` 用例单独覆盖。
+        configVar = HookSwitch(
+            dbOpen = true,
+            dbQuery = true,
+            dbDml = true,
+            dbExec = true,
+            dbTransaction = true,
+        )
         platform = FakePlatform()
         captured = Collections.synchronizedList(ArrayList())
         sink = RecordSink(
