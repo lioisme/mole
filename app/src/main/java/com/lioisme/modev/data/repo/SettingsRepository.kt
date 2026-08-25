@@ -137,6 +137,7 @@ class SettingsRepository(
     private val server: ConfigServer,
     private val writer: ConfigWriter,
     private val gson: Gson,
+    private val localPrefs: SharedPreferences,
 ) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -148,6 +149,29 @@ class SettingsRepository(
      * capability 消费,不再有任何写入方)。
      */
     val globalSwitch: StateFlow<HookSwitch> = _globalSwitch
+
+    private val _serverExternalAccess = MutableStateFlow(false)
+
+    /**
+     * 服务监听外部访问(V26):false(默认)= 127.0.0.1 仅本机;
+     * true = 0.0.0.0 所有接口(同网段设备可连)。宿主本地偏好,
+     * 不经远程镜像(注入侧零感知)。
+     */
+    val serverExternalAccess: StateFlow<Boolean> = _serverExternalAccess
+
+    /**
+     * 写入外部访问开关并即时生效:本地持久化 → 服务端改绑([ConfigServer.restart],
+     * 已连接会话由注入侧重连循环恢复)。
+     */
+    suspend fun setServerExternalAccess(enabled: Boolean) {
+        withContext(Dispatchers.IO) {
+            localPrefs.edit { putBoolean(ConfigKeys.SERVER_EXTERNAL_ACCESS, enabled) }
+        }
+        _serverExternalAccess.value = enabled
+        // volatile 同步置位(状态可观测确定性),重启改绑异步执行
+        server.externalAccess = enabled
+        scope.launch { server.restart() }
+    }
 
     private val _overrides = MutableStateFlow<Map<String, AppListenOverride>>(emptyMap())
 
@@ -212,5 +236,13 @@ class SettingsRepository(
                 pkg to AppListenOverride.fromJson(gson, writer.getLocal(key))
             }
             .filterValues { !it.isDefault }
+        // V26:恢复服务监听外部访问偏好(进程重启后重放;默认停用零动作)
+        val storedExternalAccess = localPrefs.getBoolean(ConfigKeys.SERVER_EXTERNAL_ACCESS, false)
+        _serverExternalAccess.value = storedExternalAccess
+        if (storedExternalAccess) {
+            server.externalAccess = true
+            // 服务端可能已在容器惰性初始化时以回环启动,restart 立即改绑全接口
+            scope.launch { server.restart() }
+        }
     }
 }

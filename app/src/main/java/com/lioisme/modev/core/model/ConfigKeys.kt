@@ -22,4 +22,10 @@ object ConfigKeys {
      * @param packageName 已作用域应用的包名(调用方保证非空)。
      */
     fun overrideKey(packageName: String): String = OVERRIDE_PREFIX + packageName
+
+    /**
+     * 服务监听外部访问键(V26):宿主本地 SharedPreferences 专用,
+     * 不入远程镜像(仅宿主进程消费,注入侧零感知)。
+     */
+    const val SERVER_EXTERNAL_ACCESS = "server_external_access"
 }

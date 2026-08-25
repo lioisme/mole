@@ -22,16 +22,32 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 
 /**
- * 宿主侧配置/日志服务端(仅监听 loopback):
+ * 宿主侧配置/日志服务端(V26:监听地址可配置):
  *
+ * - 默认仅监听 loopback(127.0.0.1);[externalAccess] = true 时改绑 0.0.0.0
+ *   (所有接口,支持同网段外部工具接入;风险提示与开关默认停用见诊断页);
  * - 接受注入进程 TCP 连接,握手后登记 (socket → 包名);
  * - 接收 [WireProtocol.TYPE_RECORD] 并回调 [onRecord];
  * - 配置下发(V23 per-session):握手与广播时按会话包名 resolve 有效配置推送;
- * - 心跳应答、断连清理、优雅停止。
+ * - 心跳应答、断连清理、优雅停止([close])与受管重启([restart]);
+ * - 注入侧恒连本机回环(hook/ConfigChannel),不受 externalAccess 影响。
  */
 class ConfigServer(
     private val port: Int = WireProtocol.PORT,
 ) : Closeable, ConnectionMonitor {
+
+    /**
+     * 外部访问开关(V26):false(默认)= 绑定 127.0.0.1;true = 绑定 0.0.0.0。
+     * volatile:accept 线程每次 bind 尝试读取最新值(退避重试路径天然自适应),
+     * 显式 [restart] 提供立即生效语义。偏好持久化在 SettingsRepository(宿主本地)。
+     */
+    @Volatile
+    var externalAccess: Boolean = false
+
+    /** 绑定地址观测点("127.0.0.1"/"0.0.0.0";未绑定 = null),诊断页与测试消费。 */
+    private val _boundAddress = MutableStateFlow<String?>(null)
+    override val boundAddress: StateFlow<String?> = _boundAddress
+
 
     /**
      * 类型化记录回调(ADR-1,由 LogRepository 接线,可热替换):
@@ -85,40 +101,62 @@ class ConfigServer(
     var requireToken: String? = null
 
     fun start() {
-        if (running) return
-        running = true
-        acceptThread = thread(name = "modev-config-server") {
-            var bindRetryMs = 2000L
-            while (running) {
-                try {
-                    val ss = ServerSocket()
-                    ss.reuseAddress = true
-                    ss.bind(InetSocketAddress("127.0.0.1", port))
-                    serverSocket = ss
-                    bindRetryMs = 2000L
-                    while (running) {
-                        val socket = try {
+        val myEpoch: Long
+        synchronized(lifecycleLock) {
+            if (running) return
+            running = true
+            epoch += 1
+            myEpoch = epoch
+        }
+        acceptThread = thread(name = "modev-config-server") { acceptLoop(myEpoch) }
+    }
+
+    /**
+     * accept 主循环(代元守卫):循环条件同时校验 running 与所属代元,
+     * 旧线程在 [restart] 后自然退出且不触碰新线程的 running 状态;
+     * 仅当代元仍归属自己时才将 running 复位(防覆盖新代)。
+     */
+    private fun acceptLoop(myEpoch: Long) {
+        var bindRetryMs = 2000L
+        while (isCurrentEpoch(myEpoch)) {
+            try {
+                val ss = ServerSocket()
+                ss.reuseAddress = true
+                // volatile 读:退避重试路径天然吸收开关竞态;显式 restart 提供立即生效
+                val address = if (externalAccess) ConnectionMonitor.BIND_ALL_INTERFACES else ConnectionMonitor.BIND_LOOPBACK
+                ss.bind(InetSocketAddress(address, port))
+                serverSocket = ss
+                _boundAddress.value = address
+                bindRetryMs = 2000L
+                while (isCurrentEpoch(myEpoch)) {
+                    val socket =
+                        try {
                             ss.accept()
                         } catch (t: Throwable) {
-                            if (running) continue else break
+                            if (isCurrentEpoch(myEpoch)) continue else break
                         }
-                        handleClient(socket)
-                    }
-                } catch (t: Throwable) {
-                    if (!running) break
-                    // 端口 bind 失败:指数退避重试(2s→30s)
-                    android.util.Log.w("Modev", "config server bind failed, retry in ${bindRetryMs}ms: $t")
-                    try {
-                        Thread.sleep(bindRetryMs)
-                    } catch (ie: InterruptedException) {
-                        break
-                    }
-                    bindRetryMs = (bindRetryMs * 2).coerceAtMost(30000L)
+                    handleClient(socket)
                 }
+                runCatching { ss.close() }
+            } catch (t: Throwable) {
+                if (!isCurrentEpoch(myEpoch)) break
+                // 端口 bind 失败:指数退避重试(2s→30s)
+                android.util.Log.w("Modev", "config server bind failed, retry in ${bindRetryMs}ms: $t")
+                try {
+                    Thread.sleep(bindRetryMs)
+                } catch (ie: InterruptedException) {
+                    break
+                }
+                bindRetryMs = (bindRetryMs * 2).coerceAtMost(30000L)
             }
-            running = false
+        }
+        synchronized(lifecycleLock) {
+            if (epoch == myEpoch) running = false
         }
     }
+
+    private fun isCurrentEpoch(myEpoch: Long): Boolean =
+        running && epoch == myEpoch
 
     private fun handleClient(socket: Socket) {
         thread(name = "modev-client-${socket.inetAddress.hostAddress}") {
@@ -279,7 +317,10 @@ class ConfigServer(
     }
 
     override fun close() {
-        running = false
+        synchronized(lifecycleLock) {
+            running = false
+            epoch += 1
+        }
         runCatching { serverSocket?.close() }
         for (socket in clients.keys) {
             runCatching { socket.close() }
@@ -287,7 +328,24 @@ class ConfigServer(
         clients.clear()
         registeredPackages.clear()
         _connectedPackages.value = emptySet()
+        _boundAddress.value = null
     }
+
+    /**
+     * 受管重启(V26 外部访问开关即写即生效):关闭现有 socket 与全部会话后以
+     * 当前 [externalAccess] 重启;已连接注入进程由既有重连循环恢复(hook/ConfigChannel)。
+     * 代元守卫保证旧 accept 线程安全退役。可从任意线程调用。
+     */
+    fun restart() {
+        close()
+        start()
+    }
+
+    private val lifecycleLock = Any()
+
+    /** 生命周期代元:每次 start/close 递增,accept 线程据此识别自身是否已被取代。 */
+    @Volatile
+    private var epoch = 0L
 
     private class ClientSession(val socket: Socket) {
         @Volatile

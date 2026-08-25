@@ -47,7 +47,7 @@ class SettingsRepositoryTest {
         MirroredConfigWriter(prefs, Gson(), remotePrefs = { null })
 
     private fun repo(): SettingsRepository =
-        SettingsRepository(server, writer(), Gson())
+        SettingsRepository(server, writer(), Gson(), prefs)
 
     @Test
     fun `legacy per-package keys are cleaned during migration`() {
@@ -88,5 +88,39 @@ class SettingsRepositoryTest {
         assertEquals(HookSwitch.DEFAULT, r.globalSwitch.value)
         assertTrue(prefs.contains(MirroredConfigWriter.KEY))
         assertEquals(HookSwitch.DEFAULT, writer().get())
+    }
+
+    @Test
+    fun `external access defaults to disabled`() {
+        val r = repo()
+        assertFalse(r.serverExternalAccess.value)
+    }
+
+    @Test
+    fun `setServerExternalAccess persists and updates flow both ways`() = kotlinx.coroutines.runBlocking {
+        val r = repo()
+
+        r.setServerExternalAccess(true)
+        assertTrue(r.serverExternalAccess.value)
+        assertTrue(prefs.getBoolean(com.lioisme.modev.core.model.ConfigKeys.SERVER_EXTERNAL_ACCESS, false))
+        assertTrue(server.externalAccess)
+
+        r.setServerExternalAccess(false)
+        assertFalse(r.serverExternalAccess.value)
+        assertFalse(prefs.getBoolean(com.lioisme.modev.core.model.ConfigKeys.SERVER_EXTERNAL_ACCESS, true))
+        assertFalse(server.externalAccess)
+    }
+
+    @Test
+    fun `stored external access preference is replayed on init`() {
+        prefs.edit()
+            .putBoolean(com.lioisme.modev.core.model.ConfigKeys.SERVER_EXTERNAL_ACCESS, true)
+            .commit()
+
+        val r = repo()
+
+        // 进程重启后偏好重放:仓库流与服务端标志同步为开启(restart 异步改绑)
+        assertTrue(r.serverExternalAccess.value)
+        assertTrue(server.externalAccess)
     }
 }

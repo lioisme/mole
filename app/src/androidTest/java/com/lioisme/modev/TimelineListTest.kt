@@ -265,6 +265,9 @@ class TimelineListTest {
         }
         assertTrue("详情页应渲染 SQL 节标题", sectionFound)
         // SQL 文本同时出现在顶栏标题(sqlHeadline)与 SQL 节内,取首节点断言可见。
+        // V26 markdown 化后 SQL 文本位于限高代码卡内(元数据表将其下推),先滚动至可达。
+        rule.onAllNodes(hasScrollAction()).onFirst()
+            .performScrollToNode(hasText("INSERT INTO t (name) VALUES (?)", substring = true))
         rule.onAllNodes(hasText("INSERT INTO t (name) VALUES (?)", substring = true)).onFirst().assertIsDisplayed()
     }
 }

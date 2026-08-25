@@ -3,9 +3,12 @@
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.material.icons.Icons
@@ -20,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -123,6 +127,7 @@ fun SettingsItem(
 fun SettingsToggleItem(
     icon: ImageVector,
     title: String,
+    modifier: Modifier = Modifier,
     subtitle: String = "",
     checked: Boolean,
     enabled: Boolean = true,
@@ -173,7 +178,7 @@ fun SettingsToggleItem(
             )
         },
         modifier =
-            Modifier
+            modifier
                 .fillMaxWidth()
                 .toggleable(
                     value = checked,
@@ -185,10 +190,11 @@ fun SettingsToggleItem(
 }
 
 /**
- * 只读信息行(M3 ListItem 承载):icon + 标题 + 值,无点击、无 chevron,
- * 服务状态等静态信息。值以 [MAX_VALUE_WIDTH] 上限有界测量
- * (V11 修复延续:无界时 Row 按内容全宽测量长值,标题被挤压逐字折行;
- * 值最多两行,超界省略,Key 位置恒定)。
+ * 只读信息行(M3 ListItem 承载):icon + 标题 + 值;
+ * 值以 [MAX_VALUE_WIDTH] 上限有界测量(V11 长值挤压标题回归防线)。
+ * V26 扩展(可选参数,既有调用零波及):
+ * - [valueMaxLines]:值行数上限(诊断页框架行单行省略语义);
+ * - [onClick] 非 null 时整行可点击并追加尾部 chevron(配合底部弹层展示完整值)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -196,6 +202,9 @@ fun SettingsInfoItem(
     icon: ImageVector,
     title: String,
     value: String,
+    modifier: Modifier = Modifier,
+    valueMaxLines: Int = 2,
+    onClick: (() -> Unit)? = null,
 ) {
     ListItem(
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -210,17 +219,31 @@ fun SettingsInfoItem(
             Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
         },
         trailingContent = {
-            Text(
-                value,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.End,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.widthIn(max = MAX_VALUE_WIDTH),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    value,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End,
+                    maxLines = valueMaxLines,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.widthIn(max = MAX_VALUE_WIDTH),
+                )
+                if (onClick != null) {
+                    Spacer(Modifier.width(4.dp))
+                    Icon(
+                        Icons.Default.ChevronRight,
+                        null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                        modifier = Modifier.size(20.dp),
+                    )
+                }
+            }
         },
-        modifier = Modifier.fillMaxWidth(),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .let { base -> onClick?.let { base.clickable(onClick = it) } ?: base },
     )
 }
 

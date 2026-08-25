@@ -200,9 +200,6 @@
     <string name="section_expand">展开</string>
     <string name="section_collapse">收起</string>
     <string name="section_copy">复制</string>
-    <string name="section_copy_text">复制文本</string>
-    <string name="section_copy_base64">复制 Base64</string>
-    <string name="section_copy_hex">复制 Hex</string>
     <string name="section_repr_text">文本</string>
     <string name="section_repr_base64">Base64</string>
     <string name="section_repr_hex">Hex</string>
@@ -213,7 +210,14 @@
     <plurals name="stack_more">
         <item quantity="other">另有 %1$d 帧调用栈被省略</item>
     </plurals>
-    <string name="record_see_more">展开更多</string>
+    <!-- V26 markdown 详情:代码卡全屏出口 + 显示上限截断标记 + 元数据表头 -->
+    <string name="detail_fullscreen">查看全文</string>
+    <string name="detail_exit_fullscreen">退出全屏</string>
+    <plurals name="detail_truncated_marker">
+        <item quantity="other">仅显示前 %1$,d 字符(共 %2$,d 字符),完整内容请复制或进入全文查看。</item>
+    </plurals>
+    <string name="meta_table_field">字段</string>
+    <string name="meta_table_value">值</string>
     <string name="record_copy_done">已复制%1$s:共 %2$d 字符</string>
     <string name="record_copy_too_large">内容过大(%1$d 字符)无法整段复制,请长按选中或复制区块 hex</string>
     <string name="export_failed">导出失败</string>
@@ -289,7 +293,11 @@
     <string name="settings_not_connected">未连接</string>
     <string name="settings_framework_error">框架服务异常:%1$s</string>
     <string name="settings_port">监听端口</string>
-    <string name="settings_port_value">127.0.0.1:%1$d(仅本机)</string>
+    <string name="settings_port_value">%1$s:%2$d</string>
+    <string name="settings_port_scope_local">(仅本机)</string>
+    <string name="settings_port_scope_all">(所有接口)</string>
+    <string name="settings_external_access">外部访问</string>
+    <string name="settings_external_access_hint">监听所有网络接口(0.0.0.0),同一网络的设备可连接端口 %1$d。</string>
     <string name="settings_online_targets">运行中目标进程</string>
     <string name="settings_online_targets_value">%1$,d 个</string>
     <string name="settings_clear_all_records">清空全部记录</string>
@@ -307,6 +315,7 @@
     <string name="settings_stats_section">管道统计</string>
     <string name="diagnostics_copy">复制诊断信息</string>
     <string name="diagnostics_copied">诊断信息已复制</string>
+    <string name="diagnostics_detail_copy">复制</string>
     <string name="stats_received">已接收</string>
     <string name="stats_dropped">队列已满丢弃</string>
     <string name="stats_write_failures">写库失败</string>

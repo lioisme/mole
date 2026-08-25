@@ -58,6 +58,7 @@ class AppsViewModelTest {
     private class FakeConnection : ConnectionMonitor {
         override val connectedPackagesFlow: StateFlow<Set<String>> =
             MutableStateFlow(setOf("com.online.app"))
+        override val boundAddress: StateFlow<String?> = MutableStateFlow(null)
     }
 
     private class NoServiceGateway : ScopeGateway {

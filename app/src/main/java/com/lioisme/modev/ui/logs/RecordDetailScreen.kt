@@ -5,18 +5,14 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.Key
@@ -34,65 +30,61 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.SqlRecord
-import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.data.mapping.CryptoDetail
 import com.lioisme.modev.data.mapping.RecordDetailModel
 import com.lioisme.modev.data.mapping.SqlDetail
 import com.lioisme.modev.data.mapping.toJson
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.TipIconButton
+import com.lioisme.modev.ui.components.directionLabel
 import com.lioisme.modev.ui.components.displayAlgorithm
+import com.lioisme.modev.ui.components.kindLabelRes
 import com.lioisme.modev.ui.components.sqlHeadline
+import com.lioisme.modev.ui.components.sqlKindLabelRes
+import com.lioisme.modev.ui.components.sqlOperationLabel
 import com.lioisme.modev.ui.logs.detail.CryptoHero
 import com.lioisme.modev.ui.logs.detail.DetailAnchorRow
-import com.lioisme.modev.ui.logs.detail.MetaGrid
 import com.lioisme.modev.ui.logs.detail.SqlHero
 import com.lioisme.modev.ui.logs.detail.cryptoAnchors
-import com.lioisme.modev.ui.logs.detail.cryptoMetaEntries
 import com.lioisme.modev.ui.logs.detail.sqlAnchors
-import com.lioisme.modev.ui.logs.detail.sqlMetaEntries
+import com.lioisme.modev.ui.logs.markdown.DetailCodeActions
+import com.lioisme.modev.ui.logs.markdown.DetailFenceHandle
+import com.lioisme.modev.ui.logs.markdown.FullscreenTextDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * 记录详情页(V24 G3 重设计;引擎契约 V7-V21 原样保留于 [RecordDetailSections]):
- * - 信息架构:Hero 身份卡(类别徽章/操作/算法名/方向/验签/时间,首屏一屏判读)
- *   → 锚点芯片行(按内容动态生成,点击平滑滚动至目标区块,索引经装配期簿记
- *   与 DSL 发射严格同源)→ 两列元数据网格 → 数据流区 / 密钥材料区 /
- *   SQL 各段 → 参数 / 调用栈;
+ * 记录详情页(V26 markdown 化重构):
+ * - 信息架构:Hero 身份卡(原生,D1 边界)→ 锚点芯片行 → 元数据 GFM 表 →
+ *   数据流区(input→arrow→output)→ 密钥材料区 → 参数 → 调用栈;
+ *   全部内容区块以单一 markdown 文档经 mikepenz 渲染(代码组标签页承接
+ *   原三态表示切换,卡片限高滚动 + 复制/全屏出口);
  * - 顶栏 = ModevTopBar(标题=算法名恒单行)+ 上一条/下一条(id 投影邻接导航)
  *   + 更多(唯一功能 = 导出 JSON,SAF 后台构建 + 写流,双护栏预检);
- * - 性能红线(LazyColumn 稳定键、4096 字符折叠保险丝、Tier A/B 分档虚拟化、
- *   复制 4M / 导出 32M 闸门)全部由引擎文件承担,本层零改动。
+ * - 性能红线:显示上限 128Ki(markdown 有界)/ 全屏 ChunkedText 虚拟化 /
+ *   复制 4M / 导出 32M 闸门,数值语义与 V15 一致。
  */
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -113,18 +105,31 @@ fun RecordDetailScreen(
     val clipboard = LocalClipboardManager.current
 
     /**
-     * V13 整段复制统一出口:写剪贴板 + Snackbar 反馈(区块名 + 字符数)。
+     * 整段复制统一出口(V13):写剪贴板 + Snackbar 反馈(区块名 + 字符数)。
      * V15 护栏:超 COPY_MAX_CHARS 字符拒写(ClipboardManager.setText 全量同步
-     * 物化,超巨量会卡主线程),仅提示。
+     * 物化,超巨量会卡主线程),仅提示。V26 修复占位符缺参缺陷。
      */
-    fun copyFull(titleRes: Int, fullText: String) {
+    fun copyFull(
+        label: String,
+        fullText: String,
+    ) {
         if (fullText.length > COPY_MAX_CHARS) {
-            showSnack(context.getString(R.string.record_copy_too_large))
+            showSnack(context.getString(R.string.record_copy_too_large, fullText.length))
             return
         }
         clipboard.setText(AnnotatedString(fullText))
-        showSnack(context.getString(R.string.record_copy_done, context.getString(titleRes), fullText.length))
+        showSnack(context.getString(R.string.record_copy_done, label, fullText.length))
     }
+
+    // 全屏查看请求(V26 代码卡「展开」出口):句柄承载全量文本与标题。
+    var fullscreenRequest by remember { mutableStateOf<DetailFenceHandle?>(null) }
+    val codeActions =
+        remember {
+            DetailCodeActions(
+                onCopyFull = { handle -> copyFull(handle.label, handle.fullText) },
+                onFullscreen = { handle -> fullscreenRequest = handle },
+            )
+        }
 
     // 导出落盘状态:后台构建的 JSON 在 SAF 回调中写流(唯一导出出口)。
     var exportJson by remember { mutableStateOf<String?>(null) }
@@ -240,7 +245,7 @@ fun RecordDetailScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { innerPadding ->
         // 详情列表状态:记录切换(上一条/下一条/重试)即回顶,避免滞留旧位置。
-        val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+        val listState = rememberLazyListState()
         val currentRecordId = state.record?.id
         LaunchedEffect(currentRecordId) { listState.scrollToItem(0) }
         when {
@@ -250,9 +255,18 @@ fun RecordDetailScreen(
                 record = state.record!!,
                 innerPadding = innerPadding,
                 listState = listState,
-                copyFull = ::copyFull,
+                actions = codeActions,
             )
         }
+    }
+
+    fullscreenRequest?.let { handle ->
+        FullscreenTextDialog(
+            title = handle.label,
+            fullText = handle.fullText,
+            onDismiss = { fullscreenRequest = null },
+            onCopyFull = { text -> copyFull(handle.label, text) },
+        )
     }
 }
 
@@ -262,11 +276,11 @@ private fun LoadedContent(
     record: RecordDetailModel,
     innerPadding: PaddingValues,
     listState: LazyListState,
-    copyFull: (titleRes: Int, fullText: String) -> Unit,
+    actions: DetailCodeActions,
 ) {
     when (record) {
-        is CryptoDetail -> CryptoLoadedContent(record.record, innerPadding, listState, copyFull)
-        is SqlDetail -> SqlLoadedContent(record.record, innerPadding, listState, copyFull)
+        is CryptoDetail -> CryptoLoadedContent(record.record, innerPadding, listState, actions)
+        is SqlDetail -> SqlLoadedContent(record.record, innerPadding, listState, actions)
     }
 }
 
@@ -326,65 +340,100 @@ private class AnchorBookkeeping(val listState: LazyListState) {
     }
 }
 
+/** 区块文档装配缓存键:title 已本地化,remember 以内容为键避免重组期重建文档。 */
+
 /**
- * 算法记录详情内容(V24 重排):
- * hero → 锚点行 → 元数据网格 → 数据流区(input→arrow→output)→ 密钥材料区
- * → 参数 → 调用栈;字节区块引擎([byteSectionItems])原样,返回值承载索引推进。
+ * 算法记录详情内容(V26 markdown 装配):
+ * hero → 锚点行 → 元数据表 → 数据流区(input→arrow→output)→ 密钥材料区
+ * → 参数 → 调用栈;每个区块恒 1 item([markdownSectionItems])。
  */
 @Composable
-private fun CryptoLoadedContent(
+internal fun CryptoLoadedContent(
     record: CryptoRecord,
     innerPadding: PaddingValues,
     listState: LazyListState,
-    copyFull: (titleRes: Int, fullText: String) -> Unit,
+    actions: DetailCodeActions,
 ) {
-    // 长区块展开态记忆(V14 R3)/ 表示记忆(V19 T5):rememberSaveable 进程重建保持。
-    var expandedSections by rememberSaveable { mutableStateOf(mapOf<String, Boolean>()) }
-    fun sectionExpanded(sectionKey: String): Boolean = expandedSections[sectionKey] == true
-    fun setSectionExpanded(
-        sectionKey: String,
-        value: Boolean,
-    ) {
-        expandedSections = if (value) expandedSections + (sectionKey to true) else expandedSections - sectionKey
-    }
-    var byteRepresentations by rememberSaveable { mutableStateOf(mapOf<String, ByteRepresentation>()) }
-    fun sectionRepresentation(
-        sectionKey: String,
-        view: BytesView,
-    ): ByteRepresentation = byteRepresentations[sectionKey] ?: view.defaultRepresentation()
-    fun setSectionRepresentation(
-        sectionKey: String,
-        representation: ByteRepresentation,
-    ) {
-        byteRepresentations = byteRepresentations + (sectionKey to representation)
-    }
-
     val res = LocalContext.current.resources
-    val metaEntries = cryptoMetaEntries(record)
+
+    // 元数据表条目(D1:语义色让位 markdown 表,身份徽章保留于 Hero 卡)
+    val metaEntries =
+        listOf(
+            Pair(stringResource(R.string.meta_kind), stringResource(kindLabelRes(record.kind))),
+            record.direction?.let { Pair(stringResource(R.string.meta_direction), directionLabel(it)) },
+            record.provider?.let { Pair(stringResource(R.string.meta_provider), it) },
+            record.processName?.let { Pair(stringResource(R.string.meta_process), it) },
+            Pair(stringResource(R.string.meta_context), "#${record.contextId}"),
+            Pair(stringResource(R.string.meta_thread), record.threadName),
+            record.verifyResult?.let {
+                Pair(
+                    stringResource(R.string.meta_verify),
+                    stringResource(if (it) R.string.verify_ok else R.string.verify_fail),
+                )
+            },
+            if (record.keyExportable) Pair(stringResource(R.string.meta_key_exportable), stringResource(R.string.confirm)) else null,
+        ).filterNotNull()
+    val metaTable = metaTableDoc(metaEntries)
     val anchors = cryptoAnchors(record)
 
-    // V16 R2:params 护栏化文本(纯函数 + 本地化省略标记,组合上下文完成,DSL 内只消费)。
-    val paramsValue: String? = remember(record) {
-        record.params?.takeIf { it.isNotEmpty() }?.let { formatParamsText(it) }
-    }?.let { text ->
-        val truncatedMarker = if (text.truncatedValues > 0) stringResource(R.string.params_truncated) else null
-        val omittedMarker =
-            if (text.omittedEntries > 0) {
-                res.getQuantityString(R.plurals.params_omitted, text.omittedEntries, text.omittedEntries)
-            } else {
-                null
-            }
-        buildString {
-            text.lines.forEach { append(it).append('\n') }
-            truncatedMarker?.let { append(it).append('\n') }
-            omittedMarker?.let { append(it) }
+    // V16 R2:params 护栏化文本(纯函数),截断/省略标记改走围栏尾注段落。
+    val paramsTitle = stringResource(R.string.section_params)
+    val paramsDoc =
+        record.params?.takeIf { it.isNotEmpty() }?.let { bundle ->
+            val formatted = formatParamsText(bundle)
+            val trailers =
+                buildList {
+                    if (formatted.truncatedValues > 0) add(res.getString(R.string.params_truncated))
+                    if (formatted.omittedEntries > 0) {
+                        add(res.getQuantityString(R.plurals.params_omitted, formatted.omittedEntries, formatted.omittedEntries))
+                    }
+                }
+            textSectionDoc(paramsTitle, formatted.lines.joinToString("\n"), trailerLines = trailers)
         }
-    }
+
+    val inputRole = stringResource(cryptoFlowRoles(record.kind, record.operation, record.direction).first ?: R.string.section_input)
+    val outputRole = stringResource(cryptoFlowRoles(record.kind, record.operation, record.direction).second ?: R.string.section_output)
+    val hasInput = record.input != null
+    val hasOutput = record.output != null
+    val hasFlowZone = hasInput && hasOutput
+
+    // 区块文档预计算(组合期;@Composable 文档构建器不得进入 LazyListScope DSL 作用域):
+    val keyTitle = stringResource(R.string.section_key)
+    val keyAliasTitle = stringResource(R.string.section_key_alias)
+    val ivTitle = stringResource(R.string.section_iv)
+    val saltTitle = stringResource(R.string.section_salt)
+    val aadTitle = stringResource(R.string.section_aad)
+    val publicKeyTitle = stringResource(R.string.section_public_key)
+    val stackTitle = stringResource(R.string.section_stack)
+
+    val inputDoc = record.input?.let { byteSectionDoc(inputRole, it) }
+    val outputDoc = record.output?.let { byteSectionDoc(outputRole, it) }
+    val keyDoc = record.key?.let { byteSectionDoc(keyTitle, it) }
+    val keyAliasDoc = record.keyAlias?.let { textSectionDoc(keyAliasTitle, it) }
+    val ivDoc = record.iv?.let { byteSectionDoc(ivTitle, it) }
+    val saltDoc = record.salt?.let { byteSectionDoc(saltTitle, it) }
+    val aadDoc = record.aad?.let { byteSectionDoc(aadTitle, it) }
+    val publicKeyDoc = record.publicKey?.let { byteSectionDoc(publicKeyTitle, it) }
+    val stackDoc =
+        if (record.stack.isEmpty()) {
+            null
+        } else {
+            val frames = record.stack.take(STACK_MAX_FRAMES)
+            val omittedFrames = record.stack.size - STACK_MAX_FRAMES
+            val trailer =
+                if (omittedFrames > 0) {
+                    listOf(res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames))
+                } else {
+                    emptyList()
+                }
+            textSectionDoc(stackTitle, frames.joinToString("\n"), trailerLines = trailer)
+        }
 
     val book = remember(record.id) { AnchorBookkeeping(listState) }
     val scrollScope = rememberCoroutineScope()
 
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .padding(innerPadding),
@@ -397,17 +446,10 @@ private fun CryptoLoadedContent(
             DetailAnchorRow(anchors = anchors, onAnchorClick = { book.scrollTo(it, scrollScope) })
         }
         book.advance(1)
-        item(key = "meta") {
-            Column(Modifier.padding(top = 10.dp)) { MetaGrid(metaEntries) }
-        }
-        book.advance(1)
+        book.mark("meta")
+        book.advance(metaTableItems("meta", metaTable))
 
-        // V20 R4 数据关系分区:输入 → 流向箭头 → 输出(角色标签由 cryptoFlowRoles 解析);
-        // 仅一侧有数据不构成数据流,分区头与流向箭头不渲染。
-        val (inputRoleRes, outputRoleRes) = cryptoFlowRoles(record.kind, record.operation, record.direction)
-        val hasInput = record.input != null
-        val hasOutput = record.output != null
-        val hasFlowZone = hasInput && hasOutput
+        // V20 R4 数据关系分区:输入 → 流向箭头 → 输出;仅双侧齐备构成数据流。
         if (hasFlowZone) {
             book.mark("flow")
             item(key = "zone-dataflow") {
@@ -415,208 +457,143 @@ private fun CryptoLoadedContent(
             }
             book.advance(1)
         }
-        if (hasInput) {
-            val input = record.input!!
-            book.advance(
-                byteSectionItems(
-                    sectionKey = "input",
-                    titleRes = inputRoleRes ?: R.string.section_input,
-                    view = input,
-                    expanded = sectionExpanded("input"),
-                    onExpandedChange = { setSectionExpanded("input", it) },
-                    copyFull = copyFull,
-                    representation = sectionRepresentation("input", input),
-                    onRepresentationChange = { setSectionRepresentation("input", it) },
-                ),
-            )
+        inputDoc?.let { doc ->
+            book.advance(markdownSectionItems("input", doc, actions))
         }
         if (hasFlowZone) {
             item(key = "flow-arrow") { DetailFlowArrow() }
             book.advance(1)
         }
-        if (hasOutput) {
-            val output = record.output!!
-            book.advance(
-                byteSectionItems(
-                    sectionKey = "output",
-                    titleRes = outputRoleRes ?: R.string.section_output,
-                    view = output,
-                    expanded = sectionExpanded("output"),
-                    onExpandedChange = { setSectionExpanded("output", it) },
-                    copyFull = copyFull,
-                    representation = sectionRepresentation("output", output),
-                    onRepresentationChange = { setSectionRepresentation("output", it) },
-                ),
-            )
+        outputDoc?.let { doc ->
+            book.advance(markdownSectionItems("output", doc, actions))
         }
 
         // 密钥材料分区:key / keyAlias / iv / salt / aad / publicKey 归组。
         val hasKeyMaterial =
-            record.key != null || record.keyAlias != null || record.iv != null ||
-                record.salt != null || record.aad != null || record.publicKey != null
+            keyDoc != null || keyAliasDoc != null || ivDoc != null ||
+                saltDoc != null || aadDoc != null || publicKeyDoc != null
         if (hasKeyMaterial) {
             book.mark("keys")
             item(key = "zone-keymaterial") {
                 ZoneHeader(icon = Icons.Filled.Key, titleRes = R.string.section_zone_key_material)
             }
             book.advance(1)
-            record.key?.let { key ->
-                book.advance(
-                    byteSectionItems(
-                        sectionKey = "key",
-                        titleRes = R.string.section_key,
-                        view = key,
-                        expanded = sectionExpanded("key"),
-                        onExpandedChange = { setSectionExpanded("key", it) },
-                        copyFull = copyFull,
-                        representation = sectionRepresentation("key", key),
-                        onRepresentationChange = { setSectionRepresentation("key", it) },
-                    ),
-                )
-            }
-            record.keyAlias?.let { alias ->
-                book.advance(
-                    textSectionItems(
-                        sectionKey = "key-alias",
-                        titleRes = R.string.section_key_alias,
-                        value = alias,
-                        expanded = sectionExpanded("key-alias"),
-                        onExpandedChange = { setSectionExpanded("key-alias", it) },
-                        copyFull = copyFull,
-                    ),
-                )
-            }
-            record.iv?.let { iv ->
-                book.advance(
-                    byteSectionItems(
-                        sectionKey = "iv",
-                        titleRes = R.string.section_iv,
-                        view = iv,
-                        expanded = sectionExpanded("iv"),
-                        onExpandedChange = { setSectionExpanded("iv", it) },
-                        copyFull = copyFull,
-                        representation = sectionRepresentation("iv", iv),
-                        onRepresentationChange = { setSectionRepresentation("iv", it) },
-                    ),
-                )
-            }
-            record.salt?.let { salt ->
-                book.advance(
-                    byteSectionItems(
-                        sectionKey = "salt",
-                        titleRes = R.string.section_salt,
-                        view = salt,
-                        expanded = sectionExpanded("salt"),
-                        onExpandedChange = { setSectionExpanded("salt", it) },
-                        copyFull = copyFull,
-                        representation = sectionRepresentation("salt", salt),
-                        onRepresentationChange = { setSectionRepresentation("salt", it) },
-                    ),
-                )
-            }
-            record.aad?.let { aad ->
-                book.advance(
-                    byteSectionItems(
-                        sectionKey = "aad",
-                        titleRes = R.string.section_aad,
-                        view = aad,
-                        expanded = sectionExpanded("aad"),
-                        onExpandedChange = { setSectionExpanded("aad", it) },
-                        copyFull = copyFull,
-                        representation = sectionRepresentation("aad", aad),
-                        onRepresentationChange = { setSectionRepresentation("aad", it) },
-                    ),
-                )
-            }
-            record.publicKey?.let { pk ->
-                book.advance(
-                    byteSectionItems(
-                        sectionKey = "publicKey",
-                        titleRes = R.string.section_public_key,
-                        view = pk,
-                        expanded = sectionExpanded("publicKey"),
-                        onExpandedChange = { setSectionExpanded("publicKey", it) },
-                        copyFull = copyFull,
-                        representation = sectionRepresentation("publicKey", pk),
-                        onRepresentationChange = { setSectionRepresentation("publicKey", it) },
-                    ),
-                )
-            }
+            keyDoc?.let { doc -> book.advance(markdownSectionItems("key", doc, actions)) }
+            keyAliasDoc?.let { doc -> book.advance(markdownSectionItems("key-alias", doc, actions)) }
+            ivDoc?.let { doc -> book.advance(markdownSectionItems("iv", doc, actions)) }
+            saltDoc?.let { doc -> book.advance(markdownSectionItems("salt", doc, actions)) }
+            aadDoc?.let { doc -> book.advance(markdownSectionItems("aad", doc, actions)) }
+            publicKeyDoc?.let { doc -> book.advance(markdownSectionItems("publicKey", doc, actions)) }
         }
-        if (paramsValue != null) {
+        paramsDoc?.let { doc ->
             book.mark("params")
-            book.advance(
-                textSectionItems(
-                    sectionKey = "params",
-                    titleRes = R.string.section_params,
-                    value = paramsValue,
-                    expanded = sectionExpanded("params"),
-                    onExpandedChange = { setSectionExpanded("params", it) },
-                    copyFull = copyFull,
-                ),
-            )
+            book.advance(markdownSectionItems("params", doc, actions))
         }
-        if (record.stack.isNotEmpty()) {
+        stackDoc?.let { doc ->
             book.mark("stack")
-            item(key = "stack-header") {
-                StackSectionHeader()
-            }
-            book.advance(1)
-            // V16 R2 护栏:最多渲染 STACK_MAX_FRAMES 帧(近因优先),超出追加本地化标记。
-            val frames = record.stack.take(STACK_MAX_FRAMES)
-            items(frames.size, key = { index -> "stack-frame-$index" }) { index ->
-                StackFrame(frames[index])
-            }
-            book.advance(frames.size)
-            if (record.stack.size > STACK_MAX_FRAMES) {
-                val omittedFrames = record.stack.size - STACK_MAX_FRAMES
-                item(key = "stack-more") {
-                    Text(
-                        res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-                book.advance(1)
-            }
+            book.advance(markdownSectionItems("stack", doc, actions))
         }
         item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
     }
 }
 
 /**
- * 数据库记录详情内容(V17 T11 引擎复用;V24 同款 hero/锚点/网格装配):
- * SQL 语句 / 路径 / 绑定参数 / 结果集 / 参数 / 调用栈,锚点键与内容一一对应。
+ * 数据库记录详情内容(V17 T11 引擎复用;V26 markdown 装配同款):
+ * 元数据表 → SQL 语句(sql 围栏)→ 路径 → 绑定参数 → 结果集 → 结果文本
+ * → 参数 → 调用栈,锚点键与内容一一对应。
  */
 @Composable
 private fun SqlLoadedContent(
     record: SqlRecord,
     innerPadding: PaddingValues,
     listState: LazyListState,
-    copyFull: (titleRes: Int, fullText: String) -> Unit,
+    actions: DetailCodeActions,
 ) {
-    var expandedSections by rememberSaveable { mutableStateOf(mapOf<String, Boolean>()) }
-    fun sectionExpanded(sectionKey: String): Boolean = expandedSections[sectionKey] == true
-    fun setSectionExpanded(
-        sectionKey: String,
-        value: Boolean,
-    ) {
-        expandedSections = if (value) expandedSections + (sectionKey to true) else expandedSections - sectionKey
-    }
     val res = LocalContext.current.resources
+
+    val metaEntries =
+        listOf(
+            Pair(stringResource(R.string.meta_kind), stringResource(sqlKindLabelRes(record.kind))),
+            Pair(stringResource(R.string.meta_operation), sqlOperationLabel(record.operation)),
+            record.dbPath?.let { Pair(stringResource(R.string.meta_db_path), it) },
+            Pair(stringResource(R.string.meta_context), "#${record.contextId}"),
+            Pair(stringResource(R.string.meta_thread), record.threadName),
+            record.rowCount?.let { Pair(stringResource(R.string.meta_rows), it.toString()) },
+            record.affectedCount?.let { Pair(stringResource(R.string.meta_affected), it.toString()) },
+            record.rowId?.let { Pair(stringResource(R.string.meta_row_id), it.toString()) },
+        ).filterNotNull()
+    val metaTable = metaTableDoc(metaEntries)
+    val anchors = sqlAnchors(record)
 
     val bindArgsText = record.bindArgs?.takeIf { it.isNotEmpty() }?.let(::formatBindArgsText)
     val rowsText = record.rows?.takeIf { it.isNotEmpty() }?.let(::formatRowsText)
     val omittedBindRows = (record.bindArgs?.size ?: 0) - (bindArgsText?.size ?: 0)
     val omittedRows = (record.rows?.size ?: 0) - (rowsText?.size ?: 0)
-    val metaEntries = sqlMetaEntries(record)
-    val anchors = sqlAnchors(record)
+
+    // 区块文档预计算(组合期;@Composable 文档构建器不得进入 LazyListScope DSL 作用域):
+    val sqlTitle = stringResource(R.string.section_sql)
+    val dbPathTitle = stringResource(R.string.section_db_path)
+    val bindArgsTitle = stringResource(R.string.section_bind_args)
+    val resultRowsTitle = stringResource(R.string.section_result_rows)
+    val resultTitle = stringResource(R.string.section_result_text)
+    val paramsTitle = stringResource(R.string.section_params)
+    val stackTitle = stringResource(R.string.section_stack)
+
+    val sqlDoc = record.sql?.let { textSectionDoc(sqlTitle, it, lang = "sql") }
+    val dbPathDoc = record.dbPath?.let { textSectionDoc(dbPathTitle, it) }
+    val bindArgsDoc =
+        bindArgsText?.let { lines ->
+            val trailers =
+                if (omittedBindRows > 0) {
+                    listOf(res.getQuantityString(R.plurals.rows_more, omittedBindRows, omittedBindRows))
+                } else {
+                    emptyList()
+                }
+            textSectionDoc(bindArgsTitle, lines.joinToString("\n"), trailerLines = trailers)
+        }
+    val rowsDoc =
+        rowsText?.let { lines ->
+            val trailers =
+                if (omittedRows > 0) {
+                    listOf(res.getQuantityString(R.plurals.rows_more, omittedRows, omittedRows))
+                } else {
+                    emptyList()
+                }
+            textSectionDoc(resultRowsTitle, lines.joinToString("\n"), trailerLines = trailers)
+        }
+    val resultDoc = record.resultText?.let { textSectionDoc(resultTitle, it) }
+    val paramsDoc =
+        record.params?.takeIf { it.isNotEmpty() }?.let { params ->
+            val formatted = formatParamsText(params)
+            val trailers =
+                buildList {
+                    if (formatted.truncatedValues > 0) add(res.getString(R.string.params_truncated))
+                    if (formatted.omittedEntries > 0) {
+                        add(res.getQuantityString(R.plurals.params_omitted, formatted.omittedEntries, formatted.omittedEntries))
+                    }
+                }
+            textSectionDoc(paramsTitle, formatted.lines.joinToString("\n"), trailerLines = trailers)
+        }
+    val stackDoc =
+        if (record.stack.isEmpty()) {
+            null
+        } else {
+            val frames = record.stack.take(STACK_MAX_FRAMES)
+            val omittedFrames = record.stack.size - STACK_MAX_FRAMES
+            val trailer =
+                if (omittedFrames > 0) {
+                    listOf(res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames))
+                } else {
+                    emptyList()
+                }
+            textSectionDoc(stackTitle, frames.joinToString("\n"), trailerLines = trailer)
+        }
 
     val book = remember(record.id) { AnchorBookkeeping(listState) }
     val scrollScope = rememberCoroutineScope()
 
     LazyColumn(
+        state = listState,
         modifier = Modifier
             .fillMaxSize()
             .padding(innerPadding),
@@ -629,191 +606,37 @@ private fun SqlLoadedContent(
             DetailAnchorRow(anchors = anchors, onAnchorClick = { book.scrollTo(it, scrollScope) })
         }
         book.advance(1)
-        item(key = "meta") {
-            Column(Modifier.padding(top = 10.dp)) { MetaGrid(metaEntries) }
-        }
-        book.advance(1)
+        book.mark("meta")
+        book.advance(metaTableItems("meta", metaTable))
 
-        record.sql?.let { sql ->
+        sqlDoc?.let { doc ->
             book.mark("sql")
-            book.advance(
-                textSectionItems(
-                    sectionKey = "sql",
-                    titleRes = R.string.section_sql,
-                    value = sql,
-                    expanded = sectionExpanded("sql"),
-                    onExpandedChange = { setSectionExpanded("sql", it) },
-                    copyFull = copyFull,
-                ),
-            )
+            book.advance(markdownSectionItems("sql", doc, actions))
         }
-        record.dbPath?.let { path ->
+        dbPathDoc?.let { doc ->
             book.mark("dbpath")
-            book.advance(
-                textSectionItems(
-                    sectionKey = "dbpath",
-                    titleRes = R.string.section_db_path,
-                    value = path,
-                    expanded = sectionExpanded("dbpath"),
-                    onExpandedChange = { setSectionExpanded("dbpath", it) },
-                    copyFull = copyFull,
-                ),
-            )
+            book.advance(markdownSectionItems("dbpath", doc, actions))
         }
-        bindArgsText?.let { lines ->
-            val body =
-                buildString {
-                    lines.forEach { append(it).append('\n') }
-                    if (omittedBindRows > 0) {
-                        append(res.getQuantityString(R.plurals.rows_more, omittedBindRows, omittedBindRows))
-                    }
-                }.trimEnd('\n')
+        bindArgsDoc?.let { doc ->
             book.mark("bindargs")
-            book.advance(
-                textSectionItems(
-                    sectionKey = "bindargs",
-                    titleRes = R.string.section_bind_args,
-                    value = body,
-                    expanded = sectionExpanded("bindargs"),
-                    onExpandedChange = { setSectionExpanded("bindargs", it) },
-                    copyFull = copyFull,
-                ),
-            )
+            book.advance(markdownSectionItems("bindargs", doc, actions))
         }
-        rowsText?.let { lines ->
-            val body =
-                buildString {
-                    lines.forEach { append(it).append('\n') }
-                    if (omittedRows > 0) {
-                        append(res.getQuantityString(R.plurals.rows_more, omittedRows, omittedRows))
-                    }
-                }.trimEnd('\n')
+        rowsDoc?.let { doc ->
             book.mark("rows")
-            book.advance(
-                textSectionItems(
-                    sectionKey = "rows",
-                    titleRes = R.string.section_result_rows,
-                    value = body,
-                    expanded = sectionExpanded("rows"),
-                    onExpandedChange = { setSectionExpanded("rows", it) },
-                    copyFull = copyFull,
-                ),
-            )
+            book.advance(markdownSectionItems("rows", doc, actions))
         }
-        record.resultText?.let { text ->
+        resultDoc?.let { doc ->
             book.mark("result")
-            book.advance(
-                textSectionItems(
-                    sectionKey = "result",
-                    titleRes = R.string.section_result_text,
-                    value = text,
-                    expanded = sectionExpanded("result"),
-                    onExpandedChange = { setSectionExpanded("result", it) },
-                    copyFull = copyFull,
-                ),
-            )
+            book.advance(markdownSectionItems("result", doc, actions))
         }
-        record.params?.takeIf { it.isNotEmpty() }?.let { params ->
-            val text = formatParamsText(params)
-            val body = buildString {
-                text.lines.forEach { append(it).append('\n') }
-                if (text.omittedEntries > 0) {
-                    append(res.getQuantityString(R.plurals.params_omitted, text.omittedEntries, text.omittedEntries))
-                }
-            }.trimEnd('\n')
+        paramsDoc?.let { doc ->
             book.mark("params")
-            book.advance(
-                textSectionItems(
-                    sectionKey = "params",
-                    titleRes = R.string.section_params,
-                    value = body,
-                    expanded = sectionExpanded("params"),
-                    onExpandedChange = { setSectionExpanded("params", it) },
-                    copyFull = copyFull,
-                ),
-            )
+            book.advance(markdownSectionItems("params", doc, actions))
         }
-        if (record.stack.isNotEmpty()) {
+        stackDoc?.let { doc ->
             book.mark("stack")
-            item(key = "sql-stack-header") { StackSectionHeader() }
-            book.advance(1)
-            val frames = record.stack.take(STACK_MAX_FRAMES)
-            items(frames.size, key = { index -> "sql-stack-frame-$index" }) { index ->
-                StackFrame(frames[index])
-            }
-            book.advance(frames.size)
-            if (record.stack.size > STACK_MAX_FRAMES) {
-                val omittedFrames = record.stack.size - STACK_MAX_FRAMES
-                item(key = "sql-stack-more") {
-                    Text(
-                        res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-                book.advance(1)
-            }
+            book.advance(markdownSectionItems("stack", doc, actions))
         }
         item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
-    }
-}
-
-/** 分区小节标题(调用栈等非卡片化区块共用):primary titleSmall SemiBold。 */
-@Composable
-private fun StackSectionHeader() {
-    Spacer(Modifier.height(12.dp))
-    Text(
-        stringResource(R.string.section_stack),
-        style = MaterialTheme.typography.titleSmall,
-        fontWeight = FontWeight.SemiBold,
-        color = MaterialTheme.colorScheme.primary,
-    )
-}
-
-/** 堆栈帧(等宽小字,原生可选中)。 */
-@Composable
-private fun StackFrame(frame: String) {
-    SelectionContainer {
-        Text(
-            frame,
-            style = MaterialTheme.typography.bodySmall,
-            fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-/**
- * 详情分区头(V20 R4):通栏 tonal 条(图标 + titleSmall SemiBold),
- * 与区块标题(primary 文字)形成两级标题层级。
- * 独立 LazyColumn item(不包裹整区,保持虚拟化)。
- */
-@Composable
-private fun ZoneHeader(icon: ImageVector, titleRes: Int) {
-    Spacer(Modifier.height(12.dp))
-    Surface(
-        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.45f),
-        shape = MaterialTheme.shapes.medium,
-        modifier = Modifier.fillMaxWidth().testTag("detail-zone"),
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-            Spacer(Modifier.width(8.dp))
-            Text(
-                text = stringResource(titleRes),
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSecondaryContainer,
-            )
-        }
     }
 }

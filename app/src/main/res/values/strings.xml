@@ -202,9 +202,6 @@
     <string name="section_expand">Expand</string>
     <string name="section_collapse">Collapse</string>
     <string name="section_copy">Copy</string>
-    <string name="section_copy_text">Copy text</string>
-    <string name="section_copy_base64">Copy Base64</string>
-    <string name="section_copy_hex">Copy hex</string>
     <string name="section_repr_text">Text</string>
     <string name="section_repr_base64">Base64</string>
     <string name="section_repr_hex">Hex</string>
@@ -217,7 +214,15 @@
         <item quantity="one">+%1$d more stack frame omitted</item>
         <item quantity="other">+%1$d more stack frames omitted</item>
     </plurals>
-    <string name="record_see_more">See more</string>
+    <!-- V26 markdown 详情:代码卡全屏出口 + 显示上限截断标记 + 元数据表头 -->
+    <string name="detail_fullscreen">View full text</string>
+    <string name="detail_exit_fullscreen">Exit full screen</string>
+    <plurals name="detail_truncated_marker">
+        <item quantity="one">Showing first %1$,d of %2$,d character. Use copy or full view for the complete content.</item>
+        <item quantity="other">Showing first %1$,d of %2$,d characters. Use copy or full view for the complete content.</item>
+    </plurals>
+    <string name="meta_table_field">Field</string>
+    <string name="meta_table_value">Value</string>
     <string name="record_copy_done">Copied %1$s: %2$d chars</string>
     <string name="record_copy_too_large">Too large to copy (%1$d chars). Long-press or copy the hex of a section instead.</string>
     <string name="export_failed">Export failed</string>
@@ -295,7 +300,11 @@
     <string name="settings_not_connected">Not connected</string>
     <string name="settings_framework_error">Framework service error: %1$s</string>
     <string name="settings_port">Listening port</string>
-    <string name="settings_port_value">127.0.0.1:%1$d (local only)</string>
+    <string name="settings_port_value">%1$s:%2$d</string>
+    <string name="settings_port_scope_local">(local only)</string>
+    <string name="settings_port_scope_all">(all interfaces)</string>
+    <string name="settings_external_access">External access</string>
+    <string name="settings_external_access_hint">Listen on all interfaces (0.0.0.0). Devices on the same network can connect to port %1$d.</string>
     <string name="settings_online_targets">Running target processes</string>
     <string name="settings_online_targets_value">%1$,d</string>
     <string name="settings_clear_all_records">Clear all records</string>
@@ -313,6 +322,7 @@
     <string name="settings_stats_section">Pipeline Statistics</string>
     <string name="diagnostics_copy">Copy diagnostics</string>
     <string name="diagnostics_copied">Diagnostics copied</string>
+    <string name="diagnostics_detail_copy">Copy</string>
     <string name="stats_received">Received</string>
     <string name="stats_dropped">Dropped (queue full)</string>
     <string name="stats_write_failures">Write failures</string>

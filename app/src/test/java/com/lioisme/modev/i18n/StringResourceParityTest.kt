@@ -46,6 +46,8 @@ class StringResourceParityTest {
         "version",
         // 纯占位符拼接格式串(locale 无关,V22 许可列表行;V23 补录豁免)
         "licenses_row_format",
+        // 监听地址:port 行值(地址:端口,V26 参数化,locale 无关)
+        "settings_port_value",
     )
 
     @Test

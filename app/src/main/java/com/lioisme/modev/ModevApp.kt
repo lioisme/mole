@@ -86,6 +86,7 @@ class AppContainer(private val context: Context) {
                 remotePrefs = { RemotePrefsBridge.prefs() },
             ),
             gson = Gson(),
+            localPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
         ).also { server.effectiveResolver = { pkg -> it.effectiveSwitch(pkg) } }
     }
 

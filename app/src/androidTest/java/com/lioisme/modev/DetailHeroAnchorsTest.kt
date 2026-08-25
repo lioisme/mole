@@ -192,11 +192,18 @@ class DetailHeroAnchorsTest {
         }
         assertTrue("点击锚点后密钥材料分区应可见", visible)
 
-        // 引擎红线:三态分段(Hex)仍存在(密钥节分段行随分区进入组合窗口;
-        // cd_flow 唯一性由 CryptoDetailZonesTest 在数据流区可见语境下断言)。
+        // 引擎红线(V26 markdown 化):密钥节为单表示(hex)代码卡 —— 无标签页,
+        // 密钥 hex 内容在组合中(锚点滚动动画完成后密钥区进入组合窗口,轮询等待)。
+        val hexDeadline = System.currentTimeMillis() + 10_000
+        var hexFound = false
+        while (System.currentTimeMillis() < hexDeadline && !hexFound) {
+            rule.waitForIdle()
+            hexFound = rule.onAllNodesWithText("0102030405060708090a0b0c0d0e0f10").fetchSemanticsNodes().isNotEmpty()
+            if (!hexFound) Thread.sleep(100)
+        }
         assertTrue(
-            "三态分段 Hex 段应在组合中",
-            rule.onAllNodesWithText(str(R.string.section_repr_hex)).fetchSemanticsNodes().isNotEmpty(),
+            "密钥 hex 内容应在组合中",
+            hexFound,
         )
     }
 

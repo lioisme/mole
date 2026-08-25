@@ -7,9 +7,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Public
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material.icons.filled.Warning
@@ -33,10 +36,12 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -47,8 +52,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
@@ -57,16 +65,24 @@ import com.lioisme.modev.ui.apps.AppCountFormat
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsInfoItem
 import com.lioisme.modev.ui.components.SettingsSection
+import com.lioisme.modev.ui.components.SettingsToggleItem
 import com.lioisme.modev.ui.common.rememberEffectiveLocale
 import kotlinx.coroutines.launch
 
 /**
- * 服务与诊断页(V10 设置分级;V19 T8 分区化;V21 T5 重新设计):
- * 三分区——框架与作用域 / 通信服务 / 管道统计(折叠卡,默认收起,
- * AnimatedVisibility,状态 rememberSaveable;统计行图标语义分组:
- * 拒绝类 Block / 流向 SwapHoriz·SwapVert)+ 底部「复制诊断信息」
- * 动作卡(剪贴板快照 + Snackbar 反馈,与记录长按复制同 UX)。
+ * 服务与诊断页(V10 设置分级;V19 T8 分区化;V21 T5 重新设计;V26 外部访问 + 详情弹层):
+ * 三分区——框架与作用域 / 通信服务 / 管道统计(折叠卡)+ 底部「复制诊断信息」动作卡。
+ * - V26 R3:外部访问开关(SettingsToggleItem,默认停用;开启即改绑 0.0.0.0,
+ *   风险提示进副标题);端口行参数化显示当前绑定地址与作用域后缀;
+ * - V26 R4:框架名等过长值单行省略,单击经 [DiagnosticsDetailSheet]
+ *   底部弹层展示完整信息(ModalBottomSheet,V21 弹窗契约:显式
+ *   surfaceContainerHigh 容器色、imePadding、禁叠 navigationBarsPadding);
+ * - 复制快照与页面行同源(同资源标签 + 同格式化),统计无论折叠与否全量收录。
  */
+
+/** 弹层详情载荷:标题 + 完整值(可选中/复制);internal 供组件级测试直驱。 */
+internal data class DiagnosticsDetail(val title: String, val value: String)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DiagnosticsScreen(
@@ -76,6 +92,8 @@ fun DiagnosticsScreen(
     val connectedCount by viewModel.connectedCount.collectAsStateWithLifecycle()
     val frameworkState by viewModel.frameworkState.collectAsStateWithLifecycle()
     val pipelineStats by viewModel.pipelineStats.collectAsStateWithLifecycle()
+    val externalAccess by viewModel.externalAccess.collectAsStateWithLifecycle()
+    val listeningAddress by viewModel.listeningAddress.collectAsStateWithLifecycle()
 
     // V15:统计数值按应用实际生效 locale 千分位分组(与 stringResource 解析同源)。
     // V16 R5:热切换下 LocalConfiguration 陈旧,一律经包装 Context 解析(effectiveLocale)。
@@ -85,43 +103,54 @@ fun DiagnosticsScreen(
     // 管道统计折叠态:跨重建存活,展开/收起不因重组复位。
     var statsExpanded by rememberSaveable { mutableStateOf(false) }
 
+    // V26 详情弹层状态(hide 动画完成后置空,见 ModalBottomSheet 契约)。
+    var detailSheet by remember { mutableStateOf<DiagnosticsDetail?>(null) }
+
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
+    // 当前绑定地址展示口径:VM 已合并「未绑定回退回环」,UI 零传输层感知。
+    val displayAddress = listeningAddress
+
     // 剪贴板快照:与页面行同源(同资源标签 + 同格式化),统计无论折叠与否全量收录。
     fun copyDiagnostics() {
-        val lines = buildList {
-            fun line(label: String, value: String) = add("$label: $value")
-            when (val framework = frameworkState) {
-                is ScopeState.Connecting -> {
-                    line(context.getString(R.string.settings_framework_service), context.getString(R.string.settings_connecting))
-                }
-                is ScopeState.Ready -> {
-                    line(context.getString(R.string.settings_framework), "${framework.frameworkName} ${framework.frameworkVersion}")
-                    line(context.getString(R.string.settings_scoped_count), context.getString(R.string.settings_scoped_count_value, framework.scope.size))
-                }
-                is ScopeState.Unavailable -> {
-                    line(context.getString(R.string.settings_framework_service), context.getString(R.string.settings_not_connected))
-                    if (framework.reason == ScopeState.UnavailableReason.SERVICE_ERROR) {
-                        add(
-                            framework.message?.let { context.getString(R.string.settings_framework_error, it) }
-                                ?: context.getString(R.string.unknown_error),
-                        )
+        val lines =
+            buildList {
+                fun line(label: String, value: String) = add("$label: $value")
+                when (val framework = frameworkState) {
+                    is ScopeState.Connecting -> {
+                        line(context.getString(R.string.settings_framework_service), context.getString(R.string.settings_connecting))
+                    }
+                    is ScopeState.Ready -> {
+                        line(context.getString(R.string.settings_framework), "${framework.frameworkName} ${framework.frameworkVersion}")
+                        line(context.getString(R.string.settings_scoped_count), context.getString(R.string.settings_scoped_count_value, framework.scope.size))
+                    }
+                    is ScopeState.Unavailable -> {
+                        line(context.getString(R.string.settings_framework_service), context.getString(R.string.settings_not_connected))
+                        if (framework.reason == ScopeState.UnavailableReason.SERVICE_ERROR) {
+                            add(
+                                framework.message?.let { context.getString(R.string.settings_framework_error, it) }
+                                    ?: context.getString(R.string.unknown_error),
+                            )
+                        }
                     }
                 }
+                val scopeSuffix =
+                    context.getString(
+                        if (externalAccess) R.string.settings_port_scope_all else R.string.settings_port_scope_local,
+                    )
+                line(context.getString(R.string.settings_port), context.getString(R.string.settings_port_value, displayAddress, viewModel.port) + " " + scopeSuffix)
+                line(context.getString(R.string.settings_online_targets), context.getString(R.string.settings_online_targets_value, connectedCount))
+                line(context.getString(R.string.stats_received), stat(pipelineStats.received))
+                line(context.getString(R.string.stats_dropped), stat(pipelineStats.dropped))
+                line(context.getString(R.string.stats_write_failures), stat(pipelineStats.writeFailures))
+                line(context.getString(R.string.stats_trimmed), stat(pipelineStats.trimmed))
+                line(context.getString(R.string.stats_rejected_hellos), stat(pipelineStats.channel.rejectedHellos))
+                line(context.getString(R.string.stats_dropped_records), stat(pipelineStats.channel.droppedRecords))
+                line(context.getString(R.string.stats_rejected_records), stat(pipelineStats.channel.rejectedRecords))
             }
-            line(context.getString(R.string.settings_port), context.getString(R.string.settings_port_value, viewModel.port))
-            line(context.getString(R.string.settings_online_targets), context.getString(R.string.settings_online_targets_value, connectedCount))
-            line(context.getString(R.string.stats_received), stat(pipelineStats.received))
-            line(context.getString(R.string.stats_dropped), stat(pipelineStats.dropped))
-            line(context.getString(R.string.stats_write_failures), stat(pipelineStats.writeFailures))
-            line(context.getString(R.string.stats_trimmed), stat(pipelineStats.trimmed))
-            line(context.getString(R.string.stats_rejected_hellos), stat(pipelineStats.channel.rejectedHellos))
-            line(context.getString(R.string.stats_dropped_records), stat(pipelineStats.channel.droppedRecords))
-            line(context.getString(R.string.stats_rejected_records), stat(pipelineStats.channel.rejectedRecords))
-        }
         clipboard.setText(AnnotatedString(lines.joinToString("\n")))
         scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.diagnostics_copied)) }
     }
@@ -154,10 +183,20 @@ fun DiagnosticsScreen(
                         )
                     }
                     is ScopeState.Ready -> {
+                        // V26 R4:框架名+版本可能超长 —— 单行省略,单击弹层看全文。
+                        val frameworkValue = "${framework.frameworkName} ${framework.frameworkVersion}"
                         SettingsInfoItem(
                             icon = Icons.Default.Android,
                             title = stringResource(R.string.settings_framework),
-                            value = "${framework.frameworkName} ${framework.frameworkVersion}",
+                            value = frameworkValue,
+                            valueMaxLines = 1,
+                            onClick = {
+                                detailSheet =
+                                    DiagnosticsDetail(
+                                        title = context.getString(R.string.settings_framework),
+                                        value = frameworkValue,
+                                    )
+                            },
                         )
                         SettingsInfoItem(
                             icon = Icons.Default.Apps,
@@ -172,14 +211,23 @@ fun DiagnosticsScreen(
                             value = stringResource(R.string.settings_not_connected),
                         )
                         if (framework.reason == ScopeState.UnavailableReason.SERVICE_ERROR) {
-                            Text(
+                            // V26 R4:错误信息由独立多行文本块收敛为单行省略行,全文入弹层。
+                            val errorValue =
                                 framework.message?.let { msg ->
                                     stringResource(R.string.settings_framework_error, msg)
-                                } ?: stringResource(R.string.unknown_error),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                } ?: stringResource(R.string.unknown_error)
+                            SettingsInfoItem(
+                                icon = Icons.Default.Warning,
+                                title = stringResource(R.string.settings_framework),
+                                value = errorValue,
+                                valueMaxLines = 1,
+                                onClick = {
+                                    detailSheet =
+                                        DiagnosticsDetail(
+                                            title = context.getString(R.string.settings_framework),
+                                            value = errorValue,
+                                        )
+                                },
                             )
                         }
                     }
@@ -190,8 +238,20 @@ fun DiagnosticsScreen(
                 SettingsInfoItem(
                     icon = Icons.Default.Dns,
                     title = stringResource(R.string.settings_port),
-                    // M18:传输常量经 VM 暴露,UI 零传输层 import
-                    value = stringResource(R.string.settings_port_value, viewModel.port),
+                    value =
+                        stringResource(R.string.settings_port_value, displayAddress, viewModel.port) +
+                            " " + stringResource(
+                                if (externalAccess) R.string.settings_port_scope_all else R.string.settings_port_scope_local,
+                            ),
+                )
+                // V26 R3 外部访问开关:默认停用(仅本机);开启即改绑全接口,副标题承载风险提示。
+                SettingsToggleItem(
+                    icon = Icons.Default.Public,
+                    title = stringResource(R.string.settings_external_access),
+                    subtitle = stringResource(R.string.settings_external_access_hint, viewModel.port),
+                    checked = externalAccess,
+                    modifier = Modifier.testTag("diagnostics-bind-all"),
+                    onCheckedChange = { viewModel.setExternalAccess(it) },
                 )
                 SettingsInfoItem(
                     icon = Icons.Default.Devices,
@@ -287,6 +347,74 @@ fun DiagnosticsScreen(
                 )
             }
             Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    detailSheet?.let { detail ->
+        DiagnosticsDetailSheet(
+            detail = detail,
+            onDismiss = { detailSheet = null },
+            onCopy = { value ->
+                clipboard.setText(AnnotatedString(value))
+                scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.diagnostics_copied)) }
+            },
+        )
+    }
+}
+
+/**
+ * 诊断详情底部弹层(V26 R4):完整值可选中等宽展示 + 复制动作;
+ * M3 ModalBottomSheet 显式 surfaceContainerHigh 容器色(V21 契约)、
+ * imePadding 消费键盘 inset(禁再叠 navigationBarsPadding);
+ * hide 动画完成后 onDismissRequest 才置空状态,无闪黑。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun DiagnosticsDetailSheet(
+    detail: DiagnosticsDetail,
+    onDismiss: () -> Unit,
+    onCopy: (String) -> Unit,
+) {
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = Modifier.testTag("diagnostics-info-sheet"),
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 24.dp),
+        ) {
+            Text(
+                text = detail.title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.height(12.dp))
+            SelectionContainer {
+                Text(
+                    text = detail.value,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontFamily = FontFamily.Monospace),
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            TextButton(onClick = { onCopy(detail.value) }) {
+                Icon(
+                    Icons.Default.ContentCopy,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(18.dp),
+                )
+                Text(
+                    text = stringResource(R.string.diagnostics_detail_copy),
+                    modifier = Modifier.padding(start = 6.dp),
+                )
+            }
         }
     }
 }

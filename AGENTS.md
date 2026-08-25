@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名/密钥/BASE64/WebView)+ 宿主双进程日志。
-构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀)。
+构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀)。
 
 ## 构建 / 测试(Windows,gradlew.bat)
 
@@ -20,7 +20,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 .\gradlew.bat :app:assembleModernDebugAndroidTest
 .\gradlew.bat :app:connectedModernDebugAndroidTest
 
-# lint 门禁(基线:38 warning / 0 error;提交前必须跑,禁止新增 warning)
+# lint 门禁(基线:37 warning / 0 error;提交前必须跑,禁止新增 warning)
 .\gradlew.bat :app:lintModernRelease
 ```
 
@@ -41,6 +41,8 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 | 已接收 / 丢弃 / 被拒 / 写入失败 / 超容量裁剪 | 统计区文案(原因括号后缀) | 队列溢出丢弃等 |
 | 默认配置 | 内置推荐值 `HookSwitch.DEFAULT`(无 UI;`switch_global` 仅为注入侧兜底种子,init 强制重置) | 全局设置(联动语义)、跟随全局 |
 | 自定义偏差 / 恢复默认 | 每应用二态覆盖(V24)与清除动作 | 覆盖=三态、强制开/关、重置为全局 |
+| 代码组 CodeGroup | 多表示字节区块的标签页代码块(mikepenz codeFence 扩展点聚合连续 text/base64/hex 围栏) | 三态分段、SegmentedButton(V26 退役) |
+| 外部访问 External Access | 服务监听 0.0.0.0(默认停用 = 127.0.0.1 仅本机);诊断页开关即写即重启改绑 | 监听 IP、开放端口 |
 
 ## 强约束(改了会挂测试/降级质量)
 
@@ -54,26 +56,36 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 2. **数值格式**:记录数/统计用 `AppCountFormat`(locale 驱动;zh ≥1万、其他 ≥1K
    平台紧凑格式 ≤1 位小数,以下千分位)。禁止自造单位(万+/千+/K+ 后缀)。
    资源格式串大数用 `%1$,d`。
-3. **详情页三态双层渲染**:字节区块 = SegmentedButton 三态(文本/Base64/Hex,
-   `rememberSaveable` 每区块记忆,无文本时隐藏文本段),内容按所选表示渲染;
-   分档按所选表示字符数 `sectionRenderMode(...)`——≤128 KiB 字符 = 整段单
-   `SelectionContainer`(Tier A);超过 = 分块虚拟化(Tier B,`ChunkedText`
-   O(1) 取块,Tier B 三表示均走分块);摘要/列表行保持 hex 首 24 字符不膨胀。
-   `BytesView.of` 有硬保险丝(16M hex / 8M text 字符),截断 hex 恒为纯前缀
-   (截断标记由 UI 资源渲染);复制 >4M 字符、导出 >32M 字符拒绝并提示。
-   **ReadMoreText(com.webtoonscorp)预览的语义文本仅含可见片段且「… 展开更多」
-   并入同一节点**——插桩断言用短前缀 substring 匹配,勿对全量内容做精确匹配;
-   长区块「收起」按钮在内容末尾,断言/点击前须 `performScrollToNode`。
+3. **详情页 markdown 渲染(V26,取代 V21 三态双层契约)**:全部内容区块
+   (元数据表/字节/参数/堆栈/SQL)以单一 markdown 文档经 mikepenz
+   `multiplatform-markdown-renderer-m3` 渲染(`RecordMarkdownContent` 单管线);
+   多表示字节 = 连续 text/base64/hex 围栏聚合为**代码组标签页**(文案复用
+   `section_repr_*`,选中态 `rememberSaveable` 按 runFirstOrdinal 记忆),
+   单表示退化为单代码卡;Hero 徽章卡与锚点芯片保留原生(D1 边界)。
+   版本锁定 **0.38.1**(stdlib 2.2.21 与 Kotlin 2.2.20 同 minor;0.39+/0.44 需
+   stdlib 2.3/2.4 超编译器 metadata 上限,**禁升**)。显示上限
+   `MARKDOWN_DISPLAY_MAX_CHARS=128Ki`(工厂钳制「所见」,标记行 plurals
+   `detail_truncated_marker` 恒置于全部围栏之后——夹在围栏间会打断代码组聚合);
+   完整内容经 `DetailFenceHandle` 全量句柄走复制(4M 护栏)/全屏查看器
+   (`FullscreenTextDialog`,`ChunkedText` O(1) 分块虚拟化);导出 32M 护栏不变。
+   工厂(`RecordMarkdownFactory`)纯 Kotlin 零 UI import,本地化文案参数注入;
+   围栏安全 = 内容反引号最长 run+1;GFM 表格用紧凑管道格式 `|Cell|`(解析器会
+   把 '| Cell |' 的管道前空格留成单元格尾随字符)。区块恒 1 个 LazyColumn item,
+   锚点簿记契约(mark/advance 与 DSL 发射严格同序)不变;
+   **LazyColumn 必须显式 `state = listState`**(V26 曾遗漏致锚点滚动静默失效,
+   回归测试 `AnchorScrollRoboTest`)。
 4. **输入即底部 sheet**:带键盘输入的弹层一律 `ModalBottomSheet`
    (`imePadding` 即可——M3 已内部消费导航栏 inset,**禁止再叠
    `navigationBarsPadding`**,双内边距叠加 = 弹窗底部黑带根因 V21 T2;
    弹窗显式 `containerColor = surfaceContainerHigh`、宿主页 Scaffold 显式
    `containerColor = surface`,hide 动画后回调);
-   仅危险确认/关于类保留居中 `AlertDialog`。
+   仅危险确认/关于类保留居中 `AlertDialog`。诊断信息完整值弹层
+   (`DiagnosticsDetailSheet`)同规;`SettingsInfoItem` 可选参
+   `valueMaxLines`/`onClick`(onClick 追加 chevron,null 零波及既有调用)。
 5. **弃用 API 零容忍**:新增源码一律不得引入已弃用 API;`getInstalledApplications`
    走 `core/util/PackageManagerCompat.kt` 统一入口(API 33+ `ApplicationInfoFlags`,
    旧系统弃用分支);`getLaunchIntentForPackage(String)` 全 API 无 flags 重载且从未
-   弃用,直接使用即可。`lintModernRelease` 零新增(基线 38 warning/0 error,
+   弃用,直接使用即可。`lintModernRelease` 零新增(基线 37 warning/0 error,
    见上文构建命令)。
 6. **计数文本复数**:en 带 `%d` 的计数文案用 `<plurals>`(one/other),zh 仅
    `other`;禁止 `<string>` 直接内嵌 `%d + 英文单词`(PluralsCandidate lint)。
@@ -194,6 +206,17 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
     detail_remove_scope/listen_settings_title/record_copied/
     settings_pin_scoped_hint/settings_apps_section/detail_framework_error,
     新增计数文案必须 plurals 如 listen_settings_custom_n)。
+19. **服务监听绑定契约(V26)**:`ConfigServer.externalAccess`(volatile,
+    默认 false = 绑定 `ConnectionMonitor.BIND_LOOPBACK`;true = 
+    `BIND_ALL_INTERFACES`);偏好键 `server_external_access`
+    (`SettingsRepository`,宿主本地 prefs,**不入远程镜像**——仅宿主进程消费);
+    写路径唯一 = `setServerExternalAccess`(持久化 + volatile 同步置位 +
+    异步 `restart()`);restart 带 epoch 代元守卫(旧 accept 线程不触碰新代
+    running 状态),已连接会话由注入侧重连循环恢复;注入侧恒连回环,
+    wire 协议 VERSION 恒 4 零感知。UI 观测经 domain `ConnectionMonitor.
+    boundAddress`(P5-1:ui 禁 import data.server,VM 组合
+    `listeningAddress` 回退口径)。诊断页开关 testTag
+    `diagnostics-bind-all`,默认停用,风险提示进副标题。
 
 ## 已知工具链坑
 
@@ -233,10 +256,21 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 - androidx.sqlite `SimpleSQLiteQuery` 不解析 `:name` 命名参数(手写 SQL 直绑
   需用 `?` 占位);Robolectric 下 `?N` 编号占位触发 SQLITE_MISMATCH,用纯 `?`
   按序绑定。
+- **mikepenz markdown-renderer(V26)**:①默认在 Dispatchers.Default 异步解析
+  (Loading 态渲染空 Box),Robolectric 下与 waitForIdle 竞态——一律走核心
+  `rememberMarkdownState(content=…, immediate=true)` + m3 的 state 重载
+  (**m3 门面未透传 immediate**,直接 content 重载传不进去);②GFM 表格单元格
+  解析器保留管道前空格为尾随字符 → 序列化用紧凑 `|Cell|`;③文档级围栏索引按
+  content 字符串 remember 缓存,节点定位用 start/endOffset(跨解析实例稳定)。
+- 详情页锚点滚动静默失效的形态:**LazyColumn 漏传 `state = listState`** 时
+  animateScrollToItem 打在孤立状态上零异常零移动(firstVisible 恒 0);
+  回归测试 `AnchorScrollRoboTest`(Robolectric 全装配驱动,秒级)。
+- 截断标记/任何引用块插在连续围栏之间会打断代码组聚合(CodeGroupExtractor
+  以块级相邻为准)→ 工厂恒将标记后置于全部围栏之后。
 
 ## 测试金字塔(新增行为必须有测试)
 
-- 纯函数 → `app/src/test` 普通 JUnit(ChunkedText / Hex / SectionRenderMode /
-  TimelineGroup / RecordType…)。
+- 纯函数 → `app/src/test` 普通 JUnit(ChunkedText / Hex / RecordMarkdownFactory /
+  CodeGroupExtractor / TimelineGroup / RecordType…)。
 - Android 框架依赖 → Robolectric(`@Config(sdk=[34])`,resources + android.icu 可用)。
 - 组合/导航/手势 → `app/src/androidTest` Compose UI 测试(实机或模拟器)。

@@ -54,6 +54,7 @@ class SettingsRepositoryOverrideTest {
             server,
             MirroredConfigWriter(prefs, gson, remotePrefs = { null }),
             gson,
+            prefs,
         )
 
     @Test
