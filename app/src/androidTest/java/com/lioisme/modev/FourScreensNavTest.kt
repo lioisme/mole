@@ -231,12 +231,11 @@ class FourScreensNavTest {
         rule.onAllNodesWithContentDescription(str(R.string.cd_back)).assertCountEquals(1)
         rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(1)
 
-        // 筛选菜单:全部算法类别(V10 起无捕获设置入口,配置已全局化;V14 更名后
-        // 亦无「算法监听」入口——入口仅收敛于设置页)。
+        // 筛选菜单:全部算法类别(V10 起无捕获设置入口;V25 监听配置唯一入口 =
+        // 每应用「监听设置」,此处仅验证类别筛选本体)。
         rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
         rule.onNodeWithText(str(R.string.kind_cipher)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.kind_key_generation)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.algorithm_monitor_title)).assertDoesNotExist()
         pressBack()
         // 已处于算法记录列表页:无应用入口页的一键启动按钮(V20:启动按钮仅存于入口页头部)。
         rule.onAllNodesWithTag("app-launch").assertCountEquals(0)
@@ -248,14 +247,9 @@ class FourScreensNavTest {
         rule.waitForIdle()
         rule.onNodeWithContentDescription(str(R.string.cd_settings)).performClick()
         rule.waitForIdle()
-        // V21 T3:功能四入口——算法监听 / 数据库监听(V19 合并单页拆分还原)/
-        // 数据管理 / 服务与诊断。数据库入口行在小屏(360x640dp)落在折叠区,
+        // V25:功能二入口 —— 数据管理 / 服务与诊断(算法监听 / 数据库监听全局页
+        // 退役,监听配置唯一入口 = 每应用「监听设置」)。数据管理入口在小屏折叠区,
         // 滚动至可见后断言。
-        rule.onNodeWithText(str(R.string.algorithm_monitor_title)).assertIsDisplayed()
-        rule.onAllNodes(hasScrollAction()).onFirst()
-            .performScrollToNode(hasText(str(R.string.database_monitor_title)))
-        rule.onNodeWithText(str(R.string.database_monitor_title)).assertIsDisplayed()
-        // 小屏(雷电等)「数据管理」入口位于折叠区,滚动至可见后断言。
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.data_settings_title)))
         rule.onNodeWithText(str(R.string.data_settings_title)).assertIsDisplayed()
@@ -263,37 +257,6 @@ class FourScreensNavTest {
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.diagnostics_settings_title)))
         rule.onNodeWithText(str(R.string.diagnostics_settings_title)).assertIsDisplayed()
-        // 回到列表顶部,保证功能入口点击可见。
-        rule.onAllNodes(hasScrollAction()).onFirst()
-            .performScrollToNode(hasText(str(R.string.algorithm_monitor_title)))
-        rule.waitForIdle()
-
-        // 算法监听页(V21 T3):①监听类别(算法总开关 + 12 类别)②记录选项;无筛选按钮。
-        rule.onNodeWithText(str(R.string.algorithm_monitor_title)).performClick()
-        rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.algorithm_monitor_master)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.switch_cipher)).assertIsDisplayed()
-        // 记录选项区在 LazyColumn 折叠区,滚动至可见后断言。
-        rule.onAllNodes(hasScrollAction()).onFirst()
-            .performScrollToNode(hasText(str(R.string.switch_log_stack)))
-        rule.onNodeWithText(str(R.string.switch_log_stack)).assertIsDisplayed()
-        rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(0)
-        pressBack()
-
-        // 数据库监听页(V21 T3):①监听类别(数据库总开关 + 5 类别)②结果闸门;无筛选按钮。
-        // 数据库入口行在小屏(360x640dp)落在折叠区,先滚动至可见再点击。
-        rule.onAllNodes(hasScrollAction()).onFirst()
-            .performScrollToNode(hasText(str(R.string.database_monitor_title)))
-        rule.onNodeWithText(str(R.string.database_monitor_title)).performClick()
-        rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.database_monitor_master)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.switch_db_query)).assertIsDisplayed()
-        rule.onAllNodes(hasScrollAction()).onFirst()
-            .performScrollToNode(hasText(str(R.string.db_max_result_rows)))
-        rule.onNodeWithText(str(R.string.db_max_result_rows)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.db_max_result_chars)).assertIsDisplayed()
-        rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(0)
-        pressBack()
 
         // 返回设置页 → 数据管理页:总记录行 + 清空全部日志(危险块),不触发。
         // 数据管理入口在小屏折叠区,先滚动至可见再点击。

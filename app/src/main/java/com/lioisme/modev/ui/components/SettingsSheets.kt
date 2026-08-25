@@ -1,4 +1,4 @@
-package com.lioisme.modev.ui.settings
+package com.lioisme.modev.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -32,7 +32,7 @@ import com.lioisme.modev.R
 import kotlinx.coroutines.launch
 
 /**
- * 监听设置弹层集(V21 T3 拆分后共享;V21 T2 契约):
+ * 监听设置输入弹层集(V21 T2 契约;V25 自 ui/settings 迁入 components,消费方 = 每应用监听设置页):
  * - 输入型弹层一律 [ModalBottomSheet],显式 `containerColor =
  *   surfaceContainerHigh`(M3 弹层容器 token,消 R2 色差);
  * - 内容 Column **仅** `.imePadding()`(M3 已内部消费导航栏 insets,

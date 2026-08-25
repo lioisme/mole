@@ -13,6 +13,8 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
+import androidx.compose.ui.test.performTextReplacement
+import androidx.compose.ui.test.hasSetTextAction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.lioisme.modev.core.model.AppListenOverride
@@ -148,6 +150,30 @@ class PerAppListenSettingsTest {
             "恢复默认后该行应消失",
             rule.onAllNodes(hasTestTag("listen-reset")).fetchSemanticsNodes().isEmpty(),
         )
+    }
+
+    /** V25 采集微调项 E2E:底部 sheet 编辑 → 偏差持久化(注入侧推送链路另测)。 */
+    @Test
+    fun optionSheets_editCaptureLimits_andPersistDeviations() {
+        openListenSettings()
+
+        // 单字段字节上限:点击选项行 → MaxBytesSheet → 全量替换为 2048 → 确认。
+        val maxBytesRow = rule.onNodeWithTag("listen-row-max-bytes").performScrollTo()
+        maxBytesRow.assertIsDisplayed()
+        maxBytesRow.performClick()
+        rule.waitForIdle()
+        rule.onNode(hasSetTextAction()).performTextReplacement("2048")
+        rule.onNodeWithText(str(R.string.confirm)).performClick()
+        awaitPersisted { it.maxBytesPerField == 2048 }
+
+        // 结果行数上限:同链路验证 IntLimitSheet。
+        val rowsRow = rule.onNodeWithTag("listen-row-result-rows").performScrollTo()
+        rowsRow.assertIsDisplayed()
+        rowsRow.performClick()
+        rule.waitForIdle()
+        rule.onNode(hasSetTextAction()).performTextReplacement("50")
+        rule.onNodeWithText(str(R.string.confirm)).performClick()
+        awaitPersisted { it.maxResultRows == 50 }
     }
 
     private fun str(id: Int) = ctx.getString(id)

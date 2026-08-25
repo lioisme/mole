@@ -162,33 +162,6 @@ class ConfigServerOverrideTest {
     }
 
     @Test
-    fun `broadcastEffectiveConfig delivers per-package resolved values`() {
-        server.start()
-
-        val (sa, ra) = connect()
-        handshake(writer(sa), "com.a")
-        readNextConfig(ra)
-
-        val (sb, rb) = connect()
-        handshake(writer(sb), "com.b")
-        readNextConfig(rb)
-
-        // 全局关闭 base64(com.b 无覆盖跟随)+ com.a 保持自身覆盖(base64 强制开)
-        effectiveConfigs["com.b"] = HookSwitch.DEFAULT.copy(base64 = false)
-        effectiveConfigs["com.a"] = HookSwitch.DEFAULT.copy(base64 = true, random = false)
-        server.broadcastEffectiveConfig()
-
-        val configB = readNextConfig(rb)
-        assertFalse(configB.base64)
-        val configA = readNextConfig(ra)
-        assertTrue(configA.base64)
-        assertFalse(configA.random)
-
-        sa.close()
-        sb.close()
-    }
-
-    @Test
     fun `missing resolver degrades to no push on handshake`() {
         server.effectiveResolver = null
         server.start()

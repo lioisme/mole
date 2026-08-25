@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.ui.settings
+package com.lioisme.modev.ui.apps
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,7 +15,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.lioisme.modev.ui.components.SettingsToggleItem
 
-/** 开关行(对齐 LIDE SettingsToggleItem 语义,参数名本地化;算法/数据库监听页共用)。*/
+/**
+ * 每应用监听设置行组件(V25 自 ui/settings/SettingsRowItems 迁入,原全局两页退役):
+ * - [SwitchRowItem] 开关行(对齐 SettingsToggleItem 语义,参数名本地化);
+ * - [OptionRowItem] 数值选项行(M3 ListItem 承载,尾值 primary,Dialog/sheet 型交互入口)。
+ */
 @Composable
 internal fun SwitchRowItem(
     icon: ImageVector,
@@ -36,9 +40,7 @@ internal fun SwitchRowItem(
 }
 
 /**
- * 记录选项行(V9;V19 T6 矩阵 M5:M3 [ListItem] 承载):
- * icon + 标题 + 提示 + 当前值(primary,Dialog 型交互入口),token 对齐
- * SettingsItem(icon 24dp / 间距 16dp / padding h16 v12)。
+ * 记录选项行(V9;V19 T6 矩阵 M5;V25 迁移:M3 [ListItem] 承载)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -48,6 +50,7 @@ internal fun OptionRowItem(
     value: String,
     hint: String,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     ListItem(
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -67,6 +70,6 @@ internal fun OptionRowItem(
                 color = MaterialTheme.colorScheme.primary,
             )
         },
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
     )
 }

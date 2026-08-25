@@ -7,24 +7,23 @@ import android.net.Uri
  * 2026-08-18 V14 R5 更名;V18 应用监听入口;V19 T4 监听设置合并;
  * V20 记录列表单应用语境化,「查看记录」界面退役;
  * V21 T3 监听设置拆分还原;V22 R2 新增关于页 / 开源许可页;
- * V24 G2 全部记录页(records/all)退役,记录浏览收敛为每应用两列表):
+ * V24 G2 全部记录页(records/all)退役,记录浏览收敛为每应用两列表;
+ * V25 全局监听设置两页(settings/algorithm、settings/database)退役 ——
+ * 默认配置收敛为内置推荐值,监听配置唯一入口 = 每应用「监听设置」):
  * APPS(根页) → APP_MONITOR(每应用监听入口:算法记录 / 数据库记录)
  * → RECORD_DETAIL(每条记录);
- * SETTINGS → ALGORITHM_SETTINGS(算法监听)/ DATABASE_SETTINGS(数据库监听)
- * / DATA_SETTINGS(数据管理)/ DIAGNOSTICS_SETTINGS(服务与诊断)
+ * SETTINGS(通用设置)→ DATA_SETTINGS(数据管理)/ DIAGNOSTICS_SETTINGS(服务与诊断)
  * / ABOUT(关于)→ LICENSES(开源许可)→ LICENSE_DETAIL(许可全文)。
  * 路由字符串(apps/{packageName}、record/{recordId})自 V3 起保持稳定;
  * records/algorithm、records/database 于 V20 带包名参数化(单应用记录列表);
  * settings/algorithm、settings/database 于 V19 合并为 settings/monitor,
- * 于 V21 拆分还原(settings/monitor 无存量引用,退役)。
+ * V21 拆分还原,V25 随「无全局监听配置」决策整体退役。
  */
 object ModevRoutes {
     const val APPS = "apps"
     const val APP_MONITOR = "apps/{packageName}/monitor"
     const val RECORD_DETAIL = "record/{recordId}"
     const val SETTINGS = "settings"
-    const val ALGORITHM_SETTINGS = "settings/algorithm"
-    const val DATABASE_SETTINGS = "settings/database"
     const val DATA_SETTINGS = "settings/data"
     const val DIAGNOSTICS_SETTINGS = "settings/diagnostics"
     const val ABOUT = "settings/about"

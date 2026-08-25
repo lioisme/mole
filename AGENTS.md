@@ -39,7 +39,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 | 运行中 Running | 进程存活态 | 在线 Online |
 | 已作用域 / 未作用域 | Hook 作用域态 | 在作用域 / 未在作用域 |
 | 已接收 / 丢弃 / 被拒 / 写入失败 / 超容量裁剪 | 统计区文案(原因括号后缀) | 队列溢出丢弃等 |
-| 默认配置 | `switch_global`(未定制应用的有效配置来源) | 全局设置(联动语义)、跟随全局 |
+| 默认配置 | 内置推荐值 `HookSwitch.DEFAULT`(无 UI;`switch_global` 仅为注入侧兜底种子,init 强制重置) | 全局设置(联动语义)、跟随全局 |
 | 自定义偏差 / 恢复默认 | 每应用二态覆盖(V24)与清除动作 | 覆盖=三态、强制开/关、重置为全局 |
 
 ## 强约束(改了会挂测试/降级质量)
@@ -107,21 +107,21 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
     行/字节闸门触发即截断补发 `QUERY_RESULT`;未迭代的游标 rowCount=null
     且无结果记录。记录行模型 sealed 分派(`SqlRow`/`CryptoRow`),经
     `toRowModelOrNull` 对非法 kind/operation 枚举名返回 null。
-12. **数据库监听开关契约**:5 类开关(open/query/DML/exec/transaction)默认开,
-    设置页类别开关即时广播生效;结果上限为「行数 + 字节」双闸门
-    (`IntLimitSheet` 底部输入,禁居中 Dialog);`kind` 列跨枚举共用
+12. **数据库监听开关契约**:5 类开关(open/query/DML/exec/transaction)默认开
+    (内置推荐值);每应用类别开关单击即写即推(`pushToPackage` 定向);
+    结果上限为「行数 + 字节」双闸门(`IntLimitSheet` 底部输入,禁居中 Dialog,
+    V25 起编辑入口 = 每应用「结果闸门」分区);`kind` 列跨枚举共用
     (CryptoKind.name / SqlKind.name),筛选菜单记录类型 + 类别双组单选。
 13. **MD3 组件契约 + 设置页功能区**:设置类控件一律 M3 组件
     (`ListItem`/`AssistChip`/`TextButton`/`DropdownMenuItem`…),
     `CollapsedSearchInput` 为唯一例外(KDoc 固化,经 D4 单向决策);
     M3 1.4.0 `ListItem` 内容槽**合并为单一语义节点**(文本节点 = 整行高、
     节点 Text 列表含全部槽文本)——插桩勿对行内文本独立测距,锚定断言用
-    `onNodeWithText` 精确匹配合并节点即可。设置页功能区四入口:
-    算法监听(`settings/algorithm`,总开关 + 12 类别 + 记录选项)/
-    数据库监听(`settings/database`,总开关 + 5 类别 + 结果闸门)
-    (V21 拆分还原,旧合并页 `settings/monitor` 已退役)/ 数据管理
+    `onNodeWithText` 精确匹配合并节点即可。设置页功能区二入口(V25 收敛,
+    算法/数据库两全局监听页已整体退役):数据管理
     (`settings/data`)/ 服务与诊断(`settings/diagnostics`,三分区 +
-    复制诊断信息);全局列表页 `records/algorithm`/`records/database`;
+    复制诊断信息);监听配置唯一入口 = 每应用「监听设置」;全局列表页
+    `records/algorithm`/`records/database`;
     危险清理(按类型/全部)一律居中 `AlertDialog` 确认,无回收站;
     计数/存储值断言必须资源驱动(`getString` 带格式参,zh 渲染 "2 条"
     非 "2")。设置页卡片容器色 = `surfaceContainerLow`(V21 T1 决策经
@@ -152,21 +152,25 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
     (无需额外 onLoadAround 接线);`enablePlaceholders=false` 时
     `itemCount` = 已加载数。分页翻页验证须种子数据 > 2 页(如 120 条),
     否则分页路径永不触达(旧测试盲区)。
-16. **二态偏差每应用监听(V24)**:有效配置 = 默认配置(`switch_global`,由
-    通用设置算法/数据库两页编辑)⊕ 该应用稀疏二态偏差;模型 =
-    `AppListenOverride(cryptoListen/dbListen: Boolean?, kinds: Map<String,Boolean>)`,
-    null/缺条目 = 取默认,**无第三态**;`EffectiveSwitch.resolve(default, o)`
+16. **二态偏差每应用监听(V24;V25 无全局配置收敛)**:有效配置 =
+    内置推荐默认值(`HookSwitch.DEFAULT`,测试强制与 CategoryTaxonomy 对齐;
+    **无全局设置 UI**——`switch_global` 键仅作注入侧兜底种子,
+    `SettingsRepository.init` 无条件重置,历史用户自定义一次清除)⊕ 该应用
+    稀疏二态偏差;模型 = `AppListenOverride`(masters×2 + kinds 17 项 +
+    V25 微调项 `logStack/maxBytesPerField/ignoreStackPrefixes/maxResultRows/
+    maxResultChars`,全部可空,null = 取默认);`EffectiveSwitch.resolve`
     产出普通 `HookSwitch` —— wire 协议/注入侧零感知(VERSION 恒 4);
     `readKind`/applyKinds 为读写互逆映射,新增类别必须同步双端;
     存储 = 每包一键 `override_{pkg}`,惰性创建、零偏差即删键;
     JSON 兼容 V23 三态遗留(`"ON"/"OFF"` + `kindOverrides` 键名容忍解析,
     写入恒为新格式);覆盖键读本地权威(`getLocal`),默认键读优先远程;
     下发 = ConfigServer per-session resolve(`effectiveResolver` +
-    `pushToPackage` 定向推送;默认配置变更 `broadcastEffectiveConfig()`
-    对每会话各自 resolve,**禁止恢复「同一份广播全量」**);注入侧兜底
-    (HookInstaller)直读两键后 resolve。设置页 = 行内 M3 Switch
-    (`listen-row-*` testTag,整行 toggleable + 内层 Switch clearAndSetSemantics),
-    单击即写即推;「恢复默认配置」行仅在有偏差时渲染(testTag
+    `pushToPackage` 定向推送;V25 起 `broadcastEffectiveConfig` 已随全局页
+    退役,**禁止恢复「同一份广播全量」**);注入侧兜底(HookInstaller)
+    直读两键后 resolve。设置页 = 行内 M3 Switch(`listen-row-*` testTag,
+    整行 toggleable + 内层 Switch clearAndSetSemantics),单击即写即推;
+    记录选项/结果闸门数值行经底部 sheet 编辑(MaxBytesSheet/IgnoreStackSheet/
+    IntLimitSheet,≤0 显 ∞);「恢复默认配置」行仅在有偏差时渲染(testTag
     `listen-reset`,副标题 plurals `listen_settings_custom_n`);
     测试种子 hook 开关默认值见 V18(dbOpen 等噪点类别默认关),集成测试
     setUp 须显式开。

@@ -59,9 +59,7 @@
     <string name="danger_reset_listen_msg">将 %1$s 的全部监听设置恢复为默认配置?</string>
     <string name="section_record_options">记录选项</string>
     <string name="algorithm_monitor_master">启用算法监听</string>
-    <string name="algorithm_monitor_master_hint">全局总开关;分开关保留原态,重开即恢复</string>
     <string name="database_monitor_master">启用数据库监听</string>
-    <string name="database_monitor_master_hint">全局总开关;分开关保留原态,重开即恢复</string>
     <string name="section_db_result_limits">结果闸门</string>
     <string name="switch_cipher">加解密 Cipher</string>
     <string name="switch_message_digest">摘要 MessageDigest</string>
@@ -281,15 +279,11 @@
     <string name="settings_framework_section">框架与作用域</string>
     <string name="settings_server_section">通信服务</string>
     <string name="settings_about_section">关于</string>
-    <string name="algorithm_monitor_title">算法监听</string>
-    <string name="database_monitor_title">数据库监听</string>
     <string name="data_settings_title">数据管理</string>
     <string name="diagnostics_settings_title">服务与诊断</string>
     <string name="settings_framework_service">框架服务</string>
     <string name="settings_connecting">连接中…</string>
     <string name="settings_framework">框架</string>
-    <string name="settings_capability_enabled">已启用</string>
-    <string name="settings_capability_disabled">未启用</string>
     <string name="settings_scoped_count">作用域应用数</string>
     <string name="settings_scoped_count_value">%1$,d 个</string>
     <string name="settings_not_connected">未连接</string>

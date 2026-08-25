@@ -300,14 +300,20 @@ private fun HeroCard(
     }
 }
 
-/** 状态胶囊:圆点 + 文案的 tonal pill(StatusColorTokens AA 语义色)。 */
+/**
+ * 状态胶囊:圆点 + 文案的 tonal pill(StatusColorTokens AA 语义色)。
+ * V25 视觉整改:点↔文字 6dp 间距(对齐全 App 点标惯例:AppsScreen 行内 /
+ * 统计卡图例),内边距对齐 TimelineHeader 惯例(horizontal 10 / vertical 3),
+ * 消除旧版 start6/end10 非对称补偿与 0dp 挤贴。
+ */
 @Composable
 private fun StatusPill(semantic: StatusSemantic) {
     val color = statusColor(semantic.kind)
     val label = stringResource(semantic.labelRes)
     Surface(shape = CircleShape, color = color.copy(alpha = 0.15f)) {
         Row(
-            Modifier.padding(start = 6.dp, end = 10.dp, top = 3.dp, bottom = 3.dp),
+            Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             StatusDot(kind = semantic.kind, label = label)

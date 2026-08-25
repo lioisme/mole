@@ -17,8 +17,11 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * SettingsRepository 全局化单测(V10):迁移按包旧键 → switch_global、
- * 全局键优先、无旧键回落默认并落盘、set 更新内存并广播。
+ * SettingsRepository 默认配置契约(V25 D2):
+ * - 旧按包键迁移链路保留(migrateLegacy 清理残留);
+ * - **init 无条件重置 `switch_global` 为内置推荐值**——清除 V24 及更早全局设置页
+ *   遗留的用户自定义(默认配置自此无 UI 写入路径,陈旧安装自愈);
+ * - globalSwitch 流恒为 [HookSwitch.DEFAULT]。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -47,7 +50,7 @@ class SettingsRepositoryTest {
         SettingsRepository(server, writer(), Gson())
 
     @Test
-    fun `legacy per-package keys migrate to global key and are cleaned`() {
+    fun `legacy per-package keys are cleaned during migration`() {
         prefs.edit()
             .putString("switch_com.a", Gson().toJson(HookSwitch.DEFAULT.copy(cipher = false)))
             .putString("switch_com.b", Gson().toJson(HookSwitch.DEFAULT.copy(base64 = true)))
@@ -55,50 +58,35 @@ class SettingsRepositoryTest {
 
         val r = repo()
 
-        // 取首份旧配置作为全局配置(升序取首:com.a)
-        assertEquals(false, r.switch.cipher)
-        // 全局键已落盘,旧键全部清理(本地残留消除)
+        // 全局键落盘为内置默认,旧按包键全部清理(本地残留消除)
+        assertEquals(HookSwitch.DEFAULT, r.globalSwitch.value)
         assertTrue(prefs.contains(MirroredConfigWriter.KEY))
         assertFalse(prefs.contains("switch_com.a"))
         assertFalse(prefs.contains("switch_com.b"))
     }
 
     @Test
-    fun `existing global key wins over legacy keys`() {
+    fun `stale customized switch_global is reset to builtin default on init`() {
         prefs.edit()
             .putString(
                 MirroredConfigWriter.KEY,
-                Gson().toJson(HookSwitch.DEFAULT.copy(mac = false)),
+                Gson().toJson(HookSwitch.DEFAULT.copy(mac = false, maxBytesPerField = 42)),
             )
-            .putString("switch_com.a", Gson().toJson(HookSwitch.DEFAULT.copy(cipher = false)))
             .commit()
 
         val r = repo()
 
-        // 用户当前全局配置优先,不被旧键覆盖
-        assertEquals(false, r.switch.mac)
-        assertEquals(true, r.switch.cipher)
-        // 旧键仍被清理
-        assertFalse(prefs.contains("switch_com.a"))
-    }
-
-    @Test
-    fun `no legacy keys - falls back to default and persists global key`() {
-        val r = repo()
-
-        assertEquals(HookSwitch.DEFAULT, r.switch)
-        assertTrue(prefs.contains(MirroredConfigWriter.KEY))
+        // V25 D2:历史全局自定义强制重置为内置推荐值(含远程镜像)
+        assertEquals(HookSwitch.DEFAULT, r.globalSwitch.value)
         assertEquals(HookSwitch.DEFAULT, writer().get())
     }
 
     @Test
-    fun `set updates memory state and persists`() {
+    fun `no legacy keys - default is seeded and persisted`() {
         val r = repo()
-        val updated = r.switch.copy(keyAgreement = false, random = false)
 
-        r.set(updated)
-
-        assertEquals(updated, r.globalSwitch.value)
-        assertEquals(updated, writer().get())
+        assertEquals(HookSwitch.DEFAULT, r.globalSwitch.value)
+        assertTrue(prefs.contains(MirroredConfigWriter.KEY))
+        assertEquals(HookSwitch.DEFAULT, writer().get())
     }
 }

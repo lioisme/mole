@@ -127,10 +127,11 @@ class MirroredConfigWriter(
 
 /**
  * 捕获配置仓库:
- * - 默认配置(V10 全局键):ConfigWriter 持久化 + 内存 StateFlow + 变更即广播注入侧;
- * - 单应用监听自定义(V24 二态偏差):每包一键 `override_{pkg}` 惰性创建,
- *   [EffectiveSwitch] 将默认配置 ⊕ 偏差解析为有效配置后经 ConfigServer
- *   定向推送对应会话,未定制应用随默认配置变更自动传导。
+ * - 默认配置(V25 收敛):内置最佳推荐值([HookSwitch.DEFAULT]),**无任何 UI 写入路径**;
+ *   `switch_global` 键仅作注入侧兜底种子(init 强制重置,清除 V24 及更早的全局自定义遗留);
+ * - 单应用监听自定义(V24 二态偏差 + V25 采集微调项):每包一键 `override_{pkg}`
+ *   惰性创建,[EffectiveSwitch] 将默认配置 ⊕ 偏差解析为有效配置后经 ConfigServer
+ *   定向推送对应会话,未定制应用恒等于内置默认值。
  */
 class SettingsRepository(
     private val server: ConfigServer,
@@ -142,18 +143,11 @@ class SettingsRepository(
 
     private val _globalSwitch = MutableStateFlow(HookSwitch.DEFAULT)
 
-    /** 全局捕获配置(全应用唯一事实源,UI 收集即热更)。 */
+    /**
+     * 默认配置流(V25:恒为内置推荐值;保留流形态供每应用页 combine 与
+     * capability 消费,不再有任何写入方)。
+     */
     val globalSwitch: StateFlow<HookSwitch> = _globalSwitch
-
-    /** 当前全局配置快照。 */
-    val switch: HookSwitch get() = _globalSwitch.value
-
-    /** 更新全局配置:持久化 + 按会话广播各自有效配置(V23),注入侧即时生效。 */
-    fun set(switch: HookSwitch) {
-        writer.set(switch)
-        _globalSwitch.value = switch
-        server.broadcastEffectiveConfig()
-    }
 
     private val _overrides = MutableStateFlow<Map<String, AppListenOverride>>(emptyMap())
 
@@ -206,10 +200,11 @@ class SettingsRepository(
     init {
         // 迁移旧按包配置 → 全局键(仅一次;无旧键则回落默认并落盘,保证远程侧有值)
         writer.migrateLegacy()
-        _globalSwitch.value = writer.get() ?: HookSwitch.DEFAULT
-        if (writer.get() == null) {
-            writer.set(HookSwitch.DEFAULT)
-        }
+        // V25 D2:默认配置收敛为内置推荐值 —— 无条件重置 switch_global,
+        // 清除 V24 及更早「全局设置页」遗留的用户自定义值(此后无 UI 写入路径,
+        // 注入侧兜底读到恒为内置默认,陈旧安装自愈)。
+        writer.set(HookSwitch.DEFAULT)
+        _globalSwitch.value = HookSwitch.DEFAULT
         // 预载已存在的单应用覆盖(本地权威;非法 JSON 容错为 DEFAULT 并被过滤)
         _overrides.value = writer.localKeysWithPrefix(ConfigKeys.OVERRIDE_PREFIX)
             .associate { key ->

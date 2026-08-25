@@ -61,9 +61,7 @@
     <string name="danger_reset_listen_msg">Restore all listen settings for %1$s to the default configuration?</string>
     <string name="section_record_options">Record Options</string>
     <string name="algorithm_monitor_master">Enable Algorithm Listen</string>
-    <string name="algorithm_monitor_master_hint">Global switch; per-kind switches keep their state</string>
     <string name="database_monitor_master">Enable Database Listen</string>
-    <string name="database_monitor_master_hint">Global switch; per-kind switches keep their state</string>
     <string name="section_db_result_limits">Result Limits</string>
     <string name="switch_cipher">Cipher</string>
     <string name="switch_message_digest">MessageDigest</string>
@@ -287,15 +285,11 @@
     <string name="settings_framework_section">Framework &amp; scope</string>
     <string name="settings_server_section">Service</string>
     <string name="settings_about_section">About</string>
-    <string name="algorithm_monitor_title">Algorithm Monitor</string>
-    <string name="database_monitor_title">Database Monitor</string>
     <string name="data_settings_title">Data Management</string>
     <string name="diagnostics_settings_title">Service &amp; Diagnostics</string>
     <string name="settings_framework_service">Framework service</string>
     <string name="settings_connecting">Connecting…</string>
     <string name="settings_framework">Framework</string>
-    <string name="settings_capability_enabled">Enabled</string>
-    <string name="settings_capability_disabled">Disabled</string>
     <string name="settings_scoped_count">Scoped apps</string>
     <string name="settings_scoped_count_value">%1$,d</string>
     <string name="settings_not_connected">Not connected</string>

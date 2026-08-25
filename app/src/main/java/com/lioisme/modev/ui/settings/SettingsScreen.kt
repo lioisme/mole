@@ -83,12 +83,12 @@ import kotlinx.coroutines.launch
 private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
 
 /**
- * 设置页(V10 设置分级,通用设置收敛本页;V19 T4 功能收敛;V21 T3 功能四入口):
+ * 设置页(V10 设置分级,通用设置收敛本页;V21 T3 功能入口;V25 收敛二入口):
  * 卡片式分区(SettingsSection = surfaceContainerLow 卡),仅通用设置 + 入口:
  * - 显示:外观模式 sheet + 主题色 sheet(跟随壁纸 / 20 色预设网格);
  * - 语言与地区:语言 sheet(LocaleManager 热切换,零重建);
- * - 功能四入口:算法监听 / 数据库监听(V19 合并单页拆分还原,副标题 = 各自
- *   能力启用词)/ 数据管理(记录总量 / 清空全部)/ 服务与诊断(框架/端口/统计);
+ * - 功能二入口:数据管理(记录总量 / 清空全部)/ 服务与诊断(框架/端口/统计)
+ *   —— 算法监听 / 数据库监听两全局页于 V25 退役,监听配置唯一入口 = 每应用「监听设置」;
  * - 关于:版本行 → 独立关于页(V22 R2 升级,弃用 AlertDialog,内含开源许可入口)。
  * 本页经应用列表筛选菜单「设置」项进入(唯一入口),返回箭头常显。
  */
@@ -97,8 +97,6 @@ private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
 fun SettingsScreen(
     viewModel: SettingsViewModel,
     onBack: () -> Unit = {},
-    onOpenAlgorithmSettings: () -> Unit = {},
-    onOpenDatabaseSettings: () -> Unit = {},
     onOpenDataSettings: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
@@ -177,28 +175,11 @@ fun SettingsScreen(
                 )
             }
 
-            // V21 T3:功能四入口——算法监听 / 数据库监听(V19 合并单页拆分还原,
-            // 副标题 = 各能力启用词)/ 数据管理 / 服务与诊断(能力注册表 UI 呈现已退役)。
-            // 已作用域应用置顶开关于 V22 R2 迁回筛选菜单(应用列表搜索条筛选按钮)。
+            // V21 T3 功能入口;V25 收敛二入口 —— 数据管理 / 服务与诊断
+            // (算法监听 / 数据库监听全局页退役,监听配置唯一入口 = 每应用「监听设置」;
+            // 能力注册表 UI 呈现已于 V19 退役)。已作用域应用置顶开关于 V22 R2 迁回筛选菜单。
             Spacer(Modifier.height(24.dp))
             SettingsSection(stringResource(R.string.settings_features_section)) {
-                val switch by viewModel.switchState.collectAsStateWithLifecycle()
-                SettingsItem(
-                    icon = Icons.Default.Sensors,
-                    title = stringResource(R.string.algorithm_monitor_title),
-                    subtitle = stringResource(
-                        if (switch.cryptoListen) R.string.settings_capability_enabled else R.string.settings_capability_disabled
-                    ),
-                    onClick = onOpenAlgorithmSettings,
-                )
-                SettingsItem(
-                    icon = Icons.Default.TableChart,
-                    title = stringResource(R.string.database_monitor_title),
-                    subtitle = stringResource(
-                        if (switch.dbListen) R.string.settings_capability_enabled else R.string.settings_capability_disabled
-                    ),
-                    onClick = onOpenDatabaseSettings,
-                )
                 SettingsItem(
                     icon = Icons.Default.Inventory,
                     title = stringResource(R.string.data_settings_title),

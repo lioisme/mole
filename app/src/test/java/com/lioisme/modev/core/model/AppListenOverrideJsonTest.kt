@@ -115,4 +115,55 @@ class AppListenOverrideJsonTest {
             parse("{ " + quoted("kinds") + ": { " + quoted(CryptoKind.CIPHER.name) + ": false } }").kinds,
         )
     }
+
+    /** V25 采集微调项:round-trip 严格对称。 */
+    @Test
+    fun `capture option fields roundtrip symmetrically`() {
+        val override = AppListenOverride(
+            logStack = false,
+            maxBytesPerField = 2048,
+            ignoreStackPrefixes = listOf("com.example.crypto", "kotlin."),
+            maxResultRows = 50,
+            maxResultChars = 1024,
+        )
+        assertEquals(override, parse(override.toJson(gson)))
+    }
+
+    @Test
+    fun `option nulls omitted and empty prefix list normalizes to default`() {
+        val json = AppListenOverride(logStack = true).toJson(gson)
+        assertTrue(json.contains(quoted("logStack")))
+        listOf("maxBytesPerField", "ignoreStackPrefixes", "maxResultRows", "maxResultChars")
+            .forEach { key -> assertTrue("null 位不得输出:" + key, !json.contains(quoted(key))) }
+        // 空前缀表与默认等价(isDefault 归零),不构成偏差
+        assertTrue(AppListenOverride(ignoreStackPrefixes = emptyList()).isDefault)
+    }
+
+    @Test
+    fun `option malformed values degrade to take-default`() {
+        val parsed = parse(
+            "{ " +
+                quoted("logStack") + ": \"YES\", " +
+                quoted("maxBytesPerField") + ": \"big\", " +
+                quoted("ignoreStackPrefixes") + ": \"com.a\", " +
+                quoted("maxResultRows") + ": {}, " +
+                quoted("maxResultChars") + ": [] }",
+        )
+        assertNull(parsed.logStack)
+        assertNull(parsed.maxBytesPerField)
+        assertNull(parsed.ignoreStackPrefixes)
+        assertNull(parsed.maxResultRows)
+        assertNull(parsed.maxResultChars)
+    }
+
+    @Test
+    fun `legacy v23 document parses without option fields`() {
+        val legacy = "{ " + quoted("kindOverrides") + ": { " +
+            quoted(CryptoKind.CIPHER.name) + ": \"OFF\" } }"
+        val parsed = parse(legacy)
+        assertEquals(mapOf(CryptoKind.CIPHER.name to false), parsed.kinds)
+        assertNull(parsed.logStack)
+        assertNull(parsed.maxBytesPerField)
+        assertNull(parsed.ignoreStackPrefixes)
+    }
 }

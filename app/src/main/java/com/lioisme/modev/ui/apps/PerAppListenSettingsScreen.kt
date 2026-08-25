@@ -11,7 +11,11 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCut
+import androidx.compose.material.icons.filled.DataUsage
+import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.RestartAlt
+import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -47,6 +51,9 @@ import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.data.repo.SettingsRepository
+import com.lioisme.modev.ui.components.IntLimitSheet
+import com.lioisme.modev.ui.components.IgnoreStackSheet
+import com.lioisme.modev.ui.components.MaxBytesSheet
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
@@ -58,8 +65,8 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * 单应用监听自定义状态(V24 二态偏差模型):
- * - [effective] 有效配置 = 默认配置 ⊕ 本应用偏差(默认配置变更实时传导到未定制项);
+ * 单应用监听自定义状态(V24 二态偏差模型;V25 扩展采集微调项):
+ * - [effective] 有效配置 = 内置默认配置 ⊕ 本应用偏差(默认恒为内置推荐值);
  * - [override] 当前偏差(零偏差时恢复默认行隐藏);
  * - 写操作即时持久化 + 定向推送注入侧(setOverride/removeOverride 全链路);
  * - 零偏差写入自动等价删除存储键(SettingsRepository 契约)。
@@ -96,6 +103,31 @@ class PerAppListenSettingsViewModel(
         update { it.copy(kinds = it.kinds + (kindId to value)) }
     }
 
+    /** 记录堆栈定制(V25)。 */
+    fun setLogStack(value: Boolean) {
+        update { it.copy(logStack = value) }
+    }
+
+    /** 单字段字节上限定制(V25;≤0 语义为不限)。 */
+    fun setMaxBytesPerField(value: Int) {
+        update { it.copy(maxBytesPerField = value) }
+    }
+
+    /** 忽略栈前缀定制(V25;整表替换,空表归零为取默认)。 */
+    fun setIgnoreStackPrefixes(value: List<String>) {
+        update { it.copy(ignoreStackPrefixes = value.ifEmpty { null }) }
+    }
+
+    /** 结果行数上限定制(V25)。 */
+    fun setMaxResultRows(value: Int) {
+        update { it.copy(maxResultRows = value) }
+    }
+
+    /** 结果字节上限定制(V25)。 */
+    fun setMaxResultChars(value: Int) {
+        update { it.copy(maxResultChars = value) }
+    }
+
     /** 一键恢复默认配置(删除本包全部偏差存储键)。 */
     fun reset() {
         viewModelScope.launch { settings.removeOverride(packageName) }
@@ -122,10 +154,11 @@ class PerAppListenSettingsViewModelFactory(
 }
 
 /**
- * 每应用监听设置页(V24 G1 二态重构):
+ * 每应用监听设置页(V24 G1 二态重构;V25 扩展采集微调项):
  * - 每行直接承载 M3 Switch(整行 toggleable,单击即写即推 ConfigServer.pushToPackage);
- * - 总开关区(算法/数据库)+ 算法 12 类别 + 数据库 5 类别;
- *   行值显示有效配置(未定制项随默认配置实时变化,无「跟随」第三态);
+ * - 总开关区(算法/数据库)+ 算法 12 类别 + 数据库 5 类别 + 记录选项 + 结果闸门;
+ *   行值显示有效配置(未定制项恒为内置默认值,无「跟随」第三态);
+ * - 数值行经底部 sheet 编辑(MaxBytesSheet/IgnoreStackSheet/IntLimitSheet,契约 4);
  * - 操作区仅在存在自定义时出现:「恢复默认配置」(危险确认 AlertDialog 后 removeOverride)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -137,6 +170,10 @@ fun PerAppListenSettingsScreen(
     val effective by viewModel.effective.collectAsStateWithLifecycle()
     val override by viewModel.override.collectAsStateWithLifecycle()
     var confirmReset by remember { mutableStateOf(false) }
+    var showMaxBytesSheet by remember { mutableStateOf(false) }
+    var showIgnoreStackSheet by remember { mutableStateOf(false) }
+    var showResultRowsSheet by remember { mutableStateOf(false) }
+    var showResultCharsSheet by remember { mutableStateOf(false) }
     val res = rememberLocaleAwareResources()
 
     Scaffold(
@@ -216,6 +253,57 @@ fun PerAppListenSettingsScreen(
             }
             Spacer(Modifier.height(16.dp))
 
+            // V25 记录选项:堆栈开关(行内 Switch)+ 单字段字节上限 / 忽略栈前缀(sheet 编辑)。
+            SettingsSection(stringResource(R.string.section_record_options)) {
+                ListenRow(
+                    label = res.getString(R.string.switch_log_stack),
+                    checked = effective.logStack,
+                    onCheckedChange = { viewModel.setLogStack(it) },
+                    testTag = "listen-row-log-stack",
+                )
+                HorizontalDivider16Compat()
+                OptionRowItem(
+                    icon = Icons.Filled.DataUsage,
+                    title = res.getString(R.string.capture_max_bytes),
+                    value = limitValue(effective.maxBytesPerField),
+                    hint = res.getString(R.string.capture_max_bytes_hint),
+                    onClick = { showMaxBytesSheet = true },
+                    modifier = Modifier.testTag("listen-row-max-bytes"),
+                )
+                HorizontalDivider16Compat()
+                OptionRowItem(
+                    icon = Icons.Filled.ContentCut,
+                    title = res.getString(R.string.capture_ignore_stack),
+                    value = (effective.ignoreStackPrefixes.size).toString(),
+                    hint = res.getString(R.string.capture_ignore_stack_hint),
+                    onClick = { showIgnoreStackSheet = true },
+                    modifier = Modifier.testTag("listen-row-ignore-stack"),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+
+            // V25 结果闸门:结果行数 / 结果字节上限(sheet 编辑)。
+            SettingsSection(stringResource(R.string.section_db_result_limits)) {
+                OptionRowItem(
+                    icon = Icons.Filled.FormatListNumbered,
+                    title = res.getString(R.string.db_max_result_rows),
+                    value = limitValue(effective.maxResultRows),
+                    hint = res.getString(R.string.db_max_result_rows_hint),
+                    onClick = { showResultRowsSheet = true },
+                    modifier = Modifier.testTag("listen-row-result-rows"),
+                )
+                HorizontalDivider16Compat()
+                OptionRowItem(
+                    icon = Icons.Filled.TextFields,
+                    title = res.getString(R.string.db_max_result_chars),
+                    value = limitValue(effective.maxResultChars),
+                    hint = res.getString(R.string.db_max_result_chars_hint),
+                    onClick = { showResultCharsSheet = true },
+                    modifier = Modifier.testTag("listen-row-result-chars"),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+
             if (!override.isDefault) {
                 SettingsSection(stringResource(R.string.app_monitor_actions_section)) {
                     ListItem(
@@ -231,7 +319,12 @@ fun PerAppListenSettingsScreen(
                         },
                         supportingContent = {
                             val n = override.cryptoListen.count() + override.dbListen.count() +
-                                override.kinds.size
+                                override.kinds.size +
+                                override.logStack.count() +
+                                override.maxBytesPerField.count() +
+                                (if (override.ignoreStackPrefixes != null) 1 else 0) +
+                                override.maxResultRows.count() +
+                                override.maxResultChars.count()
                             Text(
                                 pluralStringResource(R.plurals.listen_settings_custom_n, n, n),
                                 style = MaterialTheme.typography.bodySmall,
@@ -277,10 +370,61 @@ fun PerAppListenSettingsScreen(
             },
         )
     }
+
+    if (showMaxBytesSheet) {
+        MaxBytesSheet(
+            initial = effective.maxBytesPerField,
+            onConfirm = {
+                viewModel.setMaxBytesPerField(it)
+                showMaxBytesSheet = false
+            },
+            onDismiss = { showMaxBytesSheet = false },
+        )
+    }
+    if (showIgnoreStackSheet) {
+        IgnoreStackSheet(
+            initial = effective.ignoreStackPrefixes,
+            onConfirm = {
+                viewModel.setIgnoreStackPrefixes(it)
+                showIgnoreStackSheet = false
+            },
+            onDismiss = { showIgnoreStackSheet = false },
+        )
+    }
+    if (showResultRowsSheet) {
+        IntLimitSheet(
+            titleRes = R.string.db_max_result_rows_dialog_title,
+            hintRes = R.string.db_max_result_rows_hint,
+            initial = effective.maxResultRows,
+            onConfirm = {
+                viewModel.setMaxResultRows(it)
+                showResultRowsSheet = false
+            },
+            onDismiss = { showResultRowsSheet = false },
+        )
+    }
+    if (showResultCharsSheet) {
+        IntLimitSheet(
+            titleRes = R.string.db_max_result_chars_dialog_title,
+            hintRes = R.string.db_max_result_chars_hint,
+            initial = effective.maxResultChars,
+            onConfirm = {
+                viewModel.setMaxResultChars(it)
+                showResultCharsSheet = false
+            },
+            onDismiss = { showResultCharsSheet = false },
+        )
+    }
 }
 
 /** Boolean?.count():非 null 记 1(null 即取默认不计),用于定制计数摘要。 */
 private fun Boolean?.count(): Int = if (this != null) 1 else 0
+
+/** Int?.count():非 null 记 1(定制计数摘要)。 */
+private fun Int?.count(): Int = if (this != null) 1 else 0
+
+/** 上限值显示惯例:≤0 = 不限(∞),否则十进制数值。 */
+private fun limitValue(value: Int): String = if (value <= 0) "∞" else value.toString()
 
 /**
  * 监听行:label + 尾部 M3 Switch;整行 toggleable(role=Switch)单击切换,
@@ -325,7 +469,7 @@ private fun HorizontalDivider16Compat() {
 
 /**
  * kind id → 设置页类别开关标签资源(switch_* 组与 HookSwitch 字段一一对应;
- * 与 AlgorithmSettingsScreen/DatabaseSettingsScreen 同源映射)。
+ * 全 App 类别标签单一事实源,V25 起仅本页消费)。
  */
 private fun switchLabelRes(kindId: String): Int = when (kindId) {
     "MESSAGE_DIGEST" -> R.string.switch_message_digest

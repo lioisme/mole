@@ -252,21 +252,9 @@ class ConfigServer(
     }
 
     /**
-     * 向全部已握手客户端广播各自的有效配置(V23):
-     * 每个会话按其包名独立 resolve —— 全局变更传导至未覆盖应用,
-     * 已覆盖应用保持自身有效配置不被全局值冲刷。
-     */
-    fun broadcastEffectiveConfig() {
-        for ((_, session) in clients) {
-            val packageName = session.packageName ?: continue
-            val config = effectiveConfigFor(packageName) ?: continue
-            pushConfig(session, packageName, config)
-        }
-    }
-
-    /**
-     * 向指定包名的全部会话定向推送其有效配置(V23):
-     * 单应用覆盖增删后调用;该包无在线会话时 no-op。
+     * 向指定包名的全部会话定向推送其有效配置(V23;V25 起为唯一推送入口 ——
+     * 默认配置已收敛为内置推荐值,不再存在「全局变更广播」语义):
+     * 单应用自定义增删后调用;该包无在线会话时 no-op。
      * @return 实际推送的会话数(诊断/测试用)。
      */
     fun pushToPackage(packageName: String): Int {

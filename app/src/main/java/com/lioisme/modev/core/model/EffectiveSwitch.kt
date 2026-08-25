@@ -1,8 +1,8 @@
 package com.lioisme.modev.core.model
 
 /**
- * 二态偏差解析(V24):默认配置 [HookSwitch] + 单应用 [AppListenOverride]
- * → 该应用的有效配置(普通 [HookSwitch])。
+ * 二态偏差解析(V24;V25 扩展采集微调项):默认配置 [HookSwitch] +
+ * 单应用 [AppListenOverride] → 该应用的有效配置(普通 [HookSwitch])。
  *
  * 解析是纯函数、无副作用;产物直接经 wire `config` 消息下发,
  * 注入侧与协议零感知偏差的存在(协议 VERSION 恒 4)。
@@ -23,6 +23,14 @@ object EffectiveSwitch {
         if (override.kinds.isNotEmpty()) {
             result = applyKinds(result, override.kinds)
         }
+        // V25 采集微调项叠加(与类别偏差同语义:非 null 即生效)
+        override.logStack?.let { result = result.copy(logStack = it) }
+        override.maxBytesPerField?.let { result = result.copy(maxBytesPerField = it) }
+        override.ignoreStackPrefixes?.takeIf { it.isNotEmpty() }?.let {
+            result = result.copy(ignoreStackPrefixes = it)
+        }
+        override.maxResultRows?.let { result = result.copy(maxResultRows = it) }
+        override.maxResultChars?.let { result = result.copy(maxResultChars = it) }
         return result
     }
 

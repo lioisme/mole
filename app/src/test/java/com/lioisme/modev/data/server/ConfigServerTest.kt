@@ -92,57 +92,6 @@ class ConfigServerTest {
     }
 
     @Test
-    fun `broadcast pushes global config to all connected clients`() {
-        var current = HookSwitch.DEFAULT
-        server.effectiveResolver = { current }
-        server.start()
-
-        // 两个客户端先后握手,均收到初始配置
-        val (s1, r1) = connect()
-        val w1 = writer(s1)
-        w1.write(WireCodec.hello("com.one.app", "com.one.app"))
-        w1.newLine()
-        w1.flush()
-        readConfigLine(r1)
-
-        val (s2, r2) = connect()
-        val w2 = writer(s2)
-        w2.write(WireCodec.hello("com.two.app", "com.two.app"))
-        w2.newLine()
-        w2.flush()
-        readConfigLine(r2)
-
-        // 全局变更:广播后两个客户端都应收到各自 resolve 后的新配置。
-        // 注意:任一客户端握手时,服务端已向全部客户端推送过配置(client1 在
-        // client2 握手时会再收到一份 DEFAULT 推送,缓冲中有残留),故验证循环
-        // 须等待「匹配新配置」的那条,而非首个 config 行。
-        current = HookSwitch.DEFAULT.copy(cipher = false, base64 = true)
-        server.broadcastEffectiveConfig()
-        for (reader in listOf(r1, r2)) {
-            var verified: Boolean? = null
-            val deadline = System.currentTimeMillis() + 5000
-            while (System.currentTimeMillis() < deadline && verified == null) {
-                val line =
-                    try {
-                        reader.readLine()
-                    } catch (e: java.net.SocketTimeoutException) {
-                        break
-                    } ?: break
-                val msg = WireCodec.parse(line)
-                if (msg?.type == WireProtocol.TYPE_CONFIG) {
-                    val switch = msg.payload?.get("switch")?.asJsonObject
-                    if (switch?.get("base64")?.asBoolean == true && switch?.get("cipher")?.asBoolean == false) {
-                        verified = true
-                    }
-                }
-            }
-            assertNotNull("client should receive broadcast config", verified)
-        }
-        s1.close()
-        s2.close()
-    }
-
-    @Test
     fun `hello with wrong token is rejected and connection closed`() {
         server.requireToken = "secret"
         server.start()

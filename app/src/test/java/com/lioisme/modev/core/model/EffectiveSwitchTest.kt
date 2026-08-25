@@ -1,5 +1,6 @@
 package com.lioisme.modev.core.model
 
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
@@ -155,5 +156,40 @@ class EffectiveSwitchTest {
         assertTrue(EffectiveSwitch.readKind(d, CryptoKind.CIPHER.name) == d.cipher)
         assertTrue(EffectiveSwitch.readKind(d, SqlKind.OPEN.name) == d.dbOpen)
         assertNull(EffectiveSwitch.readKind(d, "NOT_A_KIND"))
+    }
+
+    /** V25 采集微调项:非 null 即生效,null 位取默认。 */
+    @Test
+    fun `capture option deviations overlay onto default`() {
+        val effective = EffectiveSwitch.resolve(
+            d,
+            AppListenOverride(
+                logStack = false,
+                maxBytesPerField = 2048,
+                maxResultRows = 50,
+            ),
+        )
+        assertFalse(effective.logStack)
+        assertEquals(2048, effective.maxBytesPerField)
+        assertEquals(50, effective.maxResultRows)
+        // 未定制微调位取默认
+        assertEquals(d.maxResultChars, effective.maxResultChars)
+        assertEquals(d.ignoreStackPrefixes, effective.ignoreStackPrefixes)
+    }
+
+    @Test
+    fun `ignore stack prefixes replace as whole list`() {
+        val prefixes = listOf("com.example.crypto", "kotlin.")
+        val effective = EffectiveSwitch.resolve(
+            d,
+            AppListenOverride(ignoreStackPrefixes = prefixes),
+        )
+        assertEquals(prefixes, effective.ignoreStackPrefixes)
+    }
+
+    @Test
+    fun `option-only deviation is not default`() {
+        assertFalse(AppListenOverride(logStack = false).isDefault)
+        assertTrue(AppListenOverride(ignoreStackPrefixes = emptyList()).isDefault)
     }
 }

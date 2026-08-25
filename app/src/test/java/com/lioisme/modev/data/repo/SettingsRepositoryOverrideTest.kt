@@ -36,8 +36,6 @@ class SettingsRepositoryOverrideTest {
 
     private val gson = Gson()
 
-    private val global = HookSwitch.DEFAULT
-
     @Before
     fun setUp() {
         context = RuntimeEnvironment.getApplication()
@@ -118,36 +116,38 @@ class SettingsRepositoryOverrideTest {
     }
 
     @Test
-    fun `effectiveSwitch combines global and override`() = runBlocking {
+    fun `effectiveSwitch combines builtin default and override`() = runBlocking {
         val r = repo()
-        r.set(global.copy(cipher = false))
+        // V25:默认侧恒为内置推荐值(cipher 默认开),偏差仅来自该包自身
         r.setOverride(
             "com.target",
-            AppListenOverride(
-                cryptoListen = true,
-                kinds = mapOf(CryptoKind.CIPHER.name to true),
-            ),
+            AppListenOverride(kinds = mapOf(CryptoKind.CIPHER.name to false)),
         )
 
         val effective = r.effectiveSwitch("com.target")
-        assertTrue(effective.cipher)
-        // 未定制位取全局
-        assertEquals(global.messageDigest, effective.messageDigest)
-        // 其他应用无覆盖 → 纯全局
-        assertFalse(r.effectiveSwitch("com.other").cipher)
+        assertFalse(effective.cipher)
+        // 未定制位取内置默认
+        assertTrue(effective.messageDigest)
+        // 其他应用无偏差 → 纯默认
+        assertTrue(r.effectiveSwitch("com.other").cipher)
     }
 
     @Test
-    fun `effectiveSwitchFlow re-emits on global change`() = runBlocking {
+    fun `effectiveSwitchFlow re-emits on override changes and resets after removal`() = runBlocking {
         val r = repo()
         r.setOverride("com.target", AppListenOverride(kinds = mapOf(CryptoKind.MAC.name to false)))
 
         val before = r.effectiveSwitchFlow("com.target").first()
         assertFalse(before.mac)
 
-        r.set(global.copy(mac = false, cipher = false))
+        // 追加第二项偏差后流重发射(两项同时生效)
+        r.setOverride("com.target", AppListenOverride(kinds = mapOf(CryptoKind.MAC.name to false, CryptoKind.CIPHER.name to false)))
         val after = r.effectiveSwitchFlow("com.target").first()
         assertFalse(after.mac)
-        assertFalse(after.cipher) // 默认配置变更传导到未定制位
+        assertFalse(after.cipher)
+
+        // 恢复默认 → 回落纯内置默认
+        r.removeOverride("com.target")
+        assertEquals(HookSwitch.DEFAULT, r.effectiveSwitchFlow("com.target").first())
     }
 }

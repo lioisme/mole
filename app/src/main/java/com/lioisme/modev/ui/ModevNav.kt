@@ -34,12 +34,8 @@ import com.lioisme.modev.ui.records.AlgorithmRecordsScreen
 import com.lioisme.modev.ui.records.DatabaseRecordsScreen
 import com.lioisme.modev.ui.records.RecordsViewModelFactory
 import com.lioisme.modev.ui.settings.AboutScreen
-import com.lioisme.modev.ui.settings.AlgorithmSettingsScreen
-import com.lioisme.modev.ui.settings.AlgorithmSettingsViewModelFactory
 import com.lioisme.modev.ui.settings.DataSettingsScreen
 import com.lioisme.modev.ui.settings.DataSettingsViewModelFactory
-import com.lioisme.modev.ui.settings.DatabaseSettingsScreen
-import com.lioisme.modev.ui.settings.DatabaseSettingsViewModelFactory
 import com.lioisme.modev.ui.settings.DiagnosticsScreen
 import com.lioisme.modev.ui.settings.DiagnosticsViewModelFactory
 import com.lioisme.modev.ui.settings.LicenseDetailScreen
@@ -228,12 +224,6 @@ fun ModevNavHost(navController: NavHostController) {
                 SettingsScreen(
                     viewModel = viewModel(factory = SettingsViewModelFactory(app.container)),
                     onBack = { navController.popGuarded() },
-                    onOpenAlgorithmSettings = {
-                        navController.navigateGuarded(ModevRoutes.ALGORITHM_SETTINGS)
-                    },
-                    onOpenDatabaseSettings = {
-                        navController.navigateGuarded(ModevRoutes.DATABASE_SETTINGS)
-                    },
                     onOpenDataSettings = {
                         navController.navigateGuarded(ModevRoutes.DATA_SETTINGS)
                     },
@@ -279,22 +269,6 @@ fun ModevNavHost(navController: NavHostController) {
                     index = index,
                     onBack = { navController.popGuarded() },
                     onInvalid = { navController.popGuarded() },
-                )
-            }
-        }
-        slideComposable(route = ModevRoutes.ALGORITHM_SETTINGS) {
-            BackGuarded(navController) {
-                AlgorithmSettingsScreen(
-                    viewModel = viewModel(factory = AlgorithmSettingsViewModelFactory(app.container)),
-                    onBack = { navController.popGuarded() },
-                )
-            }
-        }
-        slideComposable(route = ModevRoutes.DATABASE_SETTINGS) {
-            BackGuarded(navController) {
-                DatabaseSettingsScreen(
-                    viewModel = viewModel(factory = DatabaseSettingsViewModelFactory(app.container)),
-                    onBack = { navController.popGuarded() },
                 )
             }
         }
