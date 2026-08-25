@@ -42,40 +42,23 @@
     <string name="algorithm_records_search">Search algorithm records…</string>
     <string name="database_records_search">Search database records…</string>
 
-    <!-- All records (V23 global unified records) -->
-    <string name="records_all_title">All records</string>
-    <string name="records_all_search">Search all records…</string>
-    <string name="filter_type_all">All types</string>
+    <string name="monitor_records_caption">All records</string>
     <string name="filter_type_crypto">Crypto</string>
     <string name="filter_type_database">Database</string>
-    <string name="filter_apps_any">Apps</string>
-    <plurals name="filter_apps_selected">
-        <item quantity="one">%1$d app selected</item>
-        <item quantity="other">%1$d apps selected</item>
-    </plurals>
-    <string name="cd_filter_apps">Filter by app</string>
-    <string name="cd_records_all">View all records</string>
-    <string name="app_picker_title">Select apps</string>
-    <string name="app_picker_search">Search package name…</string>
-    <string name="app_picker_clear">Clear</string>
-    <string name="app_picker_done">Done</string>
 
     <string name="detail_empty">No records yet</string>
     <string name="section_monitor_kinds">Monitor Kinds</string>
     <string name="app_monitor_scope_row">Monitor this app</string>
     <string name="listen_settings_entry">Listen settings</string>
-    <string name="listen_settings_follow_global">Follow global</string>
+    <string name="listen_summary_default">Uses default configuration</string>
     <plurals name="listen_settings_custom_n">
-        <item quantity="one">%1$d override</item>
-        <item quantity="other">%1$d overrides</item>
+        <item quantity="one">%1$d item customized</item>
+        <item quantity="other">%1$d items customized</item>
     </plurals>
     <string name="app_monitor_actions_section">Actions</string>
-    <string name="listen_settings_hint">Kinds not overridden follow the global settings; changes apply instantly to this app</string>
-    <string name="tri_inherit">Follow global</string>
-    <string name="tri_on">Force on</string>
-    <string name="tri_off">Force off</string>
-    <string name="listen_reset_action">Reset to global settings</string>
-    <string name="danger_reset_listen_msg">Remove all listen overrides for %1$s? The app will fall back to global settings.</string>
+    <string name="listen_settings_hint">Every switch starts from the default configuration. Toggling creates a custom setting for this app and applies instantly.</string>
+    <string name="listen_reset_action">Restore default configuration</string>
+    <string name="danger_reset_listen_msg">Restore all listen settings for %1$s to the default configuration?</string>
     <string name="section_record_options">Record Options</string>
     <string name="algorithm_monitor_master">Enable Algorithm Listen</string>
     <string name="algorithm_monitor_master_hint">Global switch; per-kind switches keep their state</string>
@@ -179,7 +162,6 @@
     <string name="export_too_large">Record too large to export (%1$d chars)</string>
     <string name="meta_kind">Kind</string>
     <string name="meta_operation">Operation</string>
-    <string name="meta_time">Time</string>
     <string name="meta_context">Context</string>
     <string name="meta_direction">Direction</string>
     <string name="meta_provider">Provider</string>
@@ -190,7 +172,6 @@
     <string name="verify_fail">✗ failed</string>
 
     <!-- Record detail zones (V20: 数据关系可视化分区) -->
-    <string name="meta_algorithm">Algorithm</string>
     <string name="section_zone_data_flow">Data Flow</string>
     <string name="section_zone_key_material">Key Material</string>
     <string name="cd_flow">Data flow</string>
@@ -282,7 +263,6 @@
         <item quantity="one">%1$d affected</item>
         <item quantity="other">%1$d affected</item>
     </plurals>
-    <string name="meta_db_name">Database</string>
     <string name="meta_db_path">Path</string>
     <string name="meta_thread">Thread</string>
     <string name="meta_rows">Rows</string>

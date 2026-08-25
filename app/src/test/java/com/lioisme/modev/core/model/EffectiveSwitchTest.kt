@@ -1,125 +1,125 @@
 package com.lioisme.modev.core.model
 
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * EffectiveSwitch 三态继承解析全分支(V23 D1):
- * 总开关联动、类别覆盖映射、INHERIT 传导、未知 kind 忽略、零拷贝短路。
+ * 二态偏差解析契约(V24):
+ * - null/零偏差零拷贝回传默认配置;
+ * - 总开关与类别显式位强制生效,未定制位取默认值;
+ * - 未知 kind 忽略(存储漂移兜底);master OFF 抑制一切算法捕获;
+ * - [EffectiveSwitch.readKind] 与写入映射互逆(设置页行值回显契约)。
  */
 class EffectiveSwitchTest {
 
-    private val global = HookSwitch.DEFAULT
+    private val d = HookSwitch.DEFAULT
 
     @Test
     fun `null override returns same instance`() {
-        assertSame(global, EffectiveSwitch.resolve(global, null))
+        assertSame(d, EffectiveSwitch.resolve(d, null))
     }
 
     @Test
-    fun `default override returns same instance`() {
-        assertSame(global, EffectiveSwitch.resolve(global, AppListenOverride.DEFAULT))
+    fun `zero-deviation override returns same instance`() {
+        assertSame(d, EffectiveSwitch.resolve(d, AppListenOverride.DEFAULT))
     }
 
     @Test
-    fun `crypto master ON forces enabled when global disabled`() {
-        val g = global.copy(cryptoListen = false)
-        val effective = EffectiveSwitch.resolve(
-            g,
-            AppListenOverride(cryptoListen = TriState.ON),
+    fun `master deviation forces value over default`() {
+        val off = EffectiveSwitch.resolve(
+            d.copy(cryptoListen = true),
+            AppListenOverride(cryptoListen = false),
         )
-        assertTrue(effective.cryptoListen)
-        // 未覆盖位保持全局原值
-        assertEquals(g.dbListen, effective.dbListen)
+        assertFalse(off.cryptoListen)
+
+        val on = EffectiveSwitch.resolve(
+            d.copy(cryptoListen = false),
+            AppListenOverride(cryptoListen = true),
+        )
+        assertTrue(on.cryptoListen)
+        assertTrue(on.anyCryptoEnabled)
     }
 
     @Test
-    fun `db master OFF forces disabled when global enabled`() {
+    fun `db master deviation forces value over default`() {
         val effective = EffectiveSwitch.resolve(
-            global,
-            AppListenOverride(dbListen = TriState.OFF),
+            d.copy(dbListen = true),
+            AppListenOverride(dbListen = false),
         )
         assertFalse(effective.dbListen)
-        assertEquals(global.cryptoListen, effective.cryptoListen)
+        assertFalse(effective.anyDbEnabled)
     }
 
     @Test
-    fun `kind override maps crypto field`() {
+    fun `kind deviation overrides default bit`() {
         val effective = EffectiveSwitch.resolve(
-            global,
-            AppListenOverride(kindOverrides = mapOf(CryptoKind.CIPHER.name to TriState.OFF)),
+            d,
+            AppListenOverride(kinds = mapOf(CryptoKind.CIPHER.name to false)),
         )
         assertFalse(effective.cipher)
-        assertTrue(effective.enabled(CryptoKind.MESSAGE_DIGEST))
-        assertFalse(effective.enabled(CryptoKind.CIPHER))
+        // 未定制位取默认
+        assertTrue(effective.messageDigest)
+        // master 未动 → 投影仍可达
+        assertTrue(effective.anyCryptoEnabled)
     }
 
     @Test
-    fun `kind override maps sql field`() {
+    fun `sql kind deviation overrides default bit`() {
         val effective = EffectiveSwitch.resolve(
-            global,
-            AppListenOverride(kindOverrides = mapOf(SqlKind.DML.name to TriState.ON)),
+            d,
+            AppListenOverride(kinds = mapOf(SqlKind.DML.name to true, SqlKind.OPEN.name to true)),
         )
         assertTrue(effective.dbDml)
-        assertTrue(effective.dbEnabled(SqlKind.DML))
-        // 未覆盖 SQL 类别取全局默认(dbOpen 默认 false)
-        assertFalse(effective.dbEnabled(SqlKind.OPEN))
+        assertTrue(effective.dbOpen)
+        assertEqualsDefaultDbRest(effective)
+    }
+
+    private fun assertEqualsDefaultDbRest(effective: HookSwitch) {
+        assertFalse(effective.dbTransaction)
+        assertTrue(effective.dbQuery)
+        assertTrue(effective.dbExec)
     }
 
     @Test
-    fun `unknown kind name is ignored`() {
+    fun `unknown kind name ignored without garbage propagation`() {
         val effective = EffectiveSwitch.resolve(
-            global,
-            AppListenOverride(
-                kindOverrides = mapOf("NOT_A_KIND" to TriState.OFF, CryptoKind.MAC.name to TriState.OFF),
-            ),
+            d,
+            AppListenOverride(kinds = mapOf("NOT_A_KIND" to false, CryptoKind.MAC.name to false)),
         )
         assertFalse(effective.mac)
-        // 其余字段不受垃圾键影响
-        assertEquals(global, effective.copy(mac = true))
+        // 其余位不受垃圾键影响
+        assertTrue(effective.cipher)
+        assertTrue(effective.messageDigest)
     }
 
     @Test
-    fun `inherit kind entries are no-op`() {
+    fun `multiple deviations apply together over modified default`() {
+        val modifiedDefault = d.copy(cipher = false, mac = false, dbDml = false)
         val effective = EffectiveSwitch.resolve(
-            global,
+            modifiedDefault,
             AppListenOverride(
-                kindOverrides = mapOf(CryptoKind.CIPHER.name to TriState.INHERIT),
-            ),
-        )
-        assertEquals(global, effective)
-    }
-
-    @Test
-    fun `override wins over global for same kind`() {
-        val g = global.copy(cipher = false, dbDml = false)
-        val effective = EffectiveSwitch.resolve(
-            g,
-            AppListenOverride(
-                kindOverrides = mapOf(
-                    CryptoKind.CIPHER.name to TriState.ON,
-                    SqlKind.DML.name to TriState.ON,
+                kinds = mapOf(
+                    CryptoKind.CIPHER.name to true,
+                    SqlKind.DML.name to true,
                 ),
             ),
         )
         assertTrue(effective.cipher)
         assertTrue(effective.dbDml)
+        // 未定制偏差位保持默认配置当前值(false)
+        assertFalse(effective.mac)
     }
 
     @Test
-    fun `master OFF still suppresses kinds forced on`() {
-        // HookSwitch.enabled 语义:总开关 false 时类别恒停用 —— 覆盖不破坏该语义
+    fun `master off suppresses forced-on kind projection`() {
         val effective = EffectiveSwitch.resolve(
-            global,
-            AppListenOverride(
-                cryptoListen = TriState.OFF,
-                kindOverrides = mapOf(CryptoKind.CIPHER.name to TriState.ON),
-            ),
+            d,
+            AppListenOverride(cryptoListen = false, kinds = mapOf(CryptoKind.CIPHER.name to true)),
         )
-        assertTrue(effective.cipher)
+        assertFalse(effective.cryptoListen)
         assertFalse(effective.anyCryptoEnabled)
         assertFalse(effective.enabled(CryptoKind.CIPHER))
     }
@@ -127,12 +127,33 @@ class EffectiveSwitchTest {
     @Test
     fun `derived flags follow resolved result`() {
         val effective = EffectiveSwitch.resolve(
-            global,
-            AppListenOverride(
-                dbListen = TriState.ON,
-                kindOverrides = mapOf(SqlKind.OPEN.name to TriState.ON),
-            ),
+            d,
+            AppListenOverride(dbListen = true, kinds = mapOf(SqlKind.OPEN.name to true)),
         )
+        assertTrue(effective.dbEnabled(SqlKind.OPEN))
         assertTrue(effective.anyDbEnabled)
+    }
+
+    /** 全类别不变量:全部类别按各自默认值取反定制后,解析回读 == 显式偏差(读写映射互逆)。 */
+    @Test
+    fun `readKind invariant holds for every taxonomy kind`() {
+        val flipped = CategoryTaxonomy.all().associate {
+            it.id to !(EffectiveSwitch.readKind(d, it.id) ?: true)
+        }
+        val effective = EffectiveSwitch.resolve(d, AppListenOverride(kinds = flipped))
+        for (category in CategoryTaxonomy.all()) {
+            org.junit.Assert.assertEquals(
+                "kind=" + category.id,
+                flipped[category.id],
+                EffectiveSwitch.readKind(effective, category.id),
+            )
+        }
+    }
+
+    @Test
+    fun `readKind returns field values and null for unknown id`() {
+        assertTrue(EffectiveSwitch.readKind(d, CryptoKind.CIPHER.name) == d.cipher)
+        assertTrue(EffectiveSwitch.readKind(d, SqlKind.OPEN.name) == d.dbOpen)
+        assertNull(EffectiveSwitch.readKind(d, "NOT_A_KIND"))
     }
 }

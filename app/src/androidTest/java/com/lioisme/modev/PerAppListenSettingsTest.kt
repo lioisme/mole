@@ -1,7 +1,10 @@
 package com.lioisme.modev
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertIsOff
+import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onFirst
@@ -12,23 +15,24 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
-import com.lioisme.modev.core.model.TriState
+import com.lioisme.modev.core.model.AppListenOverride
+import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.ui.MainActivity
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 每应用监听设置页验收(V23 G3/T5.3,三态继承):
- * - 17 类别 + 双总开关三态行渲染(行尾态文本「跟随全局」初始态);
- * - 点击类别行 → 弹三态 sheet → 选「强制开」→ 行尾值即时更新且持久化
- *   (SP 读回验证,注入侧推送链路由 ConfigServerOverrideTest 覆盖);
- * - 重置 → 确认对话框 → 覆盖删除回落「跟随全局」。
+ * 每应用监听设置页验收(V24 G1 二态偏差模型):
+ * - 行内 M3 Switch 直接承载有效配置值(未定制行 = 默认配置位);
+ * - 单击整行切换即持久化显式偏差(SP 读回验证;推送链路由 ConfigServerOverrideTest 覆盖);
+ * - 「恢复默认配置」行仅在存在自定义时出现;确认后删除偏差回落纯默认配置。
  */
 @RunWith(AndroidJUnit4::class)
 class PerAppListenSettingsTest {
@@ -48,7 +52,7 @@ class PerAppListenSettingsTest {
     @Before
     fun setUp() {
         // 自身是模块默认隐藏:开显隐使详情页入口可达(@After 复位)。
-        com.lioisme.modev.data.repo.AppListSettings.setShowModules(true)
+        AppListSettings.setShowModules(true)
         runBlocking { settings().removeOverride(ownPackage) }
         rule.waitForIdle()
     }
@@ -56,7 +60,7 @@ class PerAppListenSettingsTest {
     @After
     fun tearDown() {
         runBlocking { settings().removeOverride(ownPackage) }
-        com.lioisme.modev.data.repo.AppListSettings.setShowModules(false)
+        AppListSettings.setShowModules(false)
     }
 
     private fun openListenSettings() {
@@ -85,53 +89,65 @@ class PerAppListenSettingsTest {
         rule.onNodeWithText(str(R.string.listen_settings_hint)).assertIsDisplayed()
     }
 
-    @Test
-    fun triStateRows_render_andPersistSelection() {
-        openListenSettings()
-
-        // CIPHER 行初始为「跟随全局」。
-        val rowTag = "tri-row-CIPHER"
-        rule.onNodeWithTag(rowTag).performScrollTo().assertIsDisplayed()
-
-        // 打开三态 sheet 并选「强制关」→ 行尾值更新 + SP 持久化
-        // (初始 INHERIT 态下 sheet 内 tri_off 文本唯一,可直接定位)。
-        rule.onNodeWithTag(rowTag).performClick()
-        rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.tri_off)).performClick()
-        rule.waitForIdle()
-
-        runBlocking {
-            val stored = settings().overrideFor(ownPackage)
-            assertEquals(TriState.OFF, stored.kindOverrides["CIPHER"])
-            // 行尾值即时回显(有覆盖 → primary 态文本)。
-            assertEquals(
-                str(R.string.tri_off),
-                stored.kindOverrides["CIPHER"]?.let { ctx.getString(R.string.tri_off) },
-            )
+    /** 异步写链路轮询:VM 协程落盘后断言存储态(无 waitUntil,手写截止时间循环)。 */
+    private fun awaitPersisted(assertion: (AppListenOverride) -> Boolean) {
+        val deadline = System.currentTimeMillis() + 5_000
+        var last: AppListenOverride = AppListenOverride.DEFAULT
+        while (System.currentTimeMillis() < deadline) {
+            rule.waitForIdle()
+            last = runBlocking { settings().overrideFor(ownPackage) }
+            if (assertion(last)) return
+            Thread.sleep(100)
         }
+        throw AssertionError("偏差未在期限内持久化:kinds=" + last.kinds)
     }
 
     @Test
-    fun reset_removesAllOverrides() {
+    fun switchRows_renderEffectiveValue_andPersistToggle() {
         openListenSettings()
 
-        // 预置一项覆盖(VM 流热更,当前已在监听设置页,直接操作重置)。
+        // CIPHER 默认配置为启用:初始行呈开态。
+        val rowTag = "listen-row-CIPHER"
+        rule.onNodeWithTag(rowTag).performScrollTo().assertIsDisplayed().assertIsOn()
+
+        // 单击整行 → 显式停用偏差持久化 + 行值即时翻转。
+        rule.onNodeWithTag(rowTag).performClick()
+        awaitPersisted { it.kinds["CIPHER"] == false }
+        rule.onNodeWithTag(rowTag).assertIsOff()
+
+        // 再单击 → 回到启用(显式 true 偏差仍存在,非删键)。
+        rule.onNodeWithTag(rowTag).performClick()
+        awaitPersisted { it.kinds["CIPHER"] == true }
+        rule.onNodeWithTag(rowTag).assertIsOn()
+    }
+
+    @Test
+    fun resetRow_visibilityFollowsCustomization_andRestoreClearsAll() {
+        openListenSettings()
+
+        // 未定制:恢复默认行不存在(降噪契约)。
+        assertTrue(
+            "零偏差时不得渲染恢复默认行",
+            rule.onAllNodes(hasTestTag("listen-reset")).fetchSemanticsNodes().isEmpty(),
+        )
+
+        // 预置一项总开关偏差 → 行出现;确认对话框后回落纯默认配置且行消失。
         runBlocking {
-            settings().setOverride(
-                ownPackage,
-                com.lioisme.modev.core.model.AppListenOverride(cryptoListen = TriState.OFF),
-            )
+            settings().setOverride(ownPackage, AppListenOverride(cryptoListen = false))
         }
         rule.waitForIdle()
-        rule.onNodeWithTag("listen-reset").performScrollTo()
-        rule.onNodeWithTag("listen-reset").performClick()
+        val resetRow = rule.onNodeWithTag("listen-reset").performScrollTo()
+        resetRow.assertIsDisplayed()
+        resetRow.performClick()
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.confirm)).performClick()
-        rule.waitForIdle()
 
-        runBlocking {
-            assertEquals(true, settings().overrideFor(ownPackage).isDefault)
-        }
+        awaitPersisted { it.isDefault }
+        rule.waitForIdle()
+        assertTrue(
+            "恢复默认后该行应消失",
+            rule.onAllNodes(hasTestTag("listen-reset")).fetchSemanticsNodes().isEmpty(),
+        )
     }
 
     private fun str(id: Int) = ctx.getString(id)

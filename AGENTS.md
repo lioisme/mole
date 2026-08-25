@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名/密钥/BASE64/WebView)+ 宿主双进程日志。
-构建与质量契约(2026-08-20 审计沉淀,V21)。
+构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀)。
 
 ## 构建 / 测试(Windows,gradlew.bat)
 
@@ -39,6 +39,8 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 | 运行中 Running | 进程存活态 | 在线 Online |
 | 已作用域 / 未作用域 | Hook 作用域态 | 在作用域 / 未在作用域 |
 | 已接收 / 丢弃 / 被拒 / 写入失败 / 超容量裁剪 | 统计区文案(原因括号后缀) | 队列溢出丢弃等 |
+| 默认配置 | `switch_global`(未定制应用的有效配置来源) | 全局设置(联动语义)、跟随全局 |
+| 自定义偏差 / 恢复默认 | 每应用二态覆盖(V24)与清除动作 | 覆盖=三态、强制开/关、重置为全局 |
 
 ## 强约束(改了会挂测试/降级质量)
 
@@ -150,25 +152,31 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
     (无需额外 onLoadAround 接线);`enablePlaceholders=false` 时
     `itemCount` = 已加载数。分页翻页验证须种子数据 > 2 页(如 120 条),
     否则分页路径永不触达(旧测试盲区)。
-16. **三态继承每应用监听(V23)**:覆盖模型 =
-    `TriState{INHERIT,ON,OFF}` + `AppListenOverride`(总开关×2 + 类别×17
-    逐项三态),`EffectiveSwitch.resolve(global, override)` 产出普通
-    `HookSwitch` —— wire 协议/注入侧**零感知** TriState(VERSION 恒 4);
-    存储 = 每包一键 `override_{pkg}`(`ConfigKeys.OVERRIDE_PREFIX`,
-    与 V10 已清理的 `switch_{pkg}` 隔离),惰性创建、全 INHERIT 即删键;
-    覆盖键读本地权威(`getLocal`,只由宿主写),全局键维持读优先远程;
-    下发 = ConfigServer per-session resolve(`effectiveResolver` 回调 +
-    `pushToPackage(pkg)` 定向推送;全局变更 `broadcastEffectiveConfig()`
-    对每会话各自 resolve,**禁止恢复「同一份广播全量」**——会冲刷已覆盖
-    应用的有效配置);注入侧兜底(HookInstaller)直读 `switch_global` +
-    `override_{pkg}` 后 resolve;测试种子数据 hook 开关默认值见 V18
-    (dbOpen 等噪点类别默认关),集成测试 setUp 须显式开。
-17. **统一记录页与列表收敛(V23)**:全部记录浏览走 `records/all`
-    (`GlobalRecordsScreen`,入口仅应用列表顶栏);三页共享
-    `RecordTimelineList` + `RecordsViewModel`(presetTypes/presetPackages
-    锁定单应用语境);D6:类别筛选仅在生效记录类型唯一时可选
-    (`KindFilterMenu(enabled=...)`,VM `buildFilter` 归一化兜底),
-    类型切换自动失效已选类别。
+16. **二态偏差每应用监听(V24)**:有效配置 = 默认配置(`switch_global`,由
+    通用设置算法/数据库两页编辑)⊕ 该应用稀疏二态偏差;模型 =
+    `AppListenOverride(cryptoListen/dbListen: Boolean?, kinds: Map<String,Boolean>)`,
+    null/缺条目 = 取默认,**无第三态**;`EffectiveSwitch.resolve(default, o)`
+    产出普通 `HookSwitch` —— wire 协议/注入侧零感知(VERSION 恒 4);
+    `readKind`/applyKinds 为读写互逆映射,新增类别必须同步双端;
+    存储 = 每包一键 `override_{pkg}`,惰性创建、零偏差即删键;
+    JSON 兼容 V23 三态遗留(`"ON"/"OFF"` + `kindOverrides` 键名容忍解析,
+    写入恒为新格式);覆盖键读本地权威(`getLocal`),默认键读优先远程;
+    下发 = ConfigServer per-session resolve(`effectiveResolver` +
+    `pushToPackage` 定向推送;默认配置变更 `broadcastEffectiveConfig()`
+    对每会话各自 resolve,**禁止恢复「同一份广播全量」**);注入侧兜底
+    (HookInstaller)直读两键后 resolve。设置页 = 行内 M3 Switch
+    (`listen-row-*` testTag,整行 toggleable + 内层 Switch clearAndSetSemantics),
+    单击即写即推;「恢复默认配置」行仅在有偏差时渲染(testTag
+    `listen-reset`,副标题 plurals `listen_settings_custom_n`);
+    测试种子 hook 开关默认值见 V18(dbOpen 等噪点类别默认关),集成测试
+    setUp 须显式开。
+17. **记录浏览收敛(V24)**:`records/all`(GlobalRecordsScreen)V24 退役,
+    记录浏览 = 每应用两列表(`records/algorithm|database`,
+    `RecordsViewModelFactory(recordType, packageName)` 预设必传非空,
+    VM 可变面仅 query/kindName,`totalCount` 留作对账面);
+    详情页锚点芯片与分区头同文案——插桩断言一律
+    `onAllNodesWithText(...).onFirst()` 多节点安全形态,禁裸
+    `onNodeWithText(<区块标题>)`。
 18. **解耦契约(V23 R4)**:`PackageBoundaryTest` 新增规则——ui 子树禁
     import `data.db.*`(存储细节由仓库出口承担,如存储占用 =
     `LogRepository.storageUsage()`,DB+wal+shm 三文件和);UI 变更

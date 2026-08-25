@@ -32,7 +32,6 @@ import com.lioisme.modev.ui.navigation.popWhenReady
 import com.lioisme.modev.ui.navigation.slideComposable
 import com.lioisme.modev.ui.records.AlgorithmRecordsScreen
 import com.lioisme.modev.ui.records.DatabaseRecordsScreen
-import com.lioisme.modev.ui.records.GlobalRecordsScreen
 import com.lioisme.modev.ui.records.RecordsViewModelFactory
 import com.lioisme.modev.ui.settings.AboutScreen
 import com.lioisme.modev.ui.settings.AlgorithmSettingsScreen
@@ -50,7 +49,8 @@ import com.lioisme.modev.ui.settings.SettingsViewModelFactory
 
 /**
  * 单栈导航宿主(2026-08-16 V4,五界面收敛;2026-08-17 V10 设置分级;V18 应用监听入口;
- * V19 T4 监听设置合并;V20 记录列表单应用语境化 + 「查看记录」界面退役):
+ * V19 T4 监听设置合并;V20 记录列表单应用语境化 + 「查看记录」界面退役;
+ * V24 G2 records/all 退役,记录浏览收敛为每应用两列表):
  * 信息架构 = 应用列表(根页) → 应用监听入口(应用头部 + 算法记录 / 数据库记录)
  * → 记录详情;
  * 设置页 = 通用设置,入口 = 应用列表搜索条左上角设置按钮;二级设置页(算法监听 /
@@ -108,9 +108,6 @@ fun ModevNavHost(navController: NavHostController) {
                 },
                 onOpenSettings = {
                     navController.navigateGuarded(ModevRoutes.SETTINGS)
-                },
-                onOpenRecords = {
-                    navController.navigateGuarded(ModevRoutes.RECORDS_ALL)
                 },
             )
         }
@@ -179,20 +176,6 @@ fun ModevNavHost(navController: NavHostController) {
                         factory = RecordDetailViewModelFactory(recordId, app.container),
                     ),
                     onBack = { navController.popGuarded() },
-                )
-            }
-        }
-        slideComposable(route = ModevRoutes.RECORDS_ALL) {
-            BackGuarded(navController) {
-                GlobalRecordsScreen(
-                    viewModel = viewModel(
-                        key = "records-all",
-                        factory = RecordsViewModelFactory(null, null, app.container),
-                    ),
-                    onBack = { navController.popGuarded() },
-                    onOpenRecord = { id ->
-                        navController.navigateGuarded(ModevRoutes.recordDetail(id))
-                    },
                 )
             }
         }

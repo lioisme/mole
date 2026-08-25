@@ -67,7 +67,6 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.SqlKind
-import com.lioisme.modev.core.model.TriState
 import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.ui.common.StatusSemantic
 import com.lioisme.modev.ui.common.connectionStatus
@@ -397,7 +396,7 @@ private fun StatsCard(
                 color = MaterialTheme.colorScheme.onSurface,
             )
             Text(
-                stringResource(R.string.records_all_title),
+                stringResource(R.string.monitor_records_caption),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -538,17 +537,17 @@ private fun countText(count: Long): String {
 }
 
 /**
- * 「监听设置」摘要(V23 G3):无覆盖 → 「跟随全局」;
- * 有覆盖 → 「自定义 N 项」(N = 总开关覆盖数 + 类别覆盖数)。
+ * 「监听设置」摘要(V24 G3):未定制 → 「使用默认配置」;
+ * 有自定义 → 「N 项已自定义」(N = 总开关偏差数 + 类别偏差数)。
  */
 @Composable
 private fun listenSummary(override: AppListenOverride): String {
     if (override.isDefault) {
-        return stringResource(R.string.listen_settings_follow_global)
+        return stringResource(R.string.listen_summary_default)
     }
-    val n = (if (override.cryptoListen != TriState.INHERIT) 1 else 0) +
-        (if (override.dbListen != TriState.INHERIT) 1 else 0) +
-        override.kindOverrides.size
+    val n = (if (override.cryptoListen != null) 1 else 0) +
+        (if (override.dbListen != null) 1 else 0) +
+        override.kinds.size
     // 复数契约 6:计数文案走 plurals(one/other;zh 仅 other)。
     return pluralStringResource(R.plurals.listen_settings_custom_n, n, n)
 }

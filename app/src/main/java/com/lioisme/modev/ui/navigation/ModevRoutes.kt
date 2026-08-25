@@ -6,7 +6,8 @@ import android.net.Uri
  * 路由常量与参数编解码单一事实源(2026-08-17 V10 设置分级;
  * 2026-08-18 V14 R5 更名;V18 应用监听入口;V19 T4 监听设置合并;
  * V20 记录列表单应用语境化,「查看记录」界面退役;
- * V21 T3 监听设置拆分还原;V22 R2 新增关于页 / 开源许可页):
+ * V21 T3 监听设置拆分还原;V22 R2 新增关于页 / 开源许可页;
+ * V24 G2 全部记录页(records/all)退役,记录浏览收敛为每应用两列表):
  * APPS(根页) → APP_MONITOR(每应用监听入口:算法记录 / 数据库记录)
  * → RECORD_DETAIL(每条记录);
  * SETTINGS → ALGORITHM_SETTINGS(算法监听)/ DATABASE_SETTINGS(数据库监听)
@@ -31,9 +32,7 @@ object ModevRoutes {
     const val LICENSE_DETAIL = "settings/licenses/{index}"
     const val ALGORITHM_RECORDS = "records/algorithm/{packageName}"
     const val DATABASE_RECORDS = "records/database/{packageName}"
-    /** 全局统一记录页(V23):无参数,跨应用跨类型。 */
-    const val RECORDS_ALL = "records/all"
-    /** 每应用监听设置页(V23 三态继承)。 */
+    /** 每应用监听设置页(V24 二态偏差)。 */
     const val APP_LISTEN_SETTINGS = "apps/{packageName}/listen-settings"
 
     fun appMonitor(packageName: String): String = "apps/${enc(packageName)}/monitor"

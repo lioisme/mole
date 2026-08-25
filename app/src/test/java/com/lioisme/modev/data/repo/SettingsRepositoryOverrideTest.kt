@@ -7,7 +7,6 @@ import com.lioisme.modev.core.model.ConfigKeys
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.SqlKind
-import com.lioisme.modev.core.model.TriState
 import com.lioisme.modev.data.server.ConfigServer
 import java.net.ServerSocket
 import kotlinx.coroutines.flow.first
@@ -24,8 +23,8 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * 单应用监听覆盖持久化契约(V23 D2):每包一键 `override_{pkg}` 双写、
- * 全默认即删键、init 预载、旧 `switch_{pkg}` 键隔离(不误吞)、effective 解析联动。
+ * 单应用监听自定义持久化契约(V24 D2):每包一键 `override_{pkg}` 双写、
+ * 零偏差即删键、init 预载、旧 `switch_{pkg}` 键隔离(不误吞)、effective 解析联动。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -63,7 +62,7 @@ class SettingsRepositoryOverrideTest {
     fun `setOverride persists per-package key and exposes memory state`() = runBlocking {
         val r = repo()
         val override = AppListenOverride(
-            kindOverrides = mapOf(CryptoKind.CIPHER.name to TriState.OFF),
+            kinds = mapOf(CryptoKind.CIPHER.name to false),
         )
 
         r.setOverride("com.target", override)
@@ -78,9 +77,9 @@ class SettingsRepositoryOverrideTest {
     @Test
     fun `setOverride with default removes stored key`() = runBlocking {
         val r = repo()
-        r.setOverride("com.target", AppListenOverride(kindOverrides = mapOf(CryptoKind.CIPHER.name to TriState.OFF)))
+        r.setOverride("com.target", AppListenOverride(kinds = mapOf(CryptoKind.CIPHER.name to false)))
 
-        // 覆盖被清空为全 INHERIT:等价删除存储键(避免键膨胀)
+        // 偏差被清空为零偏差:等价删除存储键(避免键膨胀)
         r.setOverride("com.target", AppListenOverride.DEFAULT)
 
         assertFalse(prefs.contains(ConfigKeys.overrideKey("com.target")))
@@ -90,7 +89,7 @@ class SettingsRepositoryOverrideTest {
     @Test
     fun `removeOverride deletes key and resets to global semantics`() = runBlocking {
         val r = repo()
-        r.setOverride("com.target", AppListenOverride(cryptoListen = TriState.OFF))
+        r.setOverride("com.target", AppListenOverride(cryptoListen = false))
 
         r.removeOverride("com.target")
 
@@ -103,7 +102,7 @@ class SettingsRepositoryOverrideTest {
         prefs.edit()
             .putString(
                 ConfigKeys.overrideKey("com.a"),
-                AppListenOverride(dbListen = TriState.OFF).toJson(gson),
+                AppListenOverride(dbListen = false).toJson(gson),
             )
             .putString(ConfigKeys.overrideKey("com.b"), "{broken")
             .putString("switch_com.c", "{}") // 旧全局前缀键:与本特性隔离,不被预载
@@ -111,11 +110,11 @@ class SettingsRepositoryOverrideTest {
 
         val r = repo()
 
-        assertEquals(AppListenOverride(dbListen = TriState.OFF), r.overrideFor("com.a"))
+        assertEquals(AppListenOverride(dbListen = false), r.overrideFor("com.a"))
         assertTrue(r.overrideFor("com.b").isDefault)
         assertTrue(r.overrideFor("com.c").isDefault)
         // 旧 switch_{pkg} 键不受 override 特性影响(migrateLegacy 清理属既有行为,断言仅关注互不干扰)
-        assertEquals(mapOf("com.a" to AppListenOverride(dbListen = TriState.OFF)), r.overrides.value)
+        assertEquals(mapOf("com.a" to AppListenOverride(dbListen = false)), r.overrides.value)
     }
 
     @Test
@@ -125,14 +124,14 @@ class SettingsRepositoryOverrideTest {
         r.setOverride(
             "com.target",
             AppListenOverride(
-                cryptoListen = TriState.ON,
-                kindOverrides = mapOf(CryptoKind.CIPHER.name to TriState.ON),
+                cryptoListen = true,
+                kinds = mapOf(CryptoKind.CIPHER.name to true),
             ),
         )
 
         val effective = r.effectiveSwitch("com.target")
         assertTrue(effective.cipher)
-        // 未覆盖位取全局
+        // 未定制位取全局
         assertEquals(global.messageDigest, effective.messageDigest)
         // 其他应用无覆盖 → 纯全局
         assertFalse(r.effectiveSwitch("com.other").cipher)
@@ -141,7 +140,7 @@ class SettingsRepositoryOverrideTest {
     @Test
     fun `effectiveSwitchFlow re-emits on global change`() = runBlocking {
         val r = repo()
-        r.setOverride("com.target", AppListenOverride(kindOverrides = mapOf(CryptoKind.MAC.name to TriState.OFF)))
+        r.setOverride("com.target", AppListenOverride(kinds = mapOf(CryptoKind.MAC.name to false)))
 
         val before = r.effectiveSwitchFlow("com.target").first()
         assertFalse(before.mac)
@@ -149,6 +148,6 @@ class SettingsRepositoryOverrideTest {
         r.set(global.copy(mac = false, cipher = false))
         val after = r.effectiveSwitchFlow("com.target").first()
         assertFalse(after.mac)
-        assertFalse(after.cipher) // 全局变更传导到未覆盖位
+        assertFalse(after.cipher) // 默认配置变更传导到未定制位
     }
 }

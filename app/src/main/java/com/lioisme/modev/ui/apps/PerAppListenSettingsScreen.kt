@@ -8,9 +8,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -18,9 +18,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -30,7 +29,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -41,48 +43,60 @@ import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.CategoryTaxonomy
+import com.lioisme.modev.core.model.EffectiveSwitch
+import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.RecordType
-import com.lioisme.modev.core.model.TriState
 import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * 单应用监听覆盖状态(V23 G3 三态继承模型):
- * - [override] 该应用当前覆盖(无则 DEFAULT,行尾态文本「跟随全局」);
+ * 单应用监听自定义状态(V24 二态偏差模型):
+ * - [effective] 有效配置 = 默认配置 ⊕ 本应用偏差(默认配置变更实时传导到未定制项);
+ * - [override] 当前偏差(零偏差时恢复默认行隐藏);
  * - 写操作即时持久化 + 定向推送注入侧(setOverride/removeOverride 全链路);
- * - 全 INHERIT 的写入自动等价删除存储键(SettingsRepository 契约)。
+ * - 零偏差写入自动等价删除存储键(SettingsRepository 契约)。
  */
 class PerAppListenSettingsViewModel(
     val packageName: String,
     private val settings: SettingsRepository,
 ) : ViewModel() {
 
+    /** 行值回显来源:有效配置快照流(默认配置或偏差任一变化即重发射)。 */
+    val effective: StateFlow<HookSwitch> =
+        combine(settings.globalSwitch, settings.overrides) { default, map ->
+            EffectiveSwitch.resolve(default, map[packageName])
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            settings.effectiveSwitch(packageName),
+        )
+
+    /** 当前偏差(供恢复默认行可见性与计数摘要)。 */
     val override: StateFlow<AppListenOverride> = settings.overrides
         .map { it[packageName] ?: AppListenOverride.DEFAULT }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppListenOverride.DEFAULT)
 
-    /** 总开关覆盖(crypto/db 二选一)。 */
-    fun setMaster(isCrypto: Boolean, value: TriState) {
+    /** 总开关定制(crypto/db 二选一;显式布尔,无第三态)。 */
+    fun setMaster(isCrypto: Boolean, value: Boolean) {
         update {
             if (isCrypto) it.copy(cryptoListen = value) else it.copy(dbListen = value)
         }
     }
 
-    /** 类别覆盖(kind 名跨枚举;非法名由 AppListenOverride 容错忽略)。 */
-    fun setKind(kindId: String, value: TriState) {
-        update {
-            it.copy(kindOverrides = it.kindOverrides + (kindId to value)).normalized()
-        }
+    /** 类别定制(kind 名跨枚举;非法名由 AppListenOverride 容错忽略)。 */
+    fun setKind(kindId: String, value: Boolean) {
+        update { it.copy(kinds = it.kinds + (kindId to value)) }
     }
 
-    /** 重置为跟随全局(删除覆盖存储键)。 */
+    /** 一键恢复默认配置(删除本包全部偏差存储键)。 */
     fun reset() {
         viewModelScope.launch { settings.removeOverride(packageName) }
     }
@@ -107,20 +121,12 @@ class PerAppListenSettingsViewModelFactory(
     }
 }
 
-/** 三态编辑目标(sheet 单选对象):总开关或某类别。 */
-private sealed interface EditTarget {
-    data object CryptoMaster : EditTarget
-    data object DbMaster : EditTarget
-    data class Kind(val id: String) : EditTarget
-}
-
 /**
- * 每应用监听设置页(V23 G3/T5.3,三态继承):
- * - 说明行:未覆盖项跟随全局、变更即时生效;
+ * 每应用监听设置页(V24 G1 二态重构):
+ * - 每行直接承载 M3 Switch(整行 toggleable,单击即写即推 ConfigServer.pushToPackage);
  * - 总开关区(算法/数据库)+ 算法 12 类别 + 数据库 5 类别;
- *   每行尾态按钮(跟随全局/强制开/强制关)→ 点击弹 ModalBottomSheet 单选,
- *   选择即写即推(ConfigServer.pushToPackage,注入侧下一次调用生效);
- * - 重置为跟随全局(危险确认 AlertDialog 后 removeOverride)。
+ *   行值显示有效配置(未定制项随默认配置实时变化,无「跟随」第三态);
+ * - 操作区仅在存在自定义时出现:「恢复默认配置」(危险确认 AlertDialog 后 removeOverride)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -128,8 +134,8 @@ fun PerAppListenSettingsScreen(
     viewModel: PerAppListenSettingsViewModel,
     onBack: () -> Unit,
 ) {
+    val effective by viewModel.effective.collectAsStateWithLifecycle()
     val override by viewModel.override.collectAsStateWithLifecycle()
-    var editTarget by remember { mutableStateOf<EditTarget?>(null) }
     var confirmReset by remember { mutableStateOf(false) }
     val res = rememberLocaleAwareResources()
 
@@ -166,18 +172,18 @@ fun PerAppListenSettingsScreen(
             )
 
             SettingsSection(stringResource(R.string.section_monitor_kinds)) {
-                TriStateRow(
+                ListenRow(
                     label = stringResource(R.string.algorithm_monitor_master),
-                    state = override.cryptoListen,
-                    onClick = { editTarget = EditTarget.CryptoMaster },
-                    testTag = "tri-row-master-crypto",
+                    checked = effective.cryptoListen,
+                    onCheckedChange = { viewModel.setMaster(isCrypto = true, value = it) },
+                    testTag = "listen-row-master-crypto",
                 )
                 HorizontalDivider16Compat()
-                TriStateRow(
+                ListenRow(
                     label = stringResource(R.string.database_monitor_master),
-                    state = override.dbListen,
-                    onClick = { editTarget = EditTarget.DbMaster },
-                    testTag = "tri-row-master-db",
+                    checked = effective.dbListen,
+                    onCheckedChange = { viewModel.setMaster(isCrypto = false, value = it) },
+                    testTag = "listen-row-master-db",
                 )
             }
             Spacer(Modifier.height(16.dp))
@@ -186,11 +192,11 @@ fun PerAppListenSettingsScreen(
             SettingsSection(stringResource(R.string.filter_type_crypto)) {
                 CategoryTaxonomy.forType(RecordType.CRYPTO).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16Compat()
-                    TriStateRow(
+                    ListenRow(
                         label = res.getString(switchLabelRes(category.id)),
-                        state = override.kindOverrides[category.id] ?: TriState.INHERIT,
-                        onClick = { editTarget = EditTarget.Kind(category.id) },
-                        testTag = "tri-row-${category.id}",
+                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.id, it) },
+                        testTag = "listen-row-${category.id}",
                     )
                 }
             }
@@ -200,66 +206,58 @@ fun PerAppListenSettingsScreen(
             SettingsSection(stringResource(R.string.filter_type_database)) {
                 CategoryTaxonomy.forType(RecordType.DATABASE).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16Compat()
-                    TriStateRow(
+                    ListenRow(
                         label = res.getString(switchLabelRes(category.id)),
-                        state = override.kindOverrides[category.id] ?: TriState.INHERIT,
-                        onClick = { editTarget = EditTarget.Kind(category.id) },
-                        testTag = "tri-row-${category.id}",
+                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.id, it) },
+                        testTag = "listen-row-${category.id}",
                     )
                 }
             }
             Spacer(Modifier.height(16.dp))
 
-            SettingsSection(stringResource(R.string.app_monitor_actions_section)) {
-                ListItem(
-                    colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-                    headlineContent = {
-                        Text(
-                            stringResource(R.string.listen_reset_action),
-                            style = MaterialTheme.typography.bodyLarge,
-                            color = MaterialTheme.colorScheme.error,
-                        )
-                    },
-                    leadingContent = {
-                        Icon(Icons.Filled.RestartAlt, null, tint = MaterialTheme.colorScheme.error)
-                    },
-                    trailingContent = {
-                        Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error.copy(alpha = 0f))
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("listen-reset")
-                        .clickable { confirmReset = true },
-                )
-            }
-            Spacer(Modifier.height(24.dp))
-        }
-    }
-
-    editTarget?.let { target ->
-        TriStateSheet(
-            current = when (target) {
-                EditTarget.CryptoMaster -> override.cryptoListen
-                EditTarget.DbMaster -> override.dbListen
-                is EditTarget.Kind -> override.kindOverrides[target.id] ?: TriState.INHERIT
-            },
-            onSelect = { value ->
-                when (target) {
-                    EditTarget.CryptoMaster -> viewModel.setMaster(true, value)
-                    EditTarget.DbMaster -> viewModel.setMaster(false, value)
-                    is EditTarget.Kind -> viewModel.setKind(target.id, value)
+            if (!override.isDefault) {
+                SettingsSection(stringResource(R.string.app_monitor_actions_section)) {
+                    ListItem(
+                        colors = ListItemDefaults.colors(
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                        ),
+                        headlineContent = {
+                            Text(
+                                stringResource(R.string.listen_reset_action),
+                                style = MaterialTheme.typography.bodyLarge,
+                                color = MaterialTheme.colorScheme.error,
+                            )
+                        },
+                        supportingContent = {
+                            val n = override.cryptoListen.count() + override.dbListen.count() +
+                                override.kinds.size
+                            Text(
+                                pluralStringResource(R.plurals.listen_settings_custom_n, n, n),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        },
+                        leadingContent = {
+                            Icon(Icons.Filled.RestartAlt, null, tint = MaterialTheme.colorScheme.error)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("listen-reset")
+                            .clickable { confirmReset = true },
+                    )
                 }
-                editTarget = null
-            },
-            onDismiss = { editTarget = null },
-        )
+                Spacer(Modifier.height(16.dp))
+            }
+            Spacer(Modifier.height(8.dp))
+        }
     }
 
     if (confirmReset) {
         AlertDialog(
             onDismissRequest = { confirmReset = false },
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            icon = { Icon(Icons.Filled.Delete, null) },
+            icon = { Icon(Icons.Filled.RestartAlt, null) },
             title = { Text(stringResource(R.string.danger_title)) },
             text = {
                 Text(stringResource(R.string.danger_reset_listen_msg, viewModel.packageName))
@@ -281,16 +279,18 @@ fun PerAppListenSettingsScreen(
     }
 }
 
+/** Boolean?.count():非 null 记 1(null 即取默认不计),用于定制计数摘要。 */
+private fun Boolean?.count(): Int = if (this != null) 1 else 0
+
 /**
- * 三态行:label + 尾部态按钮(跟随全局/强制开/强制关);整行可点击弹选择器。
- * 态按钮 primary 色 = 有显式覆盖的感知指示(INHERIT 时中性色)。
+ * 监听行:label + 尾部 M3 Switch;整行 toggleable(role=Switch)单击切换,
+ * 内层 Switch onCheckedChange=null 并 clearAndSetSemantics 去重(契约 13 同款语义)。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun TriStateRow(
+private fun ListenRow(
     label: String,
-    state: TriState,
-    onClick: () -> Unit,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
     testTag: String,
 ) {
     ListItem(
@@ -305,64 +305,18 @@ private fun TriStateRow(
             )
         },
         trailingContent = {
-            Text(
-                text = triStateLabel(state),
-                style = MaterialTheme.typography.labelLarge,
-                color =
-                    if (state == TriState.INHERIT) {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    } else {
-                        MaterialTheme.colorScheme.primary
-                    },
-                modifier = Modifier.testTag("$testTag-value"),
+            Switch(
+                checked = checked,
+                onCheckedChange = null,
+                modifier = Modifier.clearAndSetSemantics {},
             )
         },
         modifier = Modifier
             .fillMaxWidth()
             .testTag(testTag)
-            .clickable(onClick = onClick),
+            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
     )
 }
-
-/** 三态单选底部弹层(契约 4/13:ModalBottomSheet + surfaceContainerHigh,选项即选即效)。 */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun TriStateSheet(
-    current: TriState,
-    onSelect: (TriState) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
-            listOf(TriState.INHERIT to R.string.tri_inherit, TriState.ON to R.string.tri_on, TriState.OFF to R.string.tri_off)
-                .forEach { (value, labelRes) ->
-                    ListItem(
-                        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
-                        headlineContent = { Text(stringResource(labelRes)) },
-                        leadingContent = { RadioButton(selected = current == value, onClick = null) },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onSelect(value)
-                            },
-                    )
-                }
-            Spacer(Modifier.height(8.dp))
-        }
-    }
-}
-
-@Composable
-private fun triStateLabel(state: TriState): String = stringResource(
-    when (state) {
-        TriState.INHERIT -> R.string.tri_inherit
-        TriState.ON -> R.string.tri_on
-        TriState.OFF -> R.string.tri_off
-    },
-)
 
 @Composable
 private fun HorizontalDivider16Compat() {

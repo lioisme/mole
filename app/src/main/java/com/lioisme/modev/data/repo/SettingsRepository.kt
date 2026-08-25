@@ -127,10 +127,10 @@ class MirroredConfigWriter(
 
 /**
  * 捕获配置仓库:
- * - 全局配置(V10):ConfigWriter 持久化 + 内存 StateFlow + 变更即广播注入侧;
- * - 单应用监听覆盖(V23 三态继承):每包一键 `override_{pkg}` 惰性创建,
- *   [EffectiveSwitch] 解析出有效配置后经 ConfigServer 定向推送对应会话,
- *   未覆盖应用随全局变更自动传导。
+ * - 默认配置(V10 全局键):ConfigWriter 持久化 + 内存 StateFlow + 变更即广播注入侧;
+ * - 单应用监听自定义(V24 二态偏差):每包一键 `override_{pkg}` 惰性创建,
+ *   [EffectiveSwitch] 将默认配置 ⊕ 偏差解析为有效配置后经 ConfigServer
+ *   定向推送对应会话,未定制应用随默认配置变更自动传导。
  */
 class SettingsRepository(
     private val server: ConfigServer,
@@ -157,42 +157,40 @@ class SettingsRepository(
 
     private val _overrides = MutableStateFlow<Map<String, AppListenOverride>>(emptyMap())
 
-    /** 已存在的单应用覆盖(包名 → 覆盖;仅含非默认项,init 时从本地预载)。 */
+    /** 已存在的单应用自定义偏差(包名 → 偏差;仅含非零偏差项,init 时从本地预载)。 */
     val overrides: StateFlow<Map<String, AppListenOverride>> = _overrides
 
-    /** 当前包的覆盖快照(无覆盖返回 [AppListenOverride.DEFAULT],调用方免空判)。 */
+    /** 当前包的自定义偏差快照(未定制返回 [AppListenOverride.DEFAULT],调用方免空判)。 */
     fun overrideFor(packageName: String): AppListenOverride =
         _overrides.value[packageName] ?: AppListenOverride.DEFAULT
 
-    /** 该包的有效配置快照(全局 ⊕ 覆盖,纯解析)。 */
+    /** 该包的有效配置快照(默认配置 ⊕ 偏差,纯解析)。 */
     fun effectiveSwitch(packageName: String): HookSwitch =
         EffectiveSwitch.resolve(_globalSwitch.value, _overrides.value[packageName])
 
-    /** 该包的有效配置流:全局或覆盖任一变化即重发射(distinct 由数据类 equals 保证)。 */
+    /** 该包的有效配置流:默认配置或偏差任一变化即重发射(distinct 由数据类 equals 保证)。 */
     fun effectiveSwitchFlow(packageName: String): Flow<HookSwitch> =
         combine(globalSwitch, overrides) { global, map ->
             EffectiveSwitch.resolve(global, map[packageName])
         }
 
     /**
-     * 写入单应用覆盖:规范化([AppListenOverride.normalized])后双写持久化 +
-     * 内存热更 + 向该包会话定向推送有效配置。
-     * 全默认(无实际覆盖)等价删除存储键。
+     * 写入单应用自定义偏差:双写持久化 + 内存热更 + 向该包会话定向推送有效配置。
+     * 零偏差([AppListenOverride.isDefault])等价删除存储键。
      */
     suspend fun setOverride(packageName: String, override: AppListenOverride) {
-        val normalized = override.normalized()
-        if (normalized.isDefault) {
+        if (override.isDefault) {
             removeOverride(packageName)
             return
         }
         withContext(Dispatchers.IO) {
-            writer.put(ConfigKeys.overrideKey(packageName), normalized.toJson(gson))
+            writer.put(ConfigKeys.overrideKey(packageName), override.toJson(gson))
         }
-        _overrides.update { it + (packageName to normalized) }
+        _overrides.update { it + (packageName to override) }
         pushOverride(packageName)
     }
 
-    /** 删除单应用覆盖(该包回落纯全局语义)并定向推送。 */
+    /** 删除单应用自定义(该包回落纯默认配置语义)并定向推送。 */
     suspend fun removeOverride(packageName: String) {
         withContext(Dispatchers.IO) {
             writer.remove(ConfigKeys.overrideKey(packageName))

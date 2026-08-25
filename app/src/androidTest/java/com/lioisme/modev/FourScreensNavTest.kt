@@ -85,6 +85,8 @@ class FourScreensNavTest {
         rule.onAllNodesWithContentDescription(str(R.string.cd_back)).assertCountEquals(0)
         // V7/V20:根页应用行无运行按钮(启动入口仅保留于应用监听入口页头部)。
         rule.onAllNodesWithTag("app-launch").assertCountEquals(0)
+        // V24 G2:records/all 退役,根页不得再有全部记录入口(contentDescription)。
+        rule.onAllNodesWithContentDescription(str(R.string.monitor_records_caption)).assertCountEquals(0)
 
         // 筛选菜单:仅含「系统应用 / Xposed 模块」两项(V14 R7:置顶项已收敛
         // 至通用设置页「应用列表」分区;V18:设置项迁出至搜索条左上角;

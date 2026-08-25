@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ListAlt
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Android
@@ -97,7 +96,6 @@ fun AppsScreen(
     viewModel: AppsViewModel,
     onOpen: (String) -> Unit,
     onOpenSettings: () -> Unit,
-    onOpenRecords: () -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -151,26 +149,14 @@ CollapsedSearchInput(
                                 onTapToExpand = { search.searchActive = true },
                                 placeholder = stringResource(R.string.apps_search),
                                 leadingContent = {
-                                    Row {
-                                        TipIconButton(
-                                            tooltip = stringResource(R.string.cd_settings),
-                                            onClick = openSettings,
-                                        ) {
-                                            Icon(
-                                                Icons.Default.Settings,
-                                                contentDescription = stringResource(R.string.cd_settings),
-                                            )
-                                        }
-                                        // 全部记录入口(V23 R1/G1:全局统一记录页,单一入口)。
-                                        TipIconButton(
-                                            tooltip = stringResource(R.string.records_all_title),
-                                            onClick = onOpenRecords,
-                                        ) {
-                                            Icon(
-                                                Icons.AutoMirrored.Filled.ListAlt,
-                                                contentDescription = stringResource(R.string.cd_records_all),
-                                            )
-                                        }
+                                    TipIconButton(
+                                        tooltip = stringResource(R.string.cd_settings),
+                                        onClick = openSettings,
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Settings,
+                                            contentDescription = stringResource(R.string.cd_settings),
+                                        )
                                     }
                                 },
                                 filterSlot = {

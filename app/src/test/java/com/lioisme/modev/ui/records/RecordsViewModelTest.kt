@@ -8,14 +8,12 @@ import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
 import com.lioisme.modev.data.repo.LogRepository
-import com.lioisme.modev.data.repo.RecordFilter
 import com.lioisme.modev.data.server.ConfigServer
 import java.net.ServerSocket
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -24,11 +22,11 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * RecordsViewModel 统一契约(V23 T4.1/D6):
- * - 预置语境锁定(单应用页):类型/包名固定,类别过滤生效;
- * - 全局页:跨类型聚合 + 应用多选 + 类型切换后类别失效;
- * - totalCount 与分页内容对账。
- * 内存 Room + 真实 LogRepository,数据流与生产一致。
+ * RecordsViewModel 契约(V24 G2 收敛:预设语境必选,全局页退役):
+ * - 类型/包名锁定(单应用两列表页);
+ * - 查询词过滤 + 类别过滤生效(D6 由预设类型唯一性天然满足);
+ * - 分页流首页内容与过滤语义对账(totalCount 已随全局页退役)。
+ * 内存 Room + 真实 LogRepository + 真实 PagingSource,数据流与生产一致。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -74,13 +72,20 @@ class RecordsViewModelTest {
         )
     }
 
+    private fun vm(type: RecordType, pkg: String): RecordsViewModel =
+        RecordsViewModel(
+            logs = repo,
+            presetTypes = setOf(type.wire),
+            presetPackages = setOf(pkg),
+        )
+
     /** 轮询 totalCount 直至满足谓词(主 Looper 泵动 + 真实超时)。 */
-    private fun awaitTotal(vm: RecordsViewModel, predicate: (Long) -> Boolean): Long {
+    private fun awaitTotal(viewModel: RecordsViewModel, predicate: (Long) -> Boolean): Long {
         val deadline = System.currentTimeMillis() + 5_000
         var last = -1L
         while (System.currentTimeMillis() < deadline) {
             org.robolectric.shadows.ShadowLooper.idleMainLooper()
-            last = runBlocking { vm.totalCount.first() }
+            last = runBlocking { viewModel.totalCount.first() }
             if (predicate(last)) return last
             Thread.sleep(20)
         }
@@ -90,85 +95,44 @@ class RecordsViewModelTest {
     @Test
     fun `preset context locks type and package`() = runBlocking {
         seedTwoAppsTwoTypes()
-        val vm = RecordsViewModel(
-            logs = repo,
-            presetTypes = setOf(RecordType.CRYPTO.wire),
-            presetPackages = setOf("com.a"),
-        )
-
-        val total = awaitTotal(vm) { it == 1L }
-
-        assertEquals(1L, total)
+        val viewModel = vm(RecordType.CRYPTO, "com.a")
+        assertEquals(1L, awaitTotal(viewModel) { it == 1L })
     }
 
     @Test
-    fun `global page aggregates all types and filters by packages`() = runBlocking {
+    fun `query narrows within preset context`() = runBlocking {
         seedTwoAppsTwoTypes()
-        val vm = RecordsViewModel(logs = repo)
+        val viewModel = vm(RecordType.DATABASE, "com.a")
+        assertEquals(1L, awaitTotal(viewModel) { it == 1L })
 
-        assertEquals(4L, awaitTotal(vm) { it == 4L })
-
-        vm.setPackages(setOf("com.a", "com.b"))
-        assertEquals(4L, awaitTotal(vm) { it == 4L })
-
-        vm.setPackages(setOf("com.a"))
-        assertEquals(2L, awaitTotal(vm) { it == 2L })
-
-        vm.setPackages(emptySet())
-        assertEquals(4L, awaitTotal(vm) { it == 4L })
+        viewModel.setQuery("不存在的查询词")
+        assertEquals(0L, awaitTotal(viewModel) { it == 0L })
     }
 
     @Test
-    fun `type filter narrows across types`() = runBlocking {
+    fun `kind filter applies within single preset type`() = runBlocking {
         seedTwoAppsTwoTypes()
-        val vm = RecordsViewModel(logs = repo)
+        // a 的数据库侧仅 QUERY(b 是 DML);DML 过滤 → 0 条;QUERY 过滤 → 1 条。
+        val viewModel = vm(RecordType.DATABASE, "com.a")
+        viewModel.setKindName(SqlKind.DML.name)
+        assertEquals(0L, awaitTotal(viewModel) { it == 0L })
 
-        vm.setTypeFilter(RecordType.DATABASE)
-        assertEquals(2L, awaitTotal(vm) { it == 2L })
-
-        vm.setTypeFilter(null)
-        assertEquals(4L, awaitTotal(vm) { it == 4L })
+        viewModel.setKindName(SqlKind.QUERY.name)
+        assertEquals(1L, awaitTotal(viewModel) { it == 1L })
     }
 
     @Test
-    fun `kind only applies when single type selected`() = runBlocking {
+    fun `crypto kind filter works on crypto preset`() = runBlocking {
         seedTwoAppsTwoTypes()
-        val vm = RecordsViewModel(logs = repo)
-
-        // 全部类型下类别被 D6 归一化忽略(即使误下发也不产生零结果)
-        vm.setTypeFilter(null)
-        vm.setKindName(CryptoKind.CIPHER.name)
-        assertEquals(4L, awaitTotal(vm) { it == 4L })
-
-        // 单选算法后类别生效:a 的 CIPHER 1 条(b 是 MESSAGE_DIGEST)
-        vm.setTypeFilter(RecordType.CRYPTO)
-        vm.setKindName(CryptoKind.CIPHER.name)
-        assertEquals(1L, awaitTotal(vm) { it == 1L })
-
-        // 切回全部类型:kind 自动失效
-        vm.setTypeFilter(null)
-        assertEquals(4L, awaitTotal(vm) { it == 4L })
-    }
-
-    @Test
-    fun `sql kind filter works on database type`() = runBlocking {
-        seedTwoAppsTwoTypes()
-        val vm = RecordsViewModel(logs = repo)
-        vm.setTypeFilter(RecordType.DATABASE)
-        vm.setKindName(SqlKind.DML.name)
-        assertEquals(1L, awaitTotal(vm) { it == 1L })
+        val viewModel = vm(RecordType.CRYPTO, "com.a")
+        viewModel.setKindName(CryptoKind.CIPHER.name)
+        assertEquals(1L, awaitTotal(viewModel) { it == 1L })
     }
 
     private suspend fun seedTwoAppsTwoTypes() {
         insert("com.a", CryptoKind.CIPHER.name, CryptoOperation.INIT.name, "crypto", 1000)
         insert("com.b", CryptoKind.MESSAGE_DIGEST.name, CryptoOperation.DIGEST.name, "crypto", 2000)
         insert("com.a", SqlKind.QUERY.name, "QUERY", "db", 3000)
-        insert(
-            "com.b",
-            SqlKind.DML.name,
-            "INSERT",
-            "db",
-            4000,
-        )
+        insert("com.b", SqlKind.DML.name, "INSERT", "db", 4000)
     }
 }

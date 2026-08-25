@@ -10,6 +10,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
@@ -166,28 +167,30 @@ class CryptoDetailZonesTest {
         rule.waitForIdle()
         waitForDetail()
 
-        // 元数据算法行(算法 = 顶栏标题 + 元数据行双处,断言标签存在即可)。
-        rule.onNodeWithText(str(R.string.meta_algorithm)).assertIsDisplayed()
+        // V24:算法名由顶栏 + Hero 身份卡双处承载(meta 长表已网格化,不再含算法行);
+        // Hero 卡以 detail-hero 锚点断言。
+        rule.onNodeWithTag("detail-hero").assertIsDisplayed()
 
         // 数据流分区:分区头 + 输入(明文) + 流向箭头 + 输出(密文)。
+        // V24 锚点芯片与分区头同文案:一律 onAllNodes 多节点安全断言。
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.section_zone_data_flow)))
-        rule.onNodeWithText(str(R.string.section_zone_data_flow)).assertIsDisplayed()
+        rule.onAllNodesWithText(str(R.string.section_zone_data_flow)).onFirst().assertIsDisplayed()
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.role_input_plaintext)))
-        rule.onNodeWithText(str(R.string.role_input_plaintext)).assertIsDisplayed()
+        rule.onAllNodesWithText(str(R.string.role_input_plaintext)).onFirst().assertIsDisplayed()
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.role_output_ciphertext)))
-        rule.onNodeWithText(str(R.string.role_output_ciphertext)).assertIsDisplayed()
+        rule.onAllNodesWithText(str(R.string.role_output_ciphertext)).onFirst().assertIsDisplayed()
         rule.onAllNodesWithContentDescription(str(R.string.cd_flow)).assertCountEquals(1)
 
         // 密钥材料分区:分区头 + 密钥节标题。
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.section_zone_key_material)))
-        rule.onNodeWithText(str(R.string.section_zone_key_material)).assertIsDisplayed()
+        rule.onAllNodesWithText(str(R.string.section_zone_key_material)).onFirst().assertIsDisplayed()
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.section_key)))
-        rule.onNodeWithText(str(R.string.section_key)).assertIsDisplayed()
+        rule.onAllNodesWithText(str(R.string.section_key)).onFirst().assertIsDisplayed()
 
         // 输入/输出字节区块仍在(三态分段契约未破坏;多区块并存,取首节点)。
         rule.onAllNodes(hasScrollAction()).onFirst()

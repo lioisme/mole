@@ -35,7 +35,7 @@ import org.junit.runner.RunWith
  * - Hero 卡:图标/名称/状态胶囊/作用域 Switch 行(testTag app-scope-switch);
  * - 统计概览卡(app-stats-card):总数大字 + 类型分布图例(资源驱动文案);
  * - 功能入口卡:算法记录 / 数据库记录 / 监听设置(monitor-entry-listen-settings),
- *   「监听设置」摘要 = 跟随全局(无覆盖时);
+ *   「监听设置」摘要 = 使用默认配置(未定制时);
  * - 旧「更多菜单」退役:清空记录入口归位操作卡(detail_clear_records 行)。
  * 断言一律资源驱动;行内文本经 hasAnyDescendant 限定避免合并节点误命中。
  */
@@ -126,12 +126,12 @@ class AppMonitorRedesignTest {
         rule.onNodeWithTag("app-scope-row").assertIsDisplayed()
         rule.onNodeWithTag("app-stats-card").assertIsDisplayed()
 
-        // 三入口卡:监听设置入口存在且摘要为「跟随全局」(无覆盖)。
+        // 三入口卡:监听设置入口存在且摘要为「使用默认配置」(未定制)。
         val entry = rule.onNodeWithTag("monitor-entry-listen-settings")
         entry.performScrollTo().assertIsDisplayed()
         assertTrue(
-            "无覆盖时应显示「跟随全局」",
-            rule.onAllNodesWithText(str(R.string.listen_settings_follow_global))
+            "未定制时应显示「使用默认配置」",
+            rule.onAllNodesWithText(str(R.string.listen_summary_default))
                 .fetchSemanticsNodes().isNotEmpty(),
         )
     }

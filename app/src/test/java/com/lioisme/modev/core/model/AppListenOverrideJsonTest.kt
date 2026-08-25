@@ -2,94 +2,117 @@ package com.lioisme.modev.core.model
 
 import com.google.gson.Gson
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * AppListenOverride JSON 往返与容错(V23 D2):
- * 往返对称、缺字段补 INHERIT、非法 JSON/未知 kind/非法三态名逐项容错、isDefault 语义。
+ * 单应用监听自定义 JSON 契约(V24 D2):
+ * - 新格式 round-trip 严格对称(布尔 + kinds 键);
+ * - null/空白/非法/空对象一律容错为 DEFAULT;
+ * - 未知 kind 名、非法值条目忽略(防存储漂移);
+ * - V23 三态遗留格式无损迁移:"ON"/"OFF" 映射 true/false,"INHERIT"/未知串取默认,
+ *   kindOverrides 旧键名平滑读取,写入恒为新格式(首次读改写即收敛)。
  */
 class AppListenOverrideJsonTest {
 
     private val gson = Gson()
 
+    private fun parse(json: String?): AppListenOverride = AppListenOverride.fromJson(gson, json)
+
     @Test
-    fun `round trip preserves all fields`() {
-        val origin = AppListenOverride(
-            cryptoListen = TriState.ON,
-            dbListen = TriState.OFF,
-            kindOverrides = mapOf(
-                CryptoKind.CIPHER.name to TriState.OFF,
-                SqlKind.DML.name to TriState.ON,
+    fun `roundtrip symmetry in new format`() {
+        val override = AppListenOverride(
+            cryptoListen = false,
+            dbListen = true,
+            kinds = mapOf(
+                CryptoKind.CIPHER.name to false,
+                SqlKind.DML.name to true,
             ),
         )
-        val parsed = AppListenOverride.fromJson(gson, origin.toJson(gson))
-        assertEquals(origin, parsed)
+        assertEquals(override, parse(override.toJson(gson)))
     }
 
     @Test
-    fun `null blank and invalid json fall back to default`() {
-        assertEquals(AppListenOverride.DEFAULT, AppListenOverride.fromJson(gson, null))
-        assertEquals(AppListenOverride.DEFAULT, AppListenOverride.fromJson(gson, ""))
-        assertEquals(AppListenOverride.DEFAULT, AppListenOverride.fromJson(gson, "   "))
-        assertEquals(AppListenOverride.DEFAULT, AppListenOverride.fromJson(gson, "{not-json"))
+    fun `null blank invalid json degrade to default`() {
+        assertEquals(AppListenOverride.DEFAULT, parse(null))
+        assertEquals(AppListenOverride.DEFAULT, parse("  "))
+        assertEquals(AppListenOverride.DEFAULT, parse("{broken"))
+        assertEquals(AppListenOverride.DEFAULT, parse("null"))
+        assertEquals(AppListenOverride.DEFAULT, parse("{}"))
+    }
+
+    /** JSON 字符串构造助手:避免在测试里手写转义引号。 */
+    private fun quoted(s: String): String = "\"" + s + "\""
+
+    @Test
+    fun `unknown kind names dropped`() {
+        val json = "{ \"kinds\": { " +
+            quoted("NOT_A_KIND") + ": false, " +
+            quoted(CryptoKind.MAC.name) + ": false } }"
+        assertEquals(mapOf(CryptoKind.MAC.name to false), parse(json).kinds)
     }
 
     @Test
-    fun `missing fields default to inherit`() {
-        val parsed = AppListenOverride.fromJson(gson, "{}")
-        assertEquals(AppListenOverride.DEFAULT, parsed)
-        assertTrue(parsed.isDefault)
+    fun `non primitive values degrade to take-default`() {
+        val json = "{ " +
+            quoted("cryptoListen") + ": [], " +
+            quoted("dbListen") + ": {}, " +
+            quoted("kinds") + ": { " + quoted(SqlKind.EXEC.name) + ": { \"x\": 1 } } }"
+        val parsed = parse(json)
+        assertNull(parsed.cryptoListen)
+        assertNull(parsed.dbListen)
+        assertTrue(parsed.kinds.isEmpty())
     }
 
     @Test
-    fun `unknown kind names are dropped`() {
-        val json = """{"kindOverrides":{"NOT_A_KIND":"ON","${CryptoKind.MAC.name}":"OFF"}}"""
-        val parsed = AppListenOverride.fromJson(gson, json)
-        assertEquals(mapOf(CryptoKind.MAC.name to TriState.OFF), parsed.kindOverrides)
+    fun `legacy tristate master strings migrate losslessly`() {
+        assertEquals(true, parse("{ \"cryptoListen\": \"ON\" }").cryptoListen)
+        assertEquals(false, parse("{ \"cryptoListen\": \"OFF\" }").cryptoListen)
+        val both = parse("{ \"cryptoListen\": \"OFF\", \"dbListen\": \"OFF\" }")
+        assertEquals(false, both.dbListen)
+        // INHERIT / 未知串 → 取默认(null)
+        assertNull(parse("{ \"cryptoListen\": \"INHERIT\" }").cryptoListen)
+        assertNull(parse("{ \"cryptoListen\": \"MAYBE\" }").cryptoListen)
     }
 
     @Test
-    fun `invalid tri-state values degrade to inherit`() {
-        val json = """{"cryptoListen":"MAYBE","kindOverrides":{"${SqlKind.EXEC.name}":"SOMETIMES"}}"""
-        val parsed = AppListenOverride.fromJson(gson, json)
-        assertEquals(TriState.INHERIT, parsed.cryptoListen)
-        assertTrue(parsed.isDefault)
-    }
-
-    @Test
-    fun `normalized drops inherit kind entries`() {
-        val override = AppListenOverride(
-            kindOverrides = mapOf(
-                CryptoKind.CIPHER.name to TriState.INHERIT,
-                CryptoKind.BASE64.name to TriState.ON,
-            ),
+    fun `legacy kindOverrides key and string values migrate`() {
+        val json = "{ " + quoted("kindOverrides") + ": { " +
+            quoted("NOT_A_KIND") + ": \"ON\", " +
+            quoted(CryptoKind.MAC.name) + ": \"OFF\", " +
+            quoted(CryptoKind.BASE64.name) + ": \"ON\" } }"
+        assertEquals(
+            mapOf(CryptoKind.MAC.name to false, CryptoKind.BASE64.name to true),
+            parse(json).kinds,
         )
-        assertFalse(override.isDefault)
-        val normalized = override.normalized()
-        assertEquals(mapOf(CryptoKind.BASE64.name to TriState.ON), normalized.kindOverrides)
     }
 
     @Test
-    fun `all-inherit normalizes to default`() {
-        val override = AppListenOverride(
-            kindOverrides = mapOf(CryptoKind.CIPHER.name to TriState.INHERIT),
-        ).normalized()
-        assertTrue(override.isDefault)
-        assertEquals(AppListenOverride.DEFAULT, override)
+    fun `legacy full document migrates and rewrites to new format`() {
+        val legacy = "{ " + quoted("cryptoListen") + ": \"OFF\", " +
+            quoted("kindOverrides") + ": { " + quoted(CryptoKind.CIPHER.name) + ": \"OFF\" } }"
+        val parsed = parse(legacy)
+        assertEquals(
+            AppListenOverride(cryptoListen = false, kinds = mapOf(CryptoKind.CIPHER.name to false)),
+            parsed,
+        )
+        // 写回恒为新格式:kinds 键名 + JSON 布尔(一次读改写完成迁移收敛)
+        val rewritten = parsed.toJson(gson)
+        assertTrue(!rewritten.contains("kindOverrides"))
+        assertTrue(!rewritten.contains("OFF"))
     }
 
     @Test
-    fun `master-only override is not default`() {
-        assertFalse(AppListenOverride(cryptoListen = TriState.OFF).isDefault)
-        assertFalse(AppListenOverride(dbListen = TriState.ON).isDefault)
-    }
-
-    @Test
-    fun `json serialization uses stable field names`() {
-        val json = AppListenOverride(dbListen = TriState.ON).toJson(gson)
-        assertTrue(json.contains("\"dbListen\":\"ON\""))
-        assertFalse(json.contains("dbOpen"))
+    fun `stable new format field names and boolean values`() {
+        val json = AppListenOverride(dbListen = false).toJson(gson)
+        assertTrue(json.contains(quoted("dbListen")))
+        assertTrue(json.contains("false"))
+        // null 位(cryptoListen)不输出;零偏差类别为空对象,无垃圾条目
+        assertTrue(!json.contains(quoted("cryptoListen")))
+        assertEquals(
+            mapOf(CryptoKind.CIPHER.name to false),
+            parse("{ " + quoted("kinds") + ": { " + quoted(CryptoKind.CIPHER.name) + ": false } }").kinds,
+        )
     }
 }
