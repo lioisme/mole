@@ -45,15 +45,19 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.WebViewKind
+import com.lioisme.modev.core.model.WebViewOperation
 import com.lioisme.modev.data.mapping.BehaviorRow
 import com.lioisme.modev.data.mapping.CryptoRow
 import com.lioisme.modev.data.mapping.PrefsRow
 import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.mapping.SqlRow
+import com.lioisme.modev.data.mapping.WebViewRow
 import com.lioisme.modev.ui.theme.behaviorKindColor
 import com.lioisme.modev.ui.theme.kindColor
 import com.lioisme.modev.ui.theme.prefsKindColor
 import com.lioisme.modev.ui.theme.sqlKindColor
+import com.lioisme.modev.ui.theme.webviewKindColor
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -89,6 +93,7 @@ fun RecordRow(
                 is SqlRow -> sqlPresentation(record)
                 is BehaviorRow -> behaviorPresentation(record)
                 is PrefsRow -> prefsPresentation(record)
+                is WebViewRow -> webviewPresentation(record)
             }
         Row(
             modifier =
@@ -385,6 +390,39 @@ private fun prefsPresentation(record: PrefsRow): RowPresentation {
 }
 
 /**
+ * WebView 形态(V29 一等公民):headline = 域名 / 操作名(空回退操作名,恒非空);
+ * 元行 = 类别词元 · 操作;预览行 = URL/桥名。
+ */
+@Composable
+private fun webviewPresentation(record: WebViewRow): RowPresentation {
+    val accent = webviewKindColor(record.kind)
+    val kindText = stringResource(webviewKindLabelRes(record.kind))
+    val operationText = stringResource(webviewOperationLabelRes(record.operation))
+    val headline = record.headlineText() ?: operationText
+    val meta =
+        remember(record.kind, record.operation, kindText, operationText, accent) {
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = accent)) { append(kindText) }
+                append(" · ")
+                append(operationText)
+            }
+        }
+    val preview = remember(record.url, record.bridgeName) {
+        record.bridgeName?.takeIf { it.isNotBlank() }
+            ?: record.url?.takeIf { it.isNotBlank() }
+    }
+    return RowPresentation(
+        icon = KindIcons.webview(record.kind),
+        accent = accent,
+        headline = headline,
+        meta = meta,
+        preview = preview,
+        badges = emptyList(),
+        timestamp = record.recordTimestamp,
+    )
+}
+
+/**
  * 最有价值数据段原始选择(纯数据单一事实源,优先级 密钥 > 别名 > 输出 > 输入):
  * 返回(标签资源, 值)或 null;本地化由 UI 层(组合 / 非组合)各自承担。
  */
@@ -520,3 +558,55 @@ private const val BADGE_CONTAINER_ALPHA = 0.13f
 
 /** 行内元素间距。 */
 private const val SPACING = 12
+
+// ---------------------------------------------------------------------------
+// WebView 标签资源(V29 一等公民)
+// ---------------------------------------------------------------------------
+
+/** WebView 类别显示名资源(筛选菜单 / 详情页元数据共用)。 */
+@StringRes
+fun webviewKindLabelRes(kind: WebViewKind): Int = when (kind) {
+    WebViewKind.PAGE_LOAD -> R.string.kind_wv_page_load
+    WebViewKind.EVALUATE_JS -> R.string.kind_wv_evaluate_js
+    WebViewKind.JS_BRIDGE -> R.string.kind_wv_js_bridge
+    WebViewKind.DEBUG -> R.string.kind_wv_debug
+    WebViewKind.JS_CRYPTO -> R.string.kind_wv_js_crypto
+}
+
+/** WebView 操作标签资源。 */
+@StringRes
+fun webviewOperationLabelRes(operation: WebViewOperation): Int = when (operation) {
+    WebViewOperation.LOAD_URL -> R.string.op_wv_load_url
+    WebViewOperation.LOAD_URL_WITH_HEADERS -> R.string.op_wv_load_url
+    WebViewOperation.LOAD_DATA -> R.string.op_wv_load_data
+    WebViewOperation.LOAD_DATA_WITH_BASE_URL -> R.string.op_wv_load_data
+    WebViewOperation.EVALUATE_JS -> R.string.op_wv_evaluate_js
+    WebViewOperation.EVALUATE_JS_LEGACY -> R.string.op_wv_evaluate_js
+    WebViewOperation.ADD_JS_INTERFACE -> R.string.op_wv_add_js_interface
+    WebViewOperation.SET_DEBUGGING -> R.string.op_wv_set_debugging
+    WebViewOperation.PAGE_FINISHED -> R.string.op_wv_page_finished
+    WebViewOperation.JS_ENCRYPT -> R.string.op_wv_js_encrypt
+    WebViewOperation.JS_DECRYPT -> R.string.op_wv_js_decrypt
+    WebViewOperation.JS_DIGEST -> R.string.op_wv_js_digest
+    WebViewOperation.JS_SIGN -> R.string.op_wv_js_sign
+    WebViewOperation.JS_VERIFY -> R.string.op_wv_js_verify
+    WebViewOperation.JS_IMPORT_KEY -> R.string.op_wv_js_import_key
+    WebViewOperation.JS_GENERATE_KEY -> R.string.op_wv_js_generate_key
+}
+
+/** WebView 记录摘要文本(列表行长按复制)。 */
+fun webviewSummary(context: Context, record: WebViewRow): String {
+    val time = SimpleDateFormat(
+        if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
+        Locale.getDefault(),
+    ).format(Date(record.recordTimestamp))
+    return buildString {
+        append(context.getString(webviewKindLabelRes(record.kind)))
+        append('\n')
+        append(context.getString(webviewOperationLabelRes(record.operation)))
+        record.url?.let { append('\n').append(it) }
+        record.bridgeName?.let { append('\n').append("bridge: ").append(it) }
+        append('\n').append(time)
+        append('\n').append(record.packageName)
+    }
+}

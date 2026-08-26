@@ -129,6 +129,7 @@ internal fun CryptoRecordRow.toRowModelOrNull(): RowModel? = when (recordType) {
     RecordTypes.DATABASE -> sqlRowModelOrNull()
     RecordTypes.BEHAVIOR -> behaviorRowModelOrNull()
     RecordTypes.PREFS -> prefsRowModelOrNull()
+    RecordTypes.WEBVIEW -> webviewRowModelOrNull()
     else -> null
 }
 
@@ -215,6 +216,7 @@ internal fun CryptoRecordEntity.toRecordDetailOrNull(): RecordDetailModel? = whe
     RecordTypes.DATABASE -> toSqlModelOrNull()?.let(::SqlDetail)
     RecordTypes.BEHAVIOR -> toBehaviorModelOrNull()?.let(::BehaviorDetail)
     RecordTypes.PREFS -> toPrefsModelOrNull()?.let(::PrefsDetail)
+    RecordTypes.WEBVIEW -> toWebViewModelOrNull()?.let(::WebViewDetail)
     else -> null
 }
 

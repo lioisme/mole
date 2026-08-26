@@ -1,5 +1,7 @@
 package com.lioisme.modev.core.model
 
+import androidx.compose.runtime.Immutable
+
 /**
  * 一条完整的数据库操作记录(不可变,ADR-2 数据库监听 T1)。
  *
@@ -30,6 +32,7 @@ package com.lioisme.modev.core.model
  * @param stack 过滤后的应用调用栈(最内层在前)
  * @param timestamp 毫秒时间戳
  */
+@Immutable
 data class SqlRecord(
     val id: Long = 0L,
     override val seq: Long = 0L,

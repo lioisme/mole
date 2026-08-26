@@ -4,6 +4,7 @@ import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.model.SqlBindValue
+import com.lioisme.modev.core.model.WebViewRecord
 import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.core.model.SqlResultCell
 import com.lioisme.modev.core.model.SqlResultRow
@@ -256,6 +257,26 @@ internal fun estimateBehaviorJsonChars(record: BehaviorRecord): Int {
         }
         params?.forEach { (k, v) -> total += k.length + v.length }
         processName?.let { total += it.length }
+        stack.forEach { total += it.length }
+    }
+    return total * 2
+}
+
+/**
+ * WebView 记录导出 JSON 字符数保守估算(×2 倍率,V29 与四兄弟同规):
+ * URL / 脚本 / 桥名 / 参数 + 元数据,超限免构建。
+ */
+internal fun estimateWebViewJsonChars(record: WebViewRecord): Int {
+    var total = record.packageName.length + 128
+    with(record) {
+        total += url?.length ?: 0
+        total += urlHost?.length ?: 0
+        script?.let {
+            total += it.hex.length + (it.base64?.length ?: 0) + (it.text?.length ?: 0)
+        }
+        total += bridgeName?.length ?: 0
+        params?.forEach { (k, v) -> total += k.length + v.length }
+        processName.length
         stack.forEach { total += it.length }
     }
     return total * 2

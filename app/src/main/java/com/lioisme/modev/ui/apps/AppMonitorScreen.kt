@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.DataObject
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -70,6 +71,7 @@ import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.SqlKind
+import com.lioisme.modev.core.model.WebViewKind
 import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.ui.common.StatusSemantic
 import com.lioisme.modev.ui.common.connectionStatus
@@ -85,6 +87,7 @@ import com.lioisme.modev.ui.theme.kindColor
 import com.lioisme.modev.ui.theme.prefsKindColor
 import com.lioisme.modev.ui.theme.sqlKindColor
 import com.lioisme.modev.ui.theme.statusColor
+import com.lioisme.modev.ui.theme.webviewKindColor
 import androidx.compose.material.icons.outlined.FolderOpen
 
 /**
@@ -103,6 +106,7 @@ fun AppMonitorScreen(
     onOpenDatabase: () -> Unit,
     onOpenBehavior: () -> Unit,
     onOpenPrefs: () -> Unit,
+    onOpenWebView: () -> Unit,
     onOpenListenSettings: () -> Unit,
     onLaunch: (String) -> Unit,
 ) {
@@ -116,6 +120,7 @@ fun AppMonitorScreen(
     val dbCount by viewModel.dbCount.collectAsStateWithLifecycle()
     val behaviorCount by viewModel.behaviorCount.collectAsStateWithLifecycle()
     val prefsCount by viewModel.prefsCount.collectAsStateWithLifecycle()
+    val webviewCount by viewModel.webviewCount.collectAsStateWithLifecycle()
     val listenOverride by viewModel.listenOverride.collectAsStateWithLifecycle()
 
     val label = appInfo?.label?.takeIf { it.isNotBlank() } ?: viewModel.packageName
@@ -164,6 +169,7 @@ fun AppMonitorScreen(
                 dbCount = dbCount,
                 behaviorCount = behaviorCount,
                 prefsCount = prefsCount,
+                webviewCount = webviewCount,
             )
             Spacer(Modifier.height(16.dp))
             SettingsSection(stringResource(R.string.section_monitor_kinds)) {
@@ -195,6 +201,14 @@ fun AppMonitorScreen(
                     value = countText(prefsCount),
                     onClick = onOpenPrefs,
                     modifier = Modifier.testTag("monitor-entry-prefs"),
+                )
+                HorizontalDivider16()
+                EntryRow(
+                    icon = { Icon(Icons.Default.Language, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    title = stringResource(R.string.webview_records_title),
+                    value = countText(webviewCount),
+                    onClick = onOpenWebView,
+                    modifier = Modifier.testTag("monitor-entry-webview"),
                 )
                 HorizontalDivider16()
                 EntryRow(
@@ -413,12 +427,14 @@ private fun StatsCard(
     dbCount: Long,
     behaviorCount: Long,
     prefsCount: Long,
+    webviewCount: Long,
 ) {
-    val total = cryptoCount + dbCount + behaviorCount + prefsCount
+    val total = cryptoCount + dbCount + behaviorCount + prefsCount + webviewCount
     val cryptoColor = kindColor(CryptoKind.CIPHER)
     val dbColor = sqlKindColor(SqlKind.QUERY)
     val behaviorColor = behaviorKindColor(BehaviorKind.FILE_WRITE)
     val prefsColor = prefsKindColor(PrefsKind.PUT)
+    val webviewColor = webviewKindColor(WebViewKind.PAGE_LOAD)
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         shape = MaterialTheme.shapes.medium,
@@ -444,6 +460,7 @@ private fun StatsCard(
                 val dbWeight = (dbCount.toFloat() / total).coerceAtLeast(0.02f)
                 val behaviorWeight = (behaviorCount.toFloat() / total).coerceAtLeast(0.02f)
                 val prefsWeight = (prefsCount.toFloat() / total).coerceAtLeast(0.02f)
+                val webviewWeight = (webviewCount.toFloat() / total).coerceAtLeast(0.02f)
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -475,7 +492,13 @@ private fun StatsCard(
                         Modifier
                             .weight(prefsWeight)
                             .fillMaxSize()
-                            .background(color = prefsColor, shape = RoundedCornerShape(topEnd = 5.dp, bottomEnd = 5.dp)),
+                            .background(color = prefsColor),
+                    )
+                    Box(
+                        Modifier
+                            .weight(webviewWeight)
+                            .fillMaxSize()
+                            .background(color = webviewColor, shape = RoundedCornerShape(topEnd = 5.dp, bottomEnd = 5.dp)),
                     )
                 }
                 Spacer(Modifier.height(10.dp))
@@ -483,6 +506,7 @@ private fun StatsCard(
                 LegendRow(color = dbColor, label = stringResource(R.string.filter_type_database), count = dbCount)
                 LegendRow(color = behaviorColor, label = stringResource(R.string.filter_type_behavior), count = behaviorCount)
                 LegendRow(color = prefsColor, label = stringResource(R.string.filter_type_prefs), count = prefsCount)
+                LegendRow(color = webviewColor, label = stringResource(R.string.filter_type_webview), count = webviewCount)
             }
         }
     }

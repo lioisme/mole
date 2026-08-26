@@ -45,12 +45,15 @@
     <string name="prefs_records_title">Prefs Records</string>
     <string name="prefs_records_search">Search prefs records</string>
     <string name="behavior_records_search">Search behavior records…</string>
+    <string name="webview_records_title">WebView Records</string>
+    <string name="webview_records_search">Search WebView records…</string>
 
     <string name="monitor_records_caption">All records</string>
     <string name="filter_type_crypto">Crypto</string>
     <string name="filter_type_database">Database</string>
     <string name="filter_type_behavior">Behavior</string>
     <string name="filter_type_prefs">SharedPreferences</string>
+    <string name="filter_type_webview">WebView</string>
 
     <string name="detail_empty">No records yet</string>
     <string name="detail_empty_hint">Try adjusting filters or enable more categories in listen settings</string>
@@ -169,6 +172,10 @@
     <string name="export_too_large">Record too large to export (%1$d chars)</string>
     <string name="meta_kind">Kind</string>
     <string name="meta_operation">Operation</string>
+    <string name="meta_url">URL</string>
+    <string name="meta_url_host">Host</string>
+    <string name="meta_bridge">Bridge</string>
+    <string name="meta_script_size">Script size</string>
     <string name="meta_context">Context</string>
     <string name="meta_direction">Direction</string>
     <string name="meta_provider">Provider</string>
@@ -321,13 +328,35 @@
     <string name="meta_file_size">Size</string>
     <string name="section_command">Command</string>
     <string name="section_content">Content preview</string>
+    <string name="section_script">Script</string>
     <string name="behavior_monitor_master">Behavior Listen</string>
     <string name="prefs_monitor_master">Prefs Listen</string>
+    <string name="webview_monitor_master">WebView Listen</string>
     <string name="kind_prefs_open">Prefs Opened</string>
     <string name="kind_prefs_get">Prefs Read</string>
     <string name="kind_prefs_put">Prefs Written</string>
     <string name="kind_prefs_remove">Prefs Key Removed</string>
     <string name="kind_prefs_clear">Prefs Cleared</string>
+    <!-- WebView kind labels (V29) -->
+    <string name="kind_wv_page_load">Page Load</string>
+    <string name="kind_wv_evaluate_js">Evaluate JS</string>
+    <string name="kind_wv_js_bridge">JS Bridge</string>
+    <string name="kind_wv_debug">Debug</string>
+    <string name="kind_wv_js_crypto">JS Crypto</string>
+    <!-- WebView operation labels (V29) -->
+    <string name="op_wv_load_url">loadUrl</string>
+    <string name="op_wv_load_data">loadData</string>
+    <string name="op_wv_evaluate_js">evaluateJavascript</string>
+    <string name="op_wv_add_js_interface">addJavascriptInterface</string>
+    <string name="op_wv_set_debugging">setWebContentsDebuggingEnabled</string>
+    <string name="op_wv_page_finished">onPageFinished</string>
+    <string name="op_wv_js_encrypt">JS encrypt</string>
+    <string name="op_wv_js_decrypt">JS decrypt</string>
+    <string name="op_wv_js_digest">JS digest</string>
+    <string name="op_wv_js_sign">JS sign</string>
+    <string name="op_wv_js_verify">JS verify</string>
+    <string name="op_wv_js_import_key">JS importKey</string>
+    <string name="op_wv_js_generate_key">JS generateKey</string>
     <string name="op_prefs_open">Open Prefs File</string>
     <string name="op_prefs_get_string">getString</string>
     <string name="op_prefs_get_int">getInt</string>
@@ -387,8 +416,11 @@
     <string name="settings_records_database">Database records</string>
     <string name="settings_records_behavior">Behavior records</string>
     <string name="settings_records_prefs">Prefs records</string>
+    <string name="settings_records_webview">WebView records</string>
     <string name="settings_clear_prefs_records">Clear prefs records</string>
+    <string name="settings_clear_webview_records">Clear WebView records</string>
     <string name="danger_clear_prefs_msg">Clear all SharedPreferences records? This cannot be undone.</string>
+    <string name="danger_clear_webview_msg">Clear all WebView records? This cannot be undone.</string>
     <string name="settings_storage_section">Storage</string>
     <string name="settings_storage_db">Database file</string>
     <string name="settings_clear_algorithm_records">Clear algorithm records</string>

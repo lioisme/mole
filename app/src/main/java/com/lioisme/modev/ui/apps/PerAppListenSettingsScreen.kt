@@ -53,6 +53,7 @@ import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.RecordType
+import com.lioisme.modev.core.model.WebViewKind
 import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.ui.components.IntLimitSheet
 import com.lioisme.modev.ui.components.IgnorePathSheet
@@ -110,6 +111,11 @@ class PerAppListenSettingsViewModel(
     /** 偏好监听总开关定制(V28)。 */
     fun setPrefsMaster(value: Boolean) {
         update { it.copy(prefsListen = value) }
+    }
+
+    /** WebView 监听总开关定制(V29)。 */
+    fun setWebviewMaster(value: Boolean) {
+        update { it.copy(webviewListen = value) }
     }
 
     /** 类别定制(kind 名跨枚举;非法名由 AppListenOverride 容错忽略)。 */
@@ -261,6 +267,13 @@ fun PerAppListenSettingsScreen(
                     onCheckedChange = { viewModel.setPrefsMaster(it) },
                     testTag = "listen-row-master-prefs",
                 )
+                HorizontalDivider16Compat()
+                ListenRow(
+                    label = res.getString(R.string.webview_monitor_master),
+                    checked = effective.webviewListen,
+                    onCheckedChange = { viewModel.setWebviewMaster(it) },
+                    testTag = "listen-row-master-webview",
+                )
             }
             Spacer(Modifier.height(16.dp))
 
@@ -326,6 +339,20 @@ fun PerAppListenSettingsScreen(
             // 偏好 5 类别(V28 一等公民;值捕获复用 fileContentCapture、路径降噪复用 ignorePathPrefixes)
             SettingsSection(stringResource(R.string.filter_type_prefs)) {
                 CategoryTaxonomy.forType(RecordType.PREFS).forEachIndexed { index, category ->
+                    if (index > 0) HorizontalDivider16Compat()
+                    ListenRow(
+                        label = res.getString(switchLabelRes(category.id)),
+                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.id, it) },
+                        testTag = "listen-row-${category.id}",
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+
+            // WebView 5 类别(V29 一等公民)
+            SettingsSection(stringResource(R.string.filter_type_webview)) {
+                CategoryTaxonomy.forType(RecordType.WEBVIEW).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16Compat()
                     ListenRow(
                         label = res.getString(switchLabelRes(category.id)),
@@ -613,5 +640,11 @@ private fun switchLabelRes(kindId: String): Int = when (kindId) {
     BehaviorKind.FILE_LIST.name -> R.string.kind_behavior_file_list
     BehaviorKind.ASSET_READ.name -> R.string.kind_behavior_asset_read
     BehaviorKind.SHELL_EXEC.name -> R.string.kind_behavior_shell_exec
+    // WebView 类别(V29 一等公民)
+    WebViewKind.PAGE_LOAD.name -> R.string.kind_wv_page_load
+    WebViewKind.EVALUATE_JS.name -> R.string.kind_wv_evaluate_js
+    WebViewKind.JS_BRIDGE.name -> R.string.kind_wv_js_bridge
+    WebViewKind.DEBUG.name -> R.string.kind_wv_debug
+    WebViewKind.JS_CRYPTO.name -> R.string.kind_wv_js_crypto
     else -> R.string.unknown_error
 }

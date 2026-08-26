@@ -22,6 +22,7 @@ object EffectiveSwitch {
         override.dbListen?.let { result = result.copy(dbListen = it) }
         override.behaviorListen?.let { result = result.copy(behaviorListen = it) }
         override.prefsListen?.let { result = result.copy(prefsListen = it) }
+        override.webviewListen?.let { result = result.copy(webviewListen = it) }
         if (override.kinds.isNotEmpty()) {
             result = applyKinds(result, override.kinds)
         }
@@ -72,6 +73,11 @@ object EffectiveSwitch {
         PrefsKind.PUT.name -> switch.prefsPut
         PrefsKind.REMOVE.name -> switch.prefsRemove
         PrefsKind.CLEAR.name -> switch.prefsClear
+        WebViewKind.PAGE_LOAD.name -> switch.wvPageLoad
+        WebViewKind.EVALUATE_JS.name -> switch.wvEvaluateJs
+        WebViewKind.JS_BRIDGE.name -> switch.wvJsBridge
+        WebViewKind.DEBUG.name -> switch.wvDebug
+        WebViewKind.JS_CRYPTO.name -> switch.wvJsCrypto
         else -> null
     }
 
@@ -112,6 +118,11 @@ object EffectiveSwitch {
                 PrefsKind.PUT.name -> result.copy(prefsPut = value)
                 PrefsKind.REMOVE.name -> result.copy(prefsRemove = value)
                 PrefsKind.CLEAR.name -> result.copy(prefsClear = value)
+                WebViewKind.PAGE_LOAD.name -> result.copy(wvPageLoad = value)
+                WebViewKind.EVALUATE_JS.name -> result.copy(wvEvaluateJs = value)
+                WebViewKind.JS_BRIDGE.name -> result.copy(wvJsBridge = value)
+                WebViewKind.DEBUG.name -> result.copy(wvDebug = value)
+                WebViewKind.JS_CRYPTO.name -> result.copy(wvJsCrypto = value)
                 // 未知 kind 名:忽略(存储漂移兜底)
                 else -> result
             }

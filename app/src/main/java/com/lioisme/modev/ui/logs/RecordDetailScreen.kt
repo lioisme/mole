@@ -49,10 +49,12 @@ import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.model.SqlRecord
+import com.lioisme.modev.core.model.WebViewRecord
 import com.lioisme.modev.data.mapping.BehaviorDetail
 import com.lioisme.modev.data.mapping.CryptoDetail
 import com.lioisme.modev.data.mapping.PrefsDetail
 import com.lioisme.modev.data.mapping.RecordDetailModel
+import com.lioisme.modev.data.mapping.WebViewDetail
 import com.lioisme.modev.data.mapping.SqlDetail
 import com.lioisme.modev.data.mapping.toJson
 import com.lioisme.modev.ui.components.ModevTopBar
@@ -67,6 +69,8 @@ import com.lioisme.modev.ui.components.operationLabel
 import com.lioisme.modev.ui.components.prefsKindLabelRes
 import com.lioisme.modev.ui.components.prefsOperationLabel
 import com.lioisme.modev.ui.components.prefsOperationLabelRes
+import com.lioisme.modev.ui.components.webviewKindLabelRes
+import com.lioisme.modev.ui.components.webviewOperationLabelRes
 import com.lioisme.modev.ui.components.sqlHeadline
 import com.lioisme.modev.ui.components.sqlKindLabelRes
 import com.lioisme.modev.ui.components.sqlOperationLabel
@@ -74,6 +78,7 @@ import com.lioisme.modev.ui.logs.detail.behaviorAnchors
 import com.lioisme.modev.ui.logs.detail.cryptoAnchors
 import com.lioisme.modev.ui.logs.detail.prefsAnchors
 import com.lioisme.modev.ui.logs.detail.sqlAnchors
+import com.lioisme.modev.ui.logs.detail.webviewAnchors
 import com.lioisme.modev.ui.logs.markdown.DetailCodeActions
 import com.lioisme.modev.ui.logs.markdown.DetailFenceHandle
 import com.lioisme.modev.ui.logs.markdown.FLOW_ARROW_LINE
@@ -170,6 +175,7 @@ fun RecordDetailScreen(
                 is SqlDetail -> estimateSqlJsonChars(current.record)
                 is BehaviorDetail -> estimateBehaviorJsonChars(current.record)
                 is PrefsDetail -> estimatePrefsJsonChars(current.record)
+                is WebViewDetail -> estimateWebViewJsonChars(current.record)
             }
         if (estimatedChars > EXPORT_MAX_CHARS) {
             showSnack(context.getString(R.string.export_too_large, estimatedChars))
@@ -184,6 +190,7 @@ fun RecordDetailScreen(
                             is SqlDetail -> current.record.toJson()
                             is BehaviorDetail -> current.record.toJson()
                             is PrefsDetail -> current.record.toJson()
+                            is WebViewDetail -> current.record.toJson()
                         }
                     }
                 }
@@ -298,6 +305,7 @@ private fun LoadedContent(
         is SqlDetail -> SqlLoadedContent(record.record, innerPadding, listState, actions)
         is BehaviorDetail -> BehaviorLoadedContent(record.record, innerPadding, listState, actions)
         is PrefsDetail -> PrefsLoadedContent(record.record, innerPadding, listState, actions)
+        is WebViewDetail -> WebViewLoadedContent(record.record, innerPadding, listState, actions)
     }
 }
 
@@ -952,4 +960,129 @@ private fun PrefsLoadedContent(
         item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
     }
 }
+// endregion
+
+// region WebView detail
+
+/** WebView 记录详情 Markdown 渲染(V29 一等公民)。 */
+@Composable
+private fun WebViewLoadedContent(
+    record: WebViewRecord,
+    innerPadding: PaddingValues,
+    listState: LazyListState,
+    actions: DetailCodeActions,
+) {
+    val res = LocalContext.current.resources
+
+    val metaEntries =
+        listOfNotNull(
+            Pair(stringResource(R.string.meta_kind), stringResource(webviewKindLabelRes(record.kind))),
+            Pair(stringResource(R.string.meta_operation), stringResource(webviewOperationLabelRes(record.operation))),
+            record.url?.let { Pair(stringResource(R.string.meta_url), it) },
+            record.urlHost?.let { Pair(stringResource(R.string.meta_url_host), it) },
+            record.bridgeName?.let { Pair(stringResource(R.string.meta_bridge), it) },
+            record.script?.let { view ->
+                Pair(
+                    stringResource(R.string.meta_script_size),
+                    StorageFormat.formatBytes(view.totalLength.toLong()),
+                )
+            },
+            Pair(stringResource(R.string.meta_thread), record.threadName),
+            timestampEntry(record.timestamp),
+        )
+    val metaTitle = stringResource(R.string.section_metadata)
+    val metaTable = metaSectionDoc(metaTitle, metaEntries)
+
+    val accent =
+        accentLine(
+            stringResource(webviewKindLabelRes(record.kind)),
+            stringResource(webviewOperationLabelRes(record.operation)),
+        )
+    val identityMarkdown = identityDoc(headline = webviewHeadline(record), accentLine = accent)
+
+    val anchors = webviewAnchors(record)
+    val tocList = tocEntries(anchors)
+
+    val scriptTitle = stringResource(R.string.section_script)
+    val paramsTitle = stringResource(R.string.section_params)
+    val stackTitle = stringResource(R.string.section_stack)
+
+    val scriptDoc =
+        record.script?.let { view ->
+            val body = view.text
+            if (body.isNullOrEmpty()) {
+                null
+            } else {
+                val trailers =
+                    if (view.truncated) listOf(res.getString(R.string.bytes_truncated)) else emptyList()
+                textSectionDoc(scriptTitle, body, lang = MarkdownLangs.JAVASCRIPT, trailerLines = trailers)
+            }
+        }
+    val paramsDoc =
+        record.params?.takeIf { it.isNotEmpty() }?.let { params ->
+            val formatted = formatParamsJson(params)
+            val trailers =
+                buildList {
+                    if (formatted.truncatedValues > 0) add(res.getString(R.string.params_truncated))
+                    if (formatted.omittedEntries > 0) {
+                        add(res.getQuantityString(R.plurals.params_omitted, formatted.omittedEntries, formatted.omittedEntries))
+                    }
+                }
+            textSectionDoc(paramsTitle, formatted.json!!, lang = MarkdownLangs.JSON, trailerLines = trailers)
+        }
+    val stackDoc =
+        if (record.stack.isEmpty()) {
+            null
+        } else {
+            val frames = record.stack.take(STACK_MAX_FRAMES)
+            val omittedFrames = record.stack.size - STACK_MAX_FRAMES
+            val trailer =
+                if (omittedFrames > 0) {
+                    listOf(res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames))
+                } else {
+                    emptyList()
+                }
+            textSectionDoc(stackTitle, frames.joinToString("\n"), trailerLines = trailer)
+        }
+
+    val book = remember(record.id) { AnchorBookkeeping(listState) }
+    val scrollScope = rememberCoroutineScope()
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+    ) {
+        book.cursor = 0
+        book.advance(identityItem(identityMarkdown))
+        book.advance(tocSectionItems(tocList, onAnchorClick = { book.scrollTo(it, scrollScope) }))
+        book.mark("meta")
+        book.advance(metaTableItems("meta", metaTable))
+
+        scriptDoc?.let { doc ->
+            book.mark("script")
+            book.advance(markdownSectionItems("script", doc, actions))
+        }
+        paramsDoc?.let { doc ->
+            book.mark("params")
+            book.advance(markdownSectionItems("params", doc, actions))
+        }
+        stackDoc?.let { doc ->
+            book.mark("stack")
+            book.advance(markdownSectionItems("stack", doc, actions))
+        }
+        item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+/** WebView 记录详情顶栏标题(URL host / URL / 操作名)。 */
+@Composable
+internal fun webviewHeadline(record: WebViewRecord): String {
+    record.urlHost?.takeIf { it.isNotBlank() }?.let { return it }
+    record.url?.takeIf { it.isNotBlank() }?.let { return it }
+    return stringResource(webviewOperationLabelRes(record.operation))
+}
+
 // endregion

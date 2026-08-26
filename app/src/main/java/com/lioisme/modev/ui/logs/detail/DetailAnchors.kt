@@ -5,6 +5,7 @@ import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.model.SqlRecord
+import com.lioisme.modev.core.model.WebViewRecord
 
 /**
  * 详情锚点导航(V28 纯 Kotlin 化,原 FilterChip 行退役):
@@ -57,6 +58,15 @@ fun behaviorAnchors(record: BehaviorRecord): List<DetailAnchor> {
 fun prefsAnchors(record: PrefsRecord): List<DetailAnchor> {
     val anchors = mutableListOf<DetailAnchor>()
     if (record.value != null) anchors += DetailAnchor("value", R.string.section_value)
+    if (!record.params.isNullOrEmpty()) anchors += DetailAnchor("params", R.string.section_params)
+    if (record.stack.isNotEmpty()) anchors += DetailAnchor("stack", R.string.section_stack)
+    return anchors
+}
+
+/** WebView 记录锚点(V29):脚本 / 参数 / 调用栈(按存在性)。 */
+fun webviewAnchors(record: WebViewRecord): List<DetailAnchor> {
+    val anchors = mutableListOf<DetailAnchor>()
+    if (record.script != null) anchors += DetailAnchor("script", R.string.section_script)
     if (!record.params.isNullOrEmpty()) anchors += DetailAnchor("params", R.string.section_params)
     if (record.stack.isNotEmpty()) anchors += DetailAnchor("stack", R.string.section_stack)
     return anchors

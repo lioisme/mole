@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Terminal
@@ -48,6 +49,7 @@ private enum class ClearTarget {
     DATABASE,
     BEHAVIOR,
     PREFS,
+    WEBVIEW,
     ALL,
 }
 
@@ -107,6 +109,11 @@ fun DataSettingsScreen(
                     title = stringResource(R.string.settings_records_prefs),
                     value = stringResource(R.string.settings_total_records_value, typeCounts[RecordType.PREFS.wire] ?: 0L),
                 )
+                SettingsInfoItem(
+                    icon = Icons.Default.Language,
+                    title = stringResource(R.string.settings_records_webview),
+                    value = stringResource(R.string.settings_total_records_value, typeCounts[RecordType.WEBVIEW.wire] ?: 0L),
+                )
             }
             Spacer(Modifier.height(24.dp))
             SettingsSection(stringResource(R.string.settings_storage_section)) {
@@ -140,6 +147,10 @@ fun DataSettingsScreen(
                     onClick = { pendingClear = ClearTarget.PREFS },
                 )
                 DangerRow(
+                    text = stringResource(R.string.settings_clear_webview_records),
+                    onClick = { pendingClear = ClearTarget.WEBVIEW },
+                )
+                DangerRow(
                     text = stringResource(R.string.settings_clear_all_records),
                     onClick = { pendingClear = ClearTarget.ALL },
                 )
@@ -162,6 +173,7 @@ fun DataSettingsScreen(
                             ClearTarget.DATABASE -> R.string.danger_clear_database_msg
                             ClearTarget.BEHAVIOR -> R.string.danger_clear_behavior_msg
                             ClearTarget.PREFS -> R.string.danger_clear_prefs_msg
+                            ClearTarget.WEBVIEW -> R.string.danger_clear_webview_msg
                             ClearTarget.ALL -> R.string.danger_clear_all_msg
                         },
                     ),
@@ -174,6 +186,7 @@ fun DataSettingsScreen(
                             ClearTarget.DATABASE -> viewModel.clearByType(RecordType.DATABASE)
                             ClearTarget.BEHAVIOR -> viewModel.clearByType(RecordType.BEHAVIOR)
                             ClearTarget.PREFS -> viewModel.clearByType(RecordType.PREFS)
+                            ClearTarget.WEBVIEW -> viewModel.clearByType(RecordType.WEBVIEW)
                             ClearTarget.ALL -> viewModel.clearAll()
                         }
                         pendingClear = null

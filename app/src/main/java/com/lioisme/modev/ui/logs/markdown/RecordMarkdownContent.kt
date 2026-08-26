@@ -96,6 +96,7 @@ private const val CODE_CHUNK_CHARS = 4096
 internal fun highlightSyntaxLanguage(language: String?): SyntaxLanguage? =
     when (language) {
         MarkdownLangs.JSON -> SyntaxLanguage.JAVASCRIPT
+        MarkdownLangs.JAVASCRIPT -> SyntaxLanguage.JAVASCRIPT
         "bash", "sh", "shell" -> SyntaxLanguage.SHELL
         else -> null
     }

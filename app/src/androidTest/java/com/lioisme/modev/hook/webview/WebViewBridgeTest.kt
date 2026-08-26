@@ -40,7 +40,7 @@ class WebViewBridgeTest {
 
     @Before
     fun setUp() {
-        switch = HookSwitch.DEFAULT.copy(webView = true)
+        switch = HookSwitch.DEFAULT.copy(wvJsCrypto = true)
         sink = RecordSink(
             jsonOf = { it.toString() },
             sendJson = { json ->

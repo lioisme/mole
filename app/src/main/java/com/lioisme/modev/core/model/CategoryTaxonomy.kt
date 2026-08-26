@@ -79,6 +79,13 @@ object CategoryTaxonomy {
         add(RecordCategory(PrefsKind.PUT.name, RecordType.PREFS, true, NoiseTier.SIGNAL, 2))
         add(RecordCategory(PrefsKind.REMOVE.name, RecordType.PREFS, true, NoiseTier.SIGNAL, 3))
         add(RecordCategory(PrefsKind.CLEAR.name, RecordType.PREFS, true, NoiseTier.SIGNAL, 4))
+        // WebView 类别(V29 一等公民;默认态与 HookSwitch.DEFAULT 对齐:PAGE_LOAD/EVALUATE_JS/
+        // JS_BRIDGE/DEBUG 高信号默认开,JS_CRYPTO 高频噪声默认关)
+        add(RecordCategory(WebViewKind.PAGE_LOAD.name, RecordType.WEBVIEW, true, NoiseTier.SIGNAL, 0))
+        add(RecordCategory(WebViewKind.EVALUATE_JS.name, RecordType.WEBVIEW, true, NoiseTier.SIGNAL, 1))
+        add(RecordCategory(WebViewKind.JS_BRIDGE.name, RecordType.WEBVIEW, true, NoiseTier.SIGNAL, 2))
+        add(RecordCategory(WebViewKind.DEBUG.name, RecordType.WEBVIEW, true, NoiseTier.SIGNAL, 3))
+        add(RecordCategory(WebViewKind.JS_CRYPTO.name, RecordType.WEBVIEW, false, NoiseTier.NOISE_HIGH, 4))
     }
 
     /** 全部类别(按 type 分组、组内按 order;稳定输出)。 */
@@ -118,6 +125,7 @@ object CategoryTaxonomy {
             RecordType.DATABASE -> SqlOperation.entries.map { it.name }.toSet()
             RecordType.BEHAVIOR -> BehaviorOperation.entries.map { it.name }.toSet()
             RecordType.PREFS -> PrefsOperation.entries.map { it.name }.toSet()
+            RecordType.WEBVIEW -> WebViewOperation.entries.map { it.name }.toSet()
         }
         return operations.intersect(valid)
     }

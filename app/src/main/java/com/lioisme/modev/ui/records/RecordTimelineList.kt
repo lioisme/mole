@@ -60,7 +60,7 @@ fun RecordTimelineList(
     ) {
         when {
             records.itemCount == 0 && records.loadState.refresh is LoadState.NotLoading ->
-                item(key = "empty") {
+                item(key = "empty", contentType = "empty") {
                     Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
                         EmptyState(
                             icon = Icons.Outlined.Terminal,
@@ -71,7 +71,7 @@ fun RecordTimelineList(
                 }
 
             records.itemCount == 0 && records.loadState.refresh is LoadState.Loading ->
-                item(key = "loading") {
+                item(key = "loading", contentType = "loading") {
                     Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                         Text(
                             stringResource(R.string.loading),
@@ -82,7 +82,7 @@ fun RecordTimelineList(
                 }
 
             records.itemCount == 0 && records.loadState.refresh is LoadState.Error ->
-                item(key = "refresh-error") {
+                item(key = "refresh-error", contentType = "error") {
                     RetryRow(onRetry = { records.retry() })
                 }
 
@@ -90,7 +90,7 @@ fun RecordTimelineList(
                 for (index in 0 until records.itemCount) {
                     val record = records[index]
                     if (record == null) {
-                        item(key = "ph-$index") { Box(Modifier.fillMaxWidth().height(0.dp)) }
+                        item(key = "ph-$index", contentType = "placeholder") { Box(Modifier.fillMaxWidth().height(0.dp)) }
                     } else {
                         val previous = if (index > 0) records[index - 1] else null
                         val label =
@@ -105,7 +105,7 @@ fun RecordTimelineList(
                                 )
                             }
                         if (label != null) {
-                            item(key = "h-" + secondKey(record.timestamp)) {
+                            item(key = "h-" + secondKey(record.timestamp), contentType = "header") {
                                 Box(
                                     Modifier
                                         .fillMaxWidth()
@@ -116,7 +116,7 @@ fun RecordTimelineList(
                                 }
                             }
                         }
-                        item(key = record.id) {
+                        item(key = record.id, contentType = "record") {
                             RecordRow(
                                 record = record,
                                 onClick = { onOpenRecord(record.id) },
@@ -132,7 +132,7 @@ fun RecordTimelineList(
             }
         }
         when (val append = records.loadState.append) {
-            is LoadState.Loading -> item {
+            is LoadState.Loading -> item(contentType = "append-loading") {
                 Box(Modifier.fillMaxWidth().padding(16.dp), contentAlignment = Alignment.Center) {
                     Text(
                         stringResource(R.string.loading),
@@ -141,7 +141,7 @@ fun RecordTimelineList(
                     )
                 }
             }
-            is LoadState.Error -> item {
+            is LoadState.Error -> item(contentType = "append-error") {
                 RetryRow(onRetry = { records.retry() })
             }
             else -> {}

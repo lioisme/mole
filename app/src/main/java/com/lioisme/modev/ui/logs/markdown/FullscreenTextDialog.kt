@@ -1,8 +1,6 @@
 package com.lioisme.modev.ui.logs.markdown
 
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,7 +9,6 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -39,9 +36,10 @@ import com.lioisme.modev.core.util.ChunkedText
 import com.lioisme.modev.ui.components.TipIconButton
 
 /**
- * 全屏文本查看器(V29 重构):
+ * 全屏文本查看器(V31 修复):
  * - Dialog 全屏覆盖(usePlatformDefaultWidth = false),正文经 [ChunkedText]
  *   O(1) 分块惰性虚拟化——多 MB 全量文本仅组合可视块;
+ * - 文本自动换行(softWrap=true),纵向 LazyColumn 滚动浏览完整内容;
  * - 每 chunk 行独立 [SelectionContainer](修复 V26 SelectionContainer 包裹 LazyColumn
  *   导致滚动失效的已知缺陷);
  * - TopAppBar/body 正确处理系统 insets(状态栏 + 导航栏),无遮蔽;
@@ -116,10 +114,8 @@ private fun FullscreenBody(fullText: String) {
                         fontFamily = FontFamily.Monospace,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
-                    softWrap = false,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 2.dp),
                 )
             }

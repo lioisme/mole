@@ -1,5 +1,6 @@
 package com.lioisme.modev.data.mapping
 
+import androidx.compose.runtime.Immutable
 import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.BehaviorOperation
 import com.lioisme.modev.core.model.CryptoRecord
@@ -7,6 +8,8 @@ import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.PrefsOperation
 import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.core.model.SqlOperation
+import com.lioisme.modev.core.model.WebViewKind
+import com.lioisme.modev.core.model.WebViewOperation
 
 /**
  * 列表行轻量模型(ADR-10,数据库监听 T9):
@@ -24,6 +27,7 @@ sealed interface RowModel {
 }
 
 /** 算法记录行(投影预览,字段语义同列表页既有 [CryptoRecord] 轻量复用)。 */
+@Immutable
 data class CryptoRow(
     val record: CryptoRecord,
 ) : RowModel {
@@ -33,6 +37,7 @@ data class CryptoRow(
 }
 
 /** 数据库记录行(SQL 摘要预览 + 结果元数据;零大字段物化)。 */
+@Immutable
 data class SqlRow(
     val recordId: Long,
     val recordTimestamp: Long,
@@ -54,6 +59,7 @@ data class SqlRow(
  * 行为记录行(V27;路径/命令摘要预览,零内容物化——content 仅存实体列,
  * 详情页按需全量读取)。
  */
+@Immutable
 data class BehaviorRow(
     val recordId: Long,
     val recordTimestamp: Long,
@@ -85,6 +91,7 @@ data class BehaviorRow(
  * 偏好记录行(V28;键/文件摘要预览,零值域物化——value 仅存实体 content 列,
  * 详情页按需全量读取)。
  */
+@Immutable
 data class PrefsRow(
     val recordId: Long,
     val recordTimestamp: Long,
@@ -104,4 +111,32 @@ data class PrefsRow(
     fun headlineText(): String? =
         prefKey?.takeIf { it.isNotBlank() }
             ?: path?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
+}
+
+/**
+ * WebView 记录行(V29 一等公民;URL/域名/桥名摘要预览,零脚本物化——script 仅存实体列,
+ * 详情页按需全量读取)。
+ */
+@Immutable
+data class WebViewRow(
+    val recordId: Long,
+    val recordTimestamp: Long,
+    override val packageName: String,
+    val kind: WebViewKind,
+    val operation: WebViewOperation,
+    /** 目标 URL(PAGE_LOAD/EVALUATE_JS)。 */
+    val url: String?,
+    /** URL 域名(列表预览用)。 */
+    val urlHost: String?,
+    /** JS 桥名称(ADD_JS_INTERFACE)。 */
+    val bridgeName: String?,
+    val threadName: String,
+) : RowModel {
+    override val id: Long get() = recordId
+    override val timestamp: Long get() = recordTimestamp
+
+    /** 列表 headline 单一事实源:域名 / 操作名;恒非空。 */
+    fun headlineText(): String? =
+        urlHost?.takeIf { it.isNotBlank() }
+            ?: bridgeName?.takeIf { it.isNotBlank() }
 }

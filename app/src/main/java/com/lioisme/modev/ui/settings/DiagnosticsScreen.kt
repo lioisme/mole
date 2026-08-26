@@ -251,6 +251,7 @@ fun DiagnosticsScreen(
                 SettingsToggleItem(
                     icon = Icons.Default.Public,
                     title = stringResource(R.string.settings_external_access),
+                    subtitle = stringResource(R.string.settings_external_access_hint, port),
                     checked = externalAccess,
                     modifier = Modifier.testTag("diagnostics-bind-all"),
                     onCheckedChange = { viewModel.setExternalAccess(it) },

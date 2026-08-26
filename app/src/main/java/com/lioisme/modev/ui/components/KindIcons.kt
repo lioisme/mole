@@ -34,6 +34,7 @@ import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.SqlKind
+import com.lioisme.modev.core.model.WebViewKind
 
 /**
  * 类别图标映射(V27 M1-T2):记录列表 leading 徽章的 kind→图标单一事实源。
@@ -92,5 +93,15 @@ object KindIcons {
             PrefsKind.PUT -> Icons.Outlined.EditNote
             PrefsKind.REMOVE -> Icons.Outlined.RemoveCircleOutline
             PrefsKind.CLEAR -> Icons.Outlined.DeleteSweep
+        }
+
+    /** WebView 族(V29 一等公民)。 */
+    fun webview(kind: WebViewKind): ImageVector =
+        when (kind) {
+            WebViewKind.PAGE_LOAD -> Icons.Outlined.Public
+            WebViewKind.EVALUATE_JS -> Icons.Outlined.Code
+            WebViewKind.JS_BRIDGE -> Icons.Outlined.SwapHoriz
+            WebViewKind.DEBUG -> Icons.Outlined.Visibility
+            WebViewKind.JS_CRYPTO -> Icons.Outlined.EnhancedEncryption
         }
 }

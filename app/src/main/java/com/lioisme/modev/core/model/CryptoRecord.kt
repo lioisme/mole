@@ -1,5 +1,6 @@
 package com.lioisme.modev.core.model
 
+import androidx.compose.runtime.Immutable
 import com.lioisme.modev.core.util.BytesView
 
 /**
@@ -31,6 +32,7 @@ import com.lioisme.modev.core.util.BytesView
  * @param stack 过滤后的应用调用栈(最内层在前)
  * @param timestamp 毫秒时间戳
  */
+@Immutable
 data class CryptoRecord(
     val id: Long = 0L,
     override val seq: Long = 0L,

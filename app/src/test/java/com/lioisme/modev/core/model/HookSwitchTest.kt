@@ -29,6 +29,8 @@ class HookSwitchTest {
             fileRename = false, fileList = false, assetRead = false, shellExec = false,
             prefsOpen = false, prefsGet = false, prefsPut = false,
             prefsRemove = false, prefsClear = false,
+            webviewListen = false,
+            wvPageLoad = false, wvEvaluateJs = false, wvJsBridge = false, wvDebug = false, wvJsCrypto = false,
         )
         assertFalse(s.anyEnabled)
         assertFalse(s.anyCryptoEnabled)
@@ -181,6 +183,8 @@ class HookSwitchTest {
             fileRename = false, fileList = false, assetRead = false, shellExec = false,
             prefsOpen = false, prefsGet = false, prefsPut = false,
             prefsRemove = false, prefsClear = false,
+            webviewListen = false,
+            wvPageLoad = false, wvEvaluateJs = false, wvJsBridge = false, wvDebug = false, wvJsCrypto = false,
         )
         assertFalse(allOff.anyEnabled)
     }
@@ -232,8 +236,8 @@ class HookSwitchTest {
         assertTrue(prefsOff.anyCryptoEnabled)
         assertTrue(prefsOff.anyDbEnabled)
         assertTrue(prefsOff.anyBehaviorEnabled)
-        // 四总开关关:整体停用。
-        assertFalse(cryptoOff.copy(dbListen = false, behaviorListen = false, prefsListen = false).anyEnabled)
+        // 五总开关关:整体停用。
+        assertFalse(cryptoOff.copy(dbListen = false, behaviorListen = false, prefsListen = false, webviewListen = false).anyEnabled)
     }
 
     @Test
@@ -242,6 +246,7 @@ class HookSwitchTest {
         assertTrue(HookSwitch.DEFAULT.dbListen)
         assertTrue(HookSwitch.DEFAULT.behaviorListen)
         assertTrue(HookSwitch.DEFAULT.prefsListen)
+        assertTrue(HookSwitch.DEFAULT.webviewListen)
     }
 
     @Test
@@ -280,6 +285,32 @@ class HookSwitchTest {
         assertTrue(s.behaviorEnabled(BehaviorKind.FILE_LIST))
         assertFalse(s.behaviorEnabled(BehaviorKind.ASSET_READ))
         assertTrue(s.behaviorEnabled(BehaviorKind.SHELL_EXEC))
+    }
+
+    @Test
+    fun webview_enabled_maps_each_kind() {
+        val s = HookSwitch(
+            wvPageLoad = true, wvEvaluateJs = false, wvJsBridge = true,
+            wvDebug = false, wvJsCrypto = true,
+        )
+        assertTrue(s.webviewEnabled(WebViewKind.PAGE_LOAD))
+        assertFalse(s.webviewEnabled(WebViewKind.EVALUATE_JS))
+        assertTrue(s.webviewEnabled(WebViewKind.JS_BRIDGE))
+        assertFalse(s.webviewEnabled(WebViewKind.DEBUG))
+        assertTrue(s.webviewEnabled(WebViewKind.JS_CRYPTO))
+        assertTrue(s.anyWebviewEnabled)
+    }
+
+    @Test
+    fun webview_noise_categories_off_by_default() {
+        // DEBUG 默认开(诊断用途)
+        assertTrue("debug category should default on", HookSwitch.DEFAULT.webviewEnabled(WebViewKind.DEBUG))
+        // JS_CRYPTO 默认关(高噪声)
+        assertFalse("noise webview category JS_CRYPTO should default off", HookSwitch.DEFAULT.webviewEnabled(WebViewKind.JS_CRYPTO))
+        // PAGE_LOAD / EVALUATE_JS / JS_BRIDGE 默认开
+        for (kind in listOf(WebViewKind.PAGE_LOAD, WebViewKind.EVALUATE_JS, WebViewKind.JS_BRIDGE)) {
+            assertTrue("signal webview category $kind should default on", HookSwitch.DEFAULT.webviewEnabled(kind))
+        }
     }
 
     @Test

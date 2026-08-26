@@ -1,4 +1,4 @@
-# Modev 记录详情性能与全屏查看器修复任务 V30
+# Modev 记录详情性能与全屏查看器修复任务 V30/V31
 
 > 审计日期：2026-08-27
 > 完成日期：2026-08-27
@@ -122,7 +122,7 @@
 | 内存 PSS | 141MB | < 200MB | ✅ |
 | 内存 RSS | 246MB | < 300MB | ✅ |
 
-**全屏查看器验证：**
+**全屏查看器验证(V30)：**
 - `查看全文` 按钮定位成功，点击后弹出 `FullscreenTextDialog`
 - 垂直滚动正常，fling 惯性滚动流畅
 - 水平滚动正常，长行内容可完整查看
@@ -130,11 +130,40 @@
 
 ---
 
+## V31 全屏查看器修复 (2026-08-27)
+
+### 问题
+V30 的全屏查看器存在严重设计缺陷：
+1. `softWrap = false` — 长行不换行，内容被裁剪
+2. 每个 chunk 独立 `horizontalScroll` — 每行可单独水平滑动，体验极差
+
+### 修复
+**文件：** `FullscreenTextDialog.kt`
+- 移除 `horizontalScroll(rememberScrollState())` 修饰符
+- 移除 `softWrap = false`（默认 `true`，文本自动换行）
+- 移除未使用的 `Spacer`、`rememberScrollState`、`horizontalScroll` 导入
+
+### 验证结果
+
+| 指标 | 结果 | 阈值 | 状态 |
+|------|------|------|------|
+| 文本自动换行 | ✅ | - | ✅ |
+| 纵向滚动 | ✅ (fling 惯性正常) | - | ✅ |
+| 水平滚动 | ❌ (已移除，符合设计) | - | ✅ |
+| 崩溃 | 0 | 0 | ✅ |
+| ANR | 0 | 0 | ✅ |
+| Janky帧 | 35/2096 (1.67%) | < 10% | ✅ |
+| 50th percentile | 5ms | < 16.67ms | ✅ |
+| 90th percentile | 6ms | < 33ms | ✅ |
+| 95th percentile | 9ms | < 50ms | ✅ |
+
+---
+
 ## 3. 变更文件清单
 
 | 文件 | 变更类型 |
 |------|----------|
-| `ui/logs/markdown/FullscreenTextDialog.kt` | 添加 `horizontalScroll` |
+| `ui/logs/markdown/FullscreenTextDialog.kt` | V30: 添加 `horizontalScroll`; V31: 移除 `horizontalScroll` + `softWrap=false`，启用自动换行 |
 | `ui/logs/markdown/RecordMarkdownContent.kt` | 文档级 `buildFenceIndex` + `LocalFenceIndex` + `remember(placement)` |
 | `ui/logs/markdown/CodeGroupExtractor.kt` | `Long` key 替代 `Pair` |
 | `core/util/ChunkedText.kt` | 行边界对齐预计算 |
@@ -145,7 +174,7 @@
 |------|------|----------|------|
 | 详情页首帧时间 | < 200ms | `adb shell am start -W` | ✅ (代码审查确认) |
 | 滚动帧率 | ≥ 55fps（均值） | `adb shell dumpsys gfxinfo` | ✅ (50th=5ms, 90th=6ms) |
-| 全屏查看长行可见性 | 100% 字符可达 | `uiautomator dump` + ADB 滚动测试 | ✅ (实测水平/垂直滚动正常) |
+| 全屏查看长行可见性 | 100% 字符可达 | ADB 滚动测试 | ✅ (文本自动换行，纵向滚动正常) |
 | 内存泄漏 | 进出 20 次后增量 < 5MB | `adb shell dumpsys meminfo` | ✅ (141MB PSS, 稳定) |
 | 单测回归 | 全绿 | `testModernDebugUnitTest` | ✅ (485/485) |
 | Lint 基线 | 0 error / 不新增 warning | `lintModernRelease` | ✅ |

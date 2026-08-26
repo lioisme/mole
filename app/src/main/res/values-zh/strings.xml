@@ -45,12 +45,15 @@
     <string name="prefs_records_title">偏好记录</string>
     <string name="prefs_records_search">搜索偏好记录</string>
     <string name="behavior_records_search">搜索行为记录…</string>
+    <string name="webview_records_title">WebView 记录</string>
+    <string name="webview_records_search">搜索 WebView 记录…</string>
 
     <string name="monitor_records_caption">全部记录</string>
     <string name="filter_type_crypto">算法</string>
     <string name="filter_type_database">数据库</string>
     <string name="filter_type_behavior">行为</string>
     <string name="filter_type_prefs">SharedPreferences</string>
+    <string name="filter_type_webview">WebView</string>
     <string name="detail_empty">暂无记录</string>
     <string name="detail_empty_hint">试试调整筛选条件,或在监听设置中开启更多类别</string>
     <string name="records_count_subtitle">%1$s 条记录</string>
@@ -167,6 +170,10 @@
     <string name="export_ok">已导出</string>
     <string name="meta_kind">类别</string>
     <string name="meta_operation">操作</string>
+    <string name="meta_url">URL</string>
+    <string name="meta_url_host">域名</string>
+    <string name="meta_bridge">桥名称</string>
+    <string name="meta_script_size">脚本大小</string>
     <string name="meta_context">上下文</string>
     <string name="meta_direction">方向</string>
     <string name="meta_provider">提供者</string>
@@ -314,13 +321,35 @@
     <string name="meta_file_size">大小</string>
     <string name="section_command">命令</string>
     <string name="section_content">内容预览</string>
+    <string name="section_script">脚本</string>
     <string name="behavior_monitor_master">行为监听</string>
     <string name="prefs_monitor_master">偏好监听</string>
+    <string name="webview_monitor_master">WebView 监听</string>
     <string name="kind_prefs_open">读入配置文件</string>
     <string name="kind_prefs_get">配置读取</string>
     <string name="kind_prefs_put">配置写入</string>
     <string name="kind_prefs_remove">键删除</string>
     <string name="kind_prefs_clear">全量清空</string>
+    <!-- WebView 类别标签 (V29) -->
+    <string name="kind_wv_page_load">页面加载</string>
+    <string name="kind_wv_evaluate_js">执行 JS</string>
+    <string name="kind_wv_js_bridge">JS 桥</string>
+    <string name="kind_wv_debug">调试开关</string>
+    <string name="kind_wv_js_crypto">JS 密码学</string>
+    <!-- WebView 操作标签 (V29) -->
+    <string name="op_wv_load_url">加载 URL</string>
+    <string name="op_wv_load_data">加载数据</string>
+    <string name="op_wv_evaluate_js">执行 JS</string>
+    <string name="op_wv_add_js_interface">注册 JS 桥</string>
+    <string name="op_wv_set_debugging">设置调试开关</string>
+    <string name="op_wv_page_finished">页面加载完成</string>
+    <string name="op_wv_js_encrypt">JS 加密</string>
+    <string name="op_wv_js_decrypt">JS 解密</string>
+    <string name="op_wv_js_digest">JS 摘要</string>
+    <string name="op_wv_js_sign">JS 签名</string>
+    <string name="op_wv_js_verify">JS 验签</string>
+    <string name="op_wv_js_import_key">JS 导入密钥</string>
+    <string name="op_wv_js_generate_key">JS 生成密钥</string>
     <string name="op_prefs_open">载入配置文件</string>
     <string name="op_prefs_get_string">getString</string>
     <string name="op_prefs_get_int">getInt</string>
@@ -380,8 +409,11 @@
     <string name="settings_records_database">数据库记录</string>
     <string name="settings_records_behavior">行为记录</string>
     <string name="settings_records_prefs">偏好记录</string>
+    <string name="settings_records_webview">WebView 记录</string>
     <string name="settings_clear_prefs_records">清理偏好记录</string>
+    <string name="settings_clear_webview_records">清理 WebView 记录</string>
     <string name="danger_clear_prefs_msg">清空全部 SharedPreferences 记录?此操作不可撤销。</string>
+    <string name="danger_clear_webview_msg">清空全部 WebView 记录?此操作不可撤销。</string>
     <string name="settings_storage_section">存储占用</string>
     <string name="settings_storage_db">数据库文件</string>
     <string name="settings_clear_algorithm_records">清理算法记录</string>

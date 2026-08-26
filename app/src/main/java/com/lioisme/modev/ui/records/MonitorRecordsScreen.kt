@@ -19,7 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,11 +38,13 @@ import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.SqlKind
+import com.lioisme.modev.core.model.WebViewKind
 import com.lioisme.modev.data.mapping.BehaviorRow
 import com.lioisme.modev.data.mapping.CryptoRow
 import com.lioisme.modev.data.mapping.PrefsRow
 import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.mapping.SqlRow
+import com.lioisme.modev.data.mapping.WebViewRow
 import com.lioisme.modev.ui.apps.AppCountFormat
 import com.lioisme.modev.ui.common.rememberEffectiveLocale
 import com.lioisme.modev.ui.components.CollapsedSearchInput
@@ -59,6 +60,8 @@ import com.lioisme.modev.ui.components.rememberSearchController
 import com.lioisme.modev.ui.components.sqlKindLabelRes
 import com.lioisme.modev.ui.components.sqlRowSummary
 import com.lioisme.modev.ui.components.copySummary
+import com.lioisme.modev.ui.components.webviewKindLabelRes
+import com.lioisme.modev.ui.components.webviewSummary
 import kotlinx.coroutines.launch
 
 /**
@@ -142,6 +145,25 @@ fun PrefsRecordsScreen(
     )
 }
 
+/**
+ * 单应用 WebView 记录列表(V29 一等公民):同四兄弟结构,
+ * 固定记录类型 = WebView,类别单选 5 项。
+ */
+@Composable
+fun WebViewRecordsScreen(
+    viewModel: RecordsViewModel,
+    onBack: () -> Unit,
+    onOpenRecord: (Long) -> Unit,
+) {
+    MonitorRecordsContent(
+        viewModel = viewModel,
+        onBack = onBack,
+        onOpenRecord = onOpenRecord,
+        placeholder = stringResource(R.string.webview_records_search),
+        kinds = WebViewKind.entries.map { KindOption(it.name, webviewKindLabelRes(it)) },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MonitorRecordsContent(
@@ -159,8 +181,7 @@ private fun MonitorRecordsContent(
     var filterMenuOpen by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
-    // V27 M1-T4:实时计数副标(totalCount 流首次被消费;随筛选联动)。
-    val totalCount by viewModel.totalCount.collectAsState(initial = null)
+    // V30:计数副标使用 records.itemCount(消除独立 Room COUNT Flow 的重组触发)。
     val locale = rememberEffectiveLocale()
 
     // V27 M1-T4:长按复制摘要(剪贴板 + Snackbar 统一出站)。
@@ -175,6 +196,7 @@ private fun MonitorRecordsContent(
                 is SqlRow -> record.sqlRowSummary(context)
                 is BehaviorRow -> record.behaviorSummary(context)
                 is PrefsRow -> record.prefsSummary(context)
+                is WebViewRow -> webviewSummary(context, record)
             }
         clipboard.setText(AnnotatedString(summary))
         scope.launch {
@@ -226,12 +248,12 @@ private fun MonitorRecordsContent(
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             Column {
-                if (totalCount != null && !search.searchActive) {
+                if (records.itemCount > 0 && !search.searchActive) {
                     Text(
                         text =
                             stringResource(
                                 R.string.records_count_subtitle,
-                                AppCountFormat.grouped(totalCount ?: 0L, locale),
+                                AppCountFormat.grouped(records.itemCount.toLong(), locale),
                             ),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,

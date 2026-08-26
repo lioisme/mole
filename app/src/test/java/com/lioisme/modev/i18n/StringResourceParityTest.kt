@@ -65,6 +65,10 @@ class StringResourceParityTest {
         "licenses_row_format",
         // 监听地址:port 行值(地址:端口,V26 参数化,locale 无关)
         "settings_port_value",
+        // WebView 专有名词(V29)
+        "filter_type_webview",
+        "meta_url",
+        "meta_bridge",
     )
 
     @Test

@@ -70,6 +70,18 @@ data class HookSwitch(
     val shellExec: Boolean = true,
     /** 偏好监听全局总开关(V28;false = 全部偏好类别停用,分开关保留原态)。 */
     val prefsListen: Boolean = true,
+    /** WebView 监听全局总开关(V29 一等公民;false = 全部 WebView 类别停用)。 */
+    val webviewListen: Boolean = true,
+    /** WebView:页面加载(loadUrl/loadData/loadDataWithBaseURL)。低频高信号,默认启用。 */
+    val wvPageLoad: Boolean = true,
+    /** WebView:JS 执行(evaluateJavascript)。高信号,默认启用。 */
+    val wvEvaluateJs: Boolean = true,
+    /** WebView:JS 桥注册(addJavascriptInterface)。高信号,默认启用。 */
+    val wvJsBridge: Boolean = true,
+    /** WebView:调试开关(setWebContentsDebuggingEnabled)。高信号,默认启用。 */
+    val wvDebug: Boolean = true,
+    /** WebView:JS 密码学包装(WebCrypto/CryptoJS/JSEncrypt)。高频噪声,默认关。 */
+    val wvJsCrypto: Boolean = false,
     /**
      * 偏好监听:读入配置文件(SharedPreferencesImpl 构造)。
      * 进程内每文件仅一次,低频高信号,默认启用(决策 D4)。
@@ -110,9 +122,9 @@ data class HookSwitch(
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
     val maxTextChars: Int = RecordLimits.DEFAULT_MAX_TEXT_CHARS,
 ) {
-    /** 是否存在任何需要 Hook 的类别(算法 + 数据库 + 行为 + 偏好任一能力启用)。 */
+    /** 是否存在任何需要 Hook 的类别(算法 + 数据库 + 行为 + 偏好 + WebView 任一能力启用)。 */
     val anyEnabled: Boolean
-        get() = anyCryptoEnabled || anyDbEnabled || anyBehaviorEnabled || anyPrefsEnabled
+        get() = anyCryptoEnabled || anyDbEnabled || anyBehaviorEnabled || anyPrefsEnabled || anyWebviewEnabled
 
     /** 算法捕获相关类别是否任一启用(含全局总开关投影,供算法监听能力判定)。 */
     val anyCryptoEnabled: Boolean
@@ -131,6 +143,10 @@ data class HookSwitch(
     /** 偏好监听相关类别是否任一启用(含全局总开关投影,供偏好监听能力判定)。 */
     val anyPrefsEnabled: Boolean
         get() = prefsListen && (prefsOpen || prefsGet || prefsPut || prefsRemove || prefsClear)
+
+    /** WebView 监听相关类别是否任一启用(含全局总开关投影,供 WebView 监听能力判定)。 */
+    val anyWebviewEnabled: Boolean
+        get() = webviewListen && (wvPageLoad || wvEvaluateJs || wvJsBridge || wvDebug || wvJsCrypto)
 
     fun enabled(kind: CryptoKind): Boolean = cryptoListen && when (kind) {
         CryptoKind.MESSAGE_DIGEST -> messageDigest
@@ -175,6 +191,15 @@ data class HookSwitch(
         PrefsKind.CLEAR -> prefsClear
     }
 
+    /** WebView 类别有效开关(master 门控;与 [CategoryTaxonomy] 默认态对齐由测试强制)。 */
+    fun webviewEnabled(kind: WebViewKind): Boolean = webviewListen && when (kind) {
+        WebViewKind.PAGE_LOAD -> wvPageLoad
+        WebViewKind.EVALUATE_JS -> wvEvaluateJs
+        WebViewKind.JS_BRIDGE -> wvJsBridge
+        WebViewKind.DEBUG -> wvDebug
+        WebViewKind.JS_CRYPTO -> wvJsCrypto
+    }
+
     companion object {
         val DEFAULT = HookSwitch()
 
@@ -191,6 +216,7 @@ data class HookSwitch(
                 dbListen = obj?.get("dbListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
                 behaviorListen = obj?.get("behaviorListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
                 prefsListen = obj?.get("prefsListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
+                webviewListen = obj?.get("webviewListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
             )
         }.getOrNull()
     }

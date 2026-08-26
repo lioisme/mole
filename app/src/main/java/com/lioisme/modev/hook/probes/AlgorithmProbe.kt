@@ -14,11 +14,10 @@ import com.lioisme.modev.hook.hooks.MacHooker
 import com.lioisme.modev.hook.hooks.MessageDigestHooker
 import com.lioisme.modev.hook.hooks.SecureRandomHooker
 import com.lioisme.modev.hook.hooks.SignatureHooker
-import com.lioisme.modev.hook.hooks.WebViewHooker
 
 /**
- * 算法捕获探针(ADR-3):收敛全部 12 类 Hooker(四类加密原语 + 密钥链 + 摘要/MAC/签名
- * + 随机源 + Base64 + WebView 桥)。装配清单即能力边界,新增/移除类别在本类一处修改。
+ * 算法捕获探针(ADR-3):收敛全部 11 类 Hooker(四类加密原语 + 密钥链 + 摘要/MAC/签名
+ * + 随机源 + Base64)。WebViewHooker 独立为 [WebViewProbe]。
  */
 class AlgorithmProbe : Probe {
 
@@ -37,7 +36,6 @@ class AlgorithmProbe : Probe {
             KeyAgreementHooker(context),
             SecureRandomHooker(context),
             Base64Hooker(context),
-            WebViewHooker(context),
         )
         for (hooker in hookers) {
             hooker.install()

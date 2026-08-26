@@ -27,6 +27,9 @@ object MarkdownLangs {
     /** JSON 围栏(V28:params / bindArgs / rows NDJSON;渲染层经 Highlights 引擎高亮,
      *  不入 [GROUP_LANGUAGES] 集合语义 —— json 围栏永不参与相邻聚合)。 */
     const val JSON = "json"
+
+    /** JavaScript 围栏(V29:WebView 脚本;渲染层映射 Highlights JAVASCRIPT)。 */
+    const val JAVASCRIPT = "javascript"
 }
 
 /**

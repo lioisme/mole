@@ -18,4 +18,7 @@ object RecordTypes {
 
     /** SharedPreferences 监听记录(读入配置文件 + Get/Put 全家桶,V28)。 */
     const val PREFS = "prefs"
+
+    /** WebView 监听记录(页面加载/JS 执行/桥注册/调试/JS 密码学,V29 一等公民)。 */
+    const val WEBVIEW = "webview"
 }
