@@ -381,7 +381,8 @@ interface CryptoRecordDao {
             substr(outputHex, 1, :previewChars) AS outputPreview,
             keyTruncated, inputTruncated, outputTruncated,
             substr(sql, 1, :previewChars) AS sqlPreview,
-            rowCount, affectedCount, rowId
+            rowCount, affectedCount, rowId,
+            path, destPath, command, fileSize
             """
 
         /**
@@ -406,9 +407,12 @@ interface CryptoRecordDao {
                  OR outputText LIKE :query ESCAPE '\'
                  OR outputHex LIKE :query ESCAPE '\'
                  OR threadName LIKE :query ESCAPE '\'
-                 OR sql LIKE :query ESCAPE '\'
-                 OR resultText LIKE :query ESCAPE '\')
-            """
+                  OR sql LIKE :query ESCAPE '\'
+                  OR resultText LIKE :query ESCAPE '\'
+                  OR path LIKE :query ESCAPE '\'
+                  OR destPath LIKE :query ESCAPE '\'
+                  OR command LIKE :query ESCAPE '\')
+             """
     }
 }
 
@@ -455,4 +459,9 @@ data class CryptoRecordRow(
     @ColumnInfo(name = "rowCount") val rowCount: Int? = null,
     @ColumnInfo(name = "affectedCount") val affectedCount: Int? = null,
     @ColumnInfo(name = "rowId") val rowId: Long? = null,
+    // 行为监听投影列(V27;crypto/db 行为 NULL)
+    val path: String? = null,
+    val destPath: String? = null,
+    val command: String? = null,
+    val fileSize: Long? = null,
 )

@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Terminal
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -44,6 +45,7 @@ import com.lioisme.modev.ui.components.SettingsSection
 private enum class ClearTarget {
     ALGORITHM,
     DATABASE,
+    BEHAVIOR,
     ALL,
 }
 
@@ -93,6 +95,11 @@ fun DataSettingsScreen(
                     title = stringResource(R.string.settings_records_database),
                     value = stringResource(R.string.settings_total_records_value, typeCounts[RecordType.DATABASE.wire] ?: 0L),
                 )
+                SettingsInfoItem(
+                    icon = Icons.Outlined.FolderOpen,
+                    title = stringResource(R.string.settings_records_behavior),
+                    value = stringResource(R.string.settings_total_records_value, typeCounts[RecordType.BEHAVIOR.wire] ?: 0L),
+                )
             }
             Spacer(Modifier.height(24.dp))
             SettingsSection(stringResource(R.string.settings_storage_section)) {
@@ -118,6 +125,10 @@ fun DataSettingsScreen(
                     onClick = { pendingClear = ClearTarget.DATABASE },
                 )
                 DangerRow(
+                    text = stringResource(R.string.settings_clear_behavior_records),
+                    onClick = { pendingClear = ClearTarget.BEHAVIOR },
+                )
+                DangerRow(
                     text = stringResource(R.string.settings_clear_all_records),
                     onClick = { pendingClear = ClearTarget.ALL },
                 )
@@ -138,6 +149,7 @@ fun DataSettingsScreen(
                         when (target) {
                             ClearTarget.ALGORITHM -> R.string.danger_clear_algorithm_msg
                             ClearTarget.DATABASE -> R.string.danger_clear_database_msg
+                            ClearTarget.BEHAVIOR -> R.string.danger_clear_behavior_msg
                             ClearTarget.ALL -> R.string.danger_clear_all_msg
                         },
                     ),
@@ -148,6 +160,7 @@ fun DataSettingsScreen(
                     when (target) {
                         ClearTarget.ALGORITHM -> viewModel.clearByType(RecordType.CRYPTO)
                         ClearTarget.DATABASE -> viewModel.clearByType(RecordType.DATABASE)
+                        ClearTarget.BEHAVIOR -> viewModel.clearByType(RecordType.BEHAVIOR)
                         ClearTarget.ALL -> viewModel.clearAll()
                     }
                     pendingClear = null

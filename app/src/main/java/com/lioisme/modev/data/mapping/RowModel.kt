@@ -1,5 +1,7 @@
 package com.lioisme.modev.data.mapping
 
+import com.lioisme.modev.core.model.BehaviorKind
+import com.lioisme.modev.core.model.BehaviorOperation
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.core.model.SqlOperation
@@ -8,6 +10,7 @@ import com.lioisme.modev.core.model.SqlOperation
  * 列表行轻量模型(ADR-10,数据库监听 T9):
  * 数据库投影行([CryptoRecordRow])按 [recordType] 分派为本密封族,
  * 算法行复用轻量 [CryptoRecord](投影预览),数据库行承载 SQL 摘要等投影列,
+ * 行为行(V27)承载路径/命令等投影列,
  * 列表/时间线/分页/邻接场景零大字段物化。
  */
 sealed interface RowModel {
@@ -43,4 +46,35 @@ data class SqlRow(
 ) : RowModel {
     override val id: Long get() = recordId
     override val timestamp: Long get() = recordTimestamp
+}
+
+/**
+ * 行为记录行(V27;路径/命令摘要预览,零内容物化——content 仅存实体列,
+ * 详情页按需全量读取)。
+ */
+data class BehaviorRow(
+    val recordId: Long,
+    val recordTimestamp: Long,
+    override val packageName: String,
+    val kind: BehaviorKind,
+    val operation: BehaviorOperation,
+    /** 主体路径(asset 名);shell 为 null。 */
+    val path: String?,
+    /** 重命名/移动目标路径(RENAME)。 */
+    val destPath: String?,
+    /** Shell argv(EXEC)。 */
+    val command: List<String>?,
+    val fileSize: Long?,
+    val threadName: String,
+) : RowModel {
+    override val id: Long get() = recordId
+    override val timestamp: Long get() = recordTimestamp
+
+    /** 列表 headline 单一事实源:文件 basename / 命令首段(shell);恒非空。 */
+    fun headlineText(): String? = when (kind) {
+        BehaviorKind.SHELL_EXEC ->
+            command?.firstOrNull { it.isNotBlank() }?.trim()?.takeIf { it.isNotEmpty() }
+        else ->
+            path?.trimEnd('/')?.ifEmpty { "/" }?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
+    }
 }

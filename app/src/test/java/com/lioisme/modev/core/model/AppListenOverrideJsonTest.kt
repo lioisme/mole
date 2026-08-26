@@ -2,6 +2,7 @@ package com.lioisme.modev.core.model
 
 import com.google.gson.Gson
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -165,5 +166,35 @@ class AppListenOverrideJsonTest {
         assertNull(parsed.logStack)
         assertNull(parsed.maxBytesPerField)
         assertNull(parsed.ignoreStackPrefixes)
+    }
+
+    /** V27 行为域:master 偏差 + 行为 kind 白名单 + 新微调项 round-trip。 */
+    @Test
+    fun `behavior fields roundtrip symmetrically`() {
+        val override = AppListenOverride(
+            behaviorListen = false,
+            kinds = mapOf(
+                BehaviorKind.FILE_READ.name to true,
+                BehaviorKind.SHELL_EXEC.name to false,
+            ),
+            fileContentCapture = true,
+            ignorePathPrefixes = listOf("/proc/", "/sys/"),
+        )
+        assertEquals(override, parse(override.toJson(gson)))
+    }
+
+    /** V27:行为 kind 名进入白名单,未知名依旧忽略;空路径表与默认等价。 */
+    @Test
+    fun `behavior kinds whitelisted and empty path list normalizes to default`() {
+        val json = "{ " + quoted("kinds") + ": { " +
+            quoted(BehaviorKind.FILE_DELETE.name) + ": true, " +
+            quoted("NOT_A_BEHAVIOR") + ": true } }"
+        assertEquals(
+            mapOf(BehaviorKind.FILE_DELETE.name to true),
+            parse(json).kinds,
+        )
+        assertTrue(AppListenOverride(ignorePathPrefixes = emptyList()).isDefault)
+        assertFalse(AppListenOverride(ignorePathPrefixes = listOf("/proc/")).isDefault)
+        assertFalse(AppListenOverride(fileContentCapture = false).isDefault)
     }
 }

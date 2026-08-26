@@ -11,4 +11,7 @@ enum class CapabilityKind {
 
     /** 数据库监听(SQLite 打开/关闭/增删改查/事务/绑定参数/结果集)。 */
     DATABASE_LISTEN,
+
+    /** 行为监听(文件系统读/写/删/重命名/列目录、Assets 资源、Shell 命令,V27 一等公民)。 */
+    BEHAVIOR_LISTEN,
 }

@@ -113,6 +113,27 @@ data class CryptoRecordEntity(
     /** 标量查询结果(simpleQueryForLong/String)。 */
     @ColumnInfo(name = "resultText") val resultText: String? = null,
 
+    // ---- 行为监听列(v8→v9 迁移新增,recordType='behavior' 行承载;其余行为 NULL) ----
+
+    /** 主体绝对路径(文件/目录;asset 名;shell 行为 NULL)。 */
+    @ColumnInfo(name = "path") val path: String? = null,
+
+    /** 重命名/移动目标路径(RENAME 操作)。 */
+    @ColumnInfo(name = "destPath") val destPath: String? = null,
+
+    /** Shell argv JSON 字符串数组(EXEC 操作)。 */
+    @ColumnInfo(name = "command") val command: String? = null,
+
+    /** 文件字节数(仅内容捕获或调用即可得时写入;禁止额外探测)。 */
+    @ColumnInfo(name = "fileSize") val fileSize: Long? = null,
+
+    /** 捕获内容三态视图(V27 内容捕获,五元组复制既有字节列约定)。 */
+    @ColumnInfo(name = "contentHex") val contentHex: String? = null,
+    @ColumnInfo(name = "contentB64") val contentB64: String? = null,
+    @ColumnInfo(name = "contentText") val contentText: String? = null,
+    @ColumnInfo(name = "contentLength") val contentLength: Int? = null,
+    @ColumnInfo(name = "contentTruncated") val contentTruncated: Boolean = false,
+
     @ColumnInfo(name = "contextId") val contextId: Long = 0L,
     @ColumnInfo(name = "threadName") val threadName: String,
     @ColumnInfo(name = "stack") val stackJson: String? = null,

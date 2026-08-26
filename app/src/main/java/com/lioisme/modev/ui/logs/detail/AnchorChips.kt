@@ -14,6 +14,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.lioisme.modev.R
+import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.SqlRecord
 
@@ -49,6 +50,16 @@ fun sqlAnchors(record: SqlRecord): List<DetailAnchor> {
     if (!record.bindArgs.isNullOrEmpty()) anchors += DetailAnchor("bindargs", R.string.section_bind_args)
     if (!record.rows.isNullOrEmpty()) anchors += DetailAnchor("rows", R.string.section_result_rows)
     if (record.resultText != null) anchors += DetailAnchor("result", R.string.section_result_text)
+    if (!record.params.isNullOrEmpty()) anchors += DetailAnchor("params", R.string.section_params)
+    if (record.stack.isNotEmpty()) anchors += DetailAnchor("stack", R.string.section_stack)
+    return anchors
+}
+
+/** 行为记录锚点(V27):命令 / 内容预览 / 参数 / 调用栈(按存在性)。 */
+fun behaviorAnchors(record: BehaviorRecord): List<DetailAnchor> {
+    val anchors = mutableListOf<DetailAnchor>()
+    if (!record.command.isNullOrEmpty()) anchors += DetailAnchor("command", R.string.section_command)
+    if (record.content != null) anchors += DetailAnchor("content", R.string.section_content)
     if (!record.params.isNullOrEmpty()) anchors += DetailAnchor("params", R.string.section_params)
     if (record.stack.isNotEmpty()) anchors += DetailAnchor("stack", R.string.section_stack)
     return anchors

@@ -41,12 +41,18 @@
     <string name="database_records_title">Database Records</string>
     <string name="algorithm_records_search">Search algorithm records…</string>
     <string name="database_records_search">Search database records…</string>
+    <string name="behavior_records_title">Behavior Records</string>
+    <string name="behavior_records_search">Search behavior records…</string>
 
     <string name="monitor_records_caption">All records</string>
     <string name="filter_type_crypto">Crypto</string>
     <string name="filter_type_database">Database</string>
+    <string name="filter_type_behavior">Behavior</string>
 
     <string name="detail_empty">No records yet</string>
+    <string name="detail_empty_hint">Try adjusting filters or enable more categories in listen settings</string>
+    <string name="records_count_subtitle">%1$s records</string>
+    <string name="record_copied_toast">Record summary copied</string>
     <string name="section_monitor_kinds">Monitor Kinds</string>
     <string name="app_monitor_scope_row">Monitor this app</string>
     <string name="listen_settings_entry">Listen settings</string>
@@ -281,6 +287,39 @@
         <item quantity="other">+%1$d more rows omitted</item>
     </plurals>
 
+    <!-- Behavior monitor (V27: 文件/Assets/Shell 监听类别/操作/详情) -->
+    <string name="kind_behavior_file_read">File Read</string>
+    <string name="kind_behavior_file_write">File Write</string>
+    <string name="kind_behavior_file_delete">File Delete</string>
+    <string name="kind_behavior_file_rename">File Rename</string>
+    <string name="kind_behavior_file_list">Directory Listing</string>
+    <string name="kind_behavior_asset_read">Asset Access</string>
+    <string name="kind_behavior_shell_exec">Shell Command</string>
+    <string name="op_behavior_open_read">Open for read</string>
+    <string name="op_behavior_read_all">Read all</string>
+    <string name="op_behavior_open_write">Open for write</string>
+    <string name="op_behavior_write_all">Write</string>
+    <string name="op_behavior_mkdir">Create directory</string>
+    <string name="op_behavior_mkdirs">Create directories</string>
+    <string name="op_behavior_delete">Delete</string>
+    <string name="op_behavior_rename">Rename/Move</string>
+    <string name="op_behavior_list">List directory</string>
+    <string name="op_behavior_asset_open">Open asset</string>
+    <string name="op_behavior_asset_open_fd">Open asset fd</string>
+    <string name="op_behavior_asset_list">List assets</string>
+    <string name="op_behavior_exec">Execute command</string>
+    <string name="meta_path">Target path</string>
+    <string name="meta_dest_path">Destination path</string>
+    <string name="meta_file_size">Size</string>
+    <string name="section_command">Command</string>
+    <string name="section_content">Content preview</string>
+    <string name="behavior_monitor_master">Behavior Listen</string>
+    <string name="switch_file_content_capture">Capture file content</string>
+    <string name="switch_file_content_capture_hint">Only whole-read APIs (Files.readAll*/write/copy, asset open); stream paths never touched</string>
+    <string name="capture_ignore_path">Ignore path prefixes</string>
+    <string name="capture_ignore_path_hint">Skip behavior records whose subject path starts with any prefix</string>
+    <string name="capture_ignore_path_dialog_title">Ignore path prefixes</string>
+    <string name="capture_ignore_path_dialog_hint">One prefix per line, e.g. /data/local/tmp/</string>
     <!-- Settings -->
     <string name="settings_title">Settings</string>
     <string name="settings_display_section">Display</string>
@@ -313,12 +352,15 @@
     <string name="settings_type_counts_section">Records by type</string>
     <string name="settings_records_algorithm">Algorithm records</string>
     <string name="settings_records_database">Database records</string>
+    <string name="settings_records_behavior">Behavior records</string>
     <string name="settings_storage_section">Storage</string>
     <string name="settings_storage_db">Database file</string>
     <string name="settings_clear_algorithm_records">Clear algorithm records</string>
     <string name="settings_clear_database_records">Clear database records</string>
+    <string name="settings_clear_behavior_records">Clear behavior records</string>
     <string name="danger_clear_algorithm_msg">Clear all algorithm records? This cannot be undone.</string>
     <string name="danger_clear_database_msg">Clear all database records? This cannot be undone.</string>
+    <string name="danger_clear_behavior_msg">Clear all behavior records? This cannot be undone.</string>
     <string name="settings_stats_section">Pipeline Statistics</string>
     <string name="diagnostics_copy">Copy diagnostics</string>
     <string name="diagnostics_copied">Diagnostics copied</string>

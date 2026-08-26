@@ -11,7 +11,10 @@ enum class RecordType(val wire: String) {
     CRYPTO(RecordTypes.CRYPTO),
 
     /** 数据库操作记录(SQLiteDatabase / SQLiteOpenHelper / SQLiteStatement / SQLiteCursor)。 */
-    DATABASE(RecordTypes.DATABASE);
+    DATABASE(RecordTypes.DATABASE),
+
+    /** 行为监听记录(文件系统 / Assets / Shell,V27 一等公民)。 */
+    BEHAVIOR(RecordTypes.BEHAVIOR);
 
     companion object {
         fun fromWire(value: String?): RecordType? = entries.firstOrNull { it.wire == value }

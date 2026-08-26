@@ -192,4 +192,48 @@ class EffectiveSwitchTest {
         assertFalse(AppListenOverride(logStack = false).isDefault)
         assertTrue(AppListenOverride(ignoreStackPrefixes = emptyList()).isDefault)
     }
+
+    /** V27 行为域:master 偏差 + 类别偏差 + 微调项(fileContentCapture/ignorePathPrefixes)。 */
+    @Test
+    fun `behavior master and kind deviations overlay onto default`() {
+        val effective = EffectiveSwitch.resolve(
+            d,
+            AppListenOverride(
+                behaviorListen = false,
+                kinds = mapOf(BehaviorKind.FILE_READ.name to true),
+                fileContentCapture = true,
+                ignorePathPrefixes = listOf("/proc/", "/sys/"),
+            ),
+        )
+        assertFalse(effective.behaviorListen)
+        // master 关 → 投影与类别判定全停,分开关原态保留
+        assertFalse(effective.anyBehaviorEnabled)
+        assertFalse(effective.behaviorEnabled(BehaviorKind.FILE_READ))
+        assertTrue(effective.fileRead)
+        assertFalse(effective.behaviorEnabled(BehaviorKind.FILE_WRITE))
+        assertTrue(effective.fileContentCapture)
+        assertEquals(listOf("/proc/", "/sys/"), effective.ignorePathPrefixes)
+        // 算法/数据库不受行为偏差影响
+        assertTrue(effective.anyCryptoEnabled)
+        assertTrue(effective.anyDbEnabled)
+
+        val on = EffectiveSwitch.resolve(
+            d.copy(behaviorListen = false, fileWrite = false),
+            AppListenOverride(behaviorListen = true),
+        )
+        assertTrue(on.anyBehaviorEnabled)
+    }
+
+    /** V27 行为微调项:null 位取默认;空路径表不构成偏差。 */
+    @Test
+    fun `behavior option nulls take default and empty path list is zero deviation`() {
+        val effective = EffectiveSwitch.resolve(
+            d,
+            AppListenOverride(ignorePathPrefixes = listOf("/data/local/tmp/")),
+        )
+        assertEquals(d.fileContentCapture, effective.fileContentCapture)
+        assertEquals(listOf("/data/local/tmp/"), effective.ignorePathPrefixes)
+        assertFalse(AppListenOverride(fileContentCapture = true).isDefault)
+        assertFalse(AppListenOverride(behaviorListen = true).isDefault)
+    }
 }

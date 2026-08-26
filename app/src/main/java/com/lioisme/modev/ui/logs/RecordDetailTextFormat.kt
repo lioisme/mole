@@ -1,5 +1,6 @@
 package com.lioisme.modev.ui.logs
 
+import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.SqlBindValue
 import com.lioisme.modev.core.model.SqlRecord
@@ -145,6 +146,26 @@ internal fun estimateSqlJsonChars(record: SqlRecord): Int {
             row.c.forEach { cell -> total += cell.n.length + cell.renderValue().length }
         }
         params?.forEach { (k, v) -> total += k.length + v.length }
+        stack.forEach { total += it.length }
+    }
+    return total * 2
+}
+
+/**
+ * 行为记录导出 JSON 字符数保守估算(×2 倍率,与 [estimateSqlJsonChars] 同规):
+ * 路径/目标路径/命令/内容三态 + 元数据,超限免构建。
+ */
+internal fun estimateBehaviorJsonChars(record: BehaviorRecord): Int {
+    var total = record.packageName.length + 128
+    with(record) {
+        total += path?.length ?: 0
+        total += destPath?.length ?: 0
+        command?.forEach { total += it.length + 8 }
+        content?.let {
+            total += it.hex.length + (it.base64?.length ?: 0) + (it.text?.length ?: 0)
+        }
+        params?.forEach { (k, v) -> total += k.length + v.length }
+        processName?.let { total += it.length }
         stack.forEach { total += it.length }
     }
     return total * 2

@@ -32,8 +32,12 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.lioisme.modev.R
+import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.SqlRecord
+import com.lioisme.modev.ui.components.behaviorKindLabelRes
+import com.lioisme.modev.ui.components.behaviorOperationLabel
+import com.lioisme.modev.ui.components.behaviorOperationLabelRes
 import com.lioisme.modev.ui.components.directionLabel
 import com.lioisme.modev.ui.components.displayAlgorithm
 import com.lioisme.modev.ui.components.kindLabelRes
@@ -41,6 +45,7 @@ import com.lioisme.modev.ui.components.operationLabel
 import com.lioisme.modev.ui.components.sqlKindLabelRes
 import com.lioisme.modev.ui.components.sqlOperationLabel
 import com.lioisme.modev.ui.theme.AppShapes
+import com.lioisme.modev.ui.theme.behaviorKindColor
 import com.lioisme.modev.ui.theme.kindColor
 import com.lioisme.modev.ui.theme.sqlKindColor
 import java.text.SimpleDateFormat
@@ -96,6 +101,43 @@ internal fun CryptoHero(record: CryptoRecord) {
                 )
             }
         }
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = timeFmt.format(Date(record.timestamp)),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+internal fun BehaviorHero(record: BehaviorRecord) {
+    val context = LocalContext.current
+    val timeFmt = remember(context) { detailTimeFmt() }
+    val kindAccent = behaviorKindColor(record.kind)
+    val operationFallback = stringResource(behaviorOperationLabelRes(record.operation))
+    val headline =
+        record.path?.trimEnd('/')?.ifEmpty { "/" }?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
+            ?: record.commandDisplay()?.lineSequence()?.firstOrNull()?.trim()?.takeIf { it.isNotBlank() }
+            ?: operationFallback
+    HeroCard {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AccentChip(
+                label = stringResource(behaviorKindLabelRes(record.kind)),
+                accent = kindAccent,
+            )
+            Spacer(Modifier.width(8.dp))
+            HeroChip(label = behaviorOperationLabel(record.operation))
+        }
+        Spacer(Modifier.height(10.dp))
+        Text(
+            text = headline,
+            style = MaterialTheme.typography.titleMedium,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
         Spacer(Modifier.height(6.dp))
         Text(
             text = timeFmt.format(Date(record.timestamp)),

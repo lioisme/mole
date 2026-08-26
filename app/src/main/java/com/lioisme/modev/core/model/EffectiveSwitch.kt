@@ -20,6 +20,7 @@ object EffectiveSwitch {
         var result = default
         override.cryptoListen?.let { result = result.copy(cryptoListen = it) }
         override.dbListen?.let { result = result.copy(dbListen = it) }
+        override.behaviorListen?.let { result = result.copy(behaviorListen = it) }
         if (override.kinds.isNotEmpty()) {
             result = applyKinds(result, override.kinds)
         }
@@ -31,6 +32,11 @@ object EffectiveSwitch {
         }
         override.maxResultRows?.let { result = result.copy(maxResultRows = it) }
         override.maxResultChars?.let { result = result.copy(maxResultChars = it) }
+        // V27 行为微调项
+        override.fileContentCapture?.let { result = result.copy(fileContentCapture = it) }
+        override.ignorePathPrefixes?.takeIf { it.isNotEmpty() }?.let {
+            result = result.copy(ignorePathPrefixes = it)
+        }
         return result
     }
 
@@ -53,6 +59,13 @@ object EffectiveSwitch {
         SqlKind.DML.name -> switch.dbDml
         SqlKind.EXEC.name -> switch.dbExec
         SqlKind.TRANSACTION.name -> switch.dbTransaction
+        BehaviorKind.FILE_READ.name -> switch.fileRead
+        BehaviorKind.FILE_WRITE.name -> switch.fileWrite
+        BehaviorKind.FILE_DELETE.name -> switch.fileDelete
+        BehaviorKind.FILE_RENAME.name -> switch.fileRename
+        BehaviorKind.FILE_LIST.name -> switch.fileList
+        BehaviorKind.ASSET_READ.name -> switch.assetRead
+        BehaviorKind.SHELL_EXEC.name -> switch.shellExec
         else -> null
     }
 
@@ -81,6 +94,13 @@ object EffectiveSwitch {
                 SqlKind.DML.name -> result.copy(dbDml = value)
                 SqlKind.EXEC.name -> result.copy(dbExec = value)
                 SqlKind.TRANSACTION.name -> result.copy(dbTransaction = value)
+                BehaviorKind.FILE_READ.name -> result.copy(fileRead = value)
+                BehaviorKind.FILE_WRITE.name -> result.copy(fileWrite = value)
+                BehaviorKind.FILE_DELETE.name -> result.copy(fileDelete = value)
+                BehaviorKind.FILE_RENAME.name -> result.copy(fileRename = value)
+                BehaviorKind.FILE_LIST.name -> result.copy(fileList = value)
+                BehaviorKind.ASSET_READ.name -> result.copy(assetRead = value)
+                BehaviorKind.SHELL_EXEC.name -> result.copy(shellExec = value)
                 // 未知 kind 名:忽略(存储漂移兜底)
                 else -> result
             }

@@ -127,6 +127,7 @@ internal fun CryptoRecordEntity.toModelOrNull(): CryptoRecord? {
 internal fun CryptoRecordRow.toRowModelOrNull(): RowModel? = when (recordType) {
     RecordTypes.CRYPTO -> cryptoRowModelOrNull()
     RecordTypes.DATABASE -> sqlRowModelOrNull()
+    RecordTypes.BEHAVIOR -> behaviorRowModelOrNull()
     else -> null
 }
 
@@ -211,6 +212,7 @@ internal fun CryptoRecordEntity.toSqlModelOrNull(): SqlRecord? {
 internal fun CryptoRecordEntity.toRecordDetailOrNull(): RecordDetailModel? = when (recordType) {
     RecordTypes.CRYPTO -> toModelOrNull()?.let(::CryptoDetail)
     RecordTypes.DATABASE -> toSqlModelOrNull()?.let(::SqlDetail)
+    RecordTypes.BEHAVIOR -> toBehaviorModelOrNull()?.let(::BehaviorDetail)
     else -> null
 }
 
@@ -224,14 +226,14 @@ private fun parseRows(json: String): List<SqlResultRow>? =
         .onFailure { Log.w("Modev", "rowsJson parse failed: $it") }
         .getOrNull()
 
-private fun view(hex: String?, base64: String?, text: String?, length: Int?, truncated: Boolean): BytesView? =
+internal fun view(hex: String?, base64: String?, text: String?, length: Int?, truncated: Boolean): BytesView? =
     if (hex == null) null else BytesView(hex = hex, base64 = base64, text = text, totalLength = length ?: 0, truncated = truncated)
 
 /** 投影预览 → 展示 BytesView(仅存在于列表行;totalLength 由 hex 长度推断,仅供摘要展示)。 */
 private fun previewView(hex: String?, truncated: Boolean): BytesView? =
     if (hex == null) null else BytesView(hex = hex, text = null, totalLength = hex.length / 2, truncated = truncated)
 
-private inline fun <reified T : Enum<T>> enumOf(clazz: Class<T>, name: String): T? =
+internal inline fun <reified T : Enum<T>> enumOf(clazz: Class<T>, name: String): T? =
     runCatching { java.lang.Enum.valueOf(clazz, name) }.getOrNull()
 
 /**
@@ -262,7 +264,7 @@ internal fun CryptoRecord.toJson(): String = org.json.JSONObject().apply {
     put("timestamp", timestamp)
 }.toString(2)
 
-private fun BytesView.toJsonObject(name: String): org.json.JSONObject = org.json.JSONObject().apply {
+internal fun BytesView.toJsonObject(name: String): org.json.JSONObject = org.json.JSONObject().apply {
     put("name", name)
     put("hex", hex)
     base64?.let { put("base64", it) }

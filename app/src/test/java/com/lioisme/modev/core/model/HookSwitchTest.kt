@@ -25,10 +25,13 @@ class HookSwitchTest {
             webView = false,
             dbOpen = false, dbQuery = false, dbDml = false, dbExec = false,
             dbTransaction = false,
+            fileRead = false, fileWrite = false, fileDelete = false,
+            fileRename = false, fileList = false, assetRead = false, shellExec = false,
         )
         assertFalse(s.anyEnabled)
         assertFalse(s.anyCryptoEnabled)
         assertFalse(s.anyDbEnabled)
+        assertFalse(s.anyBehaviorEnabled)
     }
 
     @Test
@@ -85,6 +88,7 @@ class HookSwitchTest {
     fun defaults_align_with_category_taxonomy() {
         val crypto = CategoryTaxonomy.defaultEnabledIds(RecordType.CRYPTO)
         val db = CategoryTaxonomy.defaultEnabledIds(RecordType.DATABASE)
+        val behavior = CategoryTaxonomy.defaultEnabledIds(RecordType.BEHAVIOR)
         for (kind in CryptoKind.entries) {
             assertEquals(
                 "crypto $kind default mismatch with taxonomy",
@@ -97,6 +101,13 @@ class HookSwitchTest {
                 "db $kind default mismatch with taxonomy",
                 db.contains(kind.name),
                 HookSwitch.DEFAULT.dbEnabled(kind),
+            )
+        }
+        for (kind in BehaviorKind.entries) {
+            assertEquals(
+                "behavior $kind default mismatch with taxonomy",
+                behavior.contains(kind.name),
+                HookSwitch.DEFAULT.behaviorEnabled(kind),
             )
         }
     }
@@ -155,6 +166,8 @@ class HookSwitchTest {
             webView = false,
             dbOpen = false, dbQuery = false, dbDml = false, dbExec = false,
             dbTransaction = false,
+            fileRead = false, fileWrite = false, fileDelete = false,
+            fileRename = false, fileList = false, assetRead = false, shellExec = false,
         )
         assertFalse(allOff.anyEnabled)
     }
@@ -191,14 +204,52 @@ class HookSwitchTest {
         assertFalse(dbOff.dbEnabled(SqlKind.QUERY))
         assertTrue(dbOff.enabled(CryptoKind.CIPHER))
         assertTrue(dbOff.anyCryptoEnabled)
-        // 双总开关关:整体停用。
-        assertFalse(cryptoOff.copy(dbListen = false).anyEnabled)
+        // 行为总开关关:全部行为类别停用,算法/数据库不受影响(V27)。
+        val behaviorOff = HookSwitch(behaviorListen = false)
+        assertFalse(behaviorOff.anyBehaviorEnabled)
+        assertFalse(behaviorOff.behaviorEnabled(BehaviorKind.SHELL_EXEC))
+        assertTrue(behaviorOff.enabled(CryptoKind.CIPHER))
+        assertTrue(behaviorOff.anyCryptoEnabled)
+        assertTrue(behaviorOff.anyDbEnabled)
+        // 三总开关关:整体停用。
+        assertFalse(cryptoOff.copy(dbListen = false, behaviorListen = false).anyEnabled)
     }
 
     @Test
     fun master_switches_default_on() {
         assertTrue(HookSwitch.DEFAULT.cryptoListen)
         assertTrue(HookSwitch.DEFAULT.dbListen)
+        assertTrue(HookSwitch.DEFAULT.behaviorListen)
+    }
+
+    @Test
+    fun behavior_enabled_maps_each_kind() {
+        val s = HookSwitch(
+            fileRead = true, fileWrite = false, fileDelete = true,
+            fileRename = false, fileList = true, assetRead = false, shellExec = true,
+        )
+        assertTrue(s.behaviorEnabled(BehaviorKind.FILE_READ))
+        assertFalse(s.behaviorEnabled(BehaviorKind.FILE_WRITE))
+        assertTrue(s.behaviorEnabled(BehaviorKind.FILE_DELETE))
+        assertFalse(s.behaviorEnabled(BehaviorKind.FILE_RENAME))
+        assertTrue(s.behaviorEnabled(BehaviorKind.FILE_LIST))
+        assertFalse(s.behaviorEnabled(BehaviorKind.ASSET_READ))
+        assertTrue(s.behaviorEnabled(BehaviorKind.SHELL_EXEC))
+    }
+
+    @Test
+    fun behavior_noise_categories_off_by_default() {
+        // 高噪声行为类别默认关:读/列目录/Assets(App 启动即高频触发)
+        for (kind in listOf(BehaviorKind.FILE_READ, BehaviorKind.FILE_LIST, BehaviorKind.ASSET_READ)) {
+            assertFalse("noise behavior category $kind should default off", HookSwitch.DEFAULT.behaviorEnabled(kind))
+        }
+        // 高信号行为类别默认开:写/删/重命名/Shell
+        for (kind in listOf(
+            BehaviorKind.FILE_WRITE, BehaviorKind.FILE_DELETE,
+            BehaviorKind.FILE_RENAME, BehaviorKind.SHELL_EXEC,
+        )) {
+            assertTrue("signal behavior category $kind should default on", HookSwitch.DEFAULT.behaviorEnabled(kind))
+        }
     }
 
     @Test

@@ -63,6 +63,15 @@ object CategoryTaxonomy {
         add(RecordCategory(SqlKind.DML.name, RecordType.DATABASE, true, NoiseTier.SIGNAL, 2))
         add(RecordCategory(SqlKind.EXEC.name, RecordType.DATABASE, true, NoiseTier.SIGNAL, 3))
         add(RecordCategory(SqlKind.TRANSACTION.name, RecordType.DATABASE, false, NoiseTier.NOISE_HIGH, 4))
+        // 行为类别(V27;默认态与 HookSwitch.DEFAULT 对齐:写/删/重命名/Shell 高信号默认开,
+        // 读/列目录/Assets 高频噪声默认关)
+        add(RecordCategory(BehaviorKind.FILE_READ.name, RecordType.BEHAVIOR, false, NoiseTier.NOISE_HIGH, 0))
+        add(RecordCategory(BehaviorKind.FILE_WRITE.name, RecordType.BEHAVIOR, true, NoiseTier.SIGNAL, 1))
+        add(RecordCategory(BehaviorKind.FILE_DELETE.name, RecordType.BEHAVIOR, true, NoiseTier.SIGNAL, 2))
+        add(RecordCategory(BehaviorKind.FILE_RENAME.name, RecordType.BEHAVIOR, true, NoiseTier.SIGNAL, 3))
+        add(RecordCategory(BehaviorKind.FILE_LIST.name, RecordType.BEHAVIOR, false, NoiseTier.NOISE_HIGH, 4))
+        add(RecordCategory(BehaviorKind.ASSET_READ.name, RecordType.BEHAVIOR, false, NoiseTier.NOISE_HIGH, 5))
+        add(RecordCategory(BehaviorKind.SHELL_EXEC.name, RecordType.BEHAVIOR, true, NoiseTier.SIGNAL, 6))
     }
 
     /** 全部类别(按 type 分组、组内按 order;稳定输出)。 */
@@ -100,6 +109,7 @@ object CategoryTaxonomy {
         val valid = when (type) {
             RecordType.CRYPTO -> CryptoOperation.entries.map { it.name }.toSet()
             RecordType.DATABASE -> SqlOperation.entries.map { it.name }.toSet()
+            RecordType.BEHAVIOR -> BehaviorOperation.entries.map { it.name }.toSet()
         }
         return operations.intersect(valid)
     }

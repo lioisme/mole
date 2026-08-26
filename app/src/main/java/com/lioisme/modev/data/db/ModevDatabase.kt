@@ -21,10 +21,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *   saltB64/aadB64/publicKeyB64),存量行 NULL = 旧记录降级双态。
  * v7 → v8:多维筛选复合索引([recordType]+[kind]、[recordType]+[packageName]+[timestamp]),
  *   纯 CREATE INDEX,不触碰存量数据(与实体声明索引命名一致,运行时 schema 校验通过)。
+ * v8 → v9:行为监听(V27)新增 10 个可空列:path / destPath / command / fileSize +
+ *   content 五元组(contentHex/contentB64/contentText/contentLength/contentTruncated),
+ *   recordType='behavior' 行承载;纯 ALTER TABLE,不触碰存量行(与 v5→v6 同先例)。
  */
 @Database(
     entities = [CryptoRecordEntity::class],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class ModevDatabase : RoomDatabase() {
@@ -139,6 +142,25 @@ abstract class ModevDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v8 → v9:行为监听(V27)新增 10 个可空列,recordType='behavior' 行承载;
+         * 纯 ALTER TABLE ADD COLUMN,不触碰存量 crypto/db 行(v5→v6 同先例)。
+         */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val table = "crypto_records"
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `path` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `destPath` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `command` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `fileSize` INTEGER")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `contentHex` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `contentB64` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `contentText` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `contentLength` INTEGER")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `contentTruncated` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         @Volatile
         private var instance: ModevDatabase? = null
 
@@ -154,7 +176,7 @@ abstract class ModevDatabase : RoomDatabase() {
                     .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                        MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8,
+                        MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
                     )
                     .fallbackToDestructiveMigration(false)
                     .build()

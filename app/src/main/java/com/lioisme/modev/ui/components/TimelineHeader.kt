@@ -21,8 +21,8 @@ fun TimelineHeader(
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        shape = RoundedCornerShape(8.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
         modifier = modifier.testTag("timeline-header"),
     ) {
         Text(

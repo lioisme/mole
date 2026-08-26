@@ -22,6 +22,8 @@ data class AppListenOverride(
     val cryptoListen: Boolean? = null,
     /** 数据库监听总开关偏差(null = 取默认)。 */
     val dbListen: Boolean? = null,
+    /** 行为监听总开关偏差(V27;null = 取默认)。 */
+    val behaviorListen: Boolean? = null,
     /** 类别级偏差(kind id → 显式开关;仅存偏差条目,缺条目 = 取默认)。 */
     val kinds: Map<String, Boolean> = emptyMap(),
     /** 记录调用栈偏差(null = 取默认)。 */
@@ -37,18 +39,28 @@ data class AppListenOverride(
     val maxResultRows: Int? = null,
     /** 结果字节上限偏差(null = 取默认)。 */
     val maxResultChars: Int? = null,
+    /** 文件内容捕获偏差(V27;null = 取默认)。 */
+    val fileContentCapture: Boolean? = null,
+    /**
+     * 忽略路径前缀清单偏差(V27 行为降噪;null = 取默认,非空整表替换)。
+     * 空表与默认等价([isDefault] 归零)。
+     */
+    val ignorePathPrefixes: List<String>? = null,
 ) {
 
     /** 是否等价于「完全未定制」(与默认配置零偏差):调用方应删除存储键而非落盘。 */
     val isDefault: Boolean
         get() = cryptoListen == null &&
             dbListen == null &&
+            behaviorListen == null &&
             kinds.isEmpty() &&
             logStack == null &&
             maxBytesPerField == null &&
             ignoreStackPrefixes.isNullOrEmpty() &&
             maxResultRows == null &&
-            maxResultChars == null
+            maxResultChars == null &&
+            fileContentCapture == null &&
+            ignorePathPrefixes.isNullOrEmpty()
 
     /** Gson 序列化(null 位由 Gson 默认省略,存储紧凑;构造路径保证无冗余条目)。 */
     fun toJson(gson: Gson): String = gson.toJson(this)
@@ -70,12 +82,15 @@ data class AppListenOverride(
                 AppListenOverride(
                     cryptoListen = boolOf(obj, FIELD_CRYPTO),
                     dbListen = boolOf(obj, FIELD_DB),
+                    behaviorListen = boolOf(obj, FIELD_BEHAVIOR),
                     kinds = kindsOf(obj),
                     logStack = boolOf(obj, FIELD_LOG_STACK),
                     maxBytesPerField = intOf(obj, FIELD_MAX_BYTES),
                     ignoreStackPrefixes = stringListOf(obj, FIELD_IGNORE_STACK),
                     maxResultRows = intOf(obj, FIELD_MAX_RESULT_ROWS),
                     maxResultChars = intOf(obj, FIELD_MAX_RESULT_CHARS),
+                    fileContentCapture = boolOf(obj, FIELD_FILE_CONTENT),
+                    ignorePathPrefixes = stringListOf(obj, FIELD_IGNORE_PATH),
                 )
             }.getOrDefault(DEFAULT)
         }
@@ -134,21 +149,25 @@ data class AppListenOverride(
 
         private const val FIELD_CRYPTO = "cryptoListen"
         private const val FIELD_DB = "dbListen"
+        private const val FIELD_BEHAVIOR = "behaviorListen"
         private const val FIELD_KINDS = "kinds"
         private const val FIELD_LOG_STACK = "logStack"
         private const val FIELD_MAX_BYTES = "maxBytesPerField"
         private const val FIELD_IGNORE_STACK = "ignoreStackPrefixes"
         private const val FIELD_MAX_RESULT_ROWS = "maxResultRows"
         private const val FIELD_MAX_RESULT_CHARS = "maxResultChars"
+        private const val FIELD_FILE_CONTENT = "fileContentCapture"
+        private const val FIELD_IGNORE_PATH = "ignorePathPrefixes"
 
         /** V23 三态遗留:旧 kinds 键名与枚举序列化形态。 */
         private const val LEGACY_FIELD_KINDS = "kindOverrides"
         private const val LEGACY_ON = "ON"
         private const val LEGACY_OFF = "OFF"
 
-        /** 合法类别 id 白名单(CryptoKind ∪ SqlKind),防存储漂移注入垃圾键。 */
+        /** 合法类别 id 白名单(CryptoKind ∪ SqlKind ∪ BehaviorKind),防存储漂移注入垃圾键。 */
         private val VALID_KINDS: Set<String> =
             CryptoKind.entries.mapTo(mutableSetOf()) { it.name } +
-                SqlKind.entries.map { it.name }
+                SqlKind.entries.map { it.name } +
+                BehaviorKind.entries.map { it.name }
     }
 }

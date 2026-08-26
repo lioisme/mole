@@ -1,0 +1,81 @@
+package com.lioisme.modev.ui.components
+
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Casino
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Construction
+import androidx.compose.material.icons.outlined.DataObject
+import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.DriveFileRenameOutline
+import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EnhancedEncryption
+import androidx.compose.material.icons.outlined.Fingerprint
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.HistoryEdu
+import androidx.compose.material.icons.outlined.IntegrationInstructions
+import androidx.compose.material.icons.outlined.Layers
+import androidx.compose.material.icons.outlined.LockOpen
+import androidx.compose.material.icons.outlined.ManageSearch
+import androidx.compose.material.icons.outlined.Password
+import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.SwapHoriz
+import androidx.compose.material.icons.outlined.Tag
+import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.lioisme.modev.core.model.BehaviorKind
+import com.lioisme.modev.core.model.CryptoKind
+import com.lioisme.modev.core.model.SqlKind
+
+/**
+ * 类别图标映射(V27 M1-T2):记录列表 leading 徽章的 kind→图标单一事实源。
+ * 同族内不重复;新增类别必须同步登记。
+ */
+object KindIcons {
+
+    /** 算法族(CIPHER 按方向区分锁形:解密开锁/其余闭锁)。 */
+    fun crypto(
+        kind: CryptoKind,
+        direction: Int? = null,
+    ): ImageVector =
+        when (kind) {
+            CryptoKind.MESSAGE_DIGEST -> Icons.Outlined.Tag
+            CryptoKind.CIPHER ->
+                if (direction == 2) Icons.Outlined.LockOpen else Icons.Outlined.EnhancedEncryption
+            CryptoKind.MAC -> Icons.Outlined.Fingerprint
+            CryptoKind.SIGNATURE -> Icons.Outlined.HistoryEdu
+            CryptoKind.KEY_PARAM -> Icons.Outlined.Password
+            CryptoKind.KEY_GENERATION -> Icons.Outlined.Code
+            CryptoKind.KEY_FACTORY -> Icons.Outlined.Construction
+            CryptoKind.KEY_STORE -> Icons.Outlined.Security
+            CryptoKind.KEY_AGREEMENT -> Icons.Outlined.SwapHoriz
+            CryptoKind.RANDOM -> Icons.Outlined.Casino
+            CryptoKind.BASE64 -> Icons.Outlined.DataObject
+            CryptoKind.WEB_CRYPTO -> Icons.Outlined.Public
+        }
+
+    /** 数据库族。 */
+    fun sql(kind: SqlKind): ImageVector =
+        when (kind) {
+            SqlKind.OPEN -> Icons.Outlined.Storage
+            SqlKind.QUERY -> Icons.Outlined.ManageSearch
+            SqlKind.DML -> Icons.Outlined.Edit
+            SqlKind.EXEC -> Icons.Outlined.Terminal
+            SqlKind.TRANSACTION -> Icons.Outlined.SwapHoriz
+        }
+
+    /** 行为族(V27)。 */
+    fun behavior(kind: BehaviorKind): ImageVector =
+        when (kind) {
+            BehaviorKind.FILE_READ -> Icons.Outlined.Description
+            BehaviorKind.FILE_WRITE -> Icons.Outlined.Save
+            BehaviorKind.FILE_DELETE -> Icons.Outlined.Delete
+            BehaviorKind.FILE_RENAME -> Icons.Outlined.DriveFileRenameOutline
+            BehaviorKind.FILE_LIST -> Icons.Outlined.FolderOpen
+            BehaviorKind.ASSET_READ -> Icons.Outlined.Layers
+            BehaviorKind.SHELL_EXEC -> Icons.Outlined.IntegrationInstructions
+        }
+}

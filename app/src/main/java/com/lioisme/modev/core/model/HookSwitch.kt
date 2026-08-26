@@ -49,6 +49,25 @@ data class HookSwitch(
      * 高频、信号弱,默认关(噪点类别)。
      */
     val dbTransaction: Boolean = false,
+    /** 行为监听全局总开关(V27;false = 全部行为类别停用,分开关保留原态)。 */
+    val behaviorListen: Boolean = true,
+    /**
+     * 行为监听:文件读取(FileInputStream/FileReader/Files.newInputStream/readAllBytes)。
+     * 极高频(框架启动即数百次),默认关(噪点类别)。
+     */
+    val fileRead: Boolean = false,
+    /** 行为监听:文件写出/创建(FileOutputStream/Files.write/mkdir 族)。高信号,默认启用。 */
+    val fileWrite: Boolean = true,
+    /** 行为监听:文件删除(File.delete/Files.delete)。高信号,默认启用。 */
+    val fileDelete: Boolean = true,
+    /** 行为监听:重命名/移动(File.renameTo/Files.move)。高信号低频,默认启用。 */
+    val fileRename: Boolean = true,
+    /** 行为监听:目录列举(File.list/listFiles/Files.list)。高频低值,默认关。 */
+    val fileList: Boolean = false,
+    /** 行为监听:Assets 资源读取(AssetManager.open/openFd/list)。启动期高频,默认关。 */
+    val assetRead: Boolean = false,
+    /** 行为监听:Shell 命令执行(Runtime.exec/ProcessBuilder.start)。最高信号,默认启用。 */
+    val shellExec: Boolean = true,
     /** 数据库监听:单条查询结果行数上限;0 = 不限制(不推荐,结果闸门双保险)。 */
     val maxResultRows: Int = RecordLimits.DEFAULT_MAX_RESULT_ROWS,
     /** 数据库监听:单条查询结果序列化字符上限;0 = 不限制(不推荐)。 */
@@ -59,14 +78,26 @@ data class HookSwitch(
     val maxBytesPerField: Int = RecordLimits.DEFAULT_MAX_BYTES_PER_FIELD,
     /** 调用栈前缀 denylist:任一帧命中即跳过该记录;默认空 = 全捕获。 */
     val ignoreStackPrefixes: List<String> = emptyList(),
+    /**
+     * 文件内容捕获(V27):开启后仅对「随调用即可得」的整读 API
+     * (Files.readAllBytes/readAllLines/write/copy 与 AssetManager.open)
+     * 按 [maxBytesPerField] 截断捕获正文预览;流构造器路径绝不触碰句柄(被动红线)。
+     * 默认关。
+     */
+    val fileContentCapture: Boolean = false,
+    /**
+     * 路径前缀 denylist(V27 行为降噪):主体路径命中任一前缀即跳过该记录;
+     * 与内置系统路径清单叠加生效,默认空。
+     */
+    val ignorePathPrefixes: List<String> = emptyList(),
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
     val maxHexChars: Int = RecordLimits.DEFAULT_MAX_HEX_CHARS,
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
     val maxTextChars: Int = RecordLimits.DEFAULT_MAX_TEXT_CHARS,
 ) {
-    /** 是否存在任何需要 Hook 的类别(算法 + 数据库任一能力启用)。 */
+    /** 是否存在任何需要 Hook 的类别(算法 + 数据库 + 行为任一能力启用)。 */
     val anyEnabled: Boolean
-        get() = anyCryptoEnabled || anyDbEnabled
+        get() = anyCryptoEnabled || anyDbEnabled || anyBehaviorEnabled
 
     /** 算法捕获相关类别是否任一启用(含全局总开关投影,供算法监听能力判定)。 */
     val anyCryptoEnabled: Boolean
@@ -76,6 +107,11 @@ data class HookSwitch(
     /** 数据库监听相关类别是否任一启用(含全局总开关投影,供数据库监听能力判定)。 */
     val anyDbEnabled: Boolean
         get() = dbListen && (dbOpen || dbQuery || dbDml || dbExec || dbTransaction)
+
+    /** 行为监听相关类别是否任一启用(含全局总开关投影,供行为监听能力判定)。 */
+    val anyBehaviorEnabled: Boolean
+        get() = behaviorListen && (fileRead || fileWrite || fileDelete || fileRename ||
+            fileList || assetRead || shellExec)
 
     fun enabled(kind: CryptoKind): Boolean = cryptoListen && when (kind) {
         CryptoKind.MESSAGE_DIGEST -> messageDigest
@@ -100,6 +136,17 @@ data class HookSwitch(
         SqlKind.TRANSACTION -> dbTransaction
     }
 
+    /** 行为类别有效开关(master 门控;与 [CategoryTaxonomy] 默认态对齐由测试强制)。 */
+    fun behaviorEnabled(kind: BehaviorKind): Boolean = behaviorListen && when (kind) {
+        BehaviorKind.FILE_READ -> fileRead
+        BehaviorKind.FILE_WRITE -> fileWrite
+        BehaviorKind.FILE_DELETE -> fileDelete
+        BehaviorKind.FILE_RENAME -> fileRename
+        BehaviorKind.FILE_LIST -> fileList
+        BehaviorKind.ASSET_READ -> assetRead
+        BehaviorKind.SHELL_EXEC -> shellExec
+    }
+
     companion object {
         val DEFAULT = HookSwitch()
 
@@ -114,6 +161,7 @@ data class HookSwitch(
             base.copy(
                 cryptoListen = obj?.get("cryptoListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
                 dbListen = obj?.get("dbListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
+                behaviorListen = obj?.get("behaviorListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
             )
         }.getOrNull()
     }

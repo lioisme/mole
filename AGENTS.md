@@ -1,7 +1,7 @@
 # AGENTS.md
 
-Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名/密钥/BASE64/WebView)+ 宿主双进程日志。
-构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀)。
+Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名/密钥/BASE64/WebView)+ 数据库监听 + 行为监听(文件系统/Assets/Shell)+ 宿主双进程日志。
+构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀;2026-08-26 V27 记录列表重构/行为监听一等公民增量沉淀)。
 
 ## 构建 / 测试(Windows,gradlew.bat)
 
@@ -20,7 +20,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 .\gradlew.bat :app:assembleModernDebugAndroidTest
 .\gradlew.bat :app:connectedModernDebugAndroidTest
 
-# lint 门禁(基线:37 warning / 0 error;提交前必须跑,禁止新增 warning)
+# lint 门禁(基线:36 warning / 0 error,V27 起;提交前必须跑,禁止新增 warning)
 .\gradlew.bat :app:lintModernRelease
 ```
 
@@ -43,6 +43,8 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 | 自定义偏差 / 恢复默认 | 每应用二态覆盖(V24)与清除动作 | 覆盖=三态、强制开/关、重置为全局 |
 | 代码组 CodeGroup | 多表示字节区块的标签页代码块(mikepenz codeFence 扩展点聚合连续 text/base64/hex 围栏) | 三态分段、SegmentedButton(V26 退役) |
 | 外部访问 External Access | 服务监听 0.0.0.0(默认停用 = 127.0.0.1 仅本机);诊断页开关即写即重启改绑 | 监听 IP、开放端口 |
+| 行为监听 Behavior Listen | 文件读/写/删/重命名/列目录 + Assets 资源 + Shell 命令三类域(V27 一等公民,与算法/数据库并列) | 文件日志、hook 日志 |
+| 内容捕获 fileContentCapture | 仅「随调用即可得」的整读 API 正文预览(Files.readAllBytes/readAllLines/write/copy 与 AssetManager.open 元数据;流式路径绝不触碰句柄) | 文件内容抓取、全量读取 |
 
 ## 强约束(改了会挂测试/降级质量)
 
@@ -85,7 +87,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 5. **弃用 API 零容忍**:新增源码一律不得引入已弃用 API;`getInstalledApplications`
    走 `core/util/PackageManagerCompat.kt` 统一入口(API 33+ `ApplicationInfoFlags`,
    旧系统弃用分支);`getLaunchIntentForPackage(String)` 全 API 无 flags 重载且从未
-   弃用,直接使用即可。`lintModernRelease` 零新增(基线 37 warning/0 error,
+   弃用,直接使用即可。`lintModernRelease` 零新增(基线 36 warning/0 error,V27 由 37 净降 1,
    见上文构建命令)。
 6. **计数文本复数**:en 带 `%d` 的计数文案用 `<plurals>`(one/other),zh 仅
    `other`;禁止 `<string>` 直接内嵌 `%d + 英文单词`(PluralsCandidate lint)。
@@ -217,6 +219,32 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
     boundAddress`(P5-1:ui 禁 import data.server,VM 组合
     `listeningAddress` 回退口径)。诊断页开关 testTag
     `diagnostics-bind-all`,默认停用,风险提示进副标题。
+20. **行为监听一等公民契约(V27)**:第三记录类型 `RecordType.BEHAVIOR`
+    (wire=`behavior`),单表扩展(ADR-1,迁移 v8→v9 新增 10 可空列:
+    path/destPath/command/fileSize + content 五元组);wire VERSION 恒 4
+    零感知(`recordType` 泛型信封即扩展点)。注入侧 = `BehaviorProbe`
+    装配五 Hooker(FileMeta/FileStream/NioFiles/Asset/Shell),emit 闸门序:
+    config 快照 → `behaviorEnabled(kind)`(volatile 前置)→ `PathGate.isIgnored`
+    (内置 9 系统前缀 + modev_spool/modev_seq_ 自写消除 + 用户
+    ignorePathPrefixes 叠加)→ 栈 denylist → `SessionThrottle`(LRU cap256,
+    同键 1s 窗口去重)→ 组装;**被动红线**:内容预览仅限「随调用即可得」
+    (readAllBytes/readAllLines 返回值、write 实参、AssetFileDescriptor.length),
+    流式 API 与 open() 返回的流绝不触碰。开关模型:HookSwitch +master
+    behaviorListen + kinds 7 项(FILE_WRITE/DELETE/RENAME/SHELL_EXEC 默认开;
+    FILE_READ/LIST/ASSET_READ 默认关)+ 微调 fileContentCapture/
+    ignorePathPrefixes(AppListenOverride 偏差项同步扩展);新增行为类别必须
+    同步五处:BehaviorKind/BehaviorOperation.kind 归属/CategoryTaxonomy 条目/
+    HookSwitch.behaviorEnabled/EffectiveSwitch.readKind+applyKinds(互逆测试
+    强制)。UI 三入口对齐:`records/behavior/{pkg}` 路由、AppMonitor 第三
+    EntryRow(testTag `monitor-entry-behavior`)、StatsCard 三段比例条;
+    监听设置页行为分区 testTag:`listen-row-master-behavior` /
+    `listen-row-file-content` / `listen-row-ignore-path`;数据管理 ClearTarget
+    三类型。列表行统一脚手架(V27):`RecordRow` → RowPresentation 单一数据出口 +
+    RowScope.RecordListCard(leading 36dp 类别色@13% 徽章 KindIcons 映射 + headline
+    mono Medium + 元行 AnnotatedString 类别词元着色 + 尾栏 MicroBadge);
+    路径/命令中缀省略走 `MiddleEllipsisText`(纯函数 MiddleEllipsis.ellipsize
+    JVM 直测);计数副标消费 `RecordsViewModel.totalCount`;长按复制摘要三族齐备
+    (copySummary/sqlRowSummary/behaviorSummary)。
 
 ## 已知工具链坑
 

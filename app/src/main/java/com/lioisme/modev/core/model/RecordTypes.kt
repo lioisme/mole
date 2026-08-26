@@ -12,4 +12,7 @@ object RecordTypes {
 
     /** 数据库操作记录(SQLiteDatabase / SQLiteOpenHelper / SQLiteStatement / SQLiteCursor)。 */
     const val DATABASE = "db"
+
+    /** 行为监听记录(文件系统 / Assets / Shell,V27)。 */
+    const val BEHAVIOR = "behavior"
 }

@@ -2,11 +2,13 @@ package com.lioisme.modev.hook
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.lioisme.modev.core.codec.BehaviorRecordCodec
 import com.lioisme.modev.core.codec.CryptoRecordCodec
 import com.lioisme.modev.core.codec.Json
 import com.lioisme.modev.core.codec.SqlRecordCodec
 import com.lioisme.modev.core.codec.WireCodec
 import com.lioisme.modev.core.model.AppListenOverride
+import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.ConfigKeys
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.EffectiveSwitch
@@ -14,6 +16,7 @@ import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.framework.RemotePrefsBridge
 import com.lioisme.modev.hook.probes.AlgorithmProbe
+import com.lioisme.modev.hook.probes.BehaviorProbe
 import com.lioisme.modev.hook.probes.DatabaseProbe
 import java.io.File
 
@@ -32,8 +35,13 @@ class HookInstaller(
     private val processName: String,
     /** 现代变体注入:返回框架 RemotePreferences(可空);legacy 传 null,配置走 TCP 推送。 */
     private val remotePrefsProvider: (() -> SharedPreferences?)? = null,
-    /** 监听能力清单:默认含算法捕获 + 数据库监听探针,后续能力在此追加。 */
-    private val probes: List<Probe> = listOf(AlgorithmProbe(), DatabaseProbe()),
+    /** 监听能力清单(V27 行为监听入列);测试可注入替身。 */
+    private val probes: List<Probe> =
+        listOf(
+            AlgorithmProbe(),
+            DatabaseProbe(),
+            BehaviorProbe(),
+        ),
 ) {
 
     // 通道与出口存在循环依赖(channel 的 ACK 回调驱动 sink,spool 发送游标依赖 channel
@@ -67,6 +75,7 @@ class HookInstaller(
                 val payload = when (record) {
                     is CryptoRecord -> CryptoRecordCodec.encode(record)
                     is SqlRecord -> SqlRecordCodec.encode(record)
+                    is BehaviorRecord -> BehaviorRecordCodec.encode(record)
                 }
                 WireCodec.record(record.seq, record.recordType, payload)
             },

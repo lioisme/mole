@@ -11,9 +11,11 @@ import com.lioisme.modev.core.codec.RecordCodecRegistry
 import com.lioisme.modev.core.codec.SqlRecordCodec
 import com.lioisme.modev.core.codec.WireRecord
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.core.model.SqlRecord
+import com.lioisme.modev.core.codec.BehaviorRecordCodec
 import com.lioisme.modev.data.db.CryptoRecordDao
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
@@ -46,15 +48,20 @@ import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 
 /**
- * 日志仓库(ADR-1):类型化记录摄�?�?批量入库(200ms/32 条窗�?�?双层容量治理 �?�?UI 订阅�? *
- * - 摄入泛化:server 回调 [WireRecord] 通用信封,�?[RecordCodecRegistry] 类型化解�?
- *   新增监听类型零改动本�?
- * - 解码失败/未注册类�?计数丢弃,但仍按会话聚�?ACK(防注入侧 WAL 永久重放);
- * - 落库最终失�?�?ACK,注入�?WAL 保留重放(唯一索引幂等吸收);
- * - 管道统计(丢弃/写失�?裁剪/通道拒绝)汇入 [statsFlow]�? *
- * 读写门面:实现 [RecordService](V22),所有查�?增删改查经其暴露,
- * DAO 不对外暴�?UI 与未�?MCP 共用同一契约�? *
- * 接线:显式 [start]()(宿主 AppContainer 启动时调�?,不依赖构造副作用�? */
+ * 日志仓库(ADR-1;V27 更名注释修复):类型化记录摄入、批量入库(200ms/32 条窗口)、
+ * 双层容量治理(每包/全局)、UI 订阅出口。
+ *
+ * - 摄入泛化:server 回调 [WireRecord] 通用信封,经 [RecordCodecRegistry] 类型化解码,
+ *   新增监听类型零改动本类;
+ * - 解码失败/未注册类型:计数丢弃,但仍按会话聚合 ACK(防注入侧 WAL 永久重放);
+ * - 落库最终失败:不 ACK,注入侧 WAL 保留重放(唯一索引幂等吸收);
+ * - 管道统计(丢弃/写失败/裁剪/通道拒绝)汇入 [statsFlow]。
+ *
+ * 读写门面:实现 [RecordService](V22),所有查询/增删改查经其暴露,
+ * DAO 不对外暴露,UI 与未来 MCP 共用同一契约。
+ *
+ * 接线:显式 [start]()(宿主 AppContainer 启动时调用),不依赖构造副作用。
+ */
 class LogRepository(
     private val dao: CryptoRecordDao,
     private val server: ConfigServer,
@@ -67,12 +74,15 @@ class LogRepository(
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val writeMutex = Mutex()
 
-    /** 待入库记录通道:信封 + 其所属会话的 ACK 回调�?*/
+    /** 待入库记录通道:信封 + 其所属会话的 ACK 回调。 */
     private val pending = Channel<Pair<WireRecord, (Long) -> Unit>>(PENDING_CAPACITY)
 
     /**
-     * 背压信号�?与通道容量相等,满时�?[ACQUIRE_TIMEOUT_MS] 窗口�?     * 阻塞服务端客户端线程(�?socket 写压力反向传导至注入�?WAL,注入侧先落盘再发�?
-     * 天然安全);窗口超时仍无槽位则丢弃并计数,绝不无限挂起客户端线程�?     */
+     * 背压信号量:与通道容量相等,满时在 [ACQUIRE_TIMEOUT_MS] 窗口内
+     * 阻塞服务端客户端线程(以 socket 写压力反向传导至注入侧 WAL,
+     * 注入侧先落盘再发送、天然安全);窗口超时仍无槽位则丢弃并计数,
+     * 绝不无限挂起客户端线程。
+     */
     private val pendingSlots = Semaphore(PENDING_CAPACITY)
 
     @Volatile
@@ -86,7 +96,7 @@ class LogRepository(
     }
 
     init {
-        // 通道侧拒�?丢弃计数汇入管道统计
+        // 通道侧拒绝/丢弃计数汇入管道统计
         scope.launch {
             server.statsFlow.collect { channel ->
                 bumpStats { it.copy(channel = channel) }
@@ -95,7 +105,7 @@ class LogRepository(
         scope.launch { writerLoop() }
     }
 
-    /** 显式接线记录回调(进程启动时由 AppContainer 调用)�?*/
+    /** 显式接线记录回调(进程启动时由 AppContainer 调用)。 */
     fun start() {
         if (started) return
         started = true
@@ -120,7 +130,7 @@ class LogRepository(
         }
     }
 
-    /** 批量写入循环:收到首条后攒�?32 条或 200ms 窗口),Mutex 内批量落�?+ ACK�?*/
+    /** 批量写入循环:收到首条后攒批(32 条或 200ms 窗口),Mutex 内批量落库 + ACK。 */
     private suspend fun writerLoop() {
         val batch = ArrayList<Pair<WireRecord, (Long) -> Unit>>(BATCH_SIZE)
         while (true) {
@@ -156,6 +166,10 @@ class LogRepository(
                     decodableAcks.add(wire.seq to ack)
                     toPersist.add(decoded.toEntity())
                 }
+                is BehaviorRecord -> {
+                    decodableAcks.add(wire.seq to ack)
+                    toPersist.add(decoded.toEntity())
+                }
                 else -> {
                     // 未知记录类型/畸形载荷:计数丢弃;ACK 单独回执(防注入侧 WAL 永久重放)
                     undecodableAcks.add(wire.seq to ack)
@@ -166,12 +180,12 @@ class LogRepository(
         }
         val persisted = toPersist.isEmpty() || persistBatch(toPersist)
         if (persisted) {
-            // 全部落库成功(或无可落�?:按会话聚合回执全部游�?            // 全部落库成功:按会话聚合回执全部游标
+            // 全部落库成功(或无待持久项):按会话聚合回执全部游标
             AckAggregator.maxSeqPerSession(decodableAcks + undecodableAcks)
                 .forEach { (seq, ack) -> runCatching { ack(seq) } }
         } else {
-            // 写库最终失�?可解码记录不 ACK(注入�?WAL 保留重放,唯一索引幂等吸收);
-            // 不可解码记录仍回�?其重放无意义且永不成�?
+            // 写库最终失败:可解码记录不 ACK(注入侧 WAL 保留重放,唯一索引幂等吸收);
+            // 不可解码记录仍回执(其重放无意义且永不可能成功)。
             Log.w("Modev", "insert batch failed after ${MAX_INSERT_ATTEMPTS} attempts (${toPersist.size} records)")
             bumpStats { it.copy(writeFailures = it.writeFailures + toPersist.size) }
             AckAggregator.maxSeqPerSession(undecodableAcks)
@@ -179,7 +193,7 @@ class LogRepository(
         }
     }
 
-    /** 批量落库,失败重试 [MAX_INSERT_ATTEMPTS] �?全部失败返回 false�?*/
+    /** 批量落库,失败重试 [MAX_INSERT_ATTEMPTS] 次;全部失败返回 false。 */
     private suspend fun persistBatch(records: List<CryptoRecordEntity>): Boolean {
         var lastError: Throwable? = null
         repeat(MAX_INSERT_ATTEMPTS) {
@@ -194,7 +208,7 @@ class LogRepository(
         return false
     }
 
-    /** �?双层容量治理:�?[TRIM_EVERY] 条执行一�?全局 + 每包)�?*/
+    /** 双层容量治理(每 [TRIM_EVERY] 条执行一次):全局 + 每包。 */
     private var insertedSinceTrim = 0L
 
     private suspend fun maybeTrim(batchSize: Int) {
@@ -202,8 +216,7 @@ class LogRepository(
         if (insertedSinceTrim < TRIM_EVERY) return
         insertedSinceTrim = 0
         try {
-            // V17:跨类型计�?recordType=null = 全部),每包上限与全局上限均按全类型治�?
-            // V17:跨类型计数(recordType=null = 全部),每包上限与全局上限均按全类型治理
+            // V17:跨类型计数(recordType=null = 全部),每包上限与全局上限均按全类型治理。
             val counts = dao.counts(null)
             var trimmedNow = 0L
             var total = 0L
@@ -225,12 +238,17 @@ class LogRepository(
     }
 
     // ----------------------------------------------------------------
-    // RecordService 实现(�?/ �?/ �?/ �?/ 统计)
+    // RecordService 实现(读 / 写 / 删 / 清理 / 统计)
     // ----------------------------------------------------------------
 
     /**
-     * 流式分页记录(Paging3):时间倒序,支持�?类型/类别/操作/关键�?时间范围过滤�?     * 关键字在 SQL 侧匹�?算法/操作/hex/文本/线程/SQL),不在内存过滤�?     * 列表走投影查�?[CryptoRecordDao.observePagedRowsByFilter],仅物化展示列�?SQL 侧预�?
-     * 零大字段加载;枚举未知的行�?null 丢弃(计数�?DAO 层不感知,�?Schema 漂移兜底)�?     * V17 R2:recordType 参数�?null = 全部类型,跨监听类�?整体"语义)�?     * V22:kind/operation �?[RecordFilter.normalize] 作用域收�?空交集短路为零结果�?     */
+     * 流式分页记录(Paging3):时间倒序,支持记录类型/类别/操作/关键字/时间范围过滤。
+     * 关键字在 SQL 侧匹配(算法/操作/hex/文本/线程/SQL/路径),不在内存过滤;
+     * 列表走投影查询 [CryptoRecordDao.observePagedRowsByFilter],仅物化展示列 + SQL 侧预览,
+     * 零大字段加载;枚举未知的行返回 null 丢弃(计数在 DAO 层不感知,防 Schema 漂移兜底)。
+     * V17 R2:recordType 参数为 null = 全部类型,跨监听类别「整体」语义。
+     * V22:kind/operation 经 [RecordFilter.normalize] 作用域收敛,空交集短路为零结果。
+     */
     override fun observe(filter: RecordFilter): Flow<PagingData<RowModel>> {
         val r = resolve(filter)
         if (r.noMatch) return flowOf(PagingData.empty())
@@ -262,7 +280,7 @@ class LogRepository(
         }
     }
 
-    /** 同步切片查询(�?MCP / 导出):返回当页 + 总量,不入 Paging 冷流�?*/
+    /** 同步切片查询(供 MCP / 导出):返回当页 + 总量,不入 Paging 冷流。 */
     override suspend fun queryPage(filter: RecordFilter, page: Int, pageSize: Int): RecordPage {
         val r = resolve(filter)
         if (r.noMatch) return RecordPage(emptyList(), 0, page, pageSize)
@@ -292,7 +310,7 @@ class LogRepository(
         return RecordPage(items = items, total = total, page = safePage, pageSize = safeSize)
     }
 
-    /** 统一查询契约计数入口(V17 R2;REST/MCP 唯一依赖�?�?*/
+    /** 统一查询契约计数入口(V17 R2;REST/MCP 唯一依赖口)。 */
     override fun count(filter: RecordFilter): Flow<Long> {
         val r = resolve(filter)
         if (r.noMatch) return flowOf(0L)
@@ -311,11 +329,11 @@ class LogRepository(
         )
     }
 
-    /** 单条记录(记录详情�?,记录被清理或不可解码后返�?null�?*/
+    /** 单条记录(记录详情源),记录被清理或不可解码后返回 null。 */
     override fun get(id: Long): Flow<RecordDetailModel?> =
         dao.observeById(id).map { it?.toRecordDetailOrNull() }
 
-    /** 相邻记录 id(详情"上一�?下一�?),仅投�?id,不物化邻居大字段�?*/
+    /** 相邻记录 id(详情「上一条/下一条」),仅投影 id,不物化邻居大字段。 */
     override suspend fun neighbor(id: Long, newer: Boolean): Long? {
         val rec = dao.observeById(id).first() ?: return null
         return withContext(Dispatchers.IO) {
@@ -327,19 +345,19 @@ class LogRepository(
         }
     }
 
-    /** 新增单条(�?MCP 导入 / 手动补录),返回自增 id�?*/
+    /** 新增单条(供 MCP 导入 / 手动补录),返回自增 id。 */
     override suspend fun create(record: CryptoRecordEntity): Long = dao.insertReturningId(record)
 
-    /** 更新单条(按主键覆�?MCP 编辑),成功返回 true�?*/
+    /** 更新单条(按主键覆盖,MCP 编辑),成功返回 true。 */
     override suspend fun update(record: CryptoRecordEntity): Boolean {
         dao.upsert(record)
         return true
     }
 
-    /** �?id 删除单条�?*/
+    /** 按 id 删除单条。 */
     override suspend fun delete(id: Long): Boolean = dao.deleteById(id) > 0
 
-    /** �?[RecordFilter] 批量删除(共享 [CryptoRecordDao.WHERE_FILTER],保证"�?�?)�?*/
+    /** 按 [RecordFilter] 批量删除(共享 [CryptoRecordDao.WHERE_FILTER],保证口径单一)。 */
     override suspend fun deleteByFilter(filter: RecordFilter): Long {
         val r = resolve(filter)
         if (r.noMatch) return 0L
@@ -362,7 +380,7 @@ class LogRepository(
 
     override suspend fun clearPackage(packageName: String) = dao.clearPackage(packageName)
 
-    /** 按记录类型清�?V19 T7 数据管理按类型清�?�?*/
+    /** 按记录类型清理(V19 T7 数据管理按类型清空)。 */
     override suspend fun clearByType(recordType: String) = dao.clearByType(recordType)
 
     override suspend fun clearAll() = dao.clearAll()
@@ -383,9 +401,10 @@ class LogRepository(
         }
     }
 
-    override fun observePackages(): Flow<List<String>> = dao.observePackages(RecordTypes.CRYPTO)
+    // V27 修复:原硬编码 RecordTypes.CRYPTO 只统计算法包;null = 全类型(应用列表徽标跨类型对账)。
+    override fun observePackages(): Flow<List<String>> = dao.observePackages(null)
 
-    /** 按记录类型分组计�?V17 R2,全类型总览基础)�?*/
+    /** 按记录类型分组计数(V17 R2,全类型总览基础)。 */
     override fun observeTypeCounts(): Flow<List<RecordTypeCount>> = dao.observeRecordTypeCounts()
 
     /** 兼容别名([DataSettingsViewModel] 既有调用)。 */
@@ -412,7 +431,7 @@ class LogRepository(
     /** 兼容别名([AppMonitorScreen] 既有调用)。 */
     suspend fun clear(packageName: String) = clearPackage(packageName)
 
-    /** 指定类型每类别计�?筛选菜单徽�?�?*/
+    /** 指定类型每类别计数(筛选菜单徽标)。 */
     override suspend fun categoryCounts(type: RecordType): Map<String, Long> =
         dao.observeCategoryCounts(type.wire).first().associate { it.kind to it.count }
 
@@ -421,7 +440,9 @@ class LogRepository(
     // ----------------------------------------------------------------
 
     /**
-     * 按包/类别/关键�?记录类型分页(便捷封装,委托 [observe])�?     * kindName 为单类别�?CryptoKind.name / SqlKind.name),�?[RecordFilter] 作用域收敛�?     */
+     * 按包/类别/关键字/记录类型分页(便捷封装,委托 [observe])。
+     * kindName 为单类别 id(CryptoKind.name / SqlKind.name),经 [RecordFilter] 作用域收敛。
+     */
     fun pagedRecords(
         packageName: String? = null,
         kindName: String? = null,
@@ -437,28 +458,31 @@ class LogRepository(
         return observe(filter)
     }
 
-    /** 统一查询契约分页入口(V17 R2;REST/MCP 唯一依赖�?�?*/
+    /** 统一查询契约分页入口(V17 R2;REST/MCP 唯一依赖口)。 */
     fun paged(filter: RecordFilter): Flow<PagingData<RowModel>> = observe(filter)
 
-    /** 兼容别名:统计(委托 [count])�?*/
+    /** 兼容别名:统计(委托 [count])。 */
     fun counts(filter: RecordFilter): Flow<Long> = count(filter)
 
     fun observeRecordCounts(recordType: String? = null): Flow<Map<String, Long>> =
         dao.observeRecordCounts(recordType).map { list -> list.associate { it.packageName to it.count } }
 
-    /** SQL LIKE 模式转义(% / _ / \)�?*/
+    /** SQL LIKE 模式转义(% / _ / \)。 */
     private fun likePattern(raw: String): String =
         "%" + raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
     /**
-     * RecordFilter 集合 �?Room IN 绑定列表:null/空集绑定哨兵单例(内容无意�?
-     * �?DAO �?`:xCount = 0 OR` 短路为不过滤);非空集合原样绑定�?     */
+     * RecordFilter 集合 → Room IN 绑定列表:null/空集绑定哨兵单例(内容无意义,
+     * 由 DAO 的 `:xCount = 0 OR` 短路为不过滤);非空集合原样绑定。
+     */
     private fun Set<String>?.toBindList(): List<String> =
         this?.toList()?.takeIf { it.isNotEmpty() } ?: listOf(EMPTY_IN_SENTINEL)
 
     /**
-     * �?[RecordFilter] 解析为共�?WHERE 绑定参数 + 空交集短路标记�?     * - [noMatch]:kinds/operations �?[RecordFilter.normalize] 收敛后为空集(显式无匹�?�?调用方短路为零结�?
-     * - 其余参数恒可安全绑定(哨兵语义�?DAO WHERE 处理)�?     */
+     * 将 [RecordFilter] 解析为共享 WHERE 绑定参数 + 空交集短路标记。
+     * - [noMatch]:kinds/operations 经 [RecordFilter.normalize] 收敛后为空集(显式无匹配),调用方短路为零结果;
+     * - 其余参数恒可安全绑定(哨兵语义由 DAO WHERE 处理)。
+     */
     private data class Resolved(
         val noMatch: Boolean,
         val recordTypes: List<String>,
@@ -500,46 +524,51 @@ class LogRepository(
             RecordCodecRegistry().apply {
                 register(CryptoRecordCodec.RECORD_TYPE, CryptoRecordCodec::decode)
                 register(SqlRecordCodec.RECORD_TYPE, SqlRecordCodec::decode)
+                register(BehaviorRecordCodec.RECORD_TYPE, BehaviorRecordCodec::decode)
             }
 
         private const val MAX_RECORDS = 20_000
         private const val PAGE_SIZE = 60
 
         /**
-         * DAO paging 查询�?LIMIT 窗口上限(Room 2.7.2 LimitOffsetPagingSource
-         * 契约):生成式计�?= COUNT(*) FROM (<�?SQL>),�?SQL �?LIMIT 绑定�?         * 会钳�?itemCount �?固定�?limit �?Refresh �?nextKey=null,分页死锁
-         * 于第一�?V20 R3 设备测试实锤:120 条种子只显示 60 �?。外层实�?         * loadSize �?Room 动态注�?此值仅作窗口上�?�?MAX_RECORDS 即可)�?         */
+         * DAO paging 查询的 LIMIT 窗口上限(Room 2.7.2 LimitOffsetPagingSource
+         * 契约):生成式计数 = COUNT(*) FROM (<原 SQL>),而原 SQL 自带 LIMIT 绑定
+         * 会钳制 itemCount 至固定小 limit,Refresh 后 nextKey=null,分页死锁
+         * 于第一页(V20 R3 设备测试实锤:120 条种子只显示 60 条)。外层实际
+         * loadSize 由 Room 动态注入,此值仅作窗口上限(= MAX_RECORDS 即可)。
+         */
         private const val PAGING_WINDOW_CAP = MAX_RECORDS
 
-        /** 单包容量上限(每包治理)�?*/
+        /** 单包容量上限(每包治理)。 */
         private const val PER_PACKAGE_MAX = 5_000
 
-        /** 列表�?SQL 侧预览字符数(24 字节 hex;行摘要仅需首段)�?*/
+        /** 列表行 SQL 侧预览字符数(24 字节 hex;行摘要仅需首段)。 */
         private const val ROW_PREVIEW_CHARS = 48
 
-        /** 批量写入窗口:32 条或 200ms�?*/
+        /** 批量写入窗口:32 条或 200ms。 */
         private const val BATCH_SIZE = 32
         private const val BATCH_WINDOW_MS = 200L
 
-        /** 待入库通道容量,溢出丢弃并计数�?*/
+        /** 待入库通道容量,溢出丢弃并计数。 */
         private const val PENDING_CAPACITY = 8192
 
-        /** 背压阻塞窗口:超时丢弃并计�?绝不无限挂起客户端线程�?*/
+        /** 背压阻塞窗口:超时丢弃并计数,绝不无限挂起客户端线程。 */
         private const val ACQUIRE_TIMEOUT_MS = 10_000L
 
-        /** 批量落库失败重试次数(仍失败不 ACK,注入�?WAL 保留重放)�?*/
+        /** 批量落库失败重试次数(仍失败不 ACK,注入侧 WAL 保留重放)。 */
         private const val MAX_INSERT_ATTEMPTS = 3
 
-        /** 每插入这么多条执行一次双层容量治理�?*/
+        /** 每插入这么多条执行一次双层容量治理。 */
         private const val TRIM_EVERY = 500L
 
-        /** Room IN 绑定哨兵(Room 不支持空集合绑定;哨兵内容不被求�?�?*/
+        /** Room IN 绑定哨兵(Room 不支持空集合绑定;哨兵内容不被求值)。 */
         private const val EMPTY_IN_SENTINEL = ""
     }
 }
 
 /**
- * 宿主管道统计:收到/丢弃/写失�?裁剪 + 通道拒绝计数,供设置页展示�? */
+ * 宿主管道统计:收到/丢弃/写失败/裁剪 + 通道拒绝计数,供设置页展示。
+ */
 data class PipelineStats(
     val received: Long = 0L,
     val dropped: Long = 0L,

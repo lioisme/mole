@@ -112,6 +112,41 @@ internal fun IgnoreStackSheet(
     initial: List<String>,
     onConfirm: (List<String>) -> Unit,
     onDismiss: () -> Unit,
+) = PrefixListSheet(
+    titleRes = R.string.capture_ignore_stack_dialog_title,
+    hintRes = R.string.capture_ignore_stack_dialog_hint,
+    initial = initial,
+    onConfirm = onConfirm,
+    onDismiss = onDismiss,
+)
+
+/**
+ * 忽略路径前缀编辑(V27 行为降噪;底部 sheet,每行一个,去空行去重):
+ * 与 [IgnoreStackSheet] 同构,语义对象为主体路径而非调用栈。
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+internal fun IgnorePathSheet(
+    initial: List<String>,
+    onConfirm: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
+) = PrefixListSheet(
+    titleRes = R.string.capture_ignore_path_dialog_title,
+    hintRes = R.string.capture_ignore_path_dialog_hint,
+    initial = initial,
+    onConfirm = onConfirm,
+    onDismiss = onDismiss,
+)
+
+/** 前缀清单编辑共用实现(ModalBottomSheet 规范见文件头 KDoc)。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PrefixListSheet(
+    titleRes: Int,
+    hintRes: Int,
+    initial: List<String>,
+    onConfirm: (List<String>) -> Unit,
+    onDismiss: () -> Unit,
 ) {
     var text by remember { mutableStateOf(initial.joinToString("\n")) }
     val sheetState = rememberModalBottomSheetState()
@@ -138,7 +173,7 @@ internal fun IgnoreStackSheet(
                     .padding(bottom = 24.dp),
         ) {
             Text(
-                stringResource(R.string.capture_ignore_stack_dialog_title),
+                stringResource(titleRes),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.SemiBold,
             )
@@ -147,7 +182,7 @@ internal fun IgnoreStackSheet(
                 value = text,
                 onValueChange = { text = it },
                 minLines = 4,
-                supportingText = { Text(stringResource(R.string.capture_ignore_stack_dialog_hint)) },
+                supportingText = { Text(stringResource(hintRes)) },
                 modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(20.dp))

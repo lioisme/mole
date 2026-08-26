@@ -2,6 +2,7 @@ package com.lioisme.modev.ui.records
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,28 +13,49 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.SearchBarValue
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.lioisme.modev.R
+import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.SqlKind
+import com.lioisme.modev.data.mapping.BehaviorRow
+import com.lioisme.modev.data.mapping.CryptoRow
+import com.lioisme.modev.data.mapping.RowModel
+import com.lioisme.modev.data.mapping.SqlRow
+import com.lioisme.modev.ui.apps.AppCountFormat
+import com.lioisme.modev.ui.common.rememberEffectiveLocale
 import com.lioisme.modev.ui.components.CollapsedSearchInput
 import com.lioisme.modev.ui.components.KindFilterMenu
 import com.lioisme.modev.ui.components.KindOption
 import com.lioisme.modev.ui.components.SearchInputField
+import com.lioisme.modev.ui.components.behaviorKindLabelRes
+import com.lioisme.modev.ui.components.behaviorSummary
 import com.lioisme.modev.ui.components.kindLabelRes
 import com.lioisme.modev.ui.components.rememberSearchController
 import com.lioisme.modev.ui.components.sqlKindLabelRes
+import com.lioisme.modev.ui.components.sqlRowSummary
+import com.lioisme.modev.ui.components.copySummary
+import kotlinx.coroutines.launch
 
 /**
  * 单应用算法记录列表(V19,需求 R1 之一;V20 单应用语境化;V23 T4.2 薄壳化:
@@ -78,6 +100,25 @@ fun DatabaseRecordsScreen(
     )
 }
 
+/**
+ * 单应用行为记录列表(V27 一等公民):同两兄弟结构,
+ * 固定记录类型 = 行为,类别单选 7 项。
+ */
+@Composable
+fun BehaviorRecordsScreen(
+    viewModel: RecordsViewModel,
+    onBack: () -> Unit,
+    onOpenRecord: (Long) -> Unit,
+) {
+    MonitorRecordsContent(
+        viewModel = viewModel,
+        onBack = onBack,
+        onOpenRecord = onOpenRecord,
+        placeholder = stringResource(R.string.behavior_records_search),
+        kinds = BehaviorKind.entries.map { KindOption(it.name, behaviorKindLabelRes(it)) },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MonitorRecordsContent(
@@ -95,6 +136,28 @@ private fun MonitorRecordsContent(
     var filterMenuOpen by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
+    // V27 M1-T4:实时计数副标(totalCount 流首次被消费;随筛选联动)。
+    val totalCount by viewModel.totalCount.collectAsState(initial = null)
+    val locale = rememberEffectiveLocale()
+
+    // V27 M1-T4:长按复制摘要(剪贴板 + Snackbar 统一出站)。
+    val snackbarHostState = remember { SnackbarHostState() }
+    val clipboard = LocalClipboardManager.current
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    fun copySummary(record: RowModel) {
+        val summary =
+            when (record) {
+                is CryptoRow -> record.record.copySummary(context)
+                is SqlRow -> record.sqlRowSummary(context)
+                is BehaviorRow -> record.behaviorSummary(context)
+            }
+        clipboard.setText(AnnotatedString(summary))
+        scope.launch {
+            snackbarHostState.showSnackbar(context.getString(R.string.record_copied_toast))
+        }
+    }
+
     // 过滤条件变化 → ViewModel 重建 Paging 流(SQL 过滤)。
     LaunchedEffect(search.queryText, selectedKindName) {
         viewModel.setQuery(search.queryText)
@@ -102,6 +165,7 @@ private fun MonitorRecordsContent(
     }
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
@@ -137,18 +201,33 @@ private fun MonitorRecordsContent(
         },
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
-            RecordTimelineList(
-                records = records,
-                listState = viewModel.listState,
-                onOpenRecord = { id ->
-                    // 交互统一:展开态先收起,导航由动画唯一驱动协程执行。
-                    if (search.searchActive) {
-                        search.collapseWithNavigation(id)
-                    } else {
-                        onOpenRecord(id)
-                    }
-                },
-            )
+            Column {
+                if (totalCount != null && !search.searchActive) {
+                    Text(
+                        text =
+                            stringResource(
+                                R.string.records_count_subtitle,
+                                AppCountFormat.grouped(totalCount ?: 0L, locale),
+                            ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 2.dp),
+                    )
+                }
+                RecordTimelineList(
+                    records = records,
+                    listState = viewModel.listState,
+                    onOpenRecord = { id ->
+                        // 交互统一:展开态先收起,导航由动画唯一驱动协程执行。
+                        if (search.searchActive) {
+                            search.collapseWithNavigation(id)
+                        } else {
+                            onOpenRecord(id)
+                        }
+                    },
+                    onRecordLongPress = ::copySummary,
+                )
+            }
         }
     }
 
@@ -193,6 +272,7 @@ private fun MonitorRecordsContent(
                 onOpenRecord = { id ->
                     search.collapseWithNavigation(id)
                 },
+                onRecordLongPress = ::copySummary,
             )
         }
     }

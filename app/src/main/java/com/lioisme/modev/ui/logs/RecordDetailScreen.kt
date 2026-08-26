@@ -48,28 +48,36 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
+import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.SqlRecord
+import com.lioisme.modev.data.mapping.BehaviorDetail
 import com.lioisme.modev.data.mapping.CryptoDetail
 import com.lioisme.modev.data.mapping.RecordDetailModel
 import com.lioisme.modev.data.mapping.SqlDetail
 import com.lioisme.modev.data.mapping.toJson
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.TipIconButton
+import com.lioisme.modev.ui.components.behaviorKindLabelRes
+import com.lioisme.modev.ui.components.behaviorOperationLabel
+import com.lioisme.modev.ui.components.behaviorOperationLabelRes
 import com.lioisme.modev.ui.components.directionLabel
 import com.lioisme.modev.ui.components.displayAlgorithm
 import com.lioisme.modev.ui.components.kindLabelRes
 import com.lioisme.modev.ui.components.sqlHeadline
 import com.lioisme.modev.ui.components.sqlKindLabelRes
 import com.lioisme.modev.ui.components.sqlOperationLabel
+import com.lioisme.modev.ui.logs.detail.BehaviorHero
 import com.lioisme.modev.ui.logs.detail.CryptoHero
 import com.lioisme.modev.ui.logs.detail.DetailAnchorRow
 import com.lioisme.modev.ui.logs.detail.SqlHero
+import com.lioisme.modev.ui.logs.detail.behaviorAnchors
 import com.lioisme.modev.ui.logs.detail.cryptoAnchors
 import com.lioisme.modev.ui.logs.detail.sqlAnchors
 import com.lioisme.modev.ui.logs.markdown.DetailCodeActions
 import com.lioisme.modev.ui.logs.markdown.DetailFenceHandle
 import com.lioisme.modev.ui.logs.markdown.FullscreenTextDialog
+import com.lioisme.modev.ui.settings.StorageFormat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -153,6 +161,7 @@ fun RecordDetailScreen(
             when (current) {
                 is CryptoDetail -> estimateJsonChars(current.record)
                 is SqlDetail -> estimateSqlJsonChars(current.record)
+                is BehaviorDetail -> estimateBehaviorJsonChars(current.record)
             }
         if (estimatedChars > EXPORT_MAX_CHARS) {
             showSnack(context.getString(R.string.export_too_large, estimatedChars))
@@ -165,6 +174,7 @@ fun RecordDetailScreen(
                         when (current) {
                             is CryptoDetail -> current.record.toJson()
                             is SqlDetail -> current.record.toJson()
+                            is BehaviorDetail -> current.record.toJson()
                         }
                     }
                 }
@@ -187,6 +197,7 @@ fun RecordDetailScreen(
                     when (val current = state.record) {
                         is CryptoDetail -> current.record.displayAlgorithm()
                         is SqlDetail -> current.record.sqlHeadline()
+                        is BehaviorDetail -> behaviorHeadline(current.record)
                         null -> stringResource(R.string.record_title)
                     },
                 onBack = onBack,
@@ -281,7 +292,16 @@ private fun LoadedContent(
     when (record) {
         is CryptoDetail -> CryptoLoadedContent(record.record, innerPadding, listState, actions)
         is SqlDetail -> SqlLoadedContent(record.record, innerPadding, listState, actions)
+        is BehaviorDetail -> BehaviorLoadedContent(record.record, innerPadding, listState, actions)
     }
+}
+
+/** 行为详情顶栏标题(路径 basename / 命令首段 / 操作名,恒非空)。 */
+@Composable
+private fun behaviorHeadline(record: BehaviorRecord): String {
+    record.path?.trimEnd('/')?.ifEmpty { "/" }?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }?.let { return it }
+    record.commandDisplay()?.lineSequence()?.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+    return stringResource(behaviorOperationLabelRes(record.operation))
 }
 
 @Composable
@@ -628,6 +648,111 @@ private fun SqlLoadedContent(
         resultDoc?.let { doc ->
             book.mark("result")
             book.advance(markdownSectionItems("result", doc, actions))
+        }
+        paramsDoc?.let { doc ->
+            book.mark("params")
+            book.advance(markdownSectionItems("params", doc, actions))
+        }
+        stackDoc?.let { doc ->
+            book.mark("stack")
+            book.advance(markdownSectionItems("stack", doc, actions))
+        }
+        item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+/**
+ * 行为记录详情内容(V27 一等公民;V26 markdown 装配同款):
+ * Hero → 锚点(命令/内容/参数/栈)→ 元数据表 → 命令(bash 围栏)→
+ * 内容预览(三态字节代码组)→ 参数 → 调用栈,锚点键与内容一一对应。
+ */
+@Composable
+private fun BehaviorLoadedContent(
+    record: BehaviorRecord,
+    innerPadding: PaddingValues,
+    listState: LazyListState,
+    actions: DetailCodeActions,
+) {
+    val res = LocalContext.current.resources
+
+    val metaEntries =
+        listOf(
+            Pair(stringResource(R.string.meta_kind), stringResource(behaviorKindLabelRes(record.kind))),
+            Pair(stringResource(R.string.meta_operation), behaviorOperationLabel(record.operation)),
+            record.path?.let { Pair(stringResource(R.string.meta_path), it) },
+            record.destPath?.let { Pair(stringResource(R.string.meta_dest_path), it) },
+            record.fileSize?.let { Pair(stringResource(R.string.meta_file_size), StorageFormat.formatBytes(it)) },
+            Pair(stringResource(R.string.meta_context), "#${record.contextId}"),
+            Pair(stringResource(R.string.meta_thread), record.threadName),
+        ).filterNotNull()
+    val metaTable = metaTableDoc(metaEntries)
+    val anchors = behaviorAnchors(record)
+
+    // 区块文档预计算(组合期;@Composable 文档构建器不得进入 LazyListScope DSL 作用域):
+    val commandTitle = stringResource(R.string.section_command)
+    val contentTitle = stringResource(R.string.section_content)
+    val paramsTitle = stringResource(R.string.section_params)
+    val stackTitle = stringResource(R.string.section_stack)
+
+    val commandDoc =
+        record.command?.takeIf { it.isNotEmpty() }?.let { argv ->
+            textSectionDoc(commandTitle, argv.joinToString("\n"), lang = "bash")
+        }
+    val contentDoc = record.content?.let { byteSectionDoc(contentTitle, it) }
+    val paramsDoc =
+        record.params?.takeIf { it.isNotEmpty() }?.let { params ->
+            val formatted = formatParamsText(params)
+            val trailers =
+                buildList {
+                    if (formatted.truncatedValues > 0) add(res.getString(R.string.params_truncated))
+                    if (formatted.omittedEntries > 0) {
+                        add(res.getQuantityString(R.plurals.params_omitted, formatted.omittedEntries, formatted.omittedEntries))
+                    }
+                }
+            textSectionDoc(paramsTitle, formatted.lines.joinToString("\n"), trailerLines = trailers)
+        }
+    val stackDoc =
+        if (record.stack.isEmpty()) {
+            null
+        } else {
+            val frames = record.stack.take(STACK_MAX_FRAMES)
+            val omittedFrames = record.stack.size - STACK_MAX_FRAMES
+            val trailer =
+                if (omittedFrames > 0) {
+                    listOf(res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames))
+                } else {
+                    emptyList()
+                }
+            textSectionDoc(stackTitle, frames.joinToString("\n"), trailerLines = trailer)
+        }
+
+    val book = remember(record.id) { AnchorBookkeeping(listState) }
+    val scrollScope = rememberCoroutineScope()
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+    ) {
+        book.cursor = 0
+        item(key = "hero") { BehaviorHero(record) }
+        book.advance(1)
+        item(key = "anchors") {
+            DetailAnchorRow(anchors = anchors, onAnchorClick = { book.scrollTo(it, scrollScope) })
+        }
+        book.advance(1)
+        book.mark("meta")
+        book.advance(metaTableItems("meta", metaTable))
+
+        commandDoc?.let { doc ->
+            book.mark("command")
+            book.advance(markdownSectionItems("command", doc, actions))
+        }
+        contentDoc?.let { doc ->
+            book.mark("content")
+            book.advance(markdownSectionItems("content", doc, actions))
         }
         paramsDoc?.let { doc ->
             book.mark("params")

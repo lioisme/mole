@@ -174,7 +174,15 @@ class MarkdownByteSectionTest {
         val fullHex = "ab".repeat(70_000)
         setSection(view(hex = fullHex))
 
-        val marker = str(R.string.detail_truncated_marker, MARKDOWN_DISPLAY_MAX_CHARS, fullHex.length)
+        // V27 修复:detail_truncated_marker 为 plurals 资源(计数复数契约),
+        // 经 resources.getQuantityString 解析(此前误引 R.string 为历史遗留编译债)。
+        val res = InstrumentationRegistry.getInstrumentation().targetContext.resources
+        val marker = res.getQuantityString(
+            R.plurals.detail_truncated_marker,
+            fullHex.length,
+            MARKDOWN_DISPLAY_MAX_CHARS,
+            fullHex.length,
+        )
         assertTrue(waitForText(marker))
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(marker, substring = true))

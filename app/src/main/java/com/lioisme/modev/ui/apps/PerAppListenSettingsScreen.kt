@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.DataUsage
 import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.TextFields
+import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -46,12 +47,14 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.AppListenOverride
+import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.CategoryTaxonomy
 import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.ui.components.IntLimitSheet
+import com.lioisme.modev.ui.components.IgnorePathSheet
 import com.lioisme.modev.ui.components.IgnoreStackSheet
 import com.lioisme.modev.ui.components.MaxBytesSheet
 import com.lioisme.modev.ui.components.ModevTopBar
@@ -91,11 +94,16 @@ class PerAppListenSettingsViewModel(
         .map { it[packageName] ?: AppListenOverride.DEFAULT }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), AppListenOverride.DEFAULT)
 
-    /** 总开关定制(crypto/db 二选一;显式布尔,无第三态)。 */
+    /** 总开关定制(crypto/db/behavior;显式布尔,无第三态)。 */
     fun setMaster(isCrypto: Boolean, value: Boolean) {
         update {
             if (isCrypto) it.copy(cryptoListen = value) else it.copy(dbListen = value)
         }
+    }
+
+    /** 行为监听总开关定制(V27)。 */
+    fun setBehaviorMaster(value: Boolean) {
+        update { it.copy(behaviorListen = value) }
     }
 
     /** 类别定制(kind 名跨枚举;非法名由 AppListenOverride 容错忽略)。 */
@@ -126,6 +134,16 @@ class PerAppListenSettingsViewModel(
     /** 结果字节上限定制(V25)。 */
     fun setMaxResultChars(value: Int) {
         update { it.copy(maxResultChars = value) }
+    }
+
+    /** 文件内容捕获定制(V27)。 */
+    fun setFileContentCapture(value: Boolean) {
+        update { it.copy(fileContentCapture = value) }
+    }
+
+    /** 忽略路径前缀定制(V27;整表替换,空表归零为取默认)。 */
+    fun setIgnorePathPrefixes(value: List<String>) {
+        update { it.copy(ignorePathPrefixes = value.ifEmpty { null }) }
     }
 
     /** 一键恢复默认配置(删除本包全部偏差存储键)。 */
@@ -172,6 +190,7 @@ fun PerAppListenSettingsScreen(
     var confirmReset by remember { mutableStateOf(false) }
     var showMaxBytesSheet by remember { mutableStateOf(false) }
     var showIgnoreStackSheet by remember { mutableStateOf(false) }
+    var showIgnorePathSheet by remember { mutableStateOf(false) }
     var showResultRowsSheet by remember { mutableStateOf(false) }
     var showResultCharsSheet by remember { mutableStateOf(false) }
     val res = rememberLocaleAwareResources()
@@ -253,6 +272,43 @@ fun PerAppListenSettingsScreen(
             }
             Spacer(Modifier.height(16.dp))
 
+            // 行为 7 类别 + 内容捕获 + 忽略路径前缀(V27 一等公民)
+            SettingsSection(stringResource(R.string.filter_type_behavior)) {
+                ListenRow(
+                    label = res.getString(R.string.behavior_monitor_master),
+                    checked = effective.behaviorListen,
+                    onCheckedChange = { viewModel.setBehaviorMaster(it) },
+                    testTag = "listen-row-master-behavior",
+                )
+                CategoryTaxonomy.forType(RecordType.BEHAVIOR).forEach { category ->
+                    HorizontalDivider16Compat()
+                    ListenRow(
+                        label = res.getString(switchLabelRes(category.id)),
+                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.id, it) },
+                        testTag = "listen-row-${category.id}",
+                    )
+                }
+                HorizontalDivider16Compat()
+                ListenRow(
+                    label = res.getString(R.string.switch_file_content_capture),
+                    checked = effective.fileContentCapture,
+                    onCheckedChange = { viewModel.setFileContentCapture(it) },
+                    testTag = "listen-row-file-content",
+                    supporting = res.getString(R.string.switch_file_content_capture_hint),
+                )
+                HorizontalDivider16Compat()
+                OptionRowItem(
+                    icon = Icons.Outlined.FolderOpen,
+                    title = res.getString(R.string.capture_ignore_path),
+                    value = (effective.ignorePathPrefixes.size).toString(),
+                    hint = res.getString(R.string.capture_ignore_path_hint),
+                    onClick = { showIgnorePathSheet = true },
+                    modifier = Modifier.testTag("listen-row-ignore-path"),
+                )
+            }
+            Spacer(Modifier.height(16.dp))
+
             // V25 记录选项:堆栈开关(行内 Switch)+ 单字段字节上限 / 忽略栈前缀(sheet 编辑)。
             SettingsSection(stringResource(R.string.section_record_options)) {
                 ListenRow(
@@ -319,12 +375,15 @@ fun PerAppListenSettingsScreen(
                         },
                         supportingContent = {
                             val n = override.cryptoListen.count() + override.dbListen.count() +
+                                override.behaviorListen.count() +
                                 override.kinds.size +
                                 override.logStack.count() +
                                 override.maxBytesPerField.count() +
                                 (if (override.ignoreStackPrefixes != null) 1 else 0) +
                                 override.maxResultRows.count() +
-                                override.maxResultChars.count()
+                                override.maxResultChars.count() +
+                                override.fileContentCapture.count() +
+                                (if (override.ignorePathPrefixes != null) 1 else 0)
                             Text(
                                 pluralStringResource(R.plurals.listen_settings_custom_n, n, n),
                                 style = MaterialTheme.typography.bodySmall,
@@ -391,6 +450,16 @@ fun PerAppListenSettingsScreen(
             onDismiss = { showIgnoreStackSheet = false },
         )
     }
+    if (showIgnorePathSheet) {
+        IgnorePathSheet(
+            initial = effective.ignorePathPrefixes,
+            onConfirm = {
+                viewModel.setIgnorePathPrefixes(it)
+                showIgnorePathSheet = false
+            },
+            onDismiss = { showIgnorePathSheet = false },
+        )
+    }
     if (showResultRowsSheet) {
         IntLimitSheet(
             titleRes = R.string.db_max_result_rows_dialog_title,
@@ -427,8 +496,8 @@ private fun Int?.count(): Int = if (this != null) 1 else 0
 private fun limitValue(value: Int): String = if (value <= 0) "∞" else value.toString()
 
 /**
- * 监听行:label + 尾部 M3 Switch;整行 toggleable(role=Switch)单击切换,
- * 内层 Switch onCheckedChange=null 并 clearAndSetSemantics 去重(契约 13 同款语义)。
+ * 监听行:label(+可选 supporting 副文)+ 尾部 M3 Switch;整行 toggleable(role=Switch)
+ * 单击切换,内层 Switch onCheckedChange=null 并 clearAndSetSemantics 去重(契约 13 同款语义)。
  */
 @Composable
 private fun ListenRow(
@@ -436,6 +505,7 @@ private fun ListenRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
     testTag: String,
+    supporting: String? = null,
 ) {
     ListItem(
         colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
@@ -448,6 +518,18 @@ private fun ListenRow(
                 overflow = TextOverflow.Ellipsis,
             )
         },
+        supportingContent =
+            if (supporting.isNullOrBlank()) {
+                null
+            } else {
+                {
+                    Text(
+                        supporting,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
         trailingContent = {
             Switch(
                 checked = checked,
@@ -489,5 +571,13 @@ private fun switchLabelRes(kindId: String): Int = when (kindId) {
     "DML" -> R.string.switch_db_dml
     "EXEC" -> R.string.switch_db_exec
     "TRANSACTION" -> R.string.switch_db_transaction
+    // 行为类别(V27):复用 kind 标签单一事实源(设置页行标签 = 筛选/详情同文案)
+    BehaviorKind.FILE_READ.name -> R.string.kind_behavior_file_read
+    BehaviorKind.FILE_WRITE.name -> R.string.kind_behavior_file_write
+    BehaviorKind.FILE_DELETE.name -> R.string.kind_behavior_file_delete
+    BehaviorKind.FILE_RENAME.name -> R.string.kind_behavior_file_rename
+    BehaviorKind.FILE_LIST.name -> R.string.kind_behavior_file_list
+    BehaviorKind.ASSET_READ.name -> R.string.kind_behavior_asset_read
+    BehaviorKind.SHELL_EXEC.name -> R.string.kind_behavior_shell_exec
     else -> R.string.unknown_error
 }

@@ -4,16 +4,19 @@ import android.content.Context
 import android.text.format.DateFormat
 import androidx.annotation.StringRes
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -22,22 +25,31 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.data.mapping.BehaviorRow
 import com.lioisme.modev.data.mapping.CryptoRow
 import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.mapping.SqlRow
+import com.lioisme.modev.ui.theme.behaviorKindColor
 import com.lioisme.modev.ui.theme.kindColor
 import com.lioisme.modev.ui.theme.sqlKindColor
 import java.text.SimpleDateFormat
@@ -45,38 +57,36 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 记录行(2026-08-17 V8 卡片化;2026-08-17 V12 秒级时间 + 参数独立成行;
- * 2026-08-17 V13 去徽章 + 空白治理;2026-08-18 V14 R1 精修 M3 ListItem 层级;
- * V17 数据库监听:入参泛化为 [RowModel](算法 / 数据库双形态,按类型分支渲染)):
- * 每行 = 圆角卡片(16dp, surfaceContainerLow 浮于 surface),行间留白 8dp:
- * - 三级信息架构(对齐 M3 ListItem:headline + supporting + 数据段)+ 尾部时间:
- *   行1 headline 算法/ SQL 首行(等宽 bodyLarge SemiBold,超长省略);
- *   行2 supporting 类别·操作组合(labelMedium 类别色,类别语义唯一承载点);
- *   行3(仅当有方向)方向胶囊(算法形态);行4(仅当有数据)唯一最有价值数据段;
- *   数据库形态数据段 = SQL 预览,行数元数据并入操作行尾部(rows/affected);
- *   尾部时间(秒级精度,labelSmall onSurfaceVariant,尊重系统 12/24h 时制);
- * - 单击进详情;长按复制记录摘要([copySummary]),回调由宿主接线。
- * V20:移除 showPackage(单应用语境化,列表页不再需要行内包名)。
+ * 记录行(V27 M1-T3 重构,取代 V13 三级文本流):
+ * 单一脚手架 [RecordListCard] 承载各族记录(Crypto/Sql,后续 Behavior),信息架构四级:
+ * - leading 类别徽章(36dp 圆角方,类别色@13% 底 + 类别色图标 20dp,CIPHER 按方向换锁形);
+ * - headline 算法名 / SQL 首行(bodyLarge Medium mono,超长尾省略);
+ * - 元行 labelMedium:类别词元(类别色)+ 操作名(+库名/行数后缀);
+ * - 预览行 bodySmall mono(最有价值数据段 / SQL 预览);
+ * - 尾栏:方向微徽章(labelSmall 紧凑胶囊,替代 V19 AssistChip);
+ * - 行容器 surfaceContainerLow 圆角 16dp,最小高 68dp;
+ * - 单击进详情、长按复制摘要([CryptoRecord.copySummary],回调由宿主接线)。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RecordRow(
     record: RowModel,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
-    modifier: Modifier = Modifier,
 ) {
     val haptics = LocalHapticFeedback.current
-    val context = LocalContext.current
-    val timeFormat = remember(context) {
-        val pattern = if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a"
-        SimpleDateFormat(pattern, Locale.getDefault())
-    }
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
         color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
+        val presentation =
+            when (record) {
+                is CryptoRow -> cryptoPresentation(record)
+                is SqlRow -> sqlPresentation(record)
+                is BehaviorRow -> behaviorPresentation(record)
+            }
         Row(
             modifier =
                 Modifier
@@ -88,111 +98,215 @@ fun RecordRow(
                             onLongClick()
                         },
                     )
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            // 尾部时间与 headline 顶对齐(V14 R1 层级)。
-            verticalAlignment = Alignment.Top,
+                    .defaultMinSize(minHeight = MIN_ROW_HEIGHT)
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(SPACING.dp),
         ) {
-            // 主体:每参数独立成行(V13:无徽章,内容顶对齐、高度自适应)。
-            Column(Modifier.weight(1f)) {
-                when (record) {
-                    is CryptoRow -> CryptoRowContent(record, rowOnClick = onClick)
-                    is SqlRow -> SqlRowContent(record)
-                }
-            }
-            Spacer(Modifier.width(8.dp))
-            // 尾部时间(V14 R1:移出主体,独立于数据区右对齐)。
-            Text(
-                text = timeFormat.format(Date(record.timestamp)),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            RecordListCard(presentation = presentation)
         }
     }
 }
 
-/** 算法形态行内容(headline / 类别·操作 / 方向 / 最有价值数据段)。 */
+/** 统一行展示规格(presentation 单一数据出口,三族同构)。 */
+private data class RowPresentation(
+    val icon: ImageVector,
+    val accent: Color,
+    val headline: String,
+    val meta: AnnotatedString,
+    val preview: String?,
+    val badges: List<RowBadge>,
+    /** 尾栏秒级时间(V27 契约保留:与组头同源口径,由行装配层格式化)。 */
+    val timestamp: Long,
+)
+
+/** 微徽章规格(text 展示文案;accent 非空 = 语义色呈现,空 = 中性 surfaceVariant)。 */
+private data class RowBadge(
+    val text: String,
+    val accent: Color? = null,
+)
+
+/** 统一行卡片骨架(RowScope 内调用,weight 承载主体列)。 */
 @Composable
-private fun CryptoRowContent(record: CryptoRow, rowOnClick: () -> Unit) {
-    val r = record.record
-    Text(
-        text = r.displayAlgorithm(),
-        style = MaterialTheme.typography.bodyLarge,
-        fontWeight = FontWeight.SemiBold,
-        fontFamily = FontFamily.Monospace,
-        color = MaterialTheme.colorScheme.onSurface,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
-    Spacer(Modifier.height(4.dp))
-    Text(
-        text =
-            stringResource(kindLabelRes(r.kind)) +
-                " · " +
-                operationLabel(r.operation),
-        style = MaterialTheme.typography.labelMedium,
-        color = kindColor(r.kind),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
-    r.direction?.let { direction ->
-        Spacer(Modifier.height(4.dp))
-        DirectionChip(
-            text = directionLabel(direction),
-            kind = r.kind,
-            onClick = rowOnClick,
-        )
-    }
-    val dataSnippet = r.valuableDataSnippet()
-    if (dataSnippet != null) {
-        Spacer(Modifier.height(4.dp))
+private fun RowScope.RecordListCard(presentation: RowPresentation) {
+    LeadingBadge(icon = presentation.icon, tint = presentation.accent)
+    Column(
+        modifier = Modifier.weight(1f),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
         Text(
-            text = dataSnippet,
-            style = MaterialTheme.typography.labelMedium,
+            text = presentation.headline,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
             fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Text(
+            text = presentation.meta,
+            style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
+        )
+        presentation.preview?.let { preview ->
+            if (preview.isNotEmpty()) {
+                Text(
+                    text = preview,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+    }
+    // 尾栏恒渲染(时间必在;徽章可选)——V20「时间恒在行内右栏」契约。
+    Column(
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        TimeText(timestamp = presentation.timestamp)
+        presentation.badges.forEach { badge -> MicroBadge(badge) }
+    }
+}
+
+/**
+ * 尾栏秒级时间(labelSmall onSurfaceVariant;12/24h 时制尊重系统设置,
+ * 与时间线组头 [com.lioisme.modev.ui.common.TimelineGroup] 同口径)。
+ * V27 回归修复:重构脚手架时误删,V20 契约「时间恒在行内右栏」恢复。
+ */
+@Composable
+private fun TimeText(timestamp: Long) {
+    val context = LocalContext.current
+    val format =
+        remember(context) {
+            SimpleDateFormat(
+                if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
+                Locale.getDefault(),
+            )
+        }
+    Text(
+        text = remember(timestamp, format) { format.format(Date(timestamp)) },
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+/** leading 类别徽章(36dp 圆角方,accent@13% 容器 + accent 图标;纯装饰语义)。 */
+@Composable
+private fun LeadingBadge(
+    icon: ImageVector,
+    tint: Color,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(BADGE_SIZE.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(tint.copy(alpha = BADGE_CONTAINER_ALPHA)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(20.dp),
         )
     }
 }
 
-/** 数据库形态行内容(headline = SQL 首行 / 类别·操作 / SQL 预览 + 行数元数据)。 */
+/** 尾栏微徽章(方向/状态;紧凑胶囊)。 */
 @Composable
-private fun SqlRowContent(record: SqlRow) {
-    Text(
-        text = record.sqlHeadlineText(),
-        style = MaterialTheme.typography.bodyLarge,
-        fontWeight = FontWeight.SemiBold,
-        fontFamily = FontFamily.Monospace,
-        color = MaterialTheme.colorScheme.onSurface,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
-    Spacer(Modifier.height(4.dp))
-    Text(
-        text =
-            record.databaseName.orEmpty().takeIf { it.isNotBlank() }?.let { "$it · " }.orEmpty() +
-                stringResource(sqlKindLabelRes(record.kind)) +
-                " · " +
-                sqlOperationLabel(record.operation) +
-                record.sqlRowMetaSuffix(),
-        style = MaterialTheme.typography.labelMedium,
-        color = sqlKindColor(record.kind),
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-    )
-    val preview = record.sqlPreview?.trim()
-    if (!preview.isNullOrEmpty()) {
-        Spacer(Modifier.height(4.dp))
+private fun MicroBadge(badge: RowBadge) {
+    Surface(
+        shape = RoundedCornerShape(6.dp),
+        color =
+            badge.accent?.copy(alpha = BADGE_CONTAINER_ALPHA)
+                ?: MaterialTheme.colorScheme.surfaceVariant,
+    ) {
         Text(
-            text = preview,
-            style = MaterialTheme.typography.labelMedium,
-            fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = badge.text,
+            style = MaterialTheme.typography.labelSmall,
+            color = badge.accent ?: MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
         )
     }
+}
+
+// ---------------------------------------------------------------------------
+// 族形态:每族产出统一 [RowPresentation](组合期构建,remember 化防滚动重组)。
+// ---------------------------------------------------------------------------
+
+/** 算法形态。 */
+@Composable
+private fun cryptoPresentation(record: CryptoRow): RowPresentation {
+    val r = record.record
+    val accent = kindColor(r.kind)
+    val kindText = stringResource(kindLabelRes(r.kind))
+    val operationText = stringResource(operationLabelRes(r.operation))
+    val meta =
+        remember(r.kind, r.operation, kindText, operationText, accent) {
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = accent)) { append(kindText) }
+                append(" · ")
+                append(operationText)
+            }
+        }
+    return RowPresentation(
+        icon = KindIcons.crypto(r.kind, r.direction),
+        accent = accent,
+        headline = r.displayAlgorithm(),
+        meta = meta,
+        preview = r.valuableDataSnippet(),
+        badges = r.direction?.let { dir -> listOf(RowBadge(directionLabel(dir))) } ?: emptyList(),
+        timestamp = r.timestamp,
+    )
+}
+
+/** 数据库形态。 */
+@Composable
+private fun sqlPresentation(record: SqlRow): RowPresentation {
+    val accent = sqlKindColor(record.kind)
+    val rowCountText =
+        record.rowCount?.let { pluralStringResource(R.plurals.record_data_rows_short, it, it) }
+    val affectedText =
+        record.affectedCount?.let { pluralStringResource(R.plurals.record_data_affected_short, it, it) }
+    val suffix =
+        when {
+            rowCountText != null && affectedText != null -> " ($rowCountText, $affectedText)"
+            rowCountText != null -> " ($rowCountText)"
+            affectedText != null -> " ($affectedText)"
+            else -> ""
+        }
+    val dbName = record.databaseName.orEmpty().takeIf { it.isNotBlank() }
+    val kindText = stringResource(sqlKindLabelRes(record.kind))
+    val operationText = stringResource(sqlOperationLabelRes(record.operation))
+    val meta =
+        remember(record.kind, record.operation, dbName, kindText, operationText, suffix, accent) {
+            buildAnnotatedString {
+                dbName?.let {
+                    append(it)
+                    append(" · ")
+                }
+                withStyle(SpanStyle(color = accent)) { append(kindText) }
+                append(" · ")
+                append(operationText)
+                append(suffix)
+            }
+        }
+    return RowPresentation(
+        icon = KindIcons.sql(record.kind),
+        accent = accent,
+        headline = record.sqlHeadlineText(),
+        meta = meta,
+        preview = record.sqlPreview?.trim()?.takeIf { it.isNotEmpty() },
+        badges = emptyList(),
+        timestamp = record.recordTimestamp,
+    )
 }
 
 /** SQL 行 headline:投影无 SQL 首行可用时回退操作名(资源,恒非空)。 */
@@ -204,42 +318,37 @@ private fun SqlRow.sqlHeadlineText(): String {
     return stringResource(sqlOperationLabelRes(operation))
 }
 
-/** SQL 行元数据后缀(行数/受影响数,括号括号括,仅当有值)。 */
-@Composable
-private fun SqlRow.sqlRowMetaSuffix(): String {
-    val rowCount = rowCount?.let { pluralStringResource(R.plurals.record_data_rows_short, it, it) }
-    val affected = affectedCount?.let { pluralStringResource(R.plurals.record_data_affected_short, it, it) }
-    return when {
-        rowCount != null && affected != null -> " ($rowCount, $affected)"
-        rowCount != null -> " ($rowCount)"
-        affected != null -> " ($affected)"
-        else -> ""
-    }
-}
-
 /**
- * 方向胶囊(V19 T6 矩阵 M8:M3 [AssistChip] 承载,类别色淡底 + 类别色小字;
- * 方向是加密流关键信息,点击 = 行点击(进详情,与原行内区域行为一致)):
- * AssistChip 由 M3 原生组件提供,不再手搓 Surface+Text。
+ * 行为形态(V27):headline = 文件 basename / 命令首段(空回退操作名,恒非空);
+ * 元行 = 类别词元 · 操作 · 目标路径中缀省略;预览行 = 完整路径/命令。
  */
 @Composable
-private fun DirectionChip(text: String, kind: CryptoKind, onClick: () -> Unit) {
-    val color = kindColor(kind)
-    AssistChip(
-        onClick = onClick,
-        label = {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelSmall,
-                color = color,
-                maxLines = 1,
-            )
-        },
-        colors =
-            AssistChipDefaults.assistChipColors(
-                containerColor = color.copy(alpha = KIND_BADGE_ALPHA),
-                labelColor = color,
-            ),
+private fun behaviorPresentation(record: BehaviorRow): RowPresentation {
+    val accent = behaviorKindColor(record.kind)
+    val kindText = stringResource(behaviorKindLabelRes(record.kind))
+    val operationText = stringResource(behaviorOperationLabelRes(record.operation))
+    val headline = record.headlineText() ?: operationText
+    val subject =
+        remember(record.command, record.path) {
+            record.command?.joinToString(" ")?.takeIf { it.isNotBlank() }
+                ?: record.path?.takeIf { it.isNotBlank() }
+        }
+    val meta =
+        remember(record.kind, record.operation, kindText, operationText, accent) {
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = accent)) { append(kindText) }
+                append(" · ")
+                append(operationText)
+            }
+        }
+    return RowPresentation(
+        icon = KindIcons.behavior(record.kind),
+        accent = accent,
+        headline = headline,
+        meta = meta,
+        preview = subject,
+        badges = emptyList(),
+        timestamp = record.recordTimestamp,
     )
 }
 
@@ -292,13 +401,9 @@ fun CryptoRecord.copySummary(context: Context): String {
     }
 }
 
-/** 方向胶囊淡底透明度(类别色 alpha,淡色底 + 类别色小字)。 */
-private const val KIND_BADGE_ALPHA = 0.15f
-
 /**
  * 最有价值数据段(单段展示不堆叠,优先级 密钥 > 别名 > 输出 > 输入):
- * 取代旧版六段拼接摘要(包名·线程·方向·key·in·out)——包内列表包名冗余,
- * 线程为噪音,列表行只留「最重要的一段数据」。
+ * 列表行只留「最重要的一段数据」(包名/线程为噪音,详情页承担全量)。
  */
 @Composable
 private fun CryptoRecord.valuableDataSnippet(): String? =
@@ -371,3 +476,15 @@ fun directionLabel(direction: Int): String =
 /** 方向标签(非组合;经 Context 解析,供事件回调使用)。 */
 fun directionLabel(context: Context, direction: Int): String =
     directionLabelRes(direction)?.let { context.getString(it) } ?: context.getString(R.string.dir_mode, direction)
+
+/** 行最小高度(V27 密度规范)。 */
+private val MIN_ROW_HEIGHT: Dp = 68.dp
+
+/** leading 徽章边长。 */
+private const val BADGE_SIZE = 36
+
+/** 徽章容器/微徽章淡底透明度。 */
+private const val BADGE_CONTAINER_ALPHA = 0.13f
+
+/** 行内元素间距。 */
+private const val SPACING = 12

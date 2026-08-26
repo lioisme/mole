@@ -221,9 +221,14 @@ class FourScreensNavTest {
             .performScrollTo()
             .assertIsDisplayed()
 
-        // 两记录入口:算法记录 / 数据库记录(单应用列表)。
-        rule.onNodeWithText(str(R.string.algorithm_records_title)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.database_records_title)).assertIsDisplayed()
+        // 两记录入口:算法记录 / 数据库记录(V27 增第三行为记录入口,
+        // 视口可能容纳不下全部行,断言前逐行滚动——语义仍为「存在且可达可显」)。
+        rule.onNodeWithText(str(R.string.algorithm_records_title))
+            .performScrollTo()
+            .assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.database_records_title))
+            .performScrollTo()
+            .assertIsDisplayed()
 
         // 算法记录列表:AppBar 仅 SearchBar(返回按钮 1 个)+ 筛选按钮 1 个。
         rule.onNodeWithText(str(R.string.algorithm_records_title)).performClick()
@@ -265,7 +270,10 @@ class FourScreensNavTest {
         rule.onNodeWithText(str(R.string.data_settings_title)).performClick()
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.settings_total_records)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.settings_clear_all_records)).assertIsDisplayed()
+        // V27 数据管理新增「清理行为记录」行,清空全部行可能被推出视口:滚动至可见再断言。
+        rule.onNodeWithText(str(R.string.settings_clear_all_records))
+            .performScrollTo()
+            .assertIsDisplayed()
         pressBack()
 
         // 返回设置页 → 服务与诊断页:入口在底部折叠区,滚动后进入(端口行 + 管线统计折叠头)。

@@ -31,6 +31,7 @@ import com.lioisme.modev.ui.navigation.popGuarded
 import com.lioisme.modev.ui.navigation.popWhenReady
 import com.lioisme.modev.ui.navigation.slideComposable
 import com.lioisme.modev.ui.records.AlgorithmRecordsScreen
+import com.lioisme.modev.ui.records.BehaviorRecordsScreen
 import com.lioisme.modev.ui.records.DatabaseRecordsScreen
 import com.lioisme.modev.ui.records.RecordsViewModelFactory
 import com.lioisme.modev.ui.settings.AboutScreen
@@ -129,6 +130,9 @@ fun ModevNavHost(navController: NavHostController) {
                     onOpenDatabase = {
                         navController.navigateGuarded(ModevRoutes.databaseRecords(pkg))
                     },
+                    onOpenBehavior = {
+                        navController.navigateGuarded(ModevRoutes.behaviorRecords(pkg))
+                    },
                     onOpenListenSettings = {
                         navController.navigateGuarded(ModevRoutes.appListenSettings(pkg))
                     },
@@ -211,6 +215,28 @@ fun ModevNavHost(navController: NavHostController) {
                     viewModel = viewModel(
                         key = "records-database-$pkg",
                         factory = RecordsViewModelFactory(RecordType.DATABASE, pkg, app.container),
+                    ),
+                    onBack = { navController.popGuarded() },
+                    onOpenRecord = { id ->
+                        navController.navigateGuarded(ModevRoutes.recordDetail(id))
+                    },
+                )
+            }
+        }
+        slideComposable(
+            route = ModevRoutes.BEHAVIOR_RECORDS,
+            arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
+        ) { entry ->
+            val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
+            if (pkg.isBlank()) {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
+            BackGuarded(navController) {
+                BehaviorRecordsScreen(
+                    viewModel = viewModel(
+                        key = "records-behavior-$pkg",
+                        factory = RecordsViewModelFactory(RecordType.BEHAVIOR, pkg, app.container),
                     ),
                     onBack = { navController.popGuarded() },
                     onOpenRecord = { id ->

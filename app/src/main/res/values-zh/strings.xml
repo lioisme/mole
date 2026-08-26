@@ -41,11 +41,17 @@
     <string name="database_records_title">数据库记录</string>
     <string name="algorithm_records_search">搜索算法记录…</string>
     <string name="database_records_search">搜索数据库记录…</string>
+    <string name="behavior_records_title">行为记录</string>
+    <string name="behavior_records_search">搜索行为记录…</string>
 
     <string name="monitor_records_caption">全部记录</string>
     <string name="filter_type_crypto">算法</string>
     <string name="filter_type_database">数据库</string>
+    <string name="filter_type_behavior">行为</string>
     <string name="detail_empty">暂无记录</string>
+    <string name="detail_empty_hint">试试调整筛选条件,或在监听设置中开启更多类别</string>
+    <string name="records_count_subtitle">%1$s 条记录</string>
+    <string name="record_copied_toast">记录摘要已复制</string>
     <string name="section_monitor_kinds">监听类别</string>
     <string name="app_monitor_scope_row">监听此应用</string>
     <string name="listen_settings_entry">监听设置</string>
@@ -274,6 +280,39 @@
         <item quantity="other">+%1$d 行已省略</item>
     </plurals>
 
+    <!-- 行为监听(V27:文件/Assets/Shell 监听类别/操作/详情) -->
+    <string name="kind_behavior_file_read">文件读取</string>
+    <string name="kind_behavior_file_write">文件写入</string>
+    <string name="kind_behavior_file_delete">文件删除</string>
+    <string name="kind_behavior_file_rename">文件重命名</string>
+    <string name="kind_behavior_file_list">目录列举</string>
+    <string name="kind_behavior_asset_read">Assets 资源访问</string>
+    <string name="kind_behavior_shell_exec">Shell 命令</string>
+    <string name="op_behavior_open_read">打开读取</string>
+    <string name="op_behavior_read_all">整体读取</string>
+    <string name="op_behavior_open_write">打开写入</string>
+    <string name="op_behavior_write_all">写入</string>
+    <string name="op_behavior_mkdir">创建目录</string>
+    <string name="op_behavior_mkdirs">创建多级目录</string>
+    <string name="op_behavior_delete">删除</string>
+    <string name="op_behavior_rename">重命名/移动</string>
+    <string name="op_behavior_list">列举目录</string>
+    <string name="op_behavior_asset_open">打开资源</string>
+    <string name="op_behavior_asset_open_fd">打开资源 fd</string>
+    <string name="op_behavior_asset_list">列举资源</string>
+    <string name="op_behavior_exec">执行命令</string>
+    <string name="meta_path">目标路径</string>
+    <string name="meta_dest_path">目标新路径</string>
+    <string name="meta_file_size">大小</string>
+    <string name="section_command">命令</string>
+    <string name="section_content">内容预览</string>
+    <string name="behavior_monitor_master">行为监听</string>
+    <string name="switch_file_content_capture">捕获文件内容</string>
+    <string name="switch_file_content_capture_hint">仅限整读类 API(Files.readAll*/write/copy、Assets 整读);流式路径绝不触碰句柄</string>
+    <string name="capture_ignore_path">忽略路径前缀</string>
+    <string name="capture_ignore_path_hint">主体路径命中任一前缀即跳过该行为记录</string>
+    <string name="capture_ignore_path_dialog_title">忽略路径前缀</string>
+    <string name="capture_ignore_path_dialog_hint">每行一个前缀,例如 /data/local/tmp/</string>
     <!-- 设置页 -->
     <string name="settings_title">设置</string>
     <string name="settings_display_section">显示</string>
@@ -306,12 +345,15 @@
     <string name="settings_type_counts_section">记录分类</string>
     <string name="settings_records_algorithm">算法记录</string>
     <string name="settings_records_database">数据库记录</string>
+    <string name="settings_records_behavior">行为记录</string>
     <string name="settings_storage_section">存储占用</string>
     <string name="settings_storage_db">数据库文件</string>
     <string name="settings_clear_algorithm_records">清理算法记录</string>
     <string name="settings_clear_database_records">清理数据库记录</string>
+    <string name="settings_clear_behavior_records">清理行为记录</string>
     <string name="danger_clear_algorithm_msg">清空全部算法记录?此操作不可撤销。</string>
     <string name="danger_clear_database_msg">清空全部数据库记录?此操作不可撤销。</string>
+    <string name="danger_clear_behavior_msg">清空全部行为记录?此操作不可撤销。</string>
     <string name="settings_stats_section">管道统计</string>
     <string name="diagnostics_copy">复制诊断信息</string>
     <string name="diagnostics_copied">诊断信息已复制</string>

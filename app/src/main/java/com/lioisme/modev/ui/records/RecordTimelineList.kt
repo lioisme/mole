@@ -37,15 +37,17 @@ import com.lioisme.modev.ui.common.timelineLabel
 /**
  * 记录时间线列表(V23 T4.2 自单应用记录页抽取,全局/单应用三页共享):
  * - 手动索引循环(V17 R3 秒级时间线分组):组起始插组头,首项恒为组起始;
- * - 三态:空(detail_empty)/加载/刷新失败(RetryRow)+ append 追加态;
+ * - 三态:空(detail_empty + 引导副文)/加载/刷新失败(RetryRow)+ append 追加态;
  * - 滚动状态由 VM 级 [LazyListState] 承载,详情往返原位恢复(V20 R3);
- * - 组头 locale/时制与 RecordRow 尾部时间同源(context 包 locale)。
+ * - 组头 locale/时制与行尾时间同源(context 包 locale);
+ * - V27 M1-T4:[onRecordLongPress] 行为接线(宿主承担复制摘要 + Snackbar)。
  */
 @Composable
 fun RecordTimelineList(
     records: LazyPagingItems<RowModel>,
     listState: LazyListState,
     onOpenRecord: (Long) -> Unit,
+    onRecordLongPress: ((RowModel) -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val locale = rememberEffectiveLocale()
@@ -63,6 +65,7 @@ fun RecordTimelineList(
                         EmptyState(
                             icon = Icons.Outlined.Terminal,
                             message = stringResource(R.string.detail_empty),
+                            hint = stringResource(R.string.detail_empty_hint),
                         )
                     }
                 }
@@ -117,6 +120,7 @@ fun RecordTimelineList(
                             RecordRow(
                                 record = record,
                                 onClick = { onOpenRecord(record.id) },
+                                onLongClick = { onRecordLongPress?.invoke(record) },
                                 modifier =
                                     Modifier
                                         .testTag("record-row")

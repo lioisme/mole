@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.AppListenOverride
+import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.domain.scope.ScopeState
@@ -77,9 +78,11 @@ import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsItem
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.components.StatusDot
+import com.lioisme.modev.ui.theme.behaviorKindColor
 import com.lioisme.modev.ui.theme.kindColor
 import com.lioisme.modev.ui.theme.sqlKindColor
 import com.lioisme.modev.ui.theme.statusColor
+import androidx.compose.material.icons.outlined.FolderOpen
 
 /**
  * 应用监听入口页(V18 单击应用先到本页;V20 整合「查看记录」头部职责;
@@ -95,6 +98,7 @@ fun AppMonitorScreen(
     onBack: () -> Unit,
     onOpenAlgorithm: () -> Unit,
     onOpenDatabase: () -> Unit,
+    onOpenBehavior: () -> Unit,
     onOpenListenSettings: () -> Unit,
     onLaunch: (String) -> Unit,
 ) {
@@ -106,6 +110,7 @@ fun AppMonitorScreen(
     val launchable by viewModel.launchable.collectAsStateWithLifecycle()
     val cryptoCount by viewModel.cryptoCount.collectAsStateWithLifecycle()
     val dbCount by viewModel.dbCount.collectAsStateWithLifecycle()
+    val behaviorCount by viewModel.behaviorCount.collectAsStateWithLifecycle()
     val listenOverride by viewModel.listenOverride.collectAsStateWithLifecycle()
 
     val label = appInfo?.label?.takeIf { it.isNotBlank() } ?: viewModel.packageName
@@ -152,6 +157,7 @@ fun AppMonitorScreen(
             StatsCard(
                 cryptoCount = cryptoCount,
                 dbCount = dbCount,
+                behaviorCount = behaviorCount,
             )
             Spacer(Modifier.height(16.dp))
             SettingsSection(stringResource(R.string.section_monitor_kinds)) {
@@ -167,6 +173,14 @@ fun AppMonitorScreen(
                     title = stringResource(R.string.database_records_title),
                     value = countText(dbCount),
                     onClick = onOpenDatabase,
+                )
+                HorizontalDivider16()
+                EntryRow(
+                    icon = { Icon(Icons.Outlined.FolderOpen, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    title = stringResource(R.string.behavior_records_title),
+                    value = countText(behaviorCount),
+                    onClick = onOpenBehavior,
+                    modifier = Modifier.testTag("monitor-entry-behavior"),
                 )
                 HorizontalDivider16()
                 EntryRow(
@@ -383,10 +397,12 @@ private fun ScopeToggleRow(
 private fun StatsCard(
     cryptoCount: Long,
     dbCount: Long,
+    behaviorCount: Long,
 ) {
-    val total = cryptoCount + dbCount
+    val total = cryptoCount + dbCount + behaviorCount
     val cryptoColor = kindColor(CryptoKind.CIPHER)
     val dbColor = sqlKindColor(SqlKind.QUERY)
+    val behaviorColor = behaviorKindColor(BehaviorKind.FILE_WRITE)
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         shape = MaterialTheme.shapes.medium,
@@ -410,6 +426,7 @@ private fun StatsCard(
                 Spacer(Modifier.height(14.dp))
                 val cryptoWeight = (cryptoCount.toFloat() / total).coerceAtLeast(0.02f)
                 val dbWeight = (dbCount.toFloat() / total).coerceAtLeast(0.02f)
+                val behaviorWeight = (behaviorCount.toFloat() / total).coerceAtLeast(0.02f)
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -429,12 +446,19 @@ private fun StatsCard(
                         Modifier
                             .weight(dbWeight)
                             .fillMaxSize()
-                            .background(color = dbColor, shape = RoundedCornerShape(topEnd = 5.dp, bottomEnd = 5.dp)),
+                            .background(color = dbColor),
+                    )
+                    Box(
+                        Modifier
+                            .weight(behaviorWeight)
+                            .fillMaxSize()
+                            .background(color = behaviorColor, shape = RoundedCornerShape(topEnd = 5.dp, bottomEnd = 5.dp)),
                     )
                 }
                 Spacer(Modifier.height(10.dp))
                 LegendRow(color = cryptoColor, label = stringResource(R.string.filter_type_crypto), count = cryptoCount)
                 LegendRow(color = dbColor, label = stringResource(R.string.filter_type_database), count = dbCount)
+                LegendRow(color = behaviorColor, label = stringResource(R.string.filter_type_behavior), count = behaviorCount)
             }
         }
     }
