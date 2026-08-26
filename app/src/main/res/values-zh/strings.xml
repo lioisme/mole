@@ -370,6 +370,8 @@
     <string name="settings_external_access_hint">监听所有网络接口(0.0.0.0),同一网络的设备可连接端口 %1$d。</string>
     <string name="settings_online_targets">运行中目标进程</string>
     <string name="settings_online_targets_value">%1$,d 个</string>
+    <string name="settings_port_edit">端口设置</string>
+    <string name="settings_port_invalid">端口需为 1–65535</string>
     <string name="settings_clear_all_records">清空全部记录</string>
     <string name="settings_total_records">总记录数</string>
     <string name="settings_total_records_value">%1$,d 条</string>

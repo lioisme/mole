@@ -61,7 +61,7 @@ class DiagnosticsScreenTest {
 
     /** 端口行期望值(与页面渲染同源:地址:端口 + 作用域后缀)。 */
     private fun portRowValue(address: String, external: Boolean): String =
-        str(R.string.settings_port_value, address, vm.port) + " " +
+        str(R.string.settings_port_value, address, vm.port.value) + " " +
             str(if (external) R.string.settings_port_scope_all else R.string.settings_port_scope_local)
 
     private fun scrollTo(text: String) {
@@ -99,7 +99,7 @@ class DiagnosticsScreenTest {
             str(
                 R.string.settings_port_value,
                 ConnectionMonitor.BIND_LOOPBACK,
-                vm.port,
+                vm.port.value,
             ) + " " + str(R.string.settings_port_scope_local)
         assertTrue("端口行缺失:\n$text", text.contains(expectedPort))
         assertTrue("统计标签缺失:\n$text", text.contains(str(R.string.stats_received)))

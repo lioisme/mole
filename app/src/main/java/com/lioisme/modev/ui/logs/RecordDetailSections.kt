@@ -4,6 +4,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -48,6 +49,7 @@ internal const val COPY_MAX_CHARS = 4 * 1024 * 1024
 internal const val EXPORT_MAX_CHARS = 32 * 1024 * 1024
 
 /** 区块文档束:markdown 文本 + 与围栏生成序对齐的全量句柄。 */
+@Immutable
 data class SectionDoc(val markdown: String, val handles: List<DetailFenceHandle>)
 
 /** 详情时间戳格式(每次调用按当前 Locale 构造;语言切换重建后不残留旧 locale,V15 契约)。 */

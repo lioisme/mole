@@ -38,8 +38,8 @@ class DiagnosticsViewModel(
         .map { it.size }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
-    /** 通信服务端口(M18:传输常量单一出口,UI 不再直接引用 WireProtocol)。 */
-    val port: Int = WireProtocol.PORT
+    /** 通信服务端口(V29:经 SettingsRepository 管理,可自定义)。 */
+    val port: StateFlow<Int> = settings.serverPort
 
     /**
      * 监听地址展示口径(V26):绑定地址非空取实测值,未绑定回退默认回环语义;
@@ -56,6 +56,11 @@ class DiagnosticsViewModel(
     /** 切换外部访问:持久化 + 服务端立即改绑(127.0.0.1 ↔ 0.0.0.0)。 */
     fun setExternalAccess(enabled: Boolean) {
         viewModelScope.launch { settings.setServerExternalAccess(enabled) }
+    }
+
+    /** 设置监听端口:持久化 + 服务端重启改绑。 */
+    fun setPort(port: Int) {
+        viewModelScope.launch { settings.setServerPort(port) }
     }
 
     val pipelineStats: StateFlow<PipelineStats> = logs.statsFlow

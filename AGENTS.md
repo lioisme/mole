@@ -66,7 +66,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
    单表示退化为单代码卡;Hero 徽章卡与锚点芯片保留原生(D1 边界)。
    版本锁定 **0.38.1**(stdlib 2.2.21 与 Kotlin 2.2.20 同 minor;0.39+/0.44 需
    stdlib 2.3/2.4 超编译器 metadata 上限,**禁升**)。显示上限
-   `MARKDOWN_DISPLAY_MAX_CHARS=128Ki`(工厂钳制「所见」,标记行 plurals
+    `MARKDOWN_DISPLAY_MAX_CHARS=32Ki`(工厂钳制「所见」,标记行 plurals
    `detail_truncated_marker` 恒置于全部围栏之后——夹在围栏间会打断代码组聚合);
    完整内容经 `DetailFenceHandle` 全量句柄走复制(4M 护栏)/全屏查看器
    (`FullscreenTextDialog`,`ChunkedText` O(1) 分块虚拟化);导出 32M 护栏不变。

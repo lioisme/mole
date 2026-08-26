@@ -28,4 +28,7 @@ object ConfigKeys {
      * 不入远程镜像(仅宿主进程消费,注入侧零感知)。
      */
     const val SERVER_EXTERNAL_ACCESS = "server_external_access"
+
+    /** 服务监听端口键(V29):宿主本地 SharedPreferences 专用,默认1510。 */
+    const val SERVER_PORT = "server_port"
 }

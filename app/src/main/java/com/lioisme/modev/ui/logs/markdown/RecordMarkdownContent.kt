@@ -25,6 +25,7 @@ import androidx.compose.material3.SecondaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
@@ -60,6 +61,8 @@ import dev.snipme.highlights.model.BoldHighlight
 import dev.snipme.highlights.model.ColorHighlight
 import dev.snipme.highlights.model.SyntaxLanguage
 import dev.snipme.highlights.model.SyntaxTheme
+import org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor
+import org.intellij.markdown.parser.MarkdownParser
 
 /**
  * V28 详情页 markdown 渲染层(纯 markdown 化重构):
@@ -80,6 +83,14 @@ import dev.snipme.highlights.model.SyntaxTheme
 
 /** 高亮降级阈值:≤32Ki 同步分词(毫秒级);超限纯 mono 直渲(巨量围栏不值得)。 */
 internal const val HIGHLIGHT_MAX_CHARS = 32 * 1024
+
+/**
+ * 代码块内联分块阈值:超过此字符数时按行分块渲染(Column + verticalScroll),
+ * 避免单个 Text 节点承载过大字符串导致测量/绘制卡顿。
+ * 每块 ≤ [CODE_CHUNK_CHARS] 字符,布局/绘制有界。
+ */
+private const val CODE_CHUNK_THRESHOLD = 8 * 1024
+private const val CODE_CHUNK_CHARS = 4096
 
 /** 围栏语言 → Highlights 分词语言映射(null = 纯 mono;json 经 JS 分词器覆盖结构着色)。 */
 internal fun highlightSyntaxLanguage(language: String?): SyntaxLanguage? =
@@ -143,7 +154,32 @@ internal fun highlightAnnotatedString(
     }
 }
 
+/**
+ * 代码块行级分块(纯函数):按换行符分割后贪心合并为 ≤ [maxChunkChars] 的块列表。
+ * 每块保持原始行内容完整(不截断行),用于 Column + verticalScroll 虚拟化渲染。
+ */
+internal fun chunkCodeLines(
+    content: String,
+    maxChunkChars: Int = CODE_CHUNK_CHARS,
+): List<String> {
+    if (content.length <= maxChunkChars) return listOf(content)
+    val lines = content.split('\n')
+    val chunks = mutableListOf<String>()
+    val current = StringBuilder()
+    for (line in lines) {
+        if (current.isNotEmpty() && current.length + 1 + line.length > maxChunkChars) {
+            chunks.add(current.toString())
+            current.clear()
+        }
+        if (current.isNotEmpty()) current.append('\n')
+        current.append(line)
+    }
+    if (current.isNotEmpty()) chunks.add(current.toString())
+    return chunks
+}
+
 /** 围栏全量文本句柄(ordinal 寻址,由装配层按生成顺序对齐提供)。 */
+@Immutable
 class DetailFenceHandle(
     val label: String,
     val language: String,
@@ -158,6 +194,7 @@ class DetailCodeActions(
 
 private val LocalDetailFences = compositionLocalOf<List<DetailFenceHandle>> { emptyList() }
 private val LocalDetailCodeActions = compositionLocalOf<DetailCodeActions?> { null }
+private val LocalFenceIndex = compositionLocalOf<MarkdownFenceIndex> { error("No fence index provided") }
 
 /**
  * 区块 markdown 渲染入口:单一 [com.mikepenz.markdown.m3.Markdown] 管线。
@@ -176,15 +213,23 @@ fun RecordMarkdownContent(
         LocalDetailCodeActions provides actions,
     ) {
         val state = rememberMarkdownState(content = markdown, immediate = true)
-        Markdown(
-            markdownState = state,
-            typography = detailMarkdownTypography(),
-            modifier = modifier,
-            components =
-                markdownComponents(
-                    codeFence = ::ModevMarkdownCodeFence,
-                ),
-        )
+        // 文档级围栏索引:一次解析 + 一次线性扫描,所有 codeFence 共享(消除 O(N²) 冗余)
+        val fenceIndex = remember(markdown) {
+            val flavour = GFMFlavourDescriptor()
+            val parsedTree = MarkdownParser(flavour).buildMarkdownTreeFromString(markdown)
+            buildFenceIndex(parsedTree, markdown)
+        }
+        CompositionLocalProvider(LocalFenceIndex provides fenceIndex) {
+            Markdown(
+                markdownState = state,
+                typography = detailMarkdownTypography(),
+                modifier = modifier,
+                components =
+                    markdownComponents(
+                        codeFence = ::ModevMarkdownCodeFence,
+                    ),
+            )
+        }
     }
 }
 
@@ -237,9 +282,9 @@ internal fun detailMarkdownTypography(): MarkdownTypography {
 /** 库扩展点桥接:CODE_FENCE 节点 → 代码组 / 单代码块。 */
 @Composable
 private fun ModevMarkdownCodeFence(model: MarkdownComponentModel) {
-    // 文档级索引按 content 记忆(同一文档重组零重扫);节点自身经偏移定位。
-    // 围栏恒为顶层块(生成器契约),parent 即文档根;兜底自指保证扫描非空。
-    val index = remember(model.content) { buildFenceIndex(model.node.parent ?: model.node, model.content) }
+    // 使用文档级共享围栏索引(由 RecordMarkdownContent 构建,CompositionLocal 下发);
+    // 消除每个 codeFence 独立调用 buildFenceIndex 的 O(N²) 冗余扫描。
+    val index = LocalFenceIndex.current
     val entry = index.locate(model.node) ?: return
     val info = entry.info ?: return
     val fences = LocalDetailFences.current
@@ -264,8 +309,10 @@ private fun ModevMarkdownCodeFence(model: MarkdownComponentModel) {
     }
     // 选中态按位置域保存(LazyColumn item key 承担跨滚动恢复;V28 弃用 API 清零:去显式 key)
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
-    val members = (placement.runFirstOrdinal until placement.runFirstOrdinal + placement.runSize)
-        .mapNotNull { ordinal -> index[ordinal]?.let { ordinal to it } }
+    val members = remember(placement) {
+        (placement.runFirstOrdinal until placement.runFirstOrdinal + placement.runSize)
+            .mapNotNull { ordinal -> index[ordinal]?.let { ordinal to it } }
+    }
 
     Column(modifier = Modifier.padding(vertical = 8.dp)) {
         SecondaryTabRow(
@@ -323,6 +370,7 @@ internal fun MdCodeBlock(
     testTagKey: String,
 ) {
     val scheme = MaterialTheme.colorScheme
+    val bodySmall = MaterialTheme.typography.bodySmall
     val syntaxLanguage = highlightSyntaxLanguage(language)
     val highlighted =
         if (syntaxLanguage != null && displayContent.isNotEmpty() && displayContent.length <= HIGHLIGHT_MAX_CHARS) {
@@ -333,12 +381,14 @@ internal fun MdCodeBlock(
         } else {
             null
         }
-    val monoBody = MaterialTheme.typography.bodySmall.copy(
-        fontFamily = FontFamily.Monospace,
-        fontSize = 13.sp,
-        lineHeight = 20.sp,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-    )
+    val monoBody = remember(bodySmall, scheme.onSurfaceVariant) {
+        bodySmall.copy(
+            fontFamily = FontFamily.Monospace,
+            fontSize = 13.sp,
+            lineHeight = 20.sp,
+            color = scheme.onSurfaceVariant,
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -352,7 +402,7 @@ internal fun MdCodeBlock(
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 12.dp, end = 4.dp)
+                .padding(horizontal = 12.dp)
                 .testTag(testTagKey),
         ) {
             Text(
@@ -390,6 +440,7 @@ internal fun MdCodeBlock(
         HorizontalDivider(color = scheme.outlineVariant.copy(alpha = 0.5f))
         SelectionContainer {
             if (highlighted != null) {
+                // 已高亮内容(≤32Ki json/bash):单 Text 有界
                 Text(
                     text = highlighted,
                     style = monoBody,
@@ -401,7 +452,8 @@ internal fun MdCodeBlock(
                         .horizontalScroll(rememberScrollState())
                         .padding(12.dp),
                 )
-            } else {
+            } else if (displayContent.length <= CODE_CHUNK_THRESHOLD) {
+                // 小型纯 mono 内容:单 Text
                 Text(
                     text = displayContent,
                     style = monoBody,
@@ -413,6 +465,25 @@ internal fun MdCodeBlock(
                         .horizontalScroll(rememberScrollState())
                         .padding(12.dp),
                 )
+            } else {
+                // 大型纯 mono 内容(>8Ki):行级分块 Column + scroll,每块有界测量
+                val chunks = remember(displayContent) { chunkCodeLines(displayContent) }
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 320.dp)
+                        .verticalScroll(rememberScrollState())
+                        .horizontalScroll(rememberScrollState())
+                        .padding(12.dp),
+                ) {
+                    chunks.forEach { chunk ->
+                        Text(
+                            text = chunk,
+                            style = monoBody,
+                            softWrap = false,
+                        )
+                    }
+                }
             }
         }
     }

@@ -1,5 +1,6 @@
 package com.lioisme.modev.core.util
 
+import androidx.compose.runtime.Immutable
 import com.lioisme.modev.core.model.RecordLimits
 
 /**
@@ -14,6 +15,7 @@ import com.lioisme.modev.core.model.RecordLimits
  * 捕获侧原始字节生成并随 hex 一并持久化 —— hex 为截断前缀,运行时反推
  * Base64 会静默截断,禁止。旧记录(无 base64)渲染降级双态。
  */
+@Immutable
 data class BytesView(
     val hex: String,
     val base64: String? = null,

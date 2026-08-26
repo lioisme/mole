@@ -247,6 +247,20 @@ fun PerAppListenSettingsScreen(
                     onCheckedChange = { viewModel.setMaster(isCrypto = false, value = it) },
                     testTag = "listen-row-master-db",
                 )
+                HorizontalDivider16Compat()
+                ListenRow(
+                    label = res.getString(R.string.behavior_monitor_master),
+                    checked = effective.behaviorListen,
+                    onCheckedChange = { viewModel.setBehaviorMaster(it) },
+                    testTag = "listen-row-master-behavior",
+                )
+                HorizontalDivider16Compat()
+                ListenRow(
+                    label = res.getString(R.string.prefs_monitor_master),
+                    checked = effective.prefsListen,
+                    onCheckedChange = { viewModel.setPrefsMaster(it) },
+                    testTag = "listen-row-master-prefs",
+                )
             }
             Spacer(Modifier.height(16.dp))
 
@@ -280,14 +294,8 @@ fun PerAppListenSettingsScreen(
 
             // 行为 7 类别 + 内容捕获 + 忽略路径前缀(V27 一等公民)
             SettingsSection(stringResource(R.string.filter_type_behavior)) {
-                ListenRow(
-                    label = res.getString(R.string.behavior_monitor_master),
-                    checked = effective.behaviorListen,
-                    onCheckedChange = { viewModel.setBehaviorMaster(it) },
-                    testTag = "listen-row-master-behavior",
-                )
-                CategoryTaxonomy.forType(RecordType.BEHAVIOR).forEach { category ->
-                    HorizontalDivider16Compat()
+                CategoryTaxonomy.forType(RecordType.BEHAVIOR).forEachIndexed { index, category ->
+                    if (index > 0) HorizontalDivider16Compat()
                     ListenRow(
                         label = res.getString(switchLabelRes(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
@@ -317,14 +325,8 @@ fun PerAppListenSettingsScreen(
 
             // 偏好 5 类别(V28 一等公民;值捕获复用 fileContentCapture、路径降噪复用 ignorePathPrefixes)
             SettingsSection(stringResource(R.string.filter_type_prefs)) {
-                ListenRow(
-                    label = res.getString(R.string.prefs_monitor_master),
-                    checked = effective.prefsListen,
-                    onCheckedChange = { viewModel.setPrefsMaster(it) },
-                    testTag = "listen-row-master-prefs",
-                )
-                CategoryTaxonomy.forType(RecordType.PREFS).forEach { category ->
-                    HorizontalDivider16Compat()
+                CategoryTaxonomy.forType(RecordType.PREFS).forEachIndexed { index, category ->
+                    if (index > 0) HorizontalDivider16Compat()
                     ListenRow(
                         label = res.getString(switchLabelRes(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,

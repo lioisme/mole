@@ -1,5 +1,6 @@
 package com.lioisme.modev.ui.logs.markdown
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -8,7 +9,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -36,10 +39,13 @@ import com.lioisme.modev.core.util.ChunkedText
 import com.lioisme.modev.ui.components.TipIconButton
 
 /**
- * 全屏文本查看器(V26,DeepSeek 式代码卡「展开」出口):
- * Dialog 全屏覆盖(usePlatformDefaultWidth = false),正文经 [ChunkedText]
- * O(1) 分块惰性虚拟化——多 MB 全量文本仅组合可视块,零物化(承接原 Tier B 防线);
- * 复制走屏幕层统一出口(4M 护栏 + Snackbar 反馈)。
+ * 全屏文本查看器(V29 重构):
+ * - Dialog 全屏覆盖(usePlatformDefaultWidth = false),正文经 [ChunkedText]
+ *   O(1) 分块惰性虚拟化——多 MB 全量文本仅组合可视块;
+ * - 每 chunk 行独立 [SelectionContainer](修复 V26 SelectionContainer 包裹 LazyColumn
+ *   导致滚动失效的已知缺陷);
+ * - TopAppBar/body 正确处理系统 insets(状态栏 + 导航栏),无遮蔽;
+ * - 复制走屏幕层统一出口(4M 护栏 + Snackbar 反馈)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,9 +89,11 @@ fun FullscreenTextDialog(
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = MaterialTheme.colorScheme.surface,
                     ),
+                    windowInsets = WindowInsets.statusBars,
                 )
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                FullscreenBody(fullText)            }
+                FullscreenBody(fullText)
+            }
         }
     }
 }
@@ -109,7 +117,10 @@ private fun FullscreenBody(fullText: String) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     ),
                     softWrap = false,
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 2.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
                 )
             }
         }

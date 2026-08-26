@@ -25,7 +25,7 @@ import androidx.compose.material.icons.filled.GppBad
 import androidx.compose.material.icons.filled.GppGood
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Sensors
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.DataObject
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
@@ -190,7 +190,7 @@ fun AppMonitorScreen(
                 )
                 HorizontalDivider16()
                 EntryRow(
-                    icon = { Icon(Icons.Filled.Settings, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    icon = { Icon(Icons.Filled.DataObject, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
                     title = stringResource(R.string.prefs_records_title),
                     value = countText(prefsCount),
                     onClick = onOpenPrefs,

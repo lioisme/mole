@@ -1,5 +1,6 @@
 package com.lioisme.modev.ui.logs.markdown
 
+import androidx.compose.runtime.Immutable
 import com.lioisme.modev.core.util.BytesView
 
 /**
@@ -14,8 +15,8 @@ import com.lioisme.modev.core.util.BytesView
  *   护栏在 UI 层统一执行),markdown 仅负责「所见」。
  */
 
-/** 单代码块显示上限(承接原 SELECTABLE_CAP_CHARS 128 KiB 语义):单 Text 有界布局成本可控。 */
-const val MARKDOWN_DISPLAY_MAX_CHARS = 128 * 1024
+/** 单代码块内联显示上限(32 KiB:主线路程解析+布局成本可控;完整内容经全屏查看器承载)。 */
+const val MARKDOWN_DISPLAY_MAX_CHARS = 32 * 1024
 
 /** 代码组围栏语言标签(渲染契约:仅此集合内的连续围栏聚合为代码组)。 */
 object MarkdownLangs {
@@ -44,6 +45,7 @@ fun identityMarkdown(
 }.trimEnd('\n') + "\n"
 
 /** 目录条目:key 与屏幕装配侧锚点簿记键严格同源;label 已本地化。 */
+@Immutable
 data class TocEntry(val label: String, val key: String)
 
 /**
@@ -114,6 +116,7 @@ fun mdTable(
 private fun mdHeadingText(text: String): String = text.replace("\r", "").replace('\n', ' ')
 
 /** 截断显示切分(纯函数):≤ 上限原样;超过截前缀并标记。 */
+@Immutable
 data class CappedDisplay(val display: String, val totalChars: Int, val cappedByLimit: Boolean)
 
 fun capDisplay(value: String): CappedDisplay =

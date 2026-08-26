@@ -24,7 +24,6 @@ import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Security
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Tag
@@ -88,7 +87,7 @@ object KindIcons {
     /** 偏好族(V28)。 */
     fun prefs(kind: PrefsKind): ImageVector =
         when (kind) {
-            PrefsKind.OPEN -> Icons.Outlined.Settings
+            PrefsKind.OPEN -> Icons.Outlined.Storage
             PrefsKind.GET -> Icons.Outlined.Visibility
             PrefsKind.PUT -> Icons.Outlined.EditNote
             PrefsKind.REMOVE -> Icons.Outlined.RemoveCircleOutline

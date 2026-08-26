@@ -2,7 +2,9 @@
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,7 +12,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -37,6 +41,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -57,6 +62,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
@@ -94,6 +100,7 @@ fun DiagnosticsScreen(
     val pipelineStats by viewModel.pipelineStats.collectAsStateWithLifecycle()
     val externalAccess by viewModel.externalAccess.collectAsStateWithLifecycle()
     val listeningAddress by viewModel.listeningAddress.collectAsStateWithLifecycle()
+    val port by viewModel.port.collectAsStateWithLifecycle()
 
     // V15:统计数值按应用实际生效 locale 千分位分组(与 stringResource 解析同源)。
     // V16 R5:热切换下 LocalConfiguration 陈旧,一律经包装 Context 解析(effectiveLocale)。
@@ -105,6 +112,11 @@ fun DiagnosticsScreen(
 
     // V26 详情弹层状态(hide 动画完成后置空,见 ModalBottomSheet 契约)。
     var detailSheet by remember { mutableStateOf<DiagnosticsDetail?>(null) }
+
+    // V29 端口设置弹层状态。
+    var portSheetOpen by rememberSaveable { mutableStateOf(false) }
+    var portInputValue by rememberSaveable { mutableStateOf(port.toString()) }
+    var portInputError by rememberSaveable { mutableStateOf(false) }
 
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -141,7 +153,7 @@ fun DiagnosticsScreen(
                     context.getString(
                         if (externalAccess) R.string.settings_port_scope_all else R.string.settings_port_scope_local,
                     )
-                line(context.getString(R.string.settings_port), context.getString(R.string.settings_port_value, displayAddress, viewModel.port) + " " + scopeSuffix)
+                line(context.getString(R.string.settings_port), context.getString(R.string.settings_port_value, displayAddress, port) + " " + scopeSuffix)
                 line(context.getString(R.string.settings_online_targets), context.getString(R.string.settings_online_targets_value, connectedCount))
                 line(context.getString(R.string.stats_received), stat(pipelineStats.received))
                 line(context.getString(R.string.stats_dropped), stat(pipelineStats.dropped))
@@ -235,20 +247,10 @@ fun DiagnosticsScreen(
             }
             Spacer(Modifier.height(24.dp))
             SettingsSection(stringResource(R.string.settings_server_section)) {
-                SettingsInfoItem(
-                    icon = Icons.Default.Dns,
-                    title = stringResource(R.string.settings_port),
-                    value =
-                        stringResource(R.string.settings_port_value, displayAddress, viewModel.port) +
-                            " " + stringResource(
-                                if (externalAccess) R.string.settings_port_scope_all else R.string.settings_port_scope_local,
-                            ),
-                )
-                // V26 R3 外部访问开关:默认停用(仅本机);开启即改绑全接口,副标题承载风险提示。
+                // V26 R3 外部访问开关:默认停用(仅本机);开启即改绑全接口。
                 SettingsToggleItem(
                     icon = Icons.Default.Public,
                     title = stringResource(R.string.settings_external_access),
-                    subtitle = stringResource(R.string.settings_external_access_hint, viewModel.port),
                     checked = externalAccess,
                     modifier = Modifier.testTag("diagnostics-bind-all"),
                     onCheckedChange = { viewModel.setExternalAccess(it) },
@@ -257,6 +259,12 @@ fun DiagnosticsScreen(
                     icon = Icons.Default.Devices,
                     title = stringResource(R.string.settings_online_targets),
                     value = stringResource(R.string.settings_online_targets_value, connectedCount),
+                )
+                SettingsInfoItem(
+                    icon = Icons.Default.Dns,
+                    title = stringResource(R.string.settings_port),
+                    value = port.toString(),
+                    onClick = { portSheetOpen = true },
                 )
             }
             Spacer(Modifier.height(24.dp))
@@ -359,6 +367,80 @@ fun DiagnosticsScreen(
                 scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.diagnostics_copied)) }
             },
         )
+    }
+
+    // V29 端口设置 BottomSheet(M3 ModalBottomSheet,输入契约)。
+    if (portSheetOpen) {
+        ModalBottomSheet(
+            onDismissRequest = {
+                portSheetOpen = false
+                portInputValue = port.toString()
+                portInputError = false
+            },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.testTag("port-setting-sheet"),
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 24.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_port_edit),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = portInputValue,
+                    onValueChange = { newValue ->
+                        portInputValue = newValue.filter { it.isDigit() }
+                        portInputError = false
+                    },
+                    label = { Text(stringResource(R.string.settings_port)) },
+                    isError = portInputError,
+                    supportingText = if (portInputError) {
+                        { Text(stringResource(R.string.settings_port_invalid)) }
+                    } else null,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = {
+                        portSheetOpen = false
+                        portInputValue = port.toString()
+                        portInputError = false
+                    }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            val parsed = portInputValue.toIntOrNull()
+                            if (parsed != null && parsed in 1..65535) {
+                                viewModel.setPort(parsed)
+                                portSheetOpen = false
+                                portInputError = false
+                            } else {
+                                portInputError = true
+                            }
+                        },
+                    ) {
+                        Text(stringResource(R.string.confirm))
+                    }
+                }
+            }
+        }
     }
 }
 

@@ -377,6 +377,8 @@
     <string name="settings_external_access_hint">Listen on all interfaces (0.0.0.0). Devices on the same network can connect to port %1$d.</string>
     <string name="settings_online_targets">Running target processes</string>
     <string name="settings_online_targets_value">%1$,d</string>
+    <string name="settings_port_edit">Port setting</string>
+    <string name="settings_port_invalid">Port must be 1–65535</string>
     <string name="settings_clear_all_records">Clear all records</string>
     <string name="settings_total_records">Total records</string>
     <string name="settings_total_records_value">%1$,d</string>

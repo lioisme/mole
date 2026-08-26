@@ -3,6 +3,7 @@ package com.lioisme.modev.data.repo
 import android.content.SharedPreferences
 import androidx.core.content.edit
 import com.google.gson.Gson
+import com.lioisme.modev.core.codec.WireProtocol
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.ConfigKeys
 import com.lioisme.modev.core.model.EffectiveSwitch
@@ -173,6 +174,25 @@ class SettingsRepository(
         scope.launch { server.restart() }
     }
 
+    private val _serverPort = MutableStateFlow(WireProtocol.PORT)
+
+    /** 服务监听端口(V29):默认1510,可自定义。 */
+    val serverPort: StateFlow<Int> = _serverPort
+
+    /**
+     * 写入监听端口并即时生效:本地持久化 → 服务端改绑新端口([ConfigServer.restart],
+     * 已连接会话由注入侧重连循环恢复;当前 hook 侧使用同一默认常量,非1510时需后续同步)。
+     */
+    suspend fun setServerPort(port: Int) {
+        val clamped = port.coerceIn(1, 65535)
+        withContext(Dispatchers.IO) {
+            localPrefs.edit { putInt(ConfigKeys.SERVER_PORT, clamped) }
+        }
+        _serverPort.value = clamped
+        server.port = clamped
+        scope.launch { server.restart() }
+    }
+
     private val _overrides = MutableStateFlow<Map<String, AppListenOverride>>(emptyMap())
 
     /** 已存在的单应用自定义偏差(包名 → 偏差;仅含非零偏差项,init 时从本地预载)。 */
@@ -242,6 +262,13 @@ class SettingsRepository(
         if (storedExternalAccess) {
             server.externalAccess = true
             // 服务端可能已在容器惰性初始化时以回环启动,restart 立即改绑全接口
+            scope.launch { server.restart() }
+        }
+        // V29:恢复服务监听端口偏好(进程重启后重放;默认1510零动作)
+        val storedPort = localPrefs.getInt(ConfigKeys.SERVER_PORT, WireProtocol.PORT)
+        if (storedPort != WireProtocol.PORT) {
+            _serverPort.value = storedPort
+            server.port = storedPort
             scope.launch { server.restart() }
         }
     }

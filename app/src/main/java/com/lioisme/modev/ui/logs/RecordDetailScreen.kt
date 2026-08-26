@@ -153,7 +153,9 @@ fun RecordDetailScreen(
             scope.launch {
                 runCatching {
                     withContext(Dispatchers.IO) {
-                        context.contentResolver.openOutputStream(uri)?.use { it.write(json.toByteArray()) }
+                        context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { writer ->
+                            writer.write(json)
+                        }
                     }
                 }.onSuccess { showSnack(context.getString(R.string.export_ok)) }
                     .onFailure { showSnack(context.getString(R.string.export_failed)) }
@@ -201,14 +203,7 @@ fun RecordDetailScreen(
     Scaffold(
         topBar = {
             ModevTopBar(
-                title =
-                    when (val current = state.record) {
-                        is CryptoDetail -> current.record.displayAlgorithm()
-                        is SqlDetail -> current.record.sqlHeadline()
-                        is BehaviorDetail -> behaviorHeadline(current.record)
-                        is PrefsDetail -> prefsHeadline(current.record)
-                        null -> stringResource(R.string.record_title)
-                    },
+                title = stringResource(R.string.record_title),
                 onBack = onBack,
                 actions = {
                     TipIconButton(

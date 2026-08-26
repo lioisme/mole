@@ -22,7 +22,7 @@ package com.lioisme.modev.core.codec
  * - 记录载荷形状本身(字段/类型)不变,仅分发语义泛化。
  */
 object WireProtocol {
-    const val PORT = 46299
+    const val PORT = 1510
 
     const val MAGIC = "MDEV"
     const val VERSION = 4

@@ -33,8 +33,13 @@ import kotlinx.coroutines.flow.update
  * - 注入侧恒连本机回环(hook/ConfigChannel),不受 externalAccess 影响。
  */
 class ConfigServer(
-    private val port: Int = WireProtocol.PORT,
+    port: Int = WireProtocol.PORT,
 ) : Closeable, ConnectionMonitor {
+
+    /** 当前监听端口(V29:可动态修改,`restart()` 后生效)。 */
+    @Volatile
+    var port: Int = port
+        internal set
 
     /**
      * 外部访问开关(V26):false(默认)= 绑定 127.0.0.1;true = 绑定 0.0.0.0。

@@ -1,5 +1,7 @@
 package com.lioisme.modev.ui.logs.markdown
 
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
 import org.intellij.markdown.MarkdownElementTypes
 import org.intellij.markdown.MarkdownTokenTypes
 import org.intellij.markdown.ast.ASTNode
@@ -18,12 +20,14 @@ import org.intellij.markdown.ast.getTextInNode
  */
 
 /** 单个围栏的解析信息(镜像库 MarkdownCodeFence 的偏移提取逻辑,纯函数化)。 */
+@Immutable
 class FenceInfo(
     val language: String?,
     val code: String,
 )
 
 /** 代码组归属:runFirstOrdinal = 组首围栏的全局序;indexInRun/runSize 定位标签页。 */
+@Immutable
 data class CodeRunPlacement(
     val runFirstOrdinal: Int,
     val indexInRun: Int,
@@ -31,6 +35,7 @@ data class CodeRunPlacement(
 )
 
 /** 文档序围栏条目。 */
+@Stable
 class FenceEntry(
     val ordinal: Int,
     val node: ASTNode,
@@ -39,14 +44,22 @@ class FenceEntry(
 )
 
 /** 全部围栏索引(一次线性扫描的结果)。 */
-class MarkdownFenceIndex(private val entries: List<FenceEntry>) {
+@Stable
+class MarkdownFenceIndex(entries: List<FenceEntry>) {
+    private val entries: List<FenceEntry> = entries
     val size: Int get() = entries.size
+
+    /** 偏移量→条目映射,locate() O(1) 查找(Long key 避免 Pair boxing)。 */
+    private val offsetMap: Map<Long, FenceEntry> =
+        entries.associateBy {
+            (it.node.startOffset.toLong() shl 32) or (it.node.endOffset.toLong() and 0xFFFFFFFFL)
+        }
 
     operator fun get(ordinal: Int): FenceEntry? = entries.getOrNull(ordinal)
 
     /** 按节点偏移定位(渲染回调只拿得到当前 node)。 */
     fun locate(node: ASTNode): FenceEntry? =
-        entries.firstOrNull { it.node.startOffset == node.startOffset && it.node.endOffset == node.endOffset }
+        offsetMap[(node.startOffset.toLong() shl 32) or (node.endOffset.toLong() and 0xFFFFFFFFL)]
 }
 
 private val GROUP_LANGUAGES = setOf(MarkdownLangs.TEXT, MarkdownLangs.BASE64, MarkdownLangs.HEX)
