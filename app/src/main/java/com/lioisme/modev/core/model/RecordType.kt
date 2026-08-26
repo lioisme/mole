@@ -14,7 +14,10 @@ enum class RecordType(val wire: String) {
     DATABASE(RecordTypes.DATABASE),
 
     /** 行为监听记录(文件系统 / Assets / Shell,V27 一等公民)。 */
-    BEHAVIOR(RecordTypes.BEHAVIOR);
+    BEHAVIOR(RecordTypes.BEHAVIOR),
+
+    /** SharedPreferences 监听记录(读入配置文件 + Get/Put 全家桶,V28 一等公民)。 */
+    PREFS(RecordTypes.PREFS);
 
     companion object {
         fun fromWire(value: String?): RecordType? = entries.firstOrNull { it.wire == value }

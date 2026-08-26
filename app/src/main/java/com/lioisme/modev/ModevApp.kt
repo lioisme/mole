@@ -17,6 +17,7 @@ import com.lioisme.modev.domain.capability.CapabilityRegistry
 import com.lioisme.modev.domain.capability.AlgorithmListenCapability
 import com.lioisme.modev.domain.capability.BehaviorListenCapability
 import com.lioisme.modev.domain.capability.DatabaseListenCapability
+import com.lioisme.modev.domain.capability.PrefsListenCapability
 import com.lioisme.modev.domain.scope.ScopeGateway
 import com.lioisme.modev.domain.scope.ScopeRepository
 import com.lioisme.modev.domain.scope.ScopeService
@@ -121,6 +122,7 @@ class AppContainer(private val context: Context) {
             register(AlgorithmListenCapability(settings.globalSwitch, appScope))
             register(DatabaseListenCapability(settings.globalSwitch, appScope))
             register(BehaviorListenCapability(settings.globalSwitch, appScope))
+            register(PrefsListenCapability(settings.globalSwitch, appScope))
         }
     }
 

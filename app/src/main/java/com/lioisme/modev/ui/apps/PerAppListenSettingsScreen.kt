@@ -51,6 +51,7 @@ import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.CategoryTaxonomy
 import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.HookSwitch
+import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.ui.components.IntLimitSheet
@@ -104,6 +105,11 @@ class PerAppListenSettingsViewModel(
     /** 行为监听总开关定制(V27)。 */
     fun setBehaviorMaster(value: Boolean) {
         update { it.copy(behaviorListen = value) }
+    }
+
+    /** 偏好监听总开关定制(V28)。 */
+    fun setPrefsMaster(value: Boolean) {
+        update { it.copy(prefsListen = value) }
     }
 
     /** 类别定制(kind 名跨枚举;非法名由 AppListenOverride 容错忽略)。 */
@@ -306,6 +312,26 @@ fun PerAppListenSettingsScreen(
                     onClick = { showIgnorePathSheet = true },
                     modifier = Modifier.testTag("listen-row-ignore-path"),
                 )
+            }
+            Spacer(Modifier.height(16.dp))
+
+            // 偏好 5 类别(V28 一等公民;值捕获复用 fileContentCapture、路径降噪复用 ignorePathPrefixes)
+            SettingsSection(stringResource(R.string.filter_type_prefs)) {
+                ListenRow(
+                    label = res.getString(R.string.prefs_monitor_master),
+                    checked = effective.prefsListen,
+                    onCheckedChange = { viewModel.setPrefsMaster(it) },
+                    testTag = "listen-row-master-prefs",
+                )
+                CategoryTaxonomy.forType(RecordType.PREFS).forEach { category ->
+                    HorizontalDivider16Compat()
+                    ListenRow(
+                        label = res.getString(switchLabelRes(category.id)),
+                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.id, it) },
+                        testTag = "listen-row-${category.id}",
+                    )
+                }
             }
             Spacer(Modifier.height(16.dp))
 
@@ -554,6 +580,12 @@ private fun HorizontalDivider16Compat() {
  * 全 App 类别标签单一事实源,V25 起仅本页消费)。
  */
 private fun switchLabelRes(kindId: String): Int = when (kindId) {
+    // 偏好类别(V28):OPEN/CLEAR 与 SQL kind 名碰撞,必须前置匹配
+    PrefsKind.OPEN.name -> R.string.kind_prefs_open
+    PrefsKind.GET.name -> R.string.kind_prefs_get
+    PrefsKind.PUT.name -> R.string.kind_prefs_put
+    PrefsKind.REMOVE.name -> R.string.kind_prefs_remove
+    PrefsKind.CLEAR.name -> R.string.kind_prefs_clear
     "MESSAGE_DIGEST" -> R.string.switch_message_digest
     "CIPHER" -> R.string.switch_cipher
     "MAC" -> R.string.switch_mac

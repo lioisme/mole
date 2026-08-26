@@ -3,6 +3,7 @@ package com.lioisme.modev.ui.logs.markdown
 import com.lioisme.modev.core.util.BytesView
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -177,5 +178,48 @@ class RecordMarkdownFactoryTest {
         assertTrue(md.contains("|Field|Value|"))
         assertTrue(md.contains("|类别|Cipher|"))
         assertTrue(md.contains("|线程|m#a|"))
+    }
+
+    // ---- V28 纯 markdown 化:identity / toc / 节标题层级 ----
+
+    @Test
+    fun section_heading_defaults_to_h2_and_sanitizes_newlines() {
+        assertEquals("## 数据流向\n\n", mdSectionHeading("数据流向"))
+        assertEquals("## a b\n\n", mdSectionHeading("a\nb"))
+        assertTrue(mdSectionHeading("T", level = 3).startsWith("### T"))
+        assertTrue(mdSectionHeading("T", level = 9).startsWith("###### T"))
+    }
+
+    @Test
+    fun byte_section_heading_level_overridable() {
+        val md = byteSectionMarkdown(title = "输入", view = view(hex = "ab"), headingLevel = 2)
+        assertTrue(md.startsWith("## 输入\n\n```hex"))
+    }
+
+    @Test
+    fun text_section_heading_level_overridable() {
+        val md = textSectionMarkdown(title = "参数", value = "{}", lang = MarkdownLangs.JSON, headingLevel = 2)
+        assertTrue(md.startsWith("## 参数\n\n```json"))
+    }
+
+    @Test
+    fun identity_markdown_headline_with_optional_accent() {
+        assertEquals("## AES/CBC\n", identityMarkdown("AES/CBC"))
+        assertEquals(
+            "## db.sqlite\n\n**QUERY · DML · 写入**\n",
+            identityMarkdown("db.sqlite", "QUERY · DML · 写入"),
+        )
+    }
+
+    @Test
+    fun markdown_langs_json_never_groups_with_adjacent_fences() {
+        // 行为级契约:相邻 text/json 围栏中,text 孤立成 runSize=1 的平凡组,
+        // json 完全不具组资格(placement=null)——json 永不参与聚合
+        val parser = org.intellij.markdown.parser.MarkdownParser(org.intellij.markdown.flavours.gfm.GFMFlavourDescriptor())
+        val md = "```text\nabc\n```\n\n```json\n{}\n```"
+        val idx = buildFenceIndex(parser.buildMarkdownTreeFromString(md), md)
+        assertEquals(2, idx.size)
+        assertEquals(1, idx[0]?.placement?.runSize)
+        assertNull(idx[1]?.placement)
     }
 }

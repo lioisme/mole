@@ -30,13 +30,19 @@ class BehaviorMethodRegistry private constructor(
 
         /** 解析系统类并构造注册表;失败/类缺失返回 null。 */
         fun forName(className: String): BehaviorMethodRegistry? =
+            classForName(className)?.let(::BehaviorMethodRegistry)
+
+        /**
+         * boot classloader 优先的类解析(hide 类构造器 hook 场景复用;
+         * 经参数间接调用,与注册表同源容错语义)。
+         */
+        fun classForName(className: String): Class<*>? =
             runCatching {
-                val clazz = try {
+                try {
                     Class.forName(className, false, null)
                 } catch (e: ClassNotFoundException) {
                     Class.forName(className)
                 }
-                BehaviorMethodRegistry(clazz)
             }.getOrNull()
     }
 }

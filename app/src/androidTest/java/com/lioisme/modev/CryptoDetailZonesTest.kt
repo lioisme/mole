@@ -167,12 +167,14 @@ class CryptoDetailZonesTest {
         rule.waitForIdle()
         waitForDetail()
 
-        // V24:算法名由顶栏 + Hero 身份卡双处承载(meta 长表已网格化,不再含算法行);
-        // Hero 卡以 detail-hero 锚点断言。
-        rule.onNodeWithTag("detail-hero").assertIsDisplayed()
+        // V28:算法名由顶栏 + 身份区(markdown H2)双处承载(原生 Hero 卡已退役)。
+        assertTrue(
+            "算法名应至少两处出现(顶栏 + 身份区)",
+            rule.onAllNodesWithText(cipherAlgorithm).fetchSemanticsNodes().size >= 2,
+        )
 
-        // 数据流分区:分区头 + 输入(明文) + 流向箭头 + 输出(密文)。
-        // V24 锚点芯片与分区头同文案:一律 onAllNodes 多节点安全断言。
+        // 数据流分区:H2 节根 + 输入(明文) + 流向箭头段 + 输出(密文)。
+        // V24 锚点/目录与节标题同文案:一律 onAllNodes 多节点安全断言。
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.section_zone_data_flow)))
         rule.onAllNodesWithText(str(R.string.section_zone_data_flow)).onFirst().assertIsDisplayed()
@@ -182,7 +184,8 @@ class CryptoDetailZonesTest {
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.role_output_ciphertext)))
         rule.onAllNodesWithText(str(R.string.role_output_ciphertext)).onFirst().assertIsDisplayed()
-        rule.onAllNodesWithContentDescription(str(R.string.cd_flow)).assertCountEquals(1)
+        // V28:流向箭头 = markdown 段落「↓」(图标行退役),全页恒一处。
+        rule.onAllNodesWithText("↓").assertCountEquals(1)
 
         // 密钥材料分区:分区头 + 密钥节标题。
         rule.onAllNodes(hasScrollAction()).onFirst()

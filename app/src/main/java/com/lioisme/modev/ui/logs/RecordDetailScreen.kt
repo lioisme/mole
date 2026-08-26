@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,11 +14,9 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FileDownload
-import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -50,9 +47,11 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.data.mapping.BehaviorDetail
 import com.lioisme.modev.data.mapping.CryptoDetail
+import com.lioisme.modev.data.mapping.PrefsDetail
 import com.lioisme.modev.data.mapping.RecordDetailModel
 import com.lioisme.modev.data.mapping.SqlDetail
 import com.lioisme.modev.data.mapping.toJson
@@ -64,19 +63,23 @@ import com.lioisme.modev.ui.components.behaviorOperationLabelRes
 import com.lioisme.modev.ui.components.directionLabel
 import com.lioisme.modev.ui.components.displayAlgorithm
 import com.lioisme.modev.ui.components.kindLabelRes
+import com.lioisme.modev.ui.components.operationLabel
+import com.lioisme.modev.ui.components.prefsKindLabelRes
+import com.lioisme.modev.ui.components.prefsOperationLabel
+import com.lioisme.modev.ui.components.prefsOperationLabelRes
 import com.lioisme.modev.ui.components.sqlHeadline
 import com.lioisme.modev.ui.components.sqlKindLabelRes
 import com.lioisme.modev.ui.components.sqlOperationLabel
-import com.lioisme.modev.ui.logs.detail.BehaviorHero
-import com.lioisme.modev.ui.logs.detail.CryptoHero
-import com.lioisme.modev.ui.logs.detail.DetailAnchorRow
-import com.lioisme.modev.ui.logs.detail.SqlHero
 import com.lioisme.modev.ui.logs.detail.behaviorAnchors
 import com.lioisme.modev.ui.logs.detail.cryptoAnchors
+import com.lioisme.modev.ui.logs.detail.prefsAnchors
 import com.lioisme.modev.ui.logs.detail.sqlAnchors
 import com.lioisme.modev.ui.logs.markdown.DetailCodeActions
 import com.lioisme.modev.ui.logs.markdown.DetailFenceHandle
+import com.lioisme.modev.ui.logs.markdown.FLOW_ARROW_LINE
 import com.lioisme.modev.ui.logs.markdown.FullscreenTextDialog
+import com.lioisme.modev.ui.logs.markdown.MarkdownLangs
+import com.lioisme.modev.ui.logs.markdown.mdSectionHeading
 import com.lioisme.modev.ui.settings.StorageFormat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -84,15 +87,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * 记录详情页(V26 markdown 化重构):
- * - 信息架构:Hero 身份卡(原生,D1 边界)→ 锚点芯片行 → 元数据 GFM 表 →
- *   数据流区(input→arrow→output)→ 密钥材料区 → 参数 → 调用栈;
- *   全部内容区块以单一 markdown 文档经 mikepenz 渲染(代码组标签页承接
- *   原三态表示切换,卡片限高滚动 + 复制/全屏出口);
+ * 记录详情页(V28 纯 markdown 化重构):
+ * - 信息架构:Appbar 以下全域 100% markdown 承载 —— 身份区(## 标题 + 粗体上下文行,
+ *   取代 V24 原生 Hero 卡)→ 目录(TOC markdown 链接列表,anchor:// 经 LocalUriHandler
+ *   拦截滚动,取代 V24 FilterChip 锚点行)→ 内容节(H2 节根 + 围栏/GFM 表,
+ *   ZoneHeader 色带与流向图标行退役为纯 markdown);
+ * - 代码块扁平化(去卡)+ Highlights 引擎语法高亮(json/bash,M3 同源主题色,
+ *   >32Ki 降级);params/bindArgs/rows 以真实 JSON 承载(D3);
  * - 顶栏 = ModevTopBar(标题=算法名恒单行)+ 上一条/下一条(id 投影邻接导航)
  *   + 更多(唯一功能 = 导出 JSON,SAF 后台构建 + 写流,双护栏预检);
  * - 性能红线:显示上限 128Ki(markdown 有界)/ 全屏 ChunkedText 虚拟化 /
- *   复制 4M / 导出 32M 闸门,数值语义与 V15 一致。
+ *   复制 4M / 导出 32M / 高亮 32Ki,数值语义与 V15/V28 一致。
  */
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -162,6 +167,7 @@ fun RecordDetailScreen(
                 is CryptoDetail -> estimateJsonChars(current.record)
                 is SqlDetail -> estimateSqlJsonChars(current.record)
                 is BehaviorDetail -> estimateBehaviorJsonChars(current.record)
+                is PrefsDetail -> estimatePrefsJsonChars(current.record)
             }
         if (estimatedChars > EXPORT_MAX_CHARS) {
             showSnack(context.getString(R.string.export_too_large, estimatedChars))
@@ -175,12 +181,14 @@ fun RecordDetailScreen(
                             is CryptoDetail -> current.record.toJson()
                             is SqlDetail -> current.record.toJson()
                             is BehaviorDetail -> current.record.toJson()
+                            is PrefsDetail -> current.record.toJson()
                         }
                     }
                 }
             json.onSuccess { text ->
                 if (text.length > EXPORT_MAX_CHARS) {
-                    showSnack(context.getString(R.string.export_too_large))
+                    // V28 修复:二次拒绝同样携带格式参(F9 存量缺陷,占位符缺参曾渲染字面量)。
+                    showSnack(context.getString(R.string.export_too_large, text.length))
                     return@onSuccess
                 }
                 exportJson = text
@@ -198,6 +206,7 @@ fun RecordDetailScreen(
                         is CryptoDetail -> current.record.displayAlgorithm()
                         is SqlDetail -> current.record.sqlHeadline()
                         is BehaviorDetail -> behaviorHeadline(current.record)
+                        is PrefsDetail -> prefsHeadline(current.record)
                         null -> stringResource(R.string.record_title)
                     },
                 onBack = onBack,
@@ -281,7 +290,7 @@ fun RecordDetailScreen(
     }
 }
 
-/** 详情内容分派(V17 双形态):算法走 CryptoLoadedContent,数据库走 SQL 渲染。 */
+/** 详情内容分派(V17 双形态 + V27 行为;V28 装配统一 identity→toc→节序列)。 */
 @Composable
 private fun LoadedContent(
     record: RecordDetailModel,
@@ -293,15 +302,24 @@ private fun LoadedContent(
         is CryptoDetail -> CryptoLoadedContent(record.record, innerPadding, listState, actions)
         is SqlDetail -> SqlLoadedContent(record.record, innerPadding, listState, actions)
         is BehaviorDetail -> BehaviorLoadedContent(record.record, innerPadding, listState, actions)
+        is PrefsDetail -> PrefsLoadedContent(record.record, innerPadding, listState, actions)
     }
 }
 
 /** 行为详情顶栏标题(路径 basename / 命令首段 / 操作名,恒非空)。 */
 @Composable
-private fun behaviorHeadline(record: BehaviorRecord): String {
+internal fun behaviorHeadline(record: BehaviorRecord): String {
     record.path?.trimEnd('/')?.ifEmpty { "/" }?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }?.let { return it }
     record.commandDisplay()?.lineSequence()?.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
     return stringResource(behaviorOperationLabelRes(record.operation))
+}
+
+/** 偏好详情顶栏标题(配置键 / 文件 basename / 操作名,恒非空)。 */
+@Composable
+internal fun prefsHeadline(record: PrefsRecord): String {
+    record.key?.takeIf { it.isNotBlank() }?.let { return it }
+    record.path?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }?.let { return it }
+    return stringResource(prefsOperationLabelRes(record.operation))
 }
 
 @Composable
@@ -339,7 +357,7 @@ private fun FailedState(innerPadding: PaddingValues, onRetry: () -> Unit) {
 /**
  * 锚点滚动装配辅助:锚点 key → LazyColumn item 索引簿记表。
  * 簿记在 LazyListScope DSL 同步执行期内完成(与条目发射严格同序),
- * 普通HashMap 承载(非快照态,不参与失效循环);点击时读取最近一次装配结果。
+ * 普通 HashMap 承载(非快照态,不参与失效循环);点击时读取最近一次装配结果。
  */
 private class AnchorBookkeeping(val listState: LazyListState) {
     val indexByKey = HashMap<String, Int>()
@@ -360,12 +378,30 @@ private class AnchorBookkeeping(val listState: LazyListState) {
     }
 }
 
-/** 区块文档装配缓存键:title 已本地化,remember 以内容为键避免重组期重建文档。 */
+// region V28 共享装配片段(identity / toc / 时间戳行)
+
+/** 身份区上下文行的分隔符(locale 无关中点,非 CJK,i18n 契约安全)。 */
+private const val ACCENT_SEPARATOR = " · "
+
+/** 类别·操作(+可选方向/验签)上下文行拼装(标签已本地化)。 */
+private fun accentLine(vararg labels: String?): String =
+    labels.filterNotNull().filter { it.isNotBlank() }.joinToString(ACCENT_SEPARATOR)
+
+/** 时间戳元数据行(detailTimeFmt 按 Locale 重建契约见 [detailTimeFmt])。 */
+@Composable
+private fun timestampEntry(timestamp: Long): Pair<String, String> {
+    val context = LocalContext.current
+    val timeFmt = remember(context) { detailTimeFmt() }
+    return Pair(stringResource(R.string.meta_timestamp), timeFmt.format(java.util.Date(timestamp)))
+}
+
+// endregion
 
 /**
- * 算法记录详情内容(V26 markdown 装配):
- * hero → 锚点行 → 元数据表 → 数据流区(input→arrow→output)→ 密钥材料区
- * → 参数 → 调用栈;每个区块恒 1 item([markdownSectionItems])。
+ * 算法记录详情内容(V28 纯 markdown 装配):
+ * identity → toc → 元数据表 → 数据流节(input→↓→output,H2 节根随首文档)→
+ * 密钥材料节(key 文档带 H2 节根,余字段 H3)→ 参数(json 围栏)→ 调用栈;
+ * 每个区块恒 1 item([markdownSectionItems])。
  */
 @Composable
 internal fun CryptoLoadedContent(
@@ -376,15 +412,15 @@ internal fun CryptoLoadedContent(
 ) {
     val res = LocalContext.current.resources
 
-    // 元数据表条目(D1:语义色让位 markdown 表,身份徽章保留于 Hero 卡)
     val metaEntries =
-        listOf(
+        listOfNotNull(
             Pair(stringResource(R.string.meta_kind), stringResource(kindLabelRes(record.kind))),
             record.direction?.let { Pair(stringResource(R.string.meta_direction), directionLabel(it)) },
             record.provider?.let { Pair(stringResource(R.string.meta_provider), it) },
             record.processName?.let { Pair(stringResource(R.string.meta_process), it) },
             Pair(stringResource(R.string.meta_context), "#${record.contextId}"),
             Pair(stringResource(R.string.meta_thread), record.threadName),
+            timestampEntry(record.timestamp),
             record.verifyResult?.let {
                 Pair(
                     stringResource(R.string.meta_verify),
@@ -392,15 +428,29 @@ internal fun CryptoLoadedContent(
                 )
             },
             if (record.keyExportable) Pair(stringResource(R.string.meta_key_exportable), stringResource(R.string.confirm)) else null,
-        ).filterNotNull()
-    val metaTable = metaTableDoc(metaEntries)
-    val anchors = cryptoAnchors(record)
+        )
+    val metaTitle = stringResource(R.string.section_metadata)
+    val metaTable = metaSectionDoc(metaTitle, metaEntries)
 
-    // V16 R2:params 护栏化文本(纯函数),截断/省略标记改走围栏尾注段落。
+    // 身份区:算法名主标题 + 类别·操作·方向·验签 上下文行(取代原生 Hero 卡)。
+    val accent =
+        accentLine(
+            stringResource(kindLabelRes(record.kind)),
+            operationLabel(record.operation),
+            record.direction?.let { directionLabel(it) },
+            record.verifyResult?.let { stringResource(if (it) R.string.verify_ok else R.string.verify_fail) },
+        )
+    val identityMarkdown = identityDoc(headline = record.displayAlgorithm(), accentLine = accent)
+
+    // TOC 与簿记共用同一锚点清单(可见性与可滚动性同源)。
+    val anchors = cryptoAnchors(record)
+    val tocList = tocEntries(anchors)
+
+    // V28 D3:params → json 围栏(继承护栏计数,trailer 本地化标记不变)。
     val paramsTitle = stringResource(R.string.section_params)
     val paramsDoc =
         record.params?.takeIf { it.isNotEmpty() }?.let { bundle ->
-            val formatted = formatParamsText(bundle)
+            val formatted = formatParamsJson(bundle)
             val trailers =
                 buildList {
                     if (formatted.truncatedValues > 0) add(res.getString(R.string.params_truncated))
@@ -408,14 +458,16 @@ internal fun CryptoLoadedContent(
                         add(res.getQuantityString(R.plurals.params_omitted, formatted.omittedEntries, formatted.omittedEntries))
                     }
                 }
-            textSectionDoc(paramsTitle, formatted.lines.joinToString("\n"), trailerLines = trailers)
+            textSectionDoc(paramsTitle, formatted.json!!, lang = MarkdownLangs.JSON, trailerLines = trailers)
         }
 
-    val inputRole = stringResource(cryptoFlowRoles(record.kind, record.operation, record.direction).first ?: R.string.section_input)
-    val outputRole = stringResource(cryptoFlowRoles(record.kind, record.operation, record.direction).second ?: R.string.section_output)
+    val flowRoles = cryptoFlowRoles(record.kind, record.operation, record.direction)
+    val inputRole = stringResource(flowRoles.first ?: R.string.section_input)
+    val outputRole = stringResource(flowRoles.second ?: R.string.section_output)
     val hasInput = record.input != null
     val hasOutput = record.output != null
     val hasFlowZone = hasInput && hasOutput
+    val zoneFlowTitle = stringResource(R.string.section_zone_data_flow)
 
     // 区块文档预计算(组合期;@Composable 文档构建器不得进入 LazyListScope DSL 作用域):
     val keyTitle = stringResource(R.string.section_key)
@@ -425,11 +477,27 @@ internal fun CryptoLoadedContent(
     val aadTitle = stringResource(R.string.section_aad)
     val publicKeyTitle = stringResource(R.string.section_public_key)
     val stackTitle = stringResource(R.string.section_stack)
+    val zoneKeysTitle = stringResource(R.string.section_zone_key_material)
 
-    val inputDoc = record.input?.let { byteSectionDoc(inputRole, it) }
+    // 数据流节:H2 节根随 input 文档首发射,箭头段落内联于 input 尾部(V28 去图标 item)。
+    val inputDoc =
+        record.input?.let {
+            val inner = byteSectionDoc(inputRole, it)
+            SectionDoc(
+                markdown =
+                    mdSectionHeading(zoneFlowTitle) +
+                        inner.markdown + "\n" +
+                        FLOW_ARROW_LINE + "\n\n",
+                handles = inner.handles,
+            )
+        }
     val outputDoc = record.output?.let { byteSectionDoc(outputRole, it) }
-    val keyDoc = record.key?.let { byteSectionDoc(keyTitle, it) }
-    val keyAliasDoc = record.keyAlias?.let { textSectionDoc(keyAliasTitle, it) }
+    val keyDoc =
+        record.key?.let {
+            val inner = byteSectionDoc(keyTitle, it)
+            SectionDoc(markdown = mdSectionHeading(zoneKeysTitle) + inner.markdown, handles = inner.handles)
+        }
+    val keyAliasDoc = record.keyAlias?.let { textSectionDoc(keyAliasTitle, it, headingLevel = 3) }
     val ivDoc = record.iv?.let { byteSectionDoc(ivTitle, it) }
     val saltDoc = record.salt?.let { byteSectionDoc(saltTitle, it) }
     val aadDoc = record.aad?.let { byteSectionDoc(aadTitle, it) }
@@ -460,45 +528,29 @@ internal fun CryptoLoadedContent(
         contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
         book.cursor = 0
-        item(key = "hero") { CryptoHero(record) }
-        book.advance(1)
-        item(key = "anchors") {
-            DetailAnchorRow(anchors = anchors, onAnchorClick = { book.scrollTo(it, scrollScope) })
-        }
-        book.advance(1)
+        book.advance(identityItem(identityMarkdown))
+        book.advance(tocSectionItems(tocList, onAnchorClick = { book.scrollTo(it, scrollScope) }))
         book.mark("meta")
         book.advance(metaTableItems("meta", metaTable))
 
-        // V20 R4 数据关系分区:输入 → 流向箭头 → 输出;仅双侧齐备构成数据流。
-        if (hasFlowZone) {
-            book.mark("flow")
-            item(key = "zone-dataflow") {
-                ZoneHeader(icon = Icons.Filled.SwapVert, titleRes = R.string.section_zone_data_flow)
-            }
-            book.advance(1)
-        }
+        // 数据流节:input(H2 节根 + 尾部箭头段)→ output;仅双侧齐备构成数据流。
         inputDoc?.let { doc ->
+            book.mark("flow")
             book.advance(markdownSectionItems("input", doc, actions))
-        }
-        if (hasFlowZone) {
-            item(key = "flow-arrow") { DetailFlowArrow() }
-            book.advance(1)
         }
         outputDoc?.let { doc ->
             book.advance(markdownSectionItems("output", doc, actions))
         }
 
-        // 密钥材料分区:key / keyAlias / iv / salt / aad / publicKey 归组。
+        // 密钥材料节:key 文档承载 H2 节根,余字段 H3 归组。
         val hasKeyMaterial =
             keyDoc != null || keyAliasDoc != null || ivDoc != null ||
                 saltDoc != null || aadDoc != null || publicKeyDoc != null
         if (hasKeyMaterial) {
-            book.mark("keys")
-            item(key = "zone-keymaterial") {
-                ZoneHeader(icon = Icons.Filled.Key, titleRes = R.string.section_zone_key_material)
+            keyDoc?.let { doc ->
+                book.mark("keys")
+                book.advance(markdownSectionItems("key", doc, actions))
             }
-            book.advance(1)
-            keyDoc?.let { doc -> book.advance(markdownSectionItems("key", doc, actions)) }
             keyAliasDoc?.let { doc -> book.advance(markdownSectionItems("key-alias", doc, actions)) }
             ivDoc?.let { doc -> book.advance(markdownSectionItems("iv", doc, actions)) }
             saltDoc?.let { doc -> book.advance(markdownSectionItems("salt", doc, actions)) }
@@ -518,9 +570,9 @@ internal fun CryptoLoadedContent(
 }
 
 /**
- * 数据库记录详情内容(V17 T11 引擎复用;V26 markdown 装配同款):
- * 元数据表 → SQL 语句(sql 围栏)→ 路径 → 绑定参数 → 结果集 → 结果文本
- * → 参数 → 调用栈,锚点键与内容一一对应。
+ * 数据库记录详情内容(V28 纯 markdown 装配):
+ * identity → toc → 元数据表 → SQL(sql 围栏)→ 路径 → 绑定参数(json)→
+ * 结果集(ndjson)→ 结果文本 → 参数(json)→ 调用栈。
  */
 @Composable
 private fun SqlLoadedContent(
@@ -532,23 +584,33 @@ private fun SqlLoadedContent(
     val res = LocalContext.current.resources
 
     val metaEntries =
-        listOf(
+        listOfNotNull(
             Pair(stringResource(R.string.meta_kind), stringResource(sqlKindLabelRes(record.kind))),
             Pair(stringResource(R.string.meta_operation), sqlOperationLabel(record.operation)),
             record.dbPath?.let { Pair(stringResource(R.string.meta_db_path), it) },
             Pair(stringResource(R.string.meta_context), "#${record.contextId}"),
             Pair(stringResource(R.string.meta_thread), record.threadName),
+            timestampEntry(record.timestamp),
             record.rowCount?.let { Pair(stringResource(R.string.meta_rows), it.toString()) },
             record.affectedCount?.let { Pair(stringResource(R.string.meta_affected), it.toString()) },
             record.rowId?.let { Pair(stringResource(R.string.meta_row_id), it.toString()) },
-        ).filterNotNull()
-    val metaTable = metaTableDoc(metaEntries)
-    val anchors = sqlAnchors(record)
+        )
+    val metaTitle = stringResource(R.string.section_metadata)
+    val metaTable = metaSectionDoc(metaTitle, metaEntries)
 
-    val bindArgsText = record.bindArgs?.takeIf { it.isNotEmpty() }?.let(::formatBindArgsText)
-    val rowsText = record.rows?.takeIf { it.isNotEmpty() }?.let(::formatRowsText)
-    val omittedBindRows = (record.bindArgs?.size ?: 0) - (bindArgsText?.size ?: 0)
-    val omittedRows = (record.rows?.size ?: 0) - (rowsText?.size ?: 0)
+    val accent =
+        accentLine(
+            stringResource(sqlKindLabelRes(record.kind)),
+            sqlOperationLabel(record.operation),
+        )
+    val identityMarkdown = identityDoc(headline = record.databaseName, accentLine = accent)
+
+    val anchors = sqlAnchors(record)
+    val tocList = tocEntries(anchors)
+
+    // V28 D3:bindArgs → json 数组、rows → NDJSON(逐行独立对象)。
+    val bindArgsJson = record.bindArgs?.takeIf { it.isNotEmpty() }?.let(::formatBindArgsJson)
+    val rowsJson = record.rows?.takeIf { it.isNotEmpty() }?.let(::formatRowsNdjson)
 
     // 区块文档预计算(组合期;@Composable 文档构建器不得进入 LazyListScope DSL 作用域):
     val sqlTitle = stringResource(R.string.section_sql)
@@ -562,29 +624,29 @@ private fun SqlLoadedContent(
     val sqlDoc = record.sql?.let { textSectionDoc(sqlTitle, it, lang = "sql") }
     val dbPathDoc = record.dbPath?.let { textSectionDoc(dbPathTitle, it) }
     val bindArgsDoc =
-        bindArgsText?.let { lines ->
+        bindArgsJson?.let { bound ->
             val trailers =
-                if (omittedBindRows > 0) {
-                    listOf(res.getQuantityString(R.plurals.rows_more, omittedBindRows, omittedBindRows))
+                if (bound.omittedRows > 0) {
+                    listOf(res.getQuantityString(R.plurals.rows_more, bound.omittedRows, bound.omittedRows))
                 } else {
                     emptyList()
                 }
-            textSectionDoc(bindArgsTitle, lines.joinToString("\n"), trailerLines = trailers)
+            textSectionDoc(bindArgsTitle, bound.json!!, lang = MarkdownLangs.JSON, trailerLines = trailers)
         }
     val rowsDoc =
-        rowsText?.let { lines ->
+        rowsJson?.let { bounded ->
             val trailers =
-                if (omittedRows > 0) {
-                    listOf(res.getQuantityString(R.plurals.rows_more, omittedRows, omittedRows))
+                if (bounded.omittedRows > 0) {
+                    listOf(res.getQuantityString(R.plurals.rows_more, bounded.omittedRows, bounded.omittedRows))
                 } else {
                     emptyList()
                 }
-            textSectionDoc(resultRowsTitle, lines.joinToString("\n"), trailerLines = trailers)
+            textSectionDoc(resultRowsTitle, bounded.lines.joinToString("\n"), lang = MarkdownLangs.JSON, trailerLines = trailers)
         }
     val resultDoc = record.resultText?.let { textSectionDoc(resultTitle, it) }
     val paramsDoc =
         record.params?.takeIf { it.isNotEmpty() }?.let { params ->
-            val formatted = formatParamsText(params)
+            val formatted = formatParamsJson(params)
             val trailers =
                 buildList {
                     if (formatted.truncatedValues > 0) add(res.getString(R.string.params_truncated))
@@ -592,7 +654,7 @@ private fun SqlLoadedContent(
                         add(res.getQuantityString(R.plurals.params_omitted, formatted.omittedEntries, formatted.omittedEntries))
                     }
                 }
-            textSectionDoc(paramsTitle, formatted.lines.joinToString("\n"), trailerLines = trailers)
+            textSectionDoc(paramsTitle, formatted.json!!, lang = MarkdownLangs.JSON, trailerLines = trailers)
         }
     val stackDoc =
         if (record.stack.isEmpty()) {
@@ -620,12 +682,8 @@ private fun SqlLoadedContent(
         contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
         book.cursor = 0
-        item(key = "hero") { SqlHero(record) }
-        book.advance(1)
-        item(key = "anchors") {
-            DetailAnchorRow(anchors = anchors, onAnchorClick = { book.scrollTo(it, scrollScope) })
-        }
-        book.advance(1)
+        book.advance(identityItem(identityMarkdown))
+        book.advance(tocSectionItems(tocList, onAnchorClick = { book.scrollTo(it, scrollScope) }))
         book.mark("meta")
         book.advance(metaTableItems("meta", metaTable))
 
@@ -662,9 +720,9 @@ private fun SqlLoadedContent(
 }
 
 /**
- * 行为记录详情内容(V27 一等公民;V26 markdown 装配同款):
- * Hero → 锚点(命令/内容/参数/栈)→ 元数据表 → 命令(bash 围栏)→
- * 内容预览(三态字节代码组)→ 参数 → 调用栈,锚点键与内容一一对应。
+ * 行为记录详情内容(V28 纯 markdown 装配):
+ * identity → toc → 元数据表 → 命令(bash 围栏)→ 内容预览(三态字节代码组)→
+ * 参数(json)→ 调用栈。
  */
 @Composable
 private fun BehaviorLoadedContent(
@@ -676,7 +734,7 @@ private fun BehaviorLoadedContent(
     val res = LocalContext.current.resources
 
     val metaEntries =
-        listOf(
+        listOfNotNull(
             Pair(stringResource(R.string.meta_kind), stringResource(behaviorKindLabelRes(record.kind))),
             Pair(stringResource(R.string.meta_operation), behaviorOperationLabel(record.operation)),
             record.path?.let { Pair(stringResource(R.string.meta_path), it) },
@@ -684,9 +742,20 @@ private fun BehaviorLoadedContent(
             record.fileSize?.let { Pair(stringResource(R.string.meta_file_size), StorageFormat.formatBytes(it)) },
             Pair(stringResource(R.string.meta_context), "#${record.contextId}"),
             Pair(stringResource(R.string.meta_thread), record.threadName),
-        ).filterNotNull()
-    val metaTable = metaTableDoc(metaEntries)
+            timestampEntry(record.timestamp),
+        )
+    val metaTitle = stringResource(R.string.section_metadata)
+    val metaTable = metaSectionDoc(metaTitle, metaEntries)
+
+    val accent =
+        accentLine(
+            stringResource(behaviorKindLabelRes(record.kind)),
+            behaviorOperationLabel(record.operation),
+        )
+    val identityMarkdown = identityDoc(headline = behaviorHeadline(record), accentLine = accent)
+
     val anchors = behaviorAnchors(record)
+    val tocList = tocEntries(anchors)
 
     // 区块文档预计算(组合期;@Composable 文档构建器不得进入 LazyListScope DSL 作用域):
     val commandTitle = stringResource(R.string.section_command)
@@ -701,7 +770,7 @@ private fun BehaviorLoadedContent(
     val contentDoc = record.content?.let { byteSectionDoc(contentTitle, it) }
     val paramsDoc =
         record.params?.takeIf { it.isNotEmpty() }?.let { params ->
-            val formatted = formatParamsText(params)
+            val formatted = formatParamsJson(params)
             val trailers =
                 buildList {
                     if (formatted.truncatedValues > 0) add(res.getString(R.string.params_truncated))
@@ -709,7 +778,7 @@ private fun BehaviorLoadedContent(
                         add(res.getQuantityString(R.plurals.params_omitted, formatted.omittedEntries, formatted.omittedEntries))
                     }
                 }
-            textSectionDoc(paramsTitle, formatted.lines.joinToString("\n"), trailerLines = trailers)
+            textSectionDoc(paramsTitle, formatted.json!!, lang = MarkdownLangs.JSON, trailerLines = trailers)
         }
     val stackDoc =
         if (record.stack.isEmpty()) {
@@ -737,12 +806,8 @@ private fun BehaviorLoadedContent(
         contentPadding = PaddingValues(horizontal = 16.dp),
     ) {
         book.cursor = 0
-        item(key = "hero") { BehaviorHero(record) }
-        book.advance(1)
-        item(key = "anchors") {
-            DetailAnchorRow(anchors = anchors, onAnchorClick = { book.scrollTo(it, scrollScope) })
-        }
-        book.advance(1)
+        book.advance(identityItem(identityMarkdown))
+        book.advance(tocSectionItems(tocList, onAnchorClick = { book.scrollTo(it, scrollScope) }))
         book.mark("meta")
         book.advance(metaTableItems("meta", metaTable))
 
@@ -765,3 +830,131 @@ private fun BehaviorLoadedContent(
         item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
     }
 }
+
+// region V28 偏好详情(PrefsLoadedContent)
+
+/**
+ * 偏好记录详情内容(V28 一等公民;纯 markdown 装配同三兄弟):
+ * identity → toc → 元数据表 → 键值(json/text 围栏,fileContentCapture 闸门)→
+ * 参数(json)→ 调用栈,锚点键与内容一一对应。
+ */
+@Composable
+private fun PrefsLoadedContent(
+    record: PrefsRecord,
+    innerPadding: PaddingValues,
+    listState: LazyListState,
+    actions: DetailCodeActions,
+) {
+    val res = LocalContext.current.resources
+
+    val metaEntries =
+        listOfNotNull(
+            Pair(stringResource(R.string.meta_kind), stringResource(prefsKindLabelRes(record.kind))),
+            Pair(stringResource(R.string.meta_operation), prefsOperationLabel(record.operation)),
+            record.path?.let { Pair(stringResource(R.string.meta_pref_file), it) },
+            record.key?.let { Pair(stringResource(R.string.meta_pref_key), it) },
+            record.value?.let { view ->
+                Pair(
+                    stringResource(R.string.meta_file_size),
+                    StorageFormat.formatBytes(view.totalLength.toLong()),
+                )
+            },
+            Pair(stringResource(R.string.meta_context), "#${record.contextId}"),
+            Pair(stringResource(R.string.meta_thread), record.threadName),
+            timestampEntry(record.timestamp),
+        )
+    val metaTitle = stringResource(R.string.section_metadata)
+    val metaTable = metaSectionDoc(metaTitle, metaEntries)
+
+    val accent =
+        accentLine(
+            stringResource(prefsKindLabelRes(record.kind)),
+            prefsOperationLabel(record.operation),
+        )
+    val identityMarkdown = identityDoc(headline = prefsHeadline(record), accentLine = accent)
+
+    val anchors = prefsAnchors(record)
+    val tocList = tocEntries(anchors)
+
+    // 区块文档预计算(组合期;@Composable 文档构建器不得进入 LazyListScope DSL 作用域):
+    val valueTitle = stringResource(R.string.section_value)
+    val paramsTitle = stringResource(R.string.section_params)
+    val stackTitle = stringResource(R.string.section_stack)
+
+    // 键值节:JSON 序列化形态(stringSet/getAll)走 json 围栏高亮,其余 text;
+    // 截断标记经 BytesView.truncated 承载(捕获侧已钳制)。
+    val valueDoc =
+        record.value?.let { view ->
+            val body = view.text
+            if (body.isNullOrEmpty()) {
+                null
+            } else {
+                val lang = if (record.params?.get("type") == "stringSet" || record.params?.get("type") == "map") {
+                    MarkdownLangs.JSON
+                } else {
+                    MarkdownLangs.TEXT
+                }
+                val trailers =
+                    if (view.truncated) listOf(res.getString(R.string.bytes_truncated)) else emptyList()
+                textSectionDoc(valueTitle, body, lang = lang, trailerLines = trailers)
+            }
+        }
+    val paramsDoc =
+        record.params?.takeIf { it.isNotEmpty() }?.let { params ->
+            val formatted = formatParamsJson(params)
+            val trailers =
+                buildList {
+                    if (formatted.truncatedValues > 0) add(res.getString(R.string.params_truncated))
+                    if (formatted.omittedEntries > 0) {
+                        add(res.getQuantityString(R.plurals.params_omitted, formatted.omittedEntries, formatted.omittedEntries))
+                    }
+                }
+            textSectionDoc(paramsTitle, formatted.json!!, lang = MarkdownLangs.JSON, trailerLines = trailers)
+        }
+    val stackDoc =
+        if (record.stack.isEmpty()) {
+            null
+        } else {
+            val frames = record.stack.take(STACK_MAX_FRAMES)
+            val omittedFrames = record.stack.size - STACK_MAX_FRAMES
+            val trailer =
+                if (omittedFrames > 0) {
+                    listOf(res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames))
+                } else {
+                    emptyList()
+                }
+            textSectionDoc(stackTitle, frames.joinToString("\n"), trailerLines = trailer)
+        }
+
+    val book = remember(record.id) { AnchorBookkeeping(listState) }
+    val scrollScope = rememberCoroutineScope()
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+    ) {
+        book.cursor = 0
+        book.advance(identityItem(identityMarkdown))
+        book.advance(tocSectionItems(tocList, onAnchorClick = { book.scrollTo(it, scrollScope) }))
+        book.mark("meta")
+        book.advance(metaTableItems("meta", metaTable))
+
+        valueDoc?.let { doc ->
+            book.mark("value")
+            book.advance(markdownSectionItems("value", doc, actions))
+        }
+        paramsDoc?.let { doc ->
+            book.mark("params")
+            book.advance(markdownSectionItems("params", doc, actions))
+        }
+        stackDoc?.let { doc ->
+            book.mark("stack")
+            book.advance(markdownSectionItems("stack", doc, actions))
+        }
+        item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
+    }
+}
+// endregion

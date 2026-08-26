@@ -21,6 +21,7 @@ object EffectiveSwitch {
         override.cryptoListen?.let { result = result.copy(cryptoListen = it) }
         override.dbListen?.let { result = result.copy(dbListen = it) }
         override.behaviorListen?.let { result = result.copy(behaviorListen = it) }
+        override.prefsListen?.let { result = result.copy(prefsListen = it) }
         if (override.kinds.isNotEmpty()) {
             result = applyKinds(result, override.kinds)
         }
@@ -66,6 +67,11 @@ object EffectiveSwitch {
         BehaviorKind.FILE_LIST.name -> switch.fileList
         BehaviorKind.ASSET_READ.name -> switch.assetRead
         BehaviorKind.SHELL_EXEC.name -> switch.shellExec
+        PrefsKind.OPEN.name -> switch.prefsOpen
+        PrefsKind.GET.name -> switch.prefsGet
+        PrefsKind.PUT.name -> switch.prefsPut
+        PrefsKind.REMOVE.name -> switch.prefsRemove
+        PrefsKind.CLEAR.name -> switch.prefsClear
         else -> null
     }
 
@@ -101,6 +107,11 @@ object EffectiveSwitch {
                 BehaviorKind.FILE_LIST.name -> result.copy(fileList = value)
                 BehaviorKind.ASSET_READ.name -> result.copy(assetRead = value)
                 BehaviorKind.SHELL_EXEC.name -> result.copy(shellExec = value)
+                PrefsKind.OPEN.name -> result.copy(prefsOpen = value)
+                PrefsKind.GET.name -> result.copy(prefsGet = value)
+                PrefsKind.PUT.name -> result.copy(prefsPut = value)
+                PrefsKind.REMOVE.name -> result.copy(prefsRemove = value)
+                PrefsKind.CLEAR.name -> result.copy(prefsClear = value)
                 // 未知 kind 名:忽略(存储漂移兜底)
                 else -> result
             }

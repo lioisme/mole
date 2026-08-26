@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.lioisme.modev.core.codec.BehaviorRecordCodec
 import com.lioisme.modev.core.codec.CryptoRecordCodec
 import com.lioisme.modev.core.codec.Json
+import com.lioisme.modev.core.codec.PrefsRecordCodec
 import com.lioisme.modev.core.codec.SqlRecordCodec
 import com.lioisme.modev.core.codec.WireCodec
 import com.lioisme.modev.core.model.AppListenOverride
@@ -13,11 +14,13 @@ import com.lioisme.modev.core.model.ConfigKeys
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.HookSwitch
+import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.framework.RemotePrefsBridge
 import com.lioisme.modev.hook.probes.AlgorithmProbe
 import com.lioisme.modev.hook.probes.BehaviorProbe
 import com.lioisme.modev.hook.probes.DatabaseProbe
+import com.lioisme.modev.hook.probes.PrefsProbe
 import java.io.File
 
 /**
@@ -35,12 +38,13 @@ class HookInstaller(
     private val processName: String,
     /** 现代变体注入:返回框架 RemotePreferences(可空);legacy 传 null,配置走 TCP 推送。 */
     private val remotePrefsProvider: (() -> SharedPreferences?)? = null,
-    /** 监听能力清单(V27 行为监听入列);测试可注入替身。 */
+    /** 监听能力清单(V28 偏好监听入列);测试可注入替身。 */
     private val probes: List<Probe> =
         listOf(
             AlgorithmProbe(),
             DatabaseProbe(),
             BehaviorProbe(),
+            PrefsProbe(),
         ),
 ) {
 
@@ -76,6 +80,7 @@ class HookInstaller(
                     is CryptoRecord -> CryptoRecordCodec.encode(record)
                     is SqlRecord -> SqlRecordCodec.encode(record)
                     is BehaviorRecord -> BehaviorRecordCodec.encode(record)
+                    is PrefsRecord -> PrefsRecordCodec.encode(record)
                 }
                 WireCodec.record(record.seq, record.recordType, payload)
             },

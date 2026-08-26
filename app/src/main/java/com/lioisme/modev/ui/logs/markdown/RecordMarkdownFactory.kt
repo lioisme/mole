@@ -22,7 +22,41 @@ object MarkdownLangs {
     const val TEXT = "text"
     const val BASE64 = "base64"
     const val HEX = "hex"
+
+    /** JSON 围栏(V28:params / bindArgs / rows NDJSON;渲染层经 Highlights 引擎高亮,
+     *  不入 [GROUP_LANGUAGES] 集合语义 —— json 围栏永不参与相邻聚合)。 */
+    const val JSON = "json"
 }
+
+/**
+ * 身份区文档(V28 纯 markdown 化,取代 V24 原生 Hero 卡):
+ * `## 主标题`(算法名 / 数据库名 / 路径 basename 等,调用方解析)+ 可选粗体上下文行
+ * (类别 · 操作 · 方向/验签,调用方本地化拼接)。纯函数,JVM 直测。
+ */
+fun identityMarkdown(
+    headline: String,
+    accentLine: String? = null,
+): String = buildString {
+    append("## ").append(mdHeadingText(headline)).append("\n\n")
+    if (!accentLine.isNullOrEmpty()) {
+        append("**").append(mdHeadingText(accentLine)).append("**\n\n")
+    }
+}.trimEnd('\n') + "\n"
+
+/** 目录条目:key 与屏幕装配侧锚点簿记键严格同源;label 已本地化。 */
+data class TocEntry(val label: String, val key: String)
+
+/**
+ * 区块根标题行(V28 纯 markdown 化,取代 V20 原生 ZoneHeader 色带):
+ * 默认 H2(节根);字节/文本区块内部标题保持 H3 层级。
+ */
+fun mdSectionHeading(
+    title: String,
+    level: Int = 2,
+): String = "${"#".repeat(level.coerceIn(1, 6))} ${mdHeadingText(title)}\n\n"
+
+/** 数据流流向箭头段落(V28 取代原生图标行;居中由渲染段落样式承载,非 CJK 字符,i18n 无关)。 */
+const val FLOW_ARROW_LINE = "↓"
 
 /** 内容含 N 个连续反引号 → 围栏长度 = N+1(≥3),保证内容永不破坏围栏边界(纯函数)。 */
 fun mdFenceRunLength(content: String): Int {
@@ -104,14 +138,16 @@ private fun byteFenceInputs(view: BytesView): List<Pair<String, String?>> = list
  *
  * @param footerLine 已本地化的字节统计行(null = 省略)
  * @param capMarkerFormatter 截断标记格式器((displayed, total) → 文案;null = 不渲染标记)
+ * @param headingLevel 标题层级(V28:独立节根传 2;分区内子表示保持默认 3)
  */
 fun byteSectionMarkdown(
     title: String,
     view: BytesView,
     footerLine: String? = null,
     capMarkerFormatter: ((displayed: Int, total: Int) -> String)? = null,
+    headingLevel: Int = 3,
 ): String = buildString {
-    append("### ").append(mdHeadingText(title)).append("\n\n")
+    append("#".repeat(headingLevel.coerceIn(1, 6))).append(' ').append(mdHeadingText(title)).append("\n\n")
     if (!footerLine.isNullOrEmpty()) {
         append(mdHeadingText(footerLine)).append("\n\n")
     }
@@ -132,8 +168,10 @@ fun byteSectionMarkdown(
 }.trimEnd('\n') + "\n"
 
 /**
- * 文本区块 markdown 文档:`### 标题` + 单个 text/sql 围栏 + 尾注段落
+ * 文本区块 markdown 文档:`### 标题` + 单个 text/sql/json 围栏 + 尾注段落
  * (省略计数等本地化标记,不进围栏以免污染可复制语义——复制走全量句柄)。
+ *
+ * @param headingLevel 标题层级(V28:独立节根传 2;分区内子表示保持默认 3)
  */
 fun textSectionMarkdown(
     title: String,
@@ -141,8 +179,9 @@ fun textSectionMarkdown(
     lang: String = MarkdownLangs.TEXT,
     capMarkerFormatter: ((displayed: Int, total: Int) -> String)? = null,
     trailerLines: List<String> = emptyList(),
+    headingLevel: Int = 3,
 ): String = buildString {
-    append("### ").append(mdHeadingText(title)).append("\n\n")
+    append("#".repeat(headingLevel.coerceIn(1, 6))).append(' ').append(mdHeadingText(title)).append("\n\n")
     val capped = capDisplay(value)
     append(mdFence(lang, capped.display)).append("\n\n")
     val formatter = capMarkerFormatter

@@ -14,4 +14,7 @@ enum class CapabilityKind {
 
     /** 行为监听(文件系统读/写/删/重命名/列目录、Assets 资源、Shell 命令,V27 一等公民)。 */
     BEHAVIOR_LISTEN,
+
+    /** 偏好监听(SharedPreferences 读入配置文件 + Get/Put 全家桶,V28 一等公民)。 */
+    PREFS_LISTEN,
 }

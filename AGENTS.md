@@ -1,7 +1,7 @@
 # AGENTS.md
 
-Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名/密钥/BASE64/WebView)+ 数据库监听 + 行为监听(文件系统/Assets/Shell)+ 宿主双进程日志。
-构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀;2026-08-26 V27 记录列表重构/行为监听一等公民增量沉淀)。
+Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名/密钥/BASE64/WebView)+ 数据库监听 + 行为监听(文件系统/Assets/Shell)+ 偏好监听(SharedPreferences)+ 宿主双进程日志。
+构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀;2026-08-26 V27 记录列表重构/行为监听一等公民增量沉淀;2026-08-26 V28 详情页纯 markdown 化/偏好监听一等公民增量沉淀)。
 
 ## 构建 / 测试(Windows,gradlew.bat)
 
@@ -20,7 +20,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 .\gradlew.bat :app:assembleModernDebugAndroidTest
 .\gradlew.bat :app:connectedModernDebugAndroidTest
 
-# lint 门禁(基线:36 warning / 0 error,V27 起;提交前必须跑,禁止新增 warning)
+# lint 门禁(基线:36 warning / 0 error,V28 维持;提交前必须跑,禁止新增 warning)
 .\gradlew.bat :app:lintModernRelease
 ```
 
@@ -245,6 +245,36 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
     路径/命令中缀省略走 `MiddleEllipsisText`(纯函数 MiddleEllipsis.ellipsize
     JVM 直测);计数副标消费 `RecordsViewModel.totalCount`;长按复制摘要三族齐备
     (copySummary/sqlRowSummary/behaviorSummary)。
+21. **详情页纯 markdown 化(V28)**:Appbar 以下信息内容 100% markdown 承载
+    (identity `## 标题+粗体上下文行` / TOC 导航行 / H2 节根+H3 子表示),
+    原生 Hero 卡、FilterChip 锚点行、ZoneHeader 色带、流向图标行全部退役;
+    **D2.1:目录条目是导航控件非信息区块**——`RecordTocContent` 原生可点击行
+    (testTag `toc-{key}`,标签与节标题同源),渲染库 markdown 链接的语义节点
+    为 0×0 bounds LinkTestMarker(坐标点击不可达,勿走该链路);
+    渲染层:`markdownTypography()` 显式字阶(H2=titleMedium SemiBold 等 16 槽,
+    取代库默认 display* 巨型标题)+ 扁平代码块(`md-code-block`,
+    surfaceContainerLowest+8dp 圆角+outlineVariant@40% 描边,零 elevation;
+    SecondaryTabRow;rememberSaveable 无显式 key);高亮 = Highlights 引擎直连
+    (`dev.snipme:highlights`,**禁手搓分词器**;json→JAVASCRIPT、bash/shell→SHELL,
+    M3 同源 SyntaxTheme 亮暗自适应,`HIGHLIGHT_MAX_CHARS=32Ki` 降级纯 mono);
+    params/bindArgs/rows 以真实 JSON 承载(D3:`formatParamsJson/
+    formatBindArgsJson/formatRowsNdjson`,Gson 必须 serializeNulls 否则 SQL NULL
+    丢失;json 围栏不参与代码组聚合);`export_too_large` 两处拒绝均带格式参。
+22. **偏好监听一等公民契约(V28)**:第四记录类型 `RecordType.PREFS`
+    (wire=`prefs`),迁移 v9→v10 仅新增 `prefKey TEXT`(值域复用 content 五元组、
+    路径复用 path 列);注入侧 = PrefsProbe 三 Hooker(Open 构造器+edit 登记 /
+    Get 全家桶+contains+getAll / Editor put*+remove+clear),emit 闸门序与行为
+    逐位一致,**实例索引 PrefsInstanceIndex 双 LRU(cap256)杜绝反射读内部字段**
+    (构造器 after 的 thisObject=新实例,登记依赖它——插桩驱动测试须传实例);
+    开关模型:prefsListen master + kinds 5 项(OPEN/PUT/REMOVE/CLEAR=SIGNAL 默认开,
+    GET=NOISE_HIGH 默认关)+ 零新增微调项(值捕获复用 fileContentCapture、路径降噪
+    复用 ignorePathPrefixes);commit/apply 不挂钩(D5)。UI 四入口对齐:
+    `records/prefs/{pkg}`、AppMonitor 第4 EntryRow(`monitor-entry-prefs`)、
+    StatsCard 四段比例条(min weight 0.02f)、监听设置 prefs 分区
+    (`listen-row-master-prefs`;**switchLabelRes 中 PrefsKind.OPEN/CLEAR 与 SQL
+    kind 名碰撞,分支必须前置**)。新增类别五处同步清单同 #20
+    (+PrefsRecordMappers dispatch 双臂 + LogRepository writeBatch/registry +
+    HookInstaller probes/jsonOf + CapabilityKind.PREFS_LISTEN)。
 
 ## 已知工具链坑
 
@@ -295,6 +325,19 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
   回归测试 `AnchorScrollRoboTest`(Robolectric 全装配驱动,秒级)。
 - 截断标记/任何引用块插在连续围栏之间会打断代码组聚合(CodeGroupExtractor
   以块级相邻为准)→ 工厂恒将标记后置于全部围栏之后。
+- **KDoc 注释内禁止书写 `get*/put*` 形态**:`*/` 会提前终结块注释,余文被当
+  顶层声明解析出成串 Syntax error;且 KSP2 只报 `[MissingType] Element
+  'CryptoRecordEntity' references a type that is not present`(掩盖真实行号)。
+  定位法:临时摘除 `ksp(libs.androidx.room.compiler)` 跑 compile 看真实诊断,
+  修毕恢复。写法用「get/put/remove 系列」。
+- **Gson 树序列化默认省略 JsonNull 成员**(gson 2.13 实测):SQL NULL 必须
+  `GsonBuilder().serializeNulls()` 才落 `"value": null`,否则键静默丢失。
+- mikepenz 0.38.1 的 MarkdownComponents 无 textLink 钩子;markdown 链接语义
+  节点为 0×0 bounds(测试坐标点击不可达)→ 页内导航一律走原生可点击行
+  (见强约束 #21 D2.1),勿依赖链接点击链路。
+- lint NewerVersionAvailable 按声明依赖逐条计数:直依赖锁定旧版必 +1;
+  仅传递使用的库不要显式声明(高亮引擎经 `dev.snipme:highlights` 直依赖并锁
+  1.1.0,Kotlin 2.2.0 构建 metadata 安全;禁随上游盲升)。
 
 ## 测试金字塔(新增行为必须有测试)
 

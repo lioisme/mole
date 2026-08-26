@@ -14,6 +14,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Dns
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Terminal
 import androidx.compose.material.icons.outlined.FolderOpen
@@ -46,6 +47,7 @@ private enum class ClearTarget {
     ALGORITHM,
     DATABASE,
     BEHAVIOR,
+    PREFS,
     ALL,
 }
 
@@ -100,6 +102,11 @@ fun DataSettingsScreen(
                     title = stringResource(R.string.settings_records_behavior),
                     value = stringResource(R.string.settings_total_records_value, typeCounts[RecordType.BEHAVIOR.wire] ?: 0L),
                 )
+                SettingsInfoItem(
+                    icon = Icons.Default.Settings,
+                    title = stringResource(R.string.settings_records_prefs),
+                    value = stringResource(R.string.settings_total_records_value, typeCounts[RecordType.PREFS.wire] ?: 0L),
+                )
             }
             Spacer(Modifier.height(24.dp))
             SettingsSection(stringResource(R.string.settings_storage_section)) {
@@ -129,6 +136,10 @@ fun DataSettingsScreen(
                     onClick = { pendingClear = ClearTarget.BEHAVIOR },
                 )
                 DangerRow(
+                    text = stringResource(R.string.settings_clear_prefs_records),
+                    onClick = { pendingClear = ClearTarget.PREFS },
+                )
+                DangerRow(
                     text = stringResource(R.string.settings_clear_all_records),
                     onClick = { pendingClear = ClearTarget.ALL },
                 )
@@ -150,21 +161,23 @@ fun DataSettingsScreen(
                             ClearTarget.ALGORITHM -> R.string.danger_clear_algorithm_msg
                             ClearTarget.DATABASE -> R.string.danger_clear_database_msg
                             ClearTarget.BEHAVIOR -> R.string.danger_clear_behavior_msg
+                            ClearTarget.PREFS -> R.string.danger_clear_prefs_msg
                             ClearTarget.ALL -> R.string.danger_clear_all_msg
                         },
                     ),
                 )
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    when (target) {
-                        ClearTarget.ALGORITHM -> viewModel.clearByType(RecordType.CRYPTO)
-                        ClearTarget.DATABASE -> viewModel.clearByType(RecordType.DATABASE)
-                        ClearTarget.BEHAVIOR -> viewModel.clearByType(RecordType.BEHAVIOR)
-                        ClearTarget.ALL -> viewModel.clearAll()
-                    }
-                    pendingClear = null
-                }) {
+                confirmButton = {
+                    TextButton(onClick = {
+                        when (target) {
+                            ClearTarget.ALGORITHM -> viewModel.clearByType(RecordType.CRYPTO)
+                            ClearTarget.DATABASE -> viewModel.clearByType(RecordType.DATABASE)
+                            ClearTarget.BEHAVIOR -> viewModel.clearByType(RecordType.BEHAVIOR)
+                            ClearTarget.PREFS -> viewModel.clearByType(RecordType.PREFS)
+                            ClearTarget.ALL -> viewModel.clearAll()
+                        }
+                        pendingClear = null
+                    }) {
                     Text(stringResource(R.string.confirm))
                 }
             },

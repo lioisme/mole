@@ -192,7 +192,7 @@ class MarkdownByteSectionTest {
 
         // 复制按钮 → 全量句柄(完整 hex 进回调,护栏在屏幕层)。
         rule.onAllNodes(hasScrollAction()).onFirst()
-            .performScrollToNode(hasTestTag("detail-code-card"))
+            .performScrollToNode(hasTestTag("md-code-block"))
         rule.onAllNodesWithContentDescription(str(R.string.section_copy)).onFirst().performClick()
         rule.waitForIdle()
         assertEquals(fullHex.length, lastCopied?.second?.length)

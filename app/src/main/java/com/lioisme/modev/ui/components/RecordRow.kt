@@ -47,10 +47,12 @@ import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.data.mapping.BehaviorRow
 import com.lioisme.modev.data.mapping.CryptoRow
+import com.lioisme.modev.data.mapping.PrefsRow
 import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.mapping.SqlRow
 import com.lioisme.modev.ui.theme.behaviorKindColor
 import com.lioisme.modev.ui.theme.kindColor
+import com.lioisme.modev.ui.theme.prefsKindColor
 import com.lioisme.modev.ui.theme.sqlKindColor
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -86,6 +88,7 @@ fun RecordRow(
                 is CryptoRow -> cryptoPresentation(record)
                 is SqlRow -> sqlPresentation(record)
                 is BehaviorRow -> behaviorPresentation(record)
+                is PrefsRow -> prefsPresentation(record)
             }
         Row(
             modifier =
@@ -347,6 +350,35 @@ private fun behaviorPresentation(record: BehaviorRow): RowPresentation {
         headline = headline,
         meta = meta,
         preview = subject,
+        badges = emptyList(),
+        timestamp = record.recordTimestamp,
+    )
+}
+
+/**
+ * 偏好形态(V28):headline = 配置键 / 文件 basename(空回退操作名,恒非空);
+ * 元行 = 类别词元 · 操作;预览行 = 文件路径。
+ */
+@Composable
+private fun prefsPresentation(record: PrefsRow): RowPresentation {
+    val accent = prefsKindColor(record.kind)
+    val kindText = stringResource(prefsKindLabelRes(record.kind))
+    val operationText = stringResource(prefsOperationLabelRes(record.operation))
+    val headline = record.headlineText() ?: operationText
+    val meta =
+        remember(record.kind, record.operation, kindText, operationText, accent) {
+            buildAnnotatedString {
+                withStyle(SpanStyle(color = accent)) { append(kindText) }
+                append(" · ")
+                append(operationText)
+            }
+        }
+    return RowPresentation(
+        icon = KindIcons.prefs(record.kind),
+        accent = accent,
+        headline = headline,
+        meta = meta,
+        preview = record.path?.takeIf { it.isNotBlank() },
         badges = emptyList(),
         timestamp = record.recordTimestamp,
     )

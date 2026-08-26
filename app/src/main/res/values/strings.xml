@@ -42,12 +42,15 @@
     <string name="algorithm_records_search">Search algorithm records…</string>
     <string name="database_records_search">Search database records…</string>
     <string name="behavior_records_title">Behavior Records</string>
+    <string name="prefs_records_title">Prefs Records</string>
+    <string name="prefs_records_search">Search prefs records</string>
     <string name="behavior_records_search">Search behavior records…</string>
 
     <string name="monitor_records_caption">All records</string>
     <string name="filter_type_crypto">Crypto</string>
     <string name="filter_type_database">Database</string>
     <string name="filter_type_behavior">Behavior</string>
+    <string name="filter_type_prefs">SharedPreferences</string>
 
     <string name="detail_empty">No records yet</string>
     <string name="detail_empty_hint">Try adjusting filters or enable more categories in listen settings</string>
@@ -178,7 +181,6 @@
     <!-- Record detail zones (V20: 数据关系可视化分区) -->
     <string name="section_zone_data_flow">Data Flow</string>
     <string name="section_zone_key_material">Key Material</string>
-    <string name="cd_flow">Data flow</string>
     <string name="role_input_plaintext">Input (plaintext)</string>
     <string name="role_output_ciphertext">Output (ciphertext)</string>
     <string name="role_input_ciphertext">Input (ciphertext)</string>
@@ -203,6 +205,12 @@
     <string name="section_public_key">Public Key</string>
     <string name="section_params">Parameters</string>
     <string name="section_stack">Call Stack</string>
+    <!-- V28 纯 markdown 详情:元数据节标题 / 时间戳行 / 偏好元数据行 -->
+    <string name="section_metadata">Metadata</string>
+    <string name="meta_timestamp">Time</string>
+    <string name="section_value">Value</string>
+    <string name="meta_pref_file">Prefs File</string>
+    <string name="meta_pref_key">Key</string>
     <string name="bytes_count">%1$,d bytes</string>
     <string name="bytes_truncated">(truncated)</string>
     <string name="section_expand">Expand</string>
@@ -314,6 +322,29 @@
     <string name="section_command">Command</string>
     <string name="section_content">Content preview</string>
     <string name="behavior_monitor_master">Behavior Listen</string>
+    <string name="prefs_monitor_master">Prefs Listen</string>
+    <string name="kind_prefs_open">Prefs Opened</string>
+    <string name="kind_prefs_get">Prefs Read</string>
+    <string name="kind_prefs_put">Prefs Written</string>
+    <string name="kind_prefs_remove">Prefs Key Removed</string>
+    <string name="kind_prefs_clear">Prefs Cleared</string>
+    <string name="op_prefs_open">Open Prefs File</string>
+    <string name="op_prefs_get_string">getString</string>
+    <string name="op_prefs_get_int">getInt</string>
+    <string name="op_prefs_get_long">getLong</string>
+    <string name="op_prefs_get_float">getFloat</string>
+    <string name="op_prefs_get_boolean">getBoolean</string>
+    <string name="op_prefs_get_string_set">getStringSet</string>
+    <string name="op_prefs_get_all">getAll</string>
+    <string name="op_prefs_contains">contains</string>
+    <string name="op_prefs_put_string">putString</string>
+    <string name="op_prefs_put_int">putInt</string>
+    <string name="op_prefs_put_long">putLong</string>
+    <string name="op_prefs_put_float">putFloat</string>
+    <string name="op_prefs_put_boolean">putBoolean</string>
+    <string name="op_prefs_put_string_set">putStringSet</string>
+    <string name="op_prefs_remove">remove</string>
+    <string name="op_prefs_clear">clear</string>
     <string name="switch_file_content_capture">Capture file content</string>
     <string name="switch_file_content_capture_hint">Only whole-read APIs (Files.readAll*/write/copy, asset open); stream paths never touched</string>
     <string name="capture_ignore_path">Ignore path prefixes</string>
@@ -353,6 +384,9 @@
     <string name="settings_records_algorithm">Algorithm records</string>
     <string name="settings_records_database">Database records</string>
     <string name="settings_records_behavior">Behavior records</string>
+    <string name="settings_records_prefs">Prefs records</string>
+    <string name="settings_clear_prefs_records">Clear prefs records</string>
+    <string name="danger_clear_prefs_msg">Clear all SharedPreferences records? This cannot be undone.</string>
     <string name="settings_storage_section">Storage</string>
     <string name="settings_storage_db">Database file</string>
     <string name="settings_clear_algorithm_records">Clear algorithm records</string>

@@ -6,9 +6,11 @@ import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Construction
 import androidx.compose.material.icons.outlined.DataObject
 import androidx.compose.material.icons.outlined.Delete
+import androidx.compose.material.icons.outlined.DeleteSweep
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.EnhancedEncryption
 import androidx.compose.material.icons.outlined.Fingerprint
 import androidx.compose.material.icons.outlined.FolderOpen
@@ -19,15 +21,19 @@ import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.ManageSearch
 import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.SwapHoriz
 import androidx.compose.material.icons.outlined.Tag
 import androidx.compose.material.icons.outlined.Terminal
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.CryptoKind
+import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.SqlKind
 
 /**
@@ -77,5 +83,15 @@ object KindIcons {
             BehaviorKind.FILE_LIST -> Icons.Outlined.FolderOpen
             BehaviorKind.ASSET_READ -> Icons.Outlined.Layers
             BehaviorKind.SHELL_EXEC -> Icons.Outlined.IntegrationInstructions
+        }
+
+    /** 偏好族(V28)。 */
+    fun prefs(kind: PrefsKind): ImageVector =
+        when (kind) {
+            PrefsKind.OPEN -> Icons.Outlined.Settings
+            PrefsKind.GET -> Icons.Outlined.Visibility
+            PrefsKind.PUT -> Icons.Outlined.EditNote
+            PrefsKind.REMOVE -> Icons.Outlined.RemoveCircleOutline
+            PrefsKind.CLEAR -> Icons.Outlined.DeleteSweep
         }
 }

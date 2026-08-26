@@ -68,6 +68,21 @@ data class HookSwitch(
     val assetRead: Boolean = false,
     /** 行为监听:Shell 命令执行(Runtime.exec/ProcessBuilder.start)。最高信号,默认启用。 */
     val shellExec: Boolean = true,
+    /** 偏好监听全局总开关(V28;false = 全部偏好类别停用,分开关保留原态)。 */
+    val prefsListen: Boolean = true,
+    /**
+     * 偏好监听:读入配置文件(SharedPreferencesImpl 构造)。
+     * 进程内每文件仅一次,低频高信号,默认启用(决策 D4)。
+     */
+    val prefsOpen: Boolean = true,
+    /** 偏好监听:配置读取(get* 全家桶/contains/getAll)。极高频,默认关(噪点类别)。 */
+    val prefsGet: Boolean = false,
+    /** 偏好监听:配置写入(editor.put* 全家桶)。高信号,默认启用。 */
+    val prefsPut: Boolean = true,
+    /** 偏好监听:单键删除(editor.remove)。低频,默认启用。 */
+    val prefsRemove: Boolean = true,
+    /** 偏好监听:全量清空(editor.clear)。低频,默认启用。 */
+    val prefsClear: Boolean = true,
     /** 数据库监听:单条查询结果行数上限;0 = 不限制(不推荐,结果闸门双保险)。 */
     val maxResultRows: Int = RecordLimits.DEFAULT_MAX_RESULT_ROWS,
     /** 数据库监听:单条查询结果序列化字符上限;0 = 不限制(不推荐)。 */
@@ -95,9 +110,9 @@ data class HookSwitch(
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
     val maxTextChars: Int = RecordLimits.DEFAULT_MAX_TEXT_CHARS,
 ) {
-    /** 是否存在任何需要 Hook 的类别(算法 + 数据库 + 行为任一能力启用)。 */
+    /** 是否存在任何需要 Hook 的类别(算法 + 数据库 + 行为 + 偏好任一能力启用)。 */
     val anyEnabled: Boolean
-        get() = anyCryptoEnabled || anyDbEnabled || anyBehaviorEnabled
+        get() = anyCryptoEnabled || anyDbEnabled || anyBehaviorEnabled || anyPrefsEnabled
 
     /** 算法捕获相关类别是否任一启用(含全局总开关投影,供算法监听能力判定)。 */
     val anyCryptoEnabled: Boolean
@@ -112,6 +127,10 @@ data class HookSwitch(
     val anyBehaviorEnabled: Boolean
         get() = behaviorListen && (fileRead || fileWrite || fileDelete || fileRename ||
             fileList || assetRead || shellExec)
+
+    /** 偏好监听相关类别是否任一启用(含全局总开关投影,供偏好监听能力判定)。 */
+    val anyPrefsEnabled: Boolean
+        get() = prefsListen && (prefsOpen || prefsGet || prefsPut || prefsRemove || prefsClear)
 
     fun enabled(kind: CryptoKind): Boolean = cryptoListen && when (kind) {
         CryptoKind.MESSAGE_DIGEST -> messageDigest
@@ -147,6 +166,15 @@ data class HookSwitch(
         BehaviorKind.SHELL_EXEC -> shellExec
     }
 
+    /** 偏好类别有效开关(master 门控;与 [CategoryTaxonomy] 默认态对齐由测试强制)。 */
+    fun prefsEnabled(kind: PrefsKind): Boolean = prefsListen && when (kind) {
+        PrefsKind.OPEN -> prefsOpen
+        PrefsKind.GET -> prefsGet
+        PrefsKind.PUT -> prefsPut
+        PrefsKind.REMOVE -> prefsRemove
+        PrefsKind.CLEAR -> prefsClear
+    }
+
     companion object {
         val DEFAULT = HookSwitch()
 
@@ -162,6 +190,7 @@ data class HookSwitch(
                 cryptoListen = obj?.get("cryptoListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
                 dbListen = obj?.get("dbListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
                 behaviorListen = obj?.get("behaviorListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
+                prefsListen = obj?.get("prefsListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
             )
         }.getOrNull()
     }

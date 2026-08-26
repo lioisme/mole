@@ -14,6 +14,8 @@ class RecordTypeTest {
     fun `fromWire maps known wire to enum`() {
         assertEquals(RecordType.CRYPTO, RecordType.fromWire("crypto"))
         assertEquals(RecordType.DATABASE, RecordType.fromWire("db"))
+        assertEquals(RecordType.BEHAVIOR, RecordType.fromWire("behavior"))
+        assertEquals(RecordType.PREFS, RecordType.fromWire("prefs"))
     }
 
     @Test
@@ -28,5 +30,7 @@ class RecordTypeTest {
     fun `wire is single-sourced from RecordTypes constants`() {
         assertEquals(RecordTypes.CRYPTO, RecordType.CRYPTO.wire)
         assertEquals(RecordTypes.DATABASE, RecordType.DATABASE.wire)
+        assertEquals(RecordTypes.BEHAVIOR, RecordType.BEHAVIOR.wire)
+        assertEquals(RecordTypes.PREFS, RecordType.PREFS.wire)
     }
 }

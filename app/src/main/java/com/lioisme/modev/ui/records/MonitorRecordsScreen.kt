@@ -37,9 +37,11 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.CryptoKind
+import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.data.mapping.BehaviorRow
 import com.lioisme.modev.data.mapping.CryptoRow
+import com.lioisme.modev.data.mapping.PrefsRow
 import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.mapping.SqlRow
 import com.lioisme.modev.ui.apps.AppCountFormat
@@ -51,6 +53,8 @@ import com.lioisme.modev.ui.components.SearchInputField
 import com.lioisme.modev.ui.components.behaviorKindLabelRes
 import com.lioisme.modev.ui.components.behaviorSummary
 import com.lioisme.modev.ui.components.kindLabelRes
+import com.lioisme.modev.ui.components.prefsKindLabelRes
+import com.lioisme.modev.ui.components.prefsSummary
 import com.lioisme.modev.ui.components.rememberSearchController
 import com.lioisme.modev.ui.components.sqlKindLabelRes
 import com.lioisme.modev.ui.components.sqlRowSummary
@@ -119,6 +123,25 @@ fun BehaviorRecordsScreen(
     )
 }
 
+/**
+ * 单应用偏好记录列表(V28 一等公民):同三兄弟结构,
+ * 固定记录类型 = 偏好,类别单选 5 项。
+ */
+@Composable
+fun PrefsRecordsScreen(
+    viewModel: RecordsViewModel,
+    onBack: () -> Unit,
+    onOpenRecord: (Long) -> Unit,
+) {
+    MonitorRecordsContent(
+        viewModel = viewModel,
+        onBack = onBack,
+        onOpenRecord = onOpenRecord,
+        placeholder = stringResource(R.string.prefs_records_search),
+        kinds = PrefsKind.entries.map { KindOption(it.name, prefsKindLabelRes(it)) },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MonitorRecordsContent(
@@ -151,6 +174,7 @@ private fun MonitorRecordsContent(
                 is CryptoRow -> record.record.copySummary(context)
                 is SqlRow -> record.sqlRowSummary(context)
                 is BehaviorRow -> record.behaviorSummary(context)
+                is PrefsRow -> record.prefsSummary(context)
             }
         clipboard.setText(AnnotatedString(summary))
         scope.launch {

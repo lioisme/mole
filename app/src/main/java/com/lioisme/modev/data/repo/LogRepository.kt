@@ -12,10 +12,12 @@ import com.lioisme.modev.core.codec.SqlRecordCodec
 import com.lioisme.modev.core.codec.WireRecord
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.BehaviorRecord
+import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.core.codec.BehaviorRecordCodec
+import com.lioisme.modev.core.codec.PrefsRecordCodec
 import com.lioisme.modev.data.db.CryptoRecordDao
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
@@ -167,6 +169,10 @@ class LogRepository(
                     toPersist.add(decoded.toEntity())
                 }
                 is BehaviorRecord -> {
+                    decodableAcks.add(wire.seq to ack)
+                    toPersist.add(decoded.toEntity())
+                }
+                is PrefsRecord -> {
                     decodableAcks.add(wire.seq to ack)
                     toPersist.add(decoded.toEntity())
                 }
@@ -525,6 +531,7 @@ class LogRepository(
                 register(CryptoRecordCodec.RECORD_TYPE, CryptoRecordCodec::decode)
                 register(SqlRecordCodec.RECORD_TYPE, SqlRecordCodec::decode)
                 register(BehaviorRecordCodec.RECORD_TYPE, BehaviorRecordCodec::decode)
+                register(PrefsRecordCodec.RECORD_TYPE, PrefsRecordCodec::decode)
             }
 
         private const val MAX_RECORDS = 20_000

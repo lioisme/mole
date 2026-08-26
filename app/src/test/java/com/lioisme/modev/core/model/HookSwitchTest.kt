@@ -27,11 +27,14 @@ class HookSwitchTest {
             dbTransaction = false,
             fileRead = false, fileWrite = false, fileDelete = false,
             fileRename = false, fileList = false, assetRead = false, shellExec = false,
+            prefsOpen = false, prefsGet = false, prefsPut = false,
+            prefsRemove = false, prefsClear = false,
         )
         assertFalse(s.anyEnabled)
         assertFalse(s.anyCryptoEnabled)
         assertFalse(s.anyDbEnabled)
         assertFalse(s.anyBehaviorEnabled)
+        assertFalse(s.anyPrefsEnabled)
     }
 
     @Test
@@ -89,6 +92,7 @@ class HookSwitchTest {
         val crypto = CategoryTaxonomy.defaultEnabledIds(RecordType.CRYPTO)
         val db = CategoryTaxonomy.defaultEnabledIds(RecordType.DATABASE)
         val behavior = CategoryTaxonomy.defaultEnabledIds(RecordType.BEHAVIOR)
+        val prefs = CategoryTaxonomy.defaultEnabledIds(RecordType.PREFS)
         for (kind in CryptoKind.entries) {
             assertEquals(
                 "crypto $kind default mismatch with taxonomy",
@@ -108,6 +112,13 @@ class HookSwitchTest {
                 "behavior $kind default mismatch with taxonomy",
                 behavior.contains(kind.name),
                 HookSwitch.DEFAULT.behaviorEnabled(kind),
+            )
+        }
+        for (kind in PrefsKind.entries) {
+            assertEquals(
+                "prefs $kind default mismatch with taxonomy",
+                prefs.contains(kind.name),
+                HookSwitch.DEFAULT.prefsEnabled(kind),
             )
         }
     }
@@ -168,6 +179,8 @@ class HookSwitchTest {
             dbTransaction = false,
             fileRead = false, fileWrite = false, fileDelete = false,
             fileRename = false, fileList = false, assetRead = false, shellExec = false,
+            prefsOpen = false, prefsGet = false, prefsPut = false,
+            prefsRemove = false, prefsClear = false,
         )
         assertFalse(allOff.anyEnabled)
     }
@@ -211,8 +224,16 @@ class HookSwitchTest {
         assertTrue(behaviorOff.enabled(CryptoKind.CIPHER))
         assertTrue(behaviorOff.anyCryptoEnabled)
         assertTrue(behaviorOff.anyDbEnabled)
-        // 三总开关关:整体停用。
-        assertFalse(cryptoOff.copy(dbListen = false, behaviorListen = false).anyEnabled)
+        // 偏好总开关关:全部偏好类别停用,其余域不受影响(V28)。
+        val prefsOff = HookSwitch(prefsListen = false)
+        assertFalse(prefsOff.anyPrefsEnabled)
+        assertFalse(prefsOff.prefsEnabled(PrefsKind.OPEN))
+        assertTrue(prefsOff.enabled(CryptoKind.CIPHER))
+        assertTrue(prefsOff.anyCryptoEnabled)
+        assertTrue(prefsOff.anyDbEnabled)
+        assertTrue(prefsOff.anyBehaviorEnabled)
+        // 四总开关关:整体停用。
+        assertFalse(cryptoOff.copy(dbListen = false, behaviorListen = false, prefsListen = false).anyEnabled)
     }
 
     @Test
@@ -220,6 +241,30 @@ class HookSwitchTest {
         assertTrue(HookSwitch.DEFAULT.cryptoListen)
         assertTrue(HookSwitch.DEFAULT.dbListen)
         assertTrue(HookSwitch.DEFAULT.behaviorListen)
+        assertTrue(HookSwitch.DEFAULT.prefsListen)
+    }
+
+    @Test
+    fun prefs_enabled_maps_each_kind() {
+        val s = HookSwitch(
+            prefsOpen = true, prefsGet = true, prefsPut = false,
+            prefsRemove = true, prefsClear = false,
+        )
+        assertTrue(s.prefsEnabled(PrefsKind.OPEN))
+        assertTrue(s.prefsEnabled(PrefsKind.GET))
+        assertFalse(s.prefsEnabled(PrefsKind.PUT))
+        assertTrue(s.prefsEnabled(PrefsKind.REMOVE))
+        assertFalse(s.prefsEnabled(PrefsKind.CLEAR))
+    }
+
+    @Test
+    fun prefs_noise_categories_off_by_default() {
+        // 高噪声偏好类别默认关:GET(App 每次配置读取均触发)
+        assertFalse("noise prefs category GET should default off", HookSwitch.DEFAULT.prefsEnabled(PrefsKind.GET))
+        // 高信号偏好类别默认开:OPEN/PUT/REMOVE/CLEAR
+        for (kind in listOf(PrefsKind.OPEN, PrefsKind.PUT, PrefsKind.REMOVE, PrefsKind.CLEAR)) {
+            assertTrue("signal prefs category $kind should default on", HookSwitch.DEFAULT.prefsEnabled(kind))
+        }
     }
 
     @Test

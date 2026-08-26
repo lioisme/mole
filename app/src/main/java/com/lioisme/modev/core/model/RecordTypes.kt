@@ -15,4 +15,7 @@ object RecordTypes {
 
     /** 行为监听记录(文件系统 / Assets / Shell,V27)。 */
     const val BEHAVIOR = "behavior"
+
+    /** SharedPreferences 监听记录(读入配置文件 + Get/Put 全家桶,V28)。 */
+    const val PREFS = "prefs"
 }

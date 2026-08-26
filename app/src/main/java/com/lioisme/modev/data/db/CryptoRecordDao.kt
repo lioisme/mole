@@ -66,7 +66,8 @@ interface CryptoRecordDao {
                 OR outputHex LIKE :query ESCAPE '\'
                 OR threadName LIKE :query ESCAPE '\'
                 OR sql LIKE :query ESCAPE '\'
-                OR resultText LIKE :query ESCAPE '\')
+                OR resultText LIKE :query ESCAPE '\'
+                OR prefKey LIKE :query ESCAPE '\')
         ORDER BY timestamp DESC, id DESC
         LIMIT :limit OFFSET :offset
         """
@@ -103,7 +104,8 @@ interface CryptoRecordDao {
                 OR outputHex LIKE :query ESCAPE '\'
                 OR threadName LIKE :query ESCAPE '\'
                 OR sql LIKE :query ESCAPE '\'
-                OR resultText LIKE :query ESCAPE '\')
+                OR resultText LIKE :query ESCAPE '\'
+                OR prefKey LIKE :query ESCAPE '\')
         ORDER BY timestamp DESC, id DESC
         LIMIT :limit OFFSET :offset
         """
@@ -382,7 +384,7 @@ interface CryptoRecordDao {
             keyTruncated, inputTruncated, outputTruncated,
             substr(sql, 1, :previewChars) AS sqlPreview,
             rowCount, affectedCount, rowId,
-            path, destPath, command, fileSize
+            path, destPath, command, fileSize, prefKey
             """
 
         /**
@@ -411,7 +413,8 @@ interface CryptoRecordDao {
                   OR resultText LIKE :query ESCAPE '\'
                   OR path LIKE :query ESCAPE '\'
                   OR destPath LIKE :query ESCAPE '\'
-                  OR command LIKE :query ESCAPE '\')
+                  OR command LIKE :query ESCAPE '\'
+                  OR prefKey LIKE :query ESCAPE '\')
              """
     }
 }
@@ -464,4 +467,6 @@ data class CryptoRecordRow(
     val destPath: String? = null,
     val command: String? = null,
     val fileSize: Long? = null,
+    // 偏好监听投影列(V28;prefs 行承载配置键,其余 NULL)
+    val prefKey: String? = null,
 )

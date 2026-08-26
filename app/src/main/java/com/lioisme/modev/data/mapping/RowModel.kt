@@ -3,6 +3,8 @@ package com.lioisme.modev.data.mapping
 import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.BehaviorOperation
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.PrefsKind
+import com.lioisme.modev.core.model.PrefsOperation
 import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.core.model.SqlOperation
 
@@ -77,4 +79,29 @@ data class BehaviorRow(
         else ->
             path?.trimEnd('/')?.ifEmpty { "/" }?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
     }
+}
+
+/**
+ * 偏好记录行(V28;键/文件摘要预览,零值域物化——value 仅存实体 content 列,
+ * 详情页按需全量读取)。
+ */
+data class PrefsRow(
+    val recordId: Long,
+    val recordTimestamp: Long,
+    override val packageName: String,
+    val kind: PrefsKind,
+    val operation: PrefsOperation,
+    /** 配置键(get/put/remove 系列;getAll/clear 为 null);getAll/clear 为 null)。 */
+    val prefKey: String?,
+    /** 配置文件路径(OPEN 恒有;其余经实例映射尽力回填)。 */
+    val path: String?,
+    val threadName: String,
+) : RowModel {
+    override val id: Long get() = recordId
+    override val timestamp: Long get() = recordTimestamp
+
+    /** 列表 headline 单一事实源:配置键 / 文件 basename;恒非空。 */
+    fun headlineText(): String? =
+        prefKey?.takeIf { it.isNotBlank() }
+            ?: path?.substringAfterLast('/')?.takeIf { it.isNotEmpty() }
 }

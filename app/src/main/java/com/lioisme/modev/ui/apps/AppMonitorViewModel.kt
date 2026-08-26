@@ -86,6 +86,11 @@ class AppMonitorViewModel(
         .map { counts -> counts[packageName] ?: 0L }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
+    /** 该应用偏好记录数(V28 一等公民;入口副标题)。*/
+    val prefsCount: StateFlow<Long> = logs.observeRecordCounts(RecordTypes.PREFS)
+        .map { counts -> counts[packageName] ?: 0L }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
+
     /** 单应用监听覆盖(无覆盖 = [AppListenOverride.DEFAULT];「监听设置」摘要来源)。*/
     val listenOverride: StateFlow<AppListenOverride> = settings.overrides
         .map { it[packageName] ?: AppListenOverride.DEFAULT }

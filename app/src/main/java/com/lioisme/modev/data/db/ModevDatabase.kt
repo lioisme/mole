@@ -24,10 +24,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * v8 → v9:行为监听(V27)新增 10 个可空列:path / destPath / command / fileSize +
  *   content 五元组(contentHex/contentB64/contentText/contentLength/contentTruncated),
  *   recordType='behavior' 行承载;纯 ALTER TABLE,不触碰存量行(与 v5→v6 同先例)。
+ * v9 → v10:偏好监听(V28)新增 1 个可空列 prefKey(配置键),
+ *   recordType='prefs' 行承载(值域复用 content 五元组、路径复用 path 列);
+ *   纯 ALTER TABLE ADD COLUMN,不触碰存量行。
  */
 @Database(
     entities = [CryptoRecordEntity::class],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class ModevDatabase : RoomDatabase() {
@@ -161,6 +164,16 @@ abstract class ModevDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v9 → v10:偏好监听(V28)新增 1 个可空列 prefKey,recordType='prefs' 行承载;
+         * 纯 ALTER TABLE ADD COLUMN,不触碰存量行(v8→v9 同先例)。
+         */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `crypto_records` ADD COLUMN `prefKey` TEXT")
+            }
+        }
+
         @Volatile
         private var instance: ModevDatabase? = null
 
@@ -177,6 +190,7 @@ abstract class ModevDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                         MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+                        MIGRATION_9_10,
                     )
                     .fallbackToDestructiveMigration(false)
                     .build()

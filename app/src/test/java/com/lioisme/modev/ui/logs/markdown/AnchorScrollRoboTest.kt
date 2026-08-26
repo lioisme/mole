@@ -81,7 +81,8 @@ class AnchorScrollRoboTest {
             }
         }
         compose.waitForIdle()
-        // 对照实验 B:点击锚点芯片(生产路径;簿记索引经 println 落 XML system-out)。
+        // 对照实验 B:点击 TOC 导航行(V28;标签与区块标题同源,行级 clickable
+        // 中心命中稳定;簿记索引经 println 落 XML system-out)。
         val anchorLabel = RuntimeEnvironment.getApplication().getString(R.string.section_zone_key_material)
         compose.onAllNodesWithText(anchorLabel).onFirst().performClick()
         compose.waitForIdle()

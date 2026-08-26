@@ -9,7 +9,7 @@ import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.printToString
-import com.lioisme.modev.ui.logs.metaTableDoc
+import com.lioisme.modev.ui.logs.metaSectionDoc
 import com.lioisme.modev.ui.logs.metaTableItems
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -31,7 +31,7 @@ class MetaTableRoboTest {
         compose.setContent {
             MaterialTheme {
                 Surface(Modifier.fillMaxSize()) {
-                    val table = metaTableDoc(listOf("Context" to "#0", "Thread" to "main"))
+                    val table = metaSectionDoc("Metadata", listOf("Context" to "#0", "Thread" to "main"))
                     LazyColumn(Modifier.fillMaxSize()) {
                         metaTableItems("meta", table)
                     }

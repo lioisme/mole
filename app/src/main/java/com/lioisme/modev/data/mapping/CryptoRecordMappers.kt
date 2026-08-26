@@ -128,6 +128,7 @@ internal fun CryptoRecordRow.toRowModelOrNull(): RowModel? = when (recordType) {
     RecordTypes.CRYPTO -> cryptoRowModelOrNull()
     RecordTypes.DATABASE -> sqlRowModelOrNull()
     RecordTypes.BEHAVIOR -> behaviorRowModelOrNull()
+    RecordTypes.PREFS -> prefsRowModelOrNull()
     else -> null
 }
 
@@ -213,6 +214,7 @@ internal fun CryptoRecordEntity.toRecordDetailOrNull(): RecordDetailModel? = whe
     RecordTypes.CRYPTO -> toModelOrNull()?.let(::CryptoDetail)
     RecordTypes.DATABASE -> toSqlModelOrNull()?.let(::SqlDetail)
     RecordTypes.BEHAVIOR -> toBehaviorModelOrNull()?.let(::BehaviorDetail)
+    RecordTypes.PREFS -> toPrefsModelOrNull()?.let(::PrefsDetail)
     else -> null
 }
 

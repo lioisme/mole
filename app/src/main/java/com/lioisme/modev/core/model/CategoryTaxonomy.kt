@@ -72,6 +72,13 @@ object CategoryTaxonomy {
         add(RecordCategory(BehaviorKind.FILE_LIST.name, RecordType.BEHAVIOR, false, NoiseTier.NOISE_HIGH, 4))
         add(RecordCategory(BehaviorKind.ASSET_READ.name, RecordType.BEHAVIOR, false, NoiseTier.NOISE_HIGH, 5))
         add(RecordCategory(BehaviorKind.SHELL_EXEC.name, RecordType.BEHAVIOR, true, NoiseTier.SIGNAL, 6))
+        // 偏好类别(V28;默认态与 HookSwitch.DEFAULT 对齐:OPEN/写/删/清空 高信号默认开,
+        // GET 高频噪声默认关——决策 D4)
+        add(RecordCategory(PrefsKind.OPEN.name, RecordType.PREFS, true, NoiseTier.SIGNAL, 0))
+        add(RecordCategory(PrefsKind.GET.name, RecordType.PREFS, false, NoiseTier.NOISE_HIGH, 1))
+        add(RecordCategory(PrefsKind.PUT.name, RecordType.PREFS, true, NoiseTier.SIGNAL, 2))
+        add(RecordCategory(PrefsKind.REMOVE.name, RecordType.PREFS, true, NoiseTier.SIGNAL, 3))
+        add(RecordCategory(PrefsKind.CLEAR.name, RecordType.PREFS, true, NoiseTier.SIGNAL, 4))
     }
 
     /** 全部类别(按 type 分组、组内按 order;稳定输出)。 */
@@ -110,6 +117,7 @@ object CategoryTaxonomy {
             RecordType.CRYPTO -> CryptoOperation.entries.map { it.name }.toSet()
             RecordType.DATABASE -> SqlOperation.entries.map { it.name }.toSet()
             RecordType.BEHAVIOR -> BehaviorOperation.entries.map { it.name }.toSet()
+            RecordType.PREFS -> PrefsOperation.entries.map { it.name }.toSet()
         }
         return operations.intersect(valid)
     }

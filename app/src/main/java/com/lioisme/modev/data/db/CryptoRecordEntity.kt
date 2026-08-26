@@ -134,6 +134,11 @@ data class CryptoRecordEntity(
     @ColumnInfo(name = "contentLength") val contentLength: Int? = null,
     @ColumnInfo(name = "contentTruncated") val contentTruncated: Boolean = false,
 
+    // ---- 偏好监听列(v9→v10 迁移新增,recordType='prefs' 行承载;其余行为 NULL) ----
+
+    /** 配置键(get/put/remove 系列首参;getAll/clear 为 NULL) 首参;getAll/clear 为 NULL)。 */
+    @ColumnInfo(name = "prefKey") val prefKey: String? = null,
+
     @ColumnInfo(name = "contextId") val contextId: Long = 0L,
     @ColumnInfo(name = "threadName") val threadName: String,
     @ColumnInfo(name = "stack") val stackJson: String? = null,

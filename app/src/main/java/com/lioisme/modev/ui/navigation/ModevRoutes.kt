@@ -33,6 +33,8 @@ object ModevRoutes {
     const val DATABASE_RECORDS = "records/database/{packageName}"
     /** 每应用行为记录列表(V27 一等公民)。 */
     const val BEHAVIOR_RECORDS = "records/behavior/{packageName}"
+    /** 每应用偏好记录列表(V28 一等公民)。 */
+    const val PREFS_RECORDS = "records/prefs/{packageName}"
     /** 每应用监听设置页(V24 二态偏差)。 */
     const val APP_LISTEN_SETTINGS = "apps/{packageName}/listen-settings"
 
@@ -45,6 +47,8 @@ object ModevRoutes {
     fun databaseRecords(packageName: String): String = "records/database/${enc(packageName)}"
 
     fun behaviorRecords(packageName: String): String = "records/behavior/${enc(packageName)}"
+
+    fun prefsRecords(packageName: String): String = "records/prefs/${enc(packageName)}"
 
     fun licenseDetail(index: Int): String = "settings/licenses/${index}"
 

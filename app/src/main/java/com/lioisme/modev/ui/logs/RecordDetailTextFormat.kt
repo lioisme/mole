@@ -2,6 +2,7 @@ package com.lioisme.modev.ui.logs
 
 import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.model.SqlBindValue
 import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.core.model.SqlResultCell
@@ -130,6 +131,95 @@ private fun SqlResultCell.renderValue(): String = when (t) {
     SqlValueType.N -> "NULL"
 }
 
+// region V28 JSON 高亮发射(D3:params / bindArgs / rows 以真实 JSON 承载,
+//  经 json 围栏由 Highlights 引擎着色;序列化走 Gson 保证转义正确性。)
+
+/** 共享 pretty Gson(serializeNulls:SQL NULL 语义必须落为 JSON null;JsonObject 保持插入序)。 */
+private val prettyGson by lazy {
+    com.google.gson.GsonBuilder().setPrettyPrinting().serializeNulls().disableHtmlEscaping().create()
+}
+
+/** params JSON 渲染结果:文档(null = 无参数)+ 超限计数(UI 追加本地化标记)。 */
+internal data class ParamsJson(
+    val json: String?,
+    val omittedEntries: Int,
+    val truncatedValues: Int,
+)
+
+/** params → 保序 pretty JSON 对象(继承 [PARAMS_MAX_VALUE_CHARS]/[PARAMS_MAX_ENTRIES] 护栏)。 */
+internal fun formatParamsJson(params: Map<String, String>): ParamsJson {
+    if (params.isEmpty()) return ParamsJson(null, 0, 0)
+    var omittedEntries = 0
+    var truncatedValues = 0
+    val obj = com.google.gson.JsonObject()
+    for ((key, value) in params) {
+        if (obj.size() >= PARAMS_MAX_ENTRIES) {
+            omittedEntries++
+            continue
+        }
+        if (value.length > PARAMS_MAX_VALUE_CHARS) {
+            truncatedValues++
+            obj.addProperty(key, value.take(PARAMS_MAX_VALUE_CHARS) + "…")
+        } else {
+            obj.addProperty(key, value)
+        }
+    }
+    return ParamsJson(prettyGson.toJson(obj), omittedEntries, truncatedValues)
+}
+
+/** 绑定参数 JSON 渲染结果:pretty 数组文档(null = 无参数)+ 省略行数。 */
+internal data class BindArgsJson(val json: String?, val omittedRows: Int)
+
+/** 绑定参数 → pretty JSON 数组(`[{"index":1,"type":"STRING","value":"…"}]`,继承 [BIND_ARGS_MAX_ROWS])。 */
+internal fun formatBindArgsJson(args: List<SqlBindValue>): BindArgsJson {
+    if (args.isEmpty()) return BindArgsJson(null, 0)
+    val array = com.google.gson.JsonArray()
+    for ((index, arg) in args.withIndex()) {
+        if (index >= BIND_ARGS_MAX_ROWS) break
+        val entry = com.google.gson.JsonObject()
+        entry.addProperty("index", arg.i)
+        entry.addProperty("type", arg.t.name)
+        val rendered = arg.renderValue()
+        if (arg.t == SqlValueType.N) entry.add("value", com.google.gson.JsonNull.INSTANCE) else entry.addProperty("value", rendered)
+        array.add(entry)
+    }
+    return BindArgsJson(prettyGson.toJson(array), args.size - array.size())
+}
+
+/** 结果集 JSON 渲染结果:NDJSON 行(每行一个独立 JSON 对象)+ 省略行数。 */
+internal data class RowsJson(val lines: List<String>, val omittedRows: Int)
+
+/**
+ * 结果集 → NDJSON(每行 `{"index":0,"cells":[{"name":"id","value":"1"}]}`,
+ * 行数 ≤ [RESULT_MAX_ROWS]、行内列数 ≤ [RESULT_MAX_COLS];逐行独立成文,
+ * 高亮器按整块着色且每行可单独复制比对)。
+ */
+internal fun formatRowsNdjson(rows: List<SqlResultRow>): RowsJson {
+    if (rows.isEmpty()) return RowsJson(emptyList(), 0)
+    val lines = mutableListOf<String>()
+    for ((rowIndex, row) in rows.withIndex()) {
+        if (rowIndex >= RESULT_MAX_ROWS) break
+        val cells = row.c.take(RESULT_MAX_COLS)
+        val cellsArray = com.google.gson.JsonArray()
+        cells.forEach { cell ->
+            val entry = com.google.gson.JsonObject()
+            entry.addProperty("name", cell.n)
+            if (cell.t == SqlValueType.N) {
+                entry.add("value", com.google.gson.JsonNull.INSTANCE)
+            } else {
+                entry.addProperty("value", cell.renderValue() + if (cell.truncated) "…" else "")
+            }
+            cellsArray.add(entry)
+        }
+        val lineObj = com.google.gson.JsonObject()
+        lineObj.addProperty("index", rowIndex)
+        lineObj.add("cells", cellsArray)
+        lines += prettyGson.toJson(lineObj).replace("\n", " ")
+    }
+    return RowsJson(lines, rows.size - lines.size)
+}
+// endregion
+
 /**
  * SQL 记录导出 JSON 字符数保守估算(×2 倍率,与 [estimateJsonChars] 同规):
  * sql + bindArgs + rows + 元数据,超限免构建。
@@ -162,6 +252,25 @@ internal fun estimateBehaviorJsonChars(record: BehaviorRecord): Int {
         total += destPath?.length ?: 0
         command?.forEach { total += it.length + 8 }
         content?.let {
+            total += it.hex.length + (it.base64?.length ?: 0) + (it.text?.length ?: 0)
+        }
+        params?.forEach { (k, v) -> total += k.length + v.length }
+        processName?.let { total += it.length }
+        stack.forEach { total += it.length }
+    }
+    return total * 2
+}
+
+/**
+ * 偏好记录导出 JSON 字符数保守估算(×2 倍率,V28 与三兄弟同规):
+ * 键 / 文件路径 / 值域三态 + 元数据,超限免构建。
+ */
+internal fun estimatePrefsJsonChars(record: PrefsRecord): Int {
+    var total = record.packageName.length + 128
+    with(record) {
+        total += key?.length ?: 0
+        total += path?.length ?: 0
+        value?.let {
             total += it.hex.length + (it.base64?.length ?: 0) + (it.text?.length ?: 0)
         }
         params?.forEach { (k, v) -> total += k.length + v.length }

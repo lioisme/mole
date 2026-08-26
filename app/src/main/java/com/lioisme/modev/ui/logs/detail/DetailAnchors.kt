@@ -1,28 +1,16 @@
 package com.lioisme.modev.ui.logs.detail
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.model.SqlRecord
 
 /**
- * 详情锚点导航(V24 G3 新增能力):按记录实际内容动态生成的 FilterChip 行,
- * 点击平滑滚动至目标区块——长记录(大数据/多密钥字段)的分区到达成本从
- * 反复滑动降为一次点击。标签复用 section_* 资源(零新增 i18n);
- * 标签清单在 remember 外由纯函数构建,滚动路径零派生计算。
+ * 详情锚点导航(V28 纯 Kotlin 化,原 FilterChip 行退役):
+ * 锚点清单由纯函数按记录实际内容动态生成,同一份清单同时驱动
+ * markdown 目录(TOC)条目与屏幕装配侧的 LazyColumn 索引簿记——
+ * 「目录可见性」与「可滚动性」由同一数据源保证,永不失配。
  */
 
 /** 锚点:key = LazyColumn item 索引簿记键(与屏幕装配侧严格同源);labelRes 复用区块标题资源。 */
@@ -65,32 +53,11 @@ fun behaviorAnchors(record: BehaviorRecord): List<DetailAnchor> {
     return anchors
 }
 
-/**
- * 锚点芯片行(LazyRow + FilterChip,MD3 组件直排):
- * @param onAnchorClick 锚点 key → 屏幕装配层按簿记索引 animateScrollToItem。
- */
-@Composable
-internal fun DetailAnchorRow(
-    anchors: List<DetailAnchor>,
-    onAnchorClick: (String) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    if (anchors.isEmpty()) return
-    LazyRow(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        contentPadding = PaddingValues(vertical = 2.dp),
-        modifier = modifier.fillMaxWidth().testTag("detail-anchors"),
-    ) {
-        items(anchors.size, key = { anchors[it].key }) { index ->
-            val anchor = anchors[index]
-            FilterChip(
-                selected = false,
-                onClick = { onAnchorClick(anchor.key) },
-                label = { Text(stringResource(anchor.labelRes), maxLines = 1) },
-                colors = FilterChipDefaults.filterChipColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-                ),
-            )
-        }
-    }
+/** 偏好记录锚点(V28):值 / 参数 / 调用栈(按存在性)。 */
+fun prefsAnchors(record: PrefsRecord): List<DetailAnchor> {
+    val anchors = mutableListOf<DetailAnchor>()
+    if (record.value != null) anchors += DetailAnchor("value", R.string.section_value)
+    if (!record.params.isNullOrEmpty()) anchors += DetailAnchor("params", R.string.section_params)
+    if (record.stack.isNotEmpty()) anchors += DetailAnchor("stack", R.string.section_stack)
+    return anchors
 }

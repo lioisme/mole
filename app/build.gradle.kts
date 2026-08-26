@@ -155,6 +155,8 @@ dependencies {
     implementation(libs.androidx.paging.compose)
     // 详情页 markdown 渲染(mikepenz,M3 构件;Apache-2.0;V26 版本锁定见 toml)
     implementation(libs.markdown.renderer.m3)
+    // V28:语法高亮引擎(SnipMeDev Highlights,纯 KMP 直依赖;json→JS 分词、bash→SHELL)
+    implementation(libs.highlights)
     // 开源许可数据 core(编译期元数据,零运行时开销;UI 自建 M3 页面)
     implementation(libs.aboutlibraries.core)
 
