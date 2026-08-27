@@ -116,7 +116,7 @@ class VpnHideHooker(
                     if (!config().vpnInterface) return
                     val name = invocation.getArg(0) as? String ?: return
                     if (isVpnInterface(name)) {
-                        invocation.setResult(null)
+                        // 不干预返回值(return = 保留原始结果),仅记录检测事件
                         emit(kind = NetworkKind.VPN_INTERFACE, operation = NetworkOperation.VPN_IFACE_BY_NAME,
                             params = mapOf("name" to name))
                     }

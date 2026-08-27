@@ -11,6 +11,7 @@ class XposedClassHooker(
 ) : DeviceEnvBaseHooker(context) {
 
     override fun install() {
+        if (!config().xposedClass) return
         hookClassForName()
         hookLoadClass()
         hookFindClass()
@@ -22,6 +23,7 @@ class XposedClassHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
+                if (!config().xposedClass) return
                 val name = invocation.getArg(0) as? String ?: return
                 if (isXposedClassName(name)) {
                     invocation.setResult(null)
@@ -42,6 +44,7 @@ class XposedClassHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
+                if (!config().xposedClass) return
                 val name = invocation.getArg(0) as? String ?: return
                 if (isXposedClassName(name)) {
                     invocation.setResult(null)
@@ -63,6 +66,7 @@ class XposedClassHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
+                if (!config().xposedClass) return
                 val name = invocation.getArg(0) as? String ?: return
                 if (isXposedClassName(name)) {
                     invocation.setResult(null)
@@ -78,13 +82,19 @@ class XposedClassHooker(
     }
 
     private fun isXposedClassName(name: String): Boolean {
-        val lower = name.lowercase()
-        return XPOSED_KEYWORDS.any { lower.contains(it) }
+        return XPOSED_PREFIXES.any { name.startsWith(it) }
     }
 
     companion object {
-        private val XPOSED_KEYWORDS = listOf(
-            "xposed", "lspd", "lsplant", "edxposed", "de.robv",
+        private val XPOSED_PREFIXES = listOf(
+            "de.robv.android.xposed.",
+            "de.robv.android.xposed.core.",
+            "de.robv.android.xposed.callbacks.",
+            "com.topjohnwu.lsposed.",
+            "org.lsposed.lspd.",
+            "org.lsposed.lsplant.",
+            "io.github.lsposed.edxposed.",
+            "io.github.lsposed.lspd.",
         )
     }
 }

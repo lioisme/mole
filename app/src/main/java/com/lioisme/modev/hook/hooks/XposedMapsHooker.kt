@@ -8,15 +8,14 @@ import com.lioisme.modev.hook.ProbeContext
 import java.io.BufferedReader
 import java.io.File
 import java.io.FileReader
-import java.util.Collections
-import java.util.concurrent.ConcurrentHashMap
 
 class XposedMapsHooker(
     context: ProbeContext,
 ) : DeviceEnvBaseHooker(context) {
 
+    /** 读多写少场景:使用 synchronized HashSet 替代 ConcurrentHashMap.newKeySet() 减少开销。 */
     private val mapsReaders: MutableSet<BufferedReader> =
-        Collections.synchronizedSet(ConcurrentHashMap.newKeySet())
+        java.util.Collections.synchronizedSet(HashSet())
 
     override fun install() {
         hookFileReader()
@@ -69,6 +68,7 @@ class XposedMapsHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
+                if (!config().xposedMaps) return
                 val line = invocation.result as? String ?: return
                 val reader = invocation.thisObject as? BufferedReader ?: return
                 val isMaps = try { reader in mapsReaders } catch (_: Exception) { false }

@@ -13,13 +13,18 @@ class DetectionMonitorHooker(
 ) : DeviceEnvBaseHooker(context) {
 
     override fun install() {
-        monitorClassForName()
-        monitorGetStackTrace()
-        monitorReadLine()
-        monitorFileExists()
-        monitorGetDefaultSensor()
-        monitorGetMacAddress()
-        monitorBuildFields()
+        val switch = config()
+        if (switch.detectRoot) {
+            monitorClassForName()
+            monitorFileExists()
+        }
+        if (switch.detectEmulator) {
+            monitorGetStackTrace()
+            monitorReadLine()
+            monitorGetDefaultSensor()
+            monitorGetMacAddress()
+            monitorBuildFields()
+        }
     }
 
     private fun monitorClassForName() {

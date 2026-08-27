@@ -552,6 +552,7 @@ class LogRepository(
                 register(PrefsRecordCodec.RECORD_TYPE, PrefsRecordCodec::decode)
                 register(WebViewRecordCodec.RECORD_TYPE, WebViewRecordCodec::decode)
                 register(NetworkRecordCodec.RECORD_TYPE, NetworkRecordCodec::decode)
+                register(DeviceEnvRecordCodec.RECORD_TYPE, DeviceEnvRecordCodec::decode)
             }
 
         private const val MAX_RECORDS = 20_000

@@ -122,63 +122,63 @@ data class HookSwitch(
 
     /** 网络环境监听全局总开关(V30;false = 全部网络类别停用,分开关保留原态)。 */
     val networkListen: Boolean = true,
-    /** SSL:SSLContext.init TrustManager 替换。 */
-    val sslContext: Boolean = true,
-    /** SSL:Conscrypt TrustManagerImpl 拦截。 */
-    val sslTrustManager: Boolean = true,
-    /** SSL:OkHttp CertificatePinner.check 拦截(含混淆发现)。 */
-    val sslOkhttpPinner: Boolean = true,
-    /** SSL:OkHttp OkHostnameVerifier.verify 拦截。 */
-    val sslOkhttpVerifier: Boolean = true,
-    /** SSL:WebView onReceivedSslError 自动 proceed。 */
-    val sslWebview: Boolean = true,
-    /** SSL:NetworkSecurityConfig pin 绕过。 */
-    val sslNetworkConfig: Boolean = true,
-    /** 代理:System.getProperty 代理属性隐藏。 */
-    val proxySystemProp: Boolean = true,
-    /** 代理:ConnectivityManager 代理查询隐藏。 */
-    val proxyConnectivity: Boolean = true,
-    /** 代理:Settings.Global 代理隐藏。 */
-    val proxySettings: Boolean = true,
-    /** 代理:OkHttp ProxySelector 隐藏。 */
-    val proxyOkhttp: Boolean = true,
-    /** VPN:NetworkCapabilities TRANSPORT_VPN 隐藏。 */
-    val vpnCapabilities: Boolean = true,
-    /** VPN:NetworkInterface VPN 接口隐藏。 */
-    val vpnInterface: Boolean = true,
-    /** VPN:NetworkInfo TYPE_VPN 隐藏。 */
-    val vpnNetworkInfo: Boolean = true,
-    /** VPN:LinkProperties VPN 路由隐藏。 */
-    val vpnLinkProperties: Boolean = true,
-    /** 网络请求监控(含 Reqable 堆栈)。 */
+    /** SSL:SSLContext.init TrustManager 替换(干预型,默认关)。 */
+    val sslContext: Boolean = false,
+    /** SSL:Conscrypt TrustManagerImpl 拦截(干预型,默认关)。 */
+    val sslTrustManager: Boolean = false,
+    /** SSL:OkHttp CertificatePinner.check 拦截(含混淆发现,干预型,默认关)。 */
+    val sslOkhttpPinner: Boolean = false,
+    /** SSL:OkHttp OkHostnameVerifier.verify 拦截(干预型,默认关)。 */
+    val sslOkhttpVerifier: Boolean = false,
+    /** SSL:WebView onReceivedSslError 自动 proceed(干预型,默认关)。 */
+    val sslWebview: Boolean = false,
+    /** SSL:NetworkSecurityConfig pin 绕过(干预型,默认关)。 */
+    val sslNetworkConfig: Boolean = false,
+    /** 代理:System.getProperty 代理属性隐藏(干预型,默认关)。 */
+    val proxySystemProp: Boolean = false,
+    /** 代理:ConnectivityManager 代理查询隐藏(干预型,默认关)。 */
+    val proxyConnectivity: Boolean = false,
+    /** 代理:Settings.Global 代理隐藏(干预型,默认关)。 */
+    val proxySettings: Boolean = false,
+    /** 代理:OkHttp ProxySelector 隐藏(干预型,默认关)。 */
+    val proxyOkhttp: Boolean = false,
+    /** VPN:NetworkCapabilities TRANSPORT_VPN 隐藏(干预型,默认关)。 */
+    val vpnCapabilities: Boolean = false,
+    /** VPN:NetworkInterface VPN 接口隐藏(干预型,默认关)。 */
+    val vpnInterface: Boolean = false,
+    /** VPN:NetworkInfo TYPE_VPN 隐藏(干预型,默认关)。 */
+    val vpnNetworkInfo: Boolean = false,
+    /** VPN:LinkProperties VPN 路由隐藏(干预型,默认关)。 */
+    val vpnLinkProperties: Boolean = false,
+    /** 网络请求监控(仅记录,不干预,默认开)。 */
     val networkRequest: Boolean = true,
 
     // ---- V31 设备环境监听 ----
 
     /** 设备环境监听全局总开关(V31;false = 全部设备环境类别停用,分开关保留原态)。 */
     val deviceEnvListen: Boolean = true,
-    /** Root:文件存在性检测干预(su/busybox/magisk 路径)。 */
-    val rootFile: Boolean = true,
-    /** Root:命令执行检测干预(Runtime.exec su)。 */
-    val rootExec: Boolean = true,
-    /** Root:包管理器查询干预(root 管理 app 过滤)。 */
-    val rootPackageManager: Boolean = true,
-    /** Root:系统属性检测干预(Build.TAGS/ro.debuggable 等)。 */
-    val rootProperty: Boolean = true,
-    /** Xposed:类存在性检测干预(Class.forName XposedBridge)。 */
-    val xposedClass: Boolean = true,
-    /** Xposed:堆栈检测干预(调用栈含 xposed 帧)。 */
-    val xposedStack: Boolean = true,
-    /** Xposed:/proc/self/maps 扫描干预。 */
-    val xposedMaps: Boolean = true,
-    /** 模拟器:Build 属性伪造(fingerprint/model/product)。 */
-    val emulatorBuild: Boolean = true,
-    /** 模拟器:设备文件检测干预(qemu_pipe/goldfish_pipe)。 */
-    val emulatorFile: Boolean = true,
-    /** 模拟器:传感器伪造(假加速度计/陀螺仪)。 */
-    val emulatorSensor: Boolean = true,
-    /** 模拟器:网络/MAC/IMEI 伪造。 */
-    val emulatorNetwork: Boolean = true,
+    /** Root:文件存在性检测干预(干预型,默认关)。 */
+    val rootFile: Boolean = false,
+    /** Root:命令执行检测干预(干预型,默认关)。 */
+    val rootExec: Boolean = false,
+    /** Root:包管理器查询干预(干预型,默认关)。 */
+    val rootPackageManager: Boolean = false,
+    /** Root:系统属性检测干预(干预型,默认关)。 */
+    val rootProperty: Boolean = false,
+    /** Xposed:类存在性检测干预(干预型,默认关)。 */
+    val xposedClass: Boolean = false,
+    /** Xposed:堆栈检测干预(干预型,默认关)。 */
+    val xposedStack: Boolean = false,
+    /** Xposed:/proc/self/maps 扫描干预(干预型,默认关)。 */
+    val xposedMaps: Boolean = false,
+    /** 模拟器:Build 属性伪造(干预型,默认关)。 */
+    val emulatorBuild: Boolean = false,
+    /** 模拟器:设备文件检测干预(干预型,默认关)。 */
+    val emulatorFile: Boolean = false,
+    /** 模拟器:传感器伪造(干预型,默认关)。 */
+    val emulatorSensor: Boolean = false,
+    /** 模拟器:网络/MAC/IMEI 伪造(干预型,默认关)。 */
+    val emulatorNetwork: Boolean = false,
     /** 设备环境:Root 检测行为监控(仅记录,不干预;默认关,噪声大)。 */
     val detectRoot: Boolean = false,
     /** 设备环境:模拟器检测行为监控(仅记录,不干预;默认关,噪声大)。 */
@@ -188,6 +188,12 @@ data class HookSwitch(
     val maxHexChars: Int = RecordLimits.DEFAULT_MAX_HEX_CHARS,
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
     val maxTextChars: Int = RecordLimits.DEFAULT_MAX_TEXT_CHARS,
+
+    /**
+     * 配置版本号(V32+):旧配置缺失此字段时,Gson 给 JVM 默认值 0,
+     * [fromJson] 据此判定需迁移干预型 hook 默认值。
+     */
+    val configVersion: Int = 0,
 ) {
     /** 是否存在任何需要 Hook 的类别(算法 + 数据库 + 行为 + 偏好 + WebView + 网络 + 设备环境 任一能力启用)。 */
     val anyEnabled: Boolean
@@ -320,16 +326,23 @@ data class HookSwitch(
     }
 
     companion object {
-        val DEFAULT = HookSwitch()
+        /** 当前配置版本号:V32 干预型 hook 默认关闭迁移。 */
+        private const val CURRENT_CONFIG_VERSION = 1
+
+        val DEFAULT = HookSwitch(configVersion = CURRENT_CONFIG_VERSION)
 
         /**
-         * Gson 反序列化 + 缺字段默认值补齐:新增字段(cryptoListen/dbListen 等)
-         * 在旧配置 JSON 中缺失时,Gson 的 Unsafe 实例化会给 JVM 默认值(false),
-         * 会误把历史配置判为「全部停用」。此处按 JsonObject 键存在性补齐默认值。
+         * Gson 反序列化 + 缺字段默认值补齐 + 版本迁移:
+         * - 旧字段缺失时按 JsonObject 键存在性补齐默认值;
+         * - configVersion < CURRENT_CONFIG_VERSION 时重置干预型 hook 为安全默认(false),
+         *   防止 V31 及更早版本遗留的旧 true 值导致宿主崩溃。
          */
         fun fromJson(gson: Gson, json: String): HookSwitch? = runCatching {
             val base = gson.fromJson(json, HookSwitch::class.java) ?: return null
             val obj = gson.fromJson(json, JsonObject::class.java)
+            val version = obj?.get("configVersion")
+                ?.takeIf { it.isJsonPrimitive }?.asInt ?: 0
+            val needsMigration = version < CURRENT_CONFIG_VERSION
             base.copy(
                 cryptoListen = obj?.get("cryptoListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
                 dbListen = obj?.get("dbListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
@@ -338,6 +351,33 @@ data class HookSwitch(
                 webviewListen = obj?.get("webviewListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
                 networkListen = obj?.get("networkListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
                 deviceEnvListen = obj?.get("deviceEnvListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
+                configVersion = CURRENT_CONFIG_VERSION,
+                // V32 迁移:干预型 hook 强制重置为 false(旧版默认 true 导致宿主崩溃)
+                sslContext = if (needsMigration) false else base.sslContext,
+                sslTrustManager = if (needsMigration) false else base.sslTrustManager,
+                sslOkhttpPinner = if (needsMigration) false else base.sslOkhttpPinner,
+                sslOkhttpVerifier = if (needsMigration) false else base.sslOkhttpVerifier,
+                sslWebview = if (needsMigration) false else base.sslWebview,
+                sslNetworkConfig = if (needsMigration) false else base.sslNetworkConfig,
+                proxySystemProp = if (needsMigration) false else base.proxySystemProp,
+                proxyConnectivity = if (needsMigration) false else base.proxyConnectivity,
+                proxySettings = if (needsMigration) false else base.proxySettings,
+                proxyOkhttp = if (needsMigration) false else base.proxyOkhttp,
+                vpnCapabilities = if (needsMigration) false else base.vpnCapabilities,
+                vpnInterface = if (needsMigration) false else base.vpnInterface,
+                vpnNetworkInfo = if (needsMigration) false else base.vpnNetworkInfo,
+                vpnLinkProperties = if (needsMigration) false else base.vpnLinkProperties,
+                rootFile = if (needsMigration) false else base.rootFile,
+                rootExec = if (needsMigration) false else base.rootExec,
+                rootPackageManager = if (needsMigration) false else base.rootPackageManager,
+                rootProperty = if (needsMigration) false else base.rootProperty,
+                xposedClass = if (needsMigration) false else base.xposedClass,
+                xposedStack = if (needsMigration) false else base.xposedStack,
+                xposedMaps = if (needsMigration) false else base.xposedMaps,
+                emulatorBuild = if (needsMigration) false else base.emulatorBuild,
+                emulatorFile = if (needsMigration) false else base.emulatorFile,
+                emulatorSensor = if (needsMigration) false else base.emulatorSensor,
+                emulatorNetwork = if (needsMigration) false else base.emulatorNetwork,
             )
         }.getOrNull()
     }

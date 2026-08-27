@@ -41,6 +41,17 @@ class SSLBypassHooker(
     /** 已发现的混淆 OkHttp 类(堆栈指纹法缓存)。 */
     private val discoveredClasses = HashMap<String, Any>()
 
+    /** SSLContext 内部字段反射缓存(首次成功后复用;失败则置 null 跳过后续)。 */
+    @Volatile
+    private var contextFieldRef: java.lang.reflect.Field? = null
+
+    @Volatile
+    private var trustManagerFieldRef: java.lang.reflect.Field? = null
+
+    /** 反射失败降级标志:首次反射失败后置 true,后续调用直接跳过。 */
+    @Volatile
+    private var sslReflectionDisabled = false
+
     override fun install() {
         hookSSLContext()
         hookTrustManager()
@@ -64,16 +75,32 @@ class SSLBypassHooker(
         engine.hook(methods, object : MethodHook() {
             override fun after(invocation: Invocation) {
                 if (!config().sslContext) return
+                if (sslReflectionDisabled) return
                 // 替换 context 内的 TrustManager 为 trust-all
                 try {
                     val ctx = invocation.thisObject as? SSLContext ?: return
-                    val contextField = ctx.javaClass.getDeclaredField("context")
-                    contextField.isAccessible = true
-                    val contextImpl = contextField.get(ctx)
-                    val tmfField = contextImpl.javaClass.getDeclaredField("trustManager")
-                    tmfField.isAccessible = true
-                    tmfField.set(contextImpl, TrustAllTrustManager)
-                } catch (_: Throwable) { /* 降级:不阻塞宿主 */ }
+                    // 首次反射后缓存 Field 对象,后续直接复用
+                    val cf = contextFieldRef ?: runCatching {
+                        ctx.javaClass.getDeclaredField("context").also { it.isAccessible = true }
+                    }.getOrNull()
+                    if (cf == null) {
+                        sslReflectionDisabled = true
+                        return
+                    }
+                    contextFieldRef = cf
+                    val contextImpl = cf.get(ctx) ?: return
+                    val tmf = trustManagerFieldRef ?: runCatching {
+                        contextImpl.javaClass.getDeclaredField("trustManager").also { it.isAccessible = true }
+                    }.getOrNull()
+                    if (tmf == null) {
+                        sslReflectionDisabled = true
+                        return
+                    }
+                    trustManagerFieldRef = tmf
+                    tmf.set(contextImpl, TrustAllTrustManager)
+                } catch (_: Throwable) {
+                    sslReflectionDisabled = true
+                }
                 emit(
                     kind = NetworkKind.SSL_CONTEXT,
                     operation = NetworkOperation.SSL_INIT,

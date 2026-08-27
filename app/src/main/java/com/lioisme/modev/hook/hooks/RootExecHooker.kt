@@ -5,7 +5,6 @@ import com.lioisme.modev.core.model.DeviceEnvOperation
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
-import java.io.IOException
 
 /**
  * Root 命令执行干预 Hooker(V31):拦截 Runtime.exec(String[]) 和 ProcessBuilder.start(),
@@ -41,7 +40,6 @@ class RootExecHooker(
                         detectionPattern = ROOT_EXEC_PATTERN,
                         params = mapOf("api" to "exec-string-array"),
                     )
-                    throw IOException("Cannot run program: su")
                 }
             })
         }
@@ -66,7 +64,6 @@ class RootExecHooker(
                         detectionPattern = ROOT_EXEC_PATTERN,
                         params = mapOf("api" to "exec-string-array-env"),
                     )
-                    throw IOException("Cannot run program: su")
                 }
             })
         }
@@ -99,7 +96,6 @@ class RootExecHooker(
                             dir?.let { put("workdir", it) }
                         },
                     )
-                    throw IOException("Cannot run program: su")
                 }
             })
         }
@@ -128,7 +124,6 @@ class RootExecHooker(
                         dir?.let { put("workdir", it) }
                     },
                 )
-                throw IOException("Cannot run program: su")
             }
         })
     }

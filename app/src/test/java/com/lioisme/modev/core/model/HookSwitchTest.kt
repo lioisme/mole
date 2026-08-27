@@ -365,11 +365,14 @@ class HookSwitchTest {
     @Test
     fun `deviceEnvEnabled maps kinds correctly`() {
         val s = HookSwitch()
-        assertTrue(s.deviceEnvEnabled(DeviceEnvKind.ROOT_FILE))
-        assertTrue(s.deviceEnvEnabled(DeviceEnvKind.XPOSED_CLASS))
-        assertTrue(s.deviceEnvEnabled(DeviceEnvKind.EMULATOR_BUILD))
+        // V32:干预型 hook 默认关(安全优先),需用户显式开启
+        assertFalse(s.deviceEnvEnabled(DeviceEnvKind.ROOT_FILE))
+        assertFalse(s.deviceEnvEnabled(DeviceEnvKind.XPOSED_CLASS))
+        assertFalse(s.deviceEnvEnabled(DeviceEnvKind.EMULATOR_BUILD))
         assertFalse(s.deviceEnvEnabled(DeviceEnvKind.DETECT_ROOT))
         assertFalse(s.deviceEnvEnabled(DeviceEnvKind.DETECT_EMULATOR))
+        // master 总开关仍为 true
+        assertTrue(s.deviceEnvListen)
     }
 
     @Test

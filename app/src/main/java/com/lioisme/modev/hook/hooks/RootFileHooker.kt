@@ -7,8 +7,11 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * Root 文件检测干预 Hooker(V31):拦截 java.io.File 的 exists/length/canRead,
- * 当文件路径匹配已知 root 相关路径时伪造返回值,阻止应用通过文件存在性检测 root。
+ * 文件存在性检测干预 Hooker(V31):统一拦截 java.io.File 的 exists/length/canRead,
+ * 同时覆盖 root 路径与模拟器路径检测,避免同一方法被多个 hooker 重复 hook。
+ *
+ * 合并自原 RootFileHooker + EmulatorFileHooker 的 File.exists() hook,
+ * 减少热路径回调开销(三合一→单一)。
  */
 class RootFileHooker(
     context: ProbeContext,
@@ -26,19 +29,49 @@ class RootFileHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().rootFile) return
                 val path = (invocation.thisObject as? java.io.File)?.path ?: return
-                if (!matchesRootPath(path)) return
-                val original = runCatching { invocation.result }.getOrNull()?.toString()
-                invocation.setResult(false)
-                emit(
-                    kind = DeviceEnvKind.ROOT_FILE,
-                    operation = DeviceEnvOperation.FILE_EXISTS,
-                    originalValue = original,
-                    maskedValue = "false",
-                    targetPath = path,
-                    detectionPattern = ROOT_PATTERN,
-                )
+                val lower = path.lowercase()
+                val switch = config()
+
+                // Root 路径检测干预
+                if (switch.rootFile) {
+                    val rootMatch = ROOT_PATHS.any { lower.contains(it) }
+                    if (rootMatch) {
+                        val original = runCatching { invocation.result }.getOrNull()?.toString()
+                        invocation.setResult(false)
+                        emit(
+                            kind = DeviceEnvKind.ROOT_FILE,
+                            operation = DeviceEnvOperation.FILE_EXISTS,
+                            originalValue = original,
+                            maskedValue = "false",
+                            targetPath = path,
+                            detectionPattern = ROOT_PATTERN,
+                        )
+                        return
+                    }
+                }
+
+                // 模拟器路径检测干预
+                if (switch.emulatorFile) {
+                    val emuMatch = EMULATOR_PATHS.firstOrNull { lower.contains(it) }
+                    if (emuMatch != null) {
+                        invocation.setResult(false)
+                        val op = when {
+                            emuMatch.startsWith("/dev/") -> DeviceEnvOperation.DEV_FILE_EXISTS
+                            emuMatch.startsWith("/system/lib") || emuMatch.startsWith("/system/bin") -> DeviceEnvOperation.LIB_FILE_EXISTS
+                            else -> DeviceEnvOperation.SYS_FILE_EXISTS
+                        }
+                        emit(
+                            kind = DeviceEnvKind.EMULATOR_FILE,
+                            operation = op,
+                            originalValue = "true",
+                            maskedValue = "false",
+                            targetPath = path,
+                            detectionPattern = emuMatch,
+                        )
+                        return
+                    }
+                }
             }
         })
     }
@@ -129,6 +162,16 @@ class RootFileHooker(
             "/data/adb/magisk.db",
             "/proc/1/root",
             "/system/etc/permissive.patches",
+        )
+
+        private val EMULATOR_PATHS = listOf(
+            "/dev/qemu_pipe",
+            "/dev/goldfish_pipe",
+            "/dev/socket/qemud",
+            "/dev/qemu_trace",
+            "/system/lib/libc_malloc_debug_qemu.so",
+            "/sys/qemu_trace",
+            "/system/bin/qemu-props",
         )
     }
 }
