@@ -64,6 +64,7 @@ import com.lioisme.modev.ui.theme.sqlKindColor
 import com.lioisme.modev.ui.theme.webviewKindColor
 import com.lioisme.modev.ui.theme.networkKindColor
 import com.lioisme.modev.core.model.DeviceEnvKind
+import com.lioisme.modev.core.model.DeviceEnvOperation
 import com.lioisme.modev.ui.theme.LocalIsDarkTheme
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -661,8 +662,8 @@ private fun networkPresentation(record: NetworkRow): RowPresentation {
 @Composable
 private fun deviceEnvPresentation(record: DeviceEnvRow): RowPresentation {
     val accent = deviceEnvKindColor(record.kind)
-    val kindText = record.kind.name
-    val operationText = record.operation.name
+    val kindText = stringResource(deviceEnvKindLabelRes(record.kind))
+    val operationText = stringResource(deviceEnvOperationLabelRes(record.operation))
     val headline = record.headlineText() ?: operationText
     val meta = remember(record.kind, record.operation, kindText, operationText, accent) {
         buildAnnotatedString {
@@ -770,6 +771,84 @@ fun networkSummary(context: Context, record: NetworkRow): String {
         record.statusCode?.let { append('\n').append("HTTP $it") }
         record.proxyHost?.let { append('\n').append("proxy: $it") }
         record.vpnActive?.let { append('\n').append("VPN: $it") }
+        append('\n').append(time)
+        append('\n').append(record.packageName)
+    }
+}
+
+/** 设备环境监听类别显示名资源(V31)。 */
+@StringRes
+fun deviceEnvKindLabelRes(kind: DeviceEnvKind): Int = when (kind) {
+    DeviceEnvKind.ROOT_FILE -> R.string.kind_device_env_ROOT_FILE
+    DeviceEnvKind.ROOT_EXEC -> R.string.kind_device_env_ROOT_EXEC
+    DeviceEnvKind.ROOT_PACKAGE_MANAGER -> R.string.kind_device_env_ROOT_PACKAGE_MANAGER
+    DeviceEnvKind.ROOT_PROPERTY -> R.string.kind_device_env_ROOT_PROPERTY
+    DeviceEnvKind.XPOSED_CLASS -> R.string.kind_device_env_XPOSED_CLASS
+    DeviceEnvKind.XPOSED_STACK -> R.string.kind_device_env_XPOSED_STACK
+    DeviceEnvKind.XPOSED_MAPS -> R.string.kind_device_env_XPOSED_MAPS
+    DeviceEnvKind.EMULATOR_BUILD -> R.string.kind_device_env_EMULATOR_BUILD
+    DeviceEnvKind.EMULATOR_FILE -> R.string.kind_device_env_EMULATOR_FILE
+    DeviceEnvKind.EMULATOR_SENSOR -> R.string.kind_device_env_EMULATOR_SENSOR
+    DeviceEnvKind.EMULATOR_NETWORK -> R.string.kind_device_env_EMULATOR_NETWORK
+    DeviceEnvKind.DETECT_ROOT -> R.string.kind_device_env_DETECT_ROOT
+    DeviceEnvKind.DETECT_EMULATOR -> R.string.kind_device_env_DETECT_EMULATOR
+}
+
+/** 设备环境监听操作标签资源(V31)。 */
+@StringRes
+fun deviceEnvOperationLabelRes(operation: DeviceEnvOperation): Int = when (operation) {
+    DeviceEnvOperation.FILE_EXISTS -> R.string.op_device_env_file_exists
+    DeviceEnvOperation.FILE_LENGTH -> R.string.op_device_env_file_length
+    DeviceEnvOperation.FILE_READABLE -> R.string.op_device_env_file_readable
+    DeviceEnvOperation.EXEC_COMMAND -> R.string.op_device_env_exec_command
+    DeviceEnvOperation.PROCESS_BUILDER -> R.string.op_device_env_process_builder
+    DeviceEnvOperation.GET_INSTALLED_PACKAGES -> R.string.op_device_env_get_installed_packages
+    DeviceEnvOperation.GET_INSTALLED_APPLICATIONS -> R.string.op_device_env_get_installed_applications
+    DeviceEnvOperation.QUERY_INTENT_ACTIVITIES -> R.string.op_device_env_query_intent_activities
+    DeviceEnvOperation.GET_PROPERTY -> R.string.op_device_env_get_property
+    DeviceEnvOperation.BUILD_TAGS -> R.string.op_device_env_build_tags
+    DeviceEnvOperation.GETPROP -> R.string.op_device_env_getprop
+    DeviceEnvOperation.CLASS_FOR_NAME -> R.string.op_device_env_class_for_name
+    DeviceEnvOperation.LOAD_CLASS -> R.string.op_device_env_load_class
+    DeviceEnvOperation.FIND_CLASS -> R.string.op_device_env_find_class
+    DeviceEnvOperation.GET_STACK_TRACE -> R.string.op_device_env_get_stack_trace
+    DeviceEnvOperation.THREAD_STACK -> R.string.op_device_env_thread_stack
+    DeviceEnvOperation.READ_MAPS -> R.string.op_device_env_read_maps
+    DeviceEnvOperation.OPEN_MAPS -> R.string.op_device_env_open_maps
+    DeviceEnvOperation.BUILD_FINGERPRINT -> R.string.op_device_env_build_fingerprint
+    DeviceEnvOperation.BUILD_MODEL -> R.string.op_device_env_build_model
+    DeviceEnvOperation.BUILD_PRODUCT -> R.string.op_device_env_build_product
+    DeviceEnvOperation.BUILD_MANUFACTURER -> R.string.op_device_env_build_manufacturer
+    DeviceEnvOperation.DEV_FILE_EXISTS -> R.string.op_device_env_dev_file_exists
+    DeviceEnvOperation.SYS_FILE_EXISTS -> R.string.op_device_env_sys_file_exists
+    DeviceEnvOperation.LIB_FILE_EXISTS -> R.string.op_device_env_lib_file_exists
+    DeviceEnvOperation.GET_DEFAULT_SENSOR -> R.string.op_device_env_get_default_sensor
+    DeviceEnvOperation.SENSOR_LIST -> R.string.op_device_env_sensor_list
+    DeviceEnvOperation.GET_MAC_ADDRESS -> R.string.op_device_env_get_mac_address
+    DeviceEnvOperation.GET_DEVICE_ID -> R.string.op_device_env_get_device_id
+    DeviceEnvOperation.GET_IMEI -> R.string.op_device_env_get_imei
+    DeviceEnvOperation.ANDROID_ID -> R.string.op_device_env_android_id
+    DeviceEnvOperation.ROOT_CHECK_API -> R.string.op_device_env_root_check_api
+    DeviceEnvOperation.ROOT_CHECK_FILE -> R.string.op_device_env_root_check_file
+    DeviceEnvOperation.ROOT_CHECK_EXEC -> R.string.op_device_env_root_check_exec
+    DeviceEnvOperation.EMULATOR_CHECK_BUILD -> R.string.op_device_env_emulator_check_build
+    DeviceEnvOperation.EMULATOR_CHECK_FILE -> R.string.op_device_env_emulator_check_file
+    DeviceEnvOperation.EMULATOR_CHECK_PROP -> R.string.op_device_env_emulator_check_prop
+}
+
+/** 设备环境记录摘要文本(列表行长按复制,V31)。 */
+fun deviceEnvSummary(context: Context, record: DeviceEnvRow): String {
+    val time = SimpleDateFormat(
+        if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
+        Locale.getDefault(),
+    ).format(Date(record.recordTimestamp))
+    return buildString {
+        append(context.getString(deviceEnvKindLabelRes(record.kind)))
+        append('\n')
+        append(context.getString(deviceEnvOperationLabelRes(record.operation)))
+        record.targetPath?.let { v -> append('\n').append(v) }
+        record.targetClass?.let { v -> append('\n').append(v) }
+        record.targetProperty?.let { v -> append('\n').append(v) }
         append('\n').append(time)
         append('\n').append(record.packageName)
     }

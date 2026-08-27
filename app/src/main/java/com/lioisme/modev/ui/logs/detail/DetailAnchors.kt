@@ -3,6 +3,7 @@ package com.lioisme.modev.ui.logs.detail
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.DeviceEnvRecord
 import com.lioisme.modev.core.model.NetworkRecord
 import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.model.SqlRecord
@@ -79,5 +80,13 @@ fun networkAnchors(record: NetworkRecord): List<DetailAnchor> {
     if (record.stack.isNotEmpty()) anchors += DetailAnchor("stack", R.string.section_stack)
     if (!record.requestHeaders.isNullOrEmpty()) anchors += DetailAnchor("req-headers", R.string.section_req_headers)
     if (!record.responseHeaders.isNullOrEmpty()) anchors += DetailAnchor("resp-headers", R.string.section_resp_headers)
+    return anchors
+}
+
+/** 设备环境监听记录锚点(V31)。 */
+fun deviceEnvAnchors(record: DeviceEnvRecord): List<DetailAnchor> {
+    val anchors = mutableListOf<DetailAnchor>()
+    if (record.stack.isNotEmpty()) anchors += DetailAnchor("stack", R.string.section_stack)
+    if (!record.params.isNullOrEmpty()) anchors += DetailAnchor("params", R.string.section_params)
     return anchors
 }

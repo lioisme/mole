@@ -61,6 +61,8 @@ import com.lioisme.modev.data.mapping.DeviceEnvDetail
 import com.lioisme.modev.core.model.DeviceEnvRecord
 import com.lioisme.modev.ui.components.networkKindLabelRes
 import com.lioisme.modev.ui.components.networkOperationLabelRes
+import com.lioisme.modev.ui.components.deviceEnvKindLabelRes
+import com.lioisme.modev.ui.components.deviceEnvOperationLabelRes
 import com.lioisme.modev.ui.logs.detail.networkAnchors
 import com.lioisme.modev.data.mapping.SqlDetail
 import com.lioisme.modev.data.mapping.toJson
@@ -86,6 +88,7 @@ import com.lioisme.modev.ui.logs.detail.cryptoAnchors
 import com.lioisme.modev.ui.logs.detail.prefsAnchors
 import com.lioisme.modev.ui.logs.detail.sqlAnchors
 import com.lioisme.modev.ui.logs.detail.webviewAnchors
+import com.lioisme.modev.ui.logs.detail.deviceEnvAnchors
 import com.lioisme.modev.ui.logs.markdown.DetailCodeActions
 import com.lioisme.modev.ui.logs.markdown.DetailFenceHandle
 import com.lioisme.modev.ui.logs.markdown.FLOW_ARROW_LINE
@@ -1211,25 +1214,31 @@ private fun DeviceEnvLoadedContent(
     val res = LocalContext.current.resources
 
     val metaEntries = listOfNotNull(
-        Pair(stringResource(R.string.meta_kind), record.kind.name),
-        Pair(stringResource(R.string.meta_operation), record.operation.name),
-        record.originalValue?.let { Pair("Original", it) },
-        record.maskedValue?.let { Pair("Masked", it) },
-        record.targetPath?.let { Pair(stringResource(R.string.meta_url), it) },
-        record.targetClass?.let { Pair("Target Class", it) },
-        record.targetProperty?.let { Pair("Target Property", it) },
-        record.detectionPattern?.let { Pair("Detection Pattern", it) },
+        Pair(stringResource(R.string.meta_kind), stringResource(deviceEnvKindLabelRes(record.kind))),
+        Pair(stringResource(R.string.meta_operation), stringResource(deviceEnvOperationLabelRes(record.operation))),
+        record.originalValue?.let { Pair(stringResource(R.string.detail_device_env_original_value), it) },
+        record.maskedValue?.let { Pair(stringResource(R.string.detail_device_env_masked), it) },
+        record.targetPath?.let { Pair(stringResource(R.string.detail_device_env_target_path), it) },
+        record.targetClass?.let { Pair(stringResource(R.string.detail_device_env_target_class), it) },
+        record.targetProperty?.let { Pair(stringResource(R.string.detail_device_env_target_property), it) },
+        record.detectionPattern?.let { Pair(stringResource(R.string.detail_device_env_detection_pattern), it) },
         Pair(stringResource(R.string.meta_thread), record.threadName),
         timestampEntry(record.timestamp),
     )
     val metaTitle = stringResource(R.string.section_metadata)
     val metaTable = metaSectionDoc(metaTitle, metaEntries)
 
-    val accent = accentLine(record.kind.name, record.operation.name)
+    val accent = accentLine(
+        stringResource(deviceEnvKindLabelRes(record.kind)),
+        stringResource(deviceEnvOperationLabelRes(record.operation)),
+    )
     val identityMarkdown = identityDoc(
-        headline = "${record.kind.name}: ${record.operation.name}",
+        headline = stringResource(deviceEnvKindLabelRes(record.kind)),
         accentLine = accent,
     )
+
+    val anchors = deviceEnvAnchors(record)
+    val tocList = tocEntries(anchors)
 
     val stackTitle = stringResource(R.string.section_stack)
     val stackDoc = if (record.stack.isEmpty()) {
@@ -1257,6 +1266,7 @@ private fun DeviceEnvLoadedContent(
     ) {
         book.cursor = 0
         book.advance(identityItem(identityMarkdown))
+        book.advance(tocSectionItems(tocList, onAnchorClick = { book.scrollTo(it, scrollScope) }))
         book.mark("meta")
         book.advance(metaTableItems("meta", metaTable))
         stackDoc?.let { doc ->

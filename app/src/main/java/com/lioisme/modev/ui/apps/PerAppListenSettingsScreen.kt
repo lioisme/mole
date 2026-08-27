@@ -55,6 +55,7 @@ import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.WebViewKind
 import com.lioisme.modev.core.model.NetworkKind
+import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.ui.components.IntLimitSheet
 import com.lioisme.modev.ui.components.IgnorePathSheet
@@ -122,6 +123,11 @@ class PerAppListenSettingsViewModel(
     /** 网络环境监听总开关定制(V30)。 */
     fun setNetworkMaster(value: Boolean) {
         update { it.copy(networkListen = value) }
+    }
+
+    /** 设备环境监听总开关定制(V31)。 */
+    fun setDeviceEnvMaster(value: Boolean) {
+        update { it.copy(deviceEnvListen = value) }
     }
 
     /** 类别定制(kind 名跨枚举;非法名由 AppListenOverride 容错忽略)。 */
@@ -287,6 +293,13 @@ fun PerAppListenSettingsScreen(
                     onCheckedChange = { viewModel.setNetworkMaster(it) },
                     testTag = "listen-row-master-network",
                 )
+                HorizontalDivider16Compat()
+                ListenRow(
+                    label = res.getString(R.string.device_env_master),
+                    checked = effective.deviceEnvListen,
+                    onCheckedChange = { viewModel.setDeviceEnvMaster(it) },
+                    testTag = "listen-row-master-device-env",
+                )
             }
             Spacer(Modifier.height(16.dp))
 
@@ -391,6 +404,20 @@ fun PerAppListenSettingsScreen(
             }
             Spacer(Modifier.height(16.dp))
 
+            // 设备环境监听 13 类别(V31 一等公民)
+            SettingsSection(stringResource(R.string.filter_type_device_env)) {
+                CategoryTaxonomy.forType(RecordType.DEVICE_ENV).forEachIndexed { index, category ->
+                    if (index > 0) HorizontalDivider16Compat()
+                    ListenRow(
+                        label = res.getString(switchLabelRes(category.id)),
+                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.id, it) },
+                        testTag = "listen-row-${category.id}",
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+
             // V25 记录选项:堆栈开关(行内 Switch)+ 单字段字节上限 / 忽略栈前缀(sheet 编辑)。
             SettingsSection(stringResource(R.string.section_record_options)) {
                 ListenRow(
@@ -461,6 +488,7 @@ fun PerAppListenSettingsScreen(
                                 override.prefsListen.count() +
                                 override.webviewListen.count() +
                                 override.networkListen.count() +
+                                override.deviceEnvListen.count() +
                                 override.kinds.size +
                                 override.logStack.count() +
                                 override.maxBytesPerField.count() +
@@ -692,5 +720,19 @@ private fun switchLabelRes(kindId: String): Int = when (kindId) {
     NetworkKind.VPN_NETWORK_INFO.name -> R.string.kind_net_vpn_network_info
     NetworkKind.VPN_LINK_PROPERTIES.name -> R.string.kind_net_vpn_link_properties
     NetworkKind.REQUEST.name -> R.string.kind_net_request
+    // 设备环境监听类别(V31 一等公民)
+    DeviceEnvKind.ROOT_FILE.name -> R.string.kind_device_env_ROOT_FILE
+    DeviceEnvKind.ROOT_EXEC.name -> R.string.kind_device_env_ROOT_EXEC
+    DeviceEnvKind.ROOT_PACKAGE_MANAGER.name -> R.string.kind_device_env_ROOT_PACKAGE_MANAGER
+    DeviceEnvKind.ROOT_PROPERTY.name -> R.string.kind_device_env_ROOT_PROPERTY
+    DeviceEnvKind.XPOSED_CLASS.name -> R.string.kind_device_env_XPOSED_CLASS
+    DeviceEnvKind.XPOSED_STACK.name -> R.string.kind_device_env_XPOSED_STACK
+    DeviceEnvKind.XPOSED_MAPS.name -> R.string.kind_device_env_XPOSED_MAPS
+    DeviceEnvKind.EMULATOR_BUILD.name -> R.string.kind_device_env_EMULATOR_BUILD
+    DeviceEnvKind.EMULATOR_FILE.name -> R.string.kind_device_env_EMULATOR_FILE
+    DeviceEnvKind.EMULATOR_SENSOR.name -> R.string.kind_device_env_EMULATOR_SENSOR
+    DeviceEnvKind.EMULATOR_NETWORK.name -> R.string.kind_device_env_EMULATOR_NETWORK
+    DeviceEnvKind.DETECT_ROOT.name -> R.string.kind_device_env_DETECT_ROOT
+    DeviceEnvKind.DETECT_EMULATOR.name -> R.string.kind_device_env_DETECT_EMULATOR
     else -> R.string.unknown_error
 }

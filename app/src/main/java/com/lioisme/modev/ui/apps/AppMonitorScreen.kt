@@ -74,6 +74,7 @@ import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.core.model.WebViewKind
+import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.ui.common.StatusSemantic
 import com.lioisme.modev.ui.common.connectionStatus
@@ -91,6 +92,7 @@ import com.lioisme.modev.ui.theme.sqlKindColor
 import com.lioisme.modev.ui.theme.statusColor
 import com.lioisme.modev.ui.theme.webviewKindColor
 import com.lioisme.modev.ui.theme.networkKindColor
+import com.lioisme.modev.ui.theme.deviceEnvKindColor
 import com.lioisme.modev.core.model.NetworkKind
 import androidx.compose.material.icons.outlined.FolderOpen
 
@@ -112,6 +114,7 @@ fun AppMonitorScreen(
     onOpenPrefs: () -> Unit,
     onOpenWebView: () -> Unit,
     onOpenNetwork: () -> Unit,
+    onOpenDeviceEnv: () -> Unit,
     onOpenListenSettings: () -> Unit,
     onLaunch: (String) -> Unit,
 ) {
@@ -127,6 +130,7 @@ fun AppMonitorScreen(
     val prefsCount by viewModel.prefsCount.collectAsStateWithLifecycle()
     val webviewCount by viewModel.webviewCount.collectAsStateWithLifecycle()
     val networkCount by viewModel.networkCount.collectAsStateWithLifecycle()
+    val deviceEnvCount by viewModel.deviceEnvCount.collectAsStateWithLifecycle()
     val listenOverride by viewModel.listenOverride.collectAsStateWithLifecycle()
 
     val label = appInfo?.label?.takeIf { it.isNotBlank() } ?: viewModel.packageName
@@ -177,6 +181,7 @@ fun AppMonitorScreen(
                 prefsCount = prefsCount,
                 webviewCount = webviewCount,
                 networkCount = networkCount,
+                deviceEnvCount = deviceEnvCount,
             )
             Spacer(Modifier.height(16.dp))
             SettingsSection(stringResource(R.string.section_monitor_kinds)) {
@@ -224,6 +229,14 @@ fun AppMonitorScreen(
                     value = countText(networkCount),
                     onClick = onOpenNetwork,
                     modifier = Modifier.testTag("monitor-entry-network"),
+                )
+                HorizontalDivider16()
+                EntryRow(
+                    icon = { Icon(Icons.Filled.GppBad, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    title = stringResource(R.string.device_records_title),
+                    value = countText(deviceEnvCount),
+                    onClick = onOpenDeviceEnv,
+                    modifier = Modifier.testTag("monitor-entry-device-env"),
                 )
                 HorizontalDivider16()
                 EntryRow(
@@ -431,9 +444,9 @@ private fun ScopeToggleRow(
 }
 
 /**
- * 统计概览卡(V23 T5.2;V28 四段比例条;V30 五段):总记录数大字(locale 紧凑格式)+
- * 类型分布五色比例条(算法 = CIPHER / 数据库 = QUERY / 行为 = FILE_WRITE /
- * 偏好 = PUT / 网络 = SSL_CONTEXT,KindColorTokens 同源)+ 图例计数;
+ * 统计概览卡(V23 T5.2;V28 四段比例条;V30 五段;V31 七段):总记录数大字(locale 紧凑格式)+
+ * 类型分布七色比例条(算法 = CIPHER / 数据库 = QUERY / 行为 = FILE_WRITE /
+ * 偏好 = PUT / 网络 = SSL_CONTEXT / 设备环境 = ROOT_FILE,KindColorTokens 同源)+ 图例计数;
  * 零记录时隐藏比例条与图例(空卡仅大数字,不显零除噪)。
  */
 @Composable
@@ -444,14 +457,16 @@ private fun StatsCard(
     prefsCount: Long,
     webviewCount: Long,
     networkCount: Long,
+    deviceEnvCount: Long,
 ) {
-    val total = cryptoCount + dbCount + behaviorCount + prefsCount + webviewCount + networkCount
+    val total = cryptoCount + dbCount + behaviorCount + prefsCount + webviewCount + networkCount + deviceEnvCount
     val cryptoColor = kindColor(CryptoKind.CIPHER)
     val dbColor = sqlKindColor(SqlKind.QUERY)
     val behaviorColor = behaviorKindColor(BehaviorKind.FILE_WRITE)
     val prefsColor = prefsKindColor(PrefsKind.PUT)
     val webviewColor = webviewKindColor(WebViewKind.PAGE_LOAD)
     val networkColor = networkKindColor(NetworkKind.SSL_CONTEXT)
+    val deviceEnvColor = deviceEnvKindColor(DeviceEnvKind.ROOT_FILE)
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         shape = MaterialTheme.shapes.medium,
@@ -479,6 +494,7 @@ private fun StatsCard(
                 val prefsWeight = (prefsCount.toFloat() / total).coerceAtLeast(0.02f)
                 val webviewWeight = (webviewCount.toFloat() / total).coerceAtLeast(0.02f)
                 val networkWeight = (networkCount.toFloat() / total).coerceAtLeast(0.02f)
+                val deviceEnvWeight = (deviceEnvCount.toFloat() / total).coerceAtLeast(0.02f)
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -522,7 +538,13 @@ private fun StatsCard(
                         Modifier
                             .weight(networkWeight)
                             .fillMaxSize()
-                            .background(color = networkColor, shape = RoundedCornerShape(topEnd = 5.dp, bottomEnd = 5.dp)),
+                            .background(color = networkColor),
+                    )
+                    Box(
+                        Modifier
+                            .weight(deviceEnvWeight)
+                            .fillMaxSize()
+                            .background(color = deviceEnvColor, shape = RoundedCornerShape(topEnd = 5.dp, bottomEnd = 5.dp)),
                     )
                 }
                 Spacer(Modifier.height(10.dp))
@@ -532,6 +554,7 @@ private fun StatsCard(
                 LegendRow(color = prefsColor, label = stringResource(R.string.filter_type_prefs), count = prefsCount)
                 LegendRow(color = webviewColor, label = stringResource(R.string.filter_type_webview), count = webviewCount)
                 LegendRow(color = networkColor, label = stringResource(R.string.filter_type_network), count = networkCount)
+                LegendRow(color = deviceEnvColor, label = stringResource(R.string.filter_type_device_env), count = deviceEnvCount)
             }
         }
     }
@@ -652,6 +675,9 @@ private fun listenSummary(override: AppListenOverride): String {
         (if (override.dbListen != null) 1 else 0) +
         (if (override.behaviorListen != null) 1 else 0) +
         (if (override.prefsListen != null) 1 else 0) +
+        (if (override.webviewListen != null) 1 else 0) +
+        (if (override.networkListen != null) 1 else 0) +
+        (if (override.deviceEnvListen != null) 1 else 0) +
         override.kinds.size
     // 复数契约 6:计数文案走 plurals(one/other;zh 仅 other)。
     return pluralStringResource(R.plurals.listen_settings_custom_n, n, n)

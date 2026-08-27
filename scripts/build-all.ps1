@@ -10,7 +10,7 @@
 # ============================================================================
 
 $ErrorActionPreference = "Stop"
-$Root = $PSScriptRoot
+$Root = Split-Path -Parent $PSScriptRoot
 $Dist = Join-Path $Root "dist"
 
 Write-Host "==> Modev build (release/debug x arm64-v8a/x86_64)" -ForegroundColor Cyan
@@ -103,11 +103,19 @@ debugKeyPassword=$dbgPass
 
     # ---------- 4. build (ABI splits produce 4 single-ABI APKs) ----------
     # modern 为默认双框架变体;只构建 modern,避免 8 个 APK
-    Write-Host "[4/4] Building modern:assembleRelease + modern:assembleDebug (--no-daemon) ..."
+    # Release / Debug 独立 Gradle 调用,禁止合并构建(零共享守护进程状态)
     Push-Location $Root
-    & (Join-Path $Root "gradlew.bat") :app:assembleModernRelease :app:assembleModernDebug --no-daemon --console=plain
-    if ($LASTEXITCODE -ne 0) { throw "Gradle build failed (exit=$LASTEXITCODE)" }
-    Pop-Location
+    try {
+        Write-Host "[4/4] Building modern:assembleRelease (--no-daemon) ..."
+        & (Join-Path $Root "gradlew.bat") :app:assembleModernRelease --no-daemon --console=plain
+        if ($LASTEXITCODE -ne 0) { throw "Release build failed (exit=$LASTEXITCODE)" }
+
+        Write-Host "       Building modern:assembleDebug (--no-daemon) ..."
+        & (Join-Path $Root "gradlew.bat") :app:assembleModernDebug --no-daemon --console=plain
+        if ($LASTEXITCODE -ne 0) { throw "Debug build failed (exit=$LASTEXITCODE)" }
+    } finally {
+        Pop-Location
+    }
 
     # ---------- collect & verify ----------
     $ver = $null

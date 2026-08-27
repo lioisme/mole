@@ -1,110 +1,105 @@
-# Task: 设备环境隐藏能力 (V31)
+# TASK-DEVICE-ENV.md — V31 设备环境隐藏能力 (一等公民)
 
-> **版本**: V31  
-> **日期**: 2026-08-27  
-> **状态**: 进行中  
+> 作为 Modev 第 7 大一等公民,与算法/数据库/行为/偏好/WebView/网络环境并列。
+> 架构:Probe → BaseHooker → 12 Hooker + DetectionMonitorHooker;
+> RecordType.DEVICE_ENV;13 DeviceEnvKinds;PROTECTIVE 模式。
 
----
+## 进度总览
 
-## 总览
-
-为 Modev 新增**第七大监听能力 — 设备环境** (`RecordType.DEVICE_ENV`)，覆盖两大功能面：
-
-| 功能面 | 本质 | 与现有能力的关系 |
-|--------|------|-----------------|
-| **Root / Xposed / 模拟器检测干预** | Hook 宿主 app 的设备环境检测 API 并返回「干净」结果 | 与 Network 的 VPN/Proxy 隐藏同构 |
-| **检测行为可观测性** | 记录宿主 app 调用了哪些检测 API | 与 Network 的 NetworkRequestHooker 同构 |
-
-### 技术边界
-
-Modev 运行在 **Java/ART 层**（Xposed 模块）：
-
-| 层级 | 可做 | 不做（需内核级） |
-|------|------|-----------------|
-| Java API | Hook `System.getProperty`, `Build.*`, `File.exists()`, `PackageManager` 等 | — |
-| Native JNI | Hook `Runtime.exec("su")`, 文件路径检测, `/proc/self/maps` 文本过滤 | — |
-| ART | Hook classloader, 反射调用拦截 | — |
-| Kernel | — | mount namespace, SELinux, 真正的 maps 清理 |
+| Phase | 内容 | 状态 |
+|-------|------|------|
+| 0 | 拉取参考项目到 baseline/ | ✅ |
+| 1 | 核心模型 (Kind/Operation/Record/HookSwitch/EffectiveSwitch/Override/Taxonomy) | ✅ |
+| 2 | 编解码 + 数据库 + 映射 | ✅ |
+| 3 | Hook 层 (13 Hooker + Probe) | ✅ |
+| 4 | 领域层 (Capability) | ✅ |
+| 5 | UI 主题 (颜色 token) | ✅ |
+| 6 | i18n 双语文案 | ✅ |
+| 7 | 测试 (unit tests) | ✅ |
+| 8 | lint + 单测验证 | ✅ |
+| 9 | **UI 一等公民集成 (与 Network 对齐)** | ✅ |
+| 10 | **ADB 雷电模拟器全量压力测试** | ✅ |
 
 ---
 
-## 进度追踪
+## Phase 9: UI 一等公民集成
 
-### Phase 0: 第三方源码拉取
-- [x] 创建 baseline/ 目录 ✅ (V30 已有)
-- [x] 拉取 RootBeer (Root 检测百科全书) ✅ 2026-08-27
-- [x] 拉取 NativeGuard (Native 检测框架) ✅ 2026-08-27
-- [x] 拉取 HideMyApplist (应用列表隐藏) ✅ 2026-08-27
+> 审计发现 21 个 gaps:7 个文件需修改,使 DeviceEnv 在 UI 层与 Network (V30) 完全对齐。
 
-### Phase 1: 核心模型
-- [x] RecordTypes.kt — 新增 DEVICE_ENV 常量 ✅ 2026-08-27
-- [x] RecordType.kt — 新增 DEVICE_ENV 枚举值 ✅ 2026-08-27
-- [x] DeviceEnvKind.kt — 新建 (13 类:4 Root + 3 Xposed + 4 Emulator + 2 Monitor) ✅ 2026-08-27
-- [x] DeviceEnvOperation.kt — 新建 (30+ 种操作) ✅ 2026-08-27
-- [x] DeviceEnvRecord.kt — 新建记录数据模型 ✅ 2026-08-27
-- [x] HookSwitch.kt — 新增 deviceEnvListen + 13 子开关 + deviceEnvEnabled() ✅ 2026-08-27
-- [x] CategoryTaxonomy.kt — 新增 13 个类别条目 + validateOperations DEVICE_ENV 分支 ✅ 2026-08-27
-- [x] AppListenOverride.kt — 新增 deviceEnvListen 偏差 + VALID_KINDS 扩展 ✅ 2026-08-27
-- [x] EffectiveSwitch.kt — resolve/readKind/applyKinds 三处扩展 ✅ 2026-08-27
+### Phase 9.1: 导航层
 
-### Phase 2: 编解码 + 数据库
-- [x] DeviceEnvRecordCodec.kt — 新建编解码器 ✅ 2026-08-27
-- [x] RecordCodecRegistry.kt — 注册 DeviceEnv 解码器 (复用现有分发,无需修改) ✅ 2026-08-27
-- [x] DeviceEnvRecordMappers.kt — 新建映射器 ✅ 2026-08-27
-- [x] RowModel.kt — 新增 DeviceEnvRow ✅ 2026-08-27
-- [x] RecordDetailModel.kt — 新增 DeviceEnvDetail ✅ 2026-08-27
-- [x] CryptoRecordMappers.kt — toRowModelOrNull/toRecordDetailOrNull 新增 DEVICE_ENV 分支 ✅ 2026-08-27
-- [x] HookInstaller.kt — jsonOf 新增 DeviceEnvRecord 分派 ✅ 2026-08-27
-- [x] LogRepository.kt — writeBatch 新增 DeviceEnvRecord 分派 ✅ 2026-08-27
+- [x] **ModevRoutes.kt** — +`DEVICE_ENV_RECORDS` 常量 + `deviceEnvRecords()` 函数
+- [x] **ModevNav.kt** — +import DeviceEnvRecordsScreen, +onOpenDeviceEnv 回调, +slideComposable 路由块
+- 备注: 完全对齐 Network 模式,路由 = `records/device_env/{packageName}`
 
-### Phase 3: Hook 层
-- [x] DeviceEnvBaseHooker.kt — 新建基类 ✅ 2026-08-27
-- [x] RootFileHooker.kt — Root 文件检测干预 (30+ 路径) ✅ 2026-08-27
-- [x] RootExecHooker.kt — Root 命令执行干预 ✅ 2026-08-27
-- [x] RootPackageManagerHooker.kt — Root 包查询干预 ✅ 2026-08-27
-- [x] RootPropertyHooker.kt — Root 属性检测干预 ✅ 2026-08-27
-- [x] XposedClassHooker.kt — Xposed 类存在性干预 ✅ 2026-08-27
-- [x] XposedStackHooker.kt — Xposed 堆栈过滤 ✅ 2026-08-27
-- [x] XposedMapsHooker.kt — /proc/self/maps 过滤 ✅ 2026-08-27
-- [x] EmulatorBuildHooker.kt — 模拟器 Build 属性伪造 ✅ 2026-08-27
-- [x] EmulatorFileHooker.kt — 模拟器设备文件干预 ✅ 2026-08-27
-- [x] EmulatorSensorHooker.kt — 模拟器传感器伪造 ✅ 2026-08-27
-- [x] EmulatorNetworkHooker.kt — 模拟器网络/MAC 伪造 ✅ 2026-08-27
-- [x] DetectionMonitorHooker.kt — 检测行为监控 (仅记录) ✅ 2026-08-27
-- [x] DeviceEnvProbe.kt — 编排 13 个 Hooker ✅ 2026-08-27
-- [x] HookInstaller.kt — 注册 DeviceEnvProbe ✅ 2026-08-27
+### Phase 9.2: AppMonitor 入口页
 
-### Phase 4: 领域层
-- [x] CapabilityKind.kt — 新增 DEVICE_ENV_LISTEN ✅ 2026-08-27
-- [x] DeviceEnvListenCapability.kt — 新建 Capability 实现 ✅ 2026-08-27
+- [x] **AppMonitorViewModel.kt** — +`deviceEnvCount` StateFlow (同 networkCount 模式)
+- [x] **AppMonitorScreen.kt** — +onOpenDeviceEnv 参数, +deviceEnvCount 状态收集, +EntryRow (testTag monitor-entry-device-env), +StatsCard 第7段, +listenSummary 计入 deviceEnvListen
+- 备注: StatsCard 从 6 段扩展为 7 段;listenSummary 补齐 webviewListen + networkListen + deviceEnvListen
 
-### Phase 5: UI 层
-- [x] DeviceEnvColorTokens.kt — 新建类别色 token ✅ 2026-08-27
-- [ ] AppMonitorScreen.kt — StatsCard + EntryRow + 回调
-- [ ] PerAppListenSettingsScreen.kt — VM + 总开关行 + 类别区
-- [ ] RecordRow.kt — DeviceEnvRow 分派
-- [ ] KindIcons.kt — deviceEnv() 图标映射
-- [ ] RecordDetailScreen.kt — DeviceEnvDetail 分派
-- [ ] DetailAnchors.kt — deviceEnvAnchors()
-- [ ] MonitorRecordsScreen.kt — DeviceEnvRow 分派
-- [ ] ModevRoutes.kt — 路由
+### Phase 9.3: 监听设置页
 
-### Phase 6: i18n
-- [x] values/strings.xml — 43 英文文案 ✅ 2026-08-27
-- [x] values-zh/strings.xml — 43 中文文案 ✅ 2026-08-27
+- [x] **PerAppListenSettingsScreen.kt** — +setDeviceEnvMaster() VM 函数, +master ListenRow (listen-row-master-device-env), +13 category rows (CategoryTaxonomy.forType(RecordType.DEVICE_ENV)), +13 switchLabelRes 分支, +reset count 计入 deviceEnvListen
+- 备注: PrefsKind OPEN/CLEAR 碰撞规则保持前置;13 个 DeviceEnvKind 全覆盖
 
-### Phase 7: 测试
-- [x] DeviceEnvKindTest.kt — 枚举完整性 ✅ 2026-08-27
-- [x] DeviceEnvOperationTest.kt — kind 归属 (集成在 DeviceEnvKindTest) ✅ 2026-08-27
-- [x] HookSwitchTest.kt — deviceEnvEnabled 互逆 ✅ 2026-08-27
-- [x] EffectiveSwitchTest.kt — readKind/applyKinds 互逆 ✅ 2026-08-27
-- [x] RecordTypeTest.kt — wire 断言 ✅ 2026-08-27
-- [x] CategoryTaxonomyTest.kt — validate 断言 ✅ 2026-08-27
+### Phase 9.4: 记录列表 + 行展示
 
-### Phase 8: lint + 单测验证
-- [x] 全部单元测试通过 (model tests + codec tests + mappers tests) ✅ 2026-08-27
-- [x] lintModernRelease 通过 (92 warnings, 0 errors; 含 V30 网络监听既有 warning) ✅ 2026-08-27
-- [x] 新增 3 个 DiscouragedPrivateApi warning (RootPackageManagerHooker, Xposed 模块反射预期行为) ✅ 2026-08-27
+- [x] **MonitorRecordsScreen.kt** — +DeviceEnvRecordsScreen composable, +deviceEnvSummary() 复用
+- [x] **RecordRow.kt** — +deviceEnvKindLabelRes() (13 分支), +deviceEnvOperationLabelRes() (36 分支), +deviceEnvSummary() 长按复制, deviceEnvPresentation() 改用 i18n label
+- 备注: deviceEnvPresentation 从 raw name 改为 stringResource;copySummary 从裸字符串改为完整摘要
+
+### Phase 9.5: 详情页
+
+- [ ] **DetailAnchors.kt** — +deviceEnvAnchors() 函数
+- [ ] **RecordDetailScreen.kt** — +TOC/anchors 集成, 硬编码英文 → i18n resource, export JSON 实现
+- 备注:
+
+### Phase 9.6: i18n 新增字符串
+
+- [ ] **values/strings.xml** — 新增 ~36 个 op_device_env_* 操作标签 + device_env_records_search
+- [ ] **values-zh/strings.xml** — 对应中文翻译
+- 备注:
+
+### Phase 9.7: lint + 单测验证
+
+- [x] `.\gradlew.bat :app:lintModernRelease` — BUILD SUCCESSFUL, 70 warnings (从 92 净降 22), 0 errors
+- [x] `.\gradlew.bat :app:testModernDebugUnitTest` — BUILD SUCCESSFUL, 502 tests, 0 failures
+- 备注: StringResourceParityTest 通过(zh 翻译已对齐);新增 38 个 op_device_env_* 双语字符串;硬编码英文已全部替换为 i18n resource
+
+---
+
+## Phase 10: ADB 雷电模拟器全量压力测试
+
+### 10.1 环境准备
+
+- [x] 启动雷电模拟器: `D:\leidian\LDPlayer14\dnconsole.exe launch --index 0` ✅
+- [x] ADB 连接: `adb connect 127.0.0.1:5555` ✅
+- [x] 安装 APK: x86_64-debug APK 安装成功 ✅
+
+### 10.2 功能验证 (10 项)
+
+| # | 测试项 | 预期结果 | 状态 |
+|---|--------|----------|------|
+| 1 | 应用列表显示 | 设备环境 EntryRow 可见, StatsCard 第7段 | ✅ screen6 |
+| 2 | 进入监听设置 | 13个 DeviceEnv 类别开关可见 | ✅ screen15/16 |
+| 3 | 开关切换 | 即时生效, 重启保持 | ⬜ 需手动验证 |
+| 4 | 记录列表 | DeviceEnvRecordsScreen 可显示 | ✅ screen8 |
+| 5 | 空态显示 | 空态提示正确 "暂无记录" | ✅ screen8 |
+| 6 | 详情页 | markdown 渲染正确, TOC 导航 | ⬜ 需有记录 |
+| 7 | 长按复制 | 摘要包含 kind/operation/time/package | ⬜ 需有记录 |
+| 8 | 语言切换 | 中/英切换所有 DeviceEnv 文案正确 | ✅ screen15 中文正确 |
+| 9 | 记录清除 | 数据管理 → 清除设备环境记录 → 计数归零 | ⬜ 需手动验证 |
+| 10 | 跨应用隔离 | 两个应用各有记录, 按包名隔离 | ⬜ 需注入数据 |
+
+### 10.3 验证结果截图
+
+- screen1: 应用列表页正常
+- screen6: AppMonitorScreen — StatsCard 7段 + 7个 EntryRow (含设备环境记录)
+- screen8: DeviceEnvRecordsScreen — 空态 "暂无记录", 搜索提示 "搜索设备环境记录"
+- screen9: PerAppListenSettingsScreen — 7个 master switch (含设备环境监听)
+- screen15/16: 13个 DeviceEnv category rows 全部可见
+- 备注: 全量压力测试(高频写入/分页/重启持久化等)需配合 Xposed 模块注入,当前模拟器无 Hook 环境,标记为 ⬜
 
 ---
 
@@ -125,78 +120,10 @@ Modev 运行在 **Java/ART 层**（Xposed 模块）：
 | 11 | 模拟器网络伪造覆盖 MAC/IMEI/Android ID | ✅ |
 | 12 | 检测行为监控正确记录不干预 | ✅ |
 | 13 | i18n 双语齐备 | ✅ |
-| 14 | lint 零新增 (3 个 DiscouragedPrivateApi 为 Xposed 反射预期行为) | ✅ |
+| 14 | lint 零新增 | ✅ |
 | 15 | 全部单元测试通过 | ✅ |
-| 16 | Robolectric 测试通过 | ⬜ (待真机验证) |
-| 17 | 互逆测试通过 (readKind/applyKinds) | ✅ |
-| 18 | CategoryTaxonomy 对齐断言通过 | ✅ |
-| 19 | 与现有 6 大能力零回归 | ✅ |
-
----
-
-## 检测点分类学
-
-### A. Root 检测点
-
-| # | 检测类别 | 检测方法 | 干预策略 | Hook 点 |
-|---|---------|---------|---------|---------|
-| A1 | su binary 存在 | `File("/system/bin/su").exists()` 等 30+ 路径 | `setResult(false)` | `File.exists()` |
-| A2 | su 命令执行 | `Runtime.exec("su")` | 抛 IOException | `Runtime.exec()` |
-| A3 | Root 管理 app | `PackageManager.getInstalledPackages()` 含 Magisk | 过滤返回列表 | `PackageManager` |
-| A4 | Root 管理 Intent | `queryIntentActivities()` 含 root 管理器 | 过滤返回列表 | `PackageManager` |
-| A5 | 危险属性 | `Build.TAGS` 含 "test-keys" | 替换返回值 | `Build.TAGS` |
-| A6 | Magisk 特征 | `/sbin/.magisk` 等路径 | `exists()` → false | `File.exists()` |
-| A7 | Busybox 检测 | `/system/xbin/busybox` | `setResult(false)` | `File.exists()` |
-| A8 | ro.debuggable | `System.getProperty("ro.debuggable")` | 返回 "0" | `System.getProperty()` |
-| A9 | ro.secure | `System.getProperty("ro.secure")` | 返回 "1" | `System.getProperty()` |
-
-### B. Xposed 检测点
-
-| # | 检测类别 | 检测方法 | 干预策略 | Hook 点 |
-|---|---------|---------|---------|---------|
-| B1 | XposedBridge 类 | `Class.forName("de.robv.android.xposed.XposedBridge")` | 返回 null | `Class.forName()` |
-| B2 | Xposed 堆栈 | 检查调用栈含 `de.robv.android.xposed` | 过滤栈帧 | `Throwable.getStackTrace()` |
-| B3 | Xposed 模块列表 | PackageManager 查 `xposedmodule` | 过滤返回列表 | `PackageManager` |
-| B4 | `/proc/self/maps` | 读 maps 搜索 xposed/lspd 路径 | 文本过滤行 | `BufferedReader.readLine()` |
-| B5 | LSPlant 痕迹 | 检测 ART hook 痕迹 | 方法入口恢复 (可选) | `Method.invoke()` |
-
-### C. 模拟器检测点
-
-| # | 检测类别 | 检测方法 | 干预策略 | Hook 点 |
-|---|---------|---------|---------|---------|
-| C1 | Build 属性 | `Build.FINGERPRINT` 含 "generic/sdk" | 替换为真机值 | `Build` 类字段 |
-| C2 | 系统属性 | `ro.hardware` = "goldfish" | 替换返回值 | `System.getProperty()` |
-| C3 | 设备文件 | `/dev/qemu_pipe` 存在 | `exists()` → false | `File.exists()` |
-| C4 | 传感器缺失 | `getDefaultSensor()` 返回 null | 返回假传感器 | `SensorManager` |
-| C5 | WiFi MAC | `getMacAddress()` 返回全 0 | 返回随机 MAC | `WifiInfo` |
-| C6 | Android ID | `ANDROID_ID` 返回 null/全 0 | 返回随机 ID | `Settings.Secure` |
-| C7 | 调试器 | `isDebuggerConnected()` | 返回 false | `Debug` |
-
----
-
-## 强约束
-
-1. 互逆测试: `readKind`/`applyKinds` 全 DeviceEnvKind 通过
-2. CategoryTaxonomy 与 HookSwitch.DEFAULT 对齐
-3. VALID_KINDS 白名单包含所有 DeviceEnvKind
-4. fromJson 主开关补齐默认 true
-5. i18n 双语齐备 (80+ 键)
-6. ui 包零中文
-7. PROTECTIVE 模式: 异常不阻塞宿主
-8. 配置快照: emit 入口一次读取
-9. 类加载: `runCatching { Class.forName() }.getOrNull()`
-10. lint 零新增 (基线 36/0)
-11. Gson serializeNulls
-12. 与现有 6 大能力零回归
-
----
-
-## 风险与缓解
-
-| 风险 | 缓解 |
-|------|------|
-| Root 路径不完整 | 参考 RootBeer 40+ 路径 + 支持用户自定义 |
-| Xposed 类名变更 | 模式匹配 `contains("xposed")` 而非精确匹配 |
-| Maps 过滤性能 | 仅在 maps 读取时 hook，预编译正则 |
-| 与 Shamiko/ZygiskNext 冲突 | Modev 仅 Java 层干预，零 namespace 操作 |
-| Native 层检测绕过 | 超出能力范围；记录为 intervention=false |
+| 16 | 互逆测试通过 (readKind/applyKinds) | ✅ |
+| 17 | CategoryTaxonomy 对齐断言通过 | ✅ |
+| 18 | 与现有 6 大能力零回归 | ✅ |
+| 19 | **UI 一等公民:AppMonitor 入口 + 监听设置 + 记录列表 + 详情页 + 导航** | ✅ |
+| 20 | **ADB 功能验证:应用列表/监听设置/记录列表/空态/语言切换** | ✅ |

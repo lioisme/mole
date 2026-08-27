@@ -40,6 +40,7 @@ import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.core.model.WebViewKind
 import com.lioisme.modev.core.model.NetworkKind
+import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.ui.components.networkKindLabelRes
 import com.lioisme.modev.data.mapping.BehaviorRow
 import com.lioisme.modev.data.mapping.CryptoRow
@@ -67,6 +68,8 @@ import com.lioisme.modev.ui.components.sqlRowSummary
 import com.lioisme.modev.ui.components.copySummary
 import com.lioisme.modev.ui.components.webviewKindLabelRes
 import com.lioisme.modev.ui.components.webviewSummary
+import com.lioisme.modev.ui.components.deviceEnvKindLabelRes
+import com.lioisme.modev.ui.components.deviceEnvSummary
 import kotlinx.coroutines.launch
 
 /**
@@ -184,6 +187,22 @@ fun NetworkRecordsScreen(
     )
 }
 
+/** 单应用设备环境记录列表(V31 一等公民)。 */
+@Composable
+fun DeviceEnvRecordsScreen(
+    viewModel: RecordsViewModel,
+    onBack: () -> Unit,
+    onOpenRecord: (Long) -> Unit,
+) {
+    MonitorRecordsContent(
+        viewModel = viewModel,
+        onBack = onBack,
+        onOpenRecord = onOpenRecord,
+        placeholder = stringResource(R.string.device_records_search),
+        kinds = DeviceEnvKind.entries.map { KindOption(it.name, deviceEnvKindLabelRes(it)) },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MonitorRecordsContent(
@@ -218,7 +237,7 @@ private fun MonitorRecordsContent(
                 is PrefsRow -> record.prefsSummary(context)
                 is WebViewRow -> webviewSummary(context, record)
                 is NetworkRow -> networkSummary(context, record)
-                is DeviceEnvRow -> "${record.kind.name}: ${record.operation.name}"
+                is DeviceEnvRow -> deviceEnvSummary(context, record)
             }
         clipboard.setText(AnnotatedString(summary))
         scope.launch {
