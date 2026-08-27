@@ -39,12 +39,17 @@ import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.core.model.WebViewKind
+import com.lioisme.modev.core.model.NetworkKind
+import com.lioisme.modev.ui.components.networkKindLabelRes
 import com.lioisme.modev.data.mapping.BehaviorRow
 import com.lioisme.modev.data.mapping.CryptoRow
 import com.lioisme.modev.data.mapping.PrefsRow
 import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.mapping.SqlRow
 import com.lioisme.modev.data.mapping.WebViewRow
+import com.lioisme.modev.data.mapping.NetworkRow
+import com.lioisme.modev.data.mapping.DeviceEnvRow
+import com.lioisme.modev.ui.components.networkSummary
 import com.lioisme.modev.ui.apps.AppCountFormat
 import com.lioisme.modev.ui.common.rememberEffectiveLocale
 import com.lioisme.modev.ui.components.CollapsedSearchInput
@@ -164,6 +169,21 @@ fun WebViewRecordsScreen(
     )
 }
 
+@Composable
+fun NetworkRecordsScreen(
+    viewModel: RecordsViewModel,
+    onBack: () -> Unit,
+    onOpenRecord: (Long) -> Unit,
+) {
+    MonitorRecordsContent(
+        viewModel = viewModel,
+        onBack = onBack,
+        onOpenRecord = onOpenRecord,
+        placeholder = stringResource(R.string.network_records_search),
+        kinds = NetworkKind.entries.map { KindOption(it.name, networkKindLabelRes(it)) },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MonitorRecordsContent(
@@ -197,6 +217,8 @@ private fun MonitorRecordsContent(
                 is BehaviorRow -> record.behaviorSummary(context)
                 is PrefsRow -> record.prefsSummary(context)
                 is WebViewRow -> webviewSummary(context, record)
+                is NetworkRow -> networkSummary(context, record)
+                is DeviceEnvRow -> "${record.kind.name}: ${record.operation.name}"
             }
         clipboard.setText(AnnotatedString(summary))
         scope.launch {

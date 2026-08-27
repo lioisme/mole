@@ -136,8 +136,43 @@ data class CryptoRecordEntity(
 
     // ---- 偏好监听列(v9→v10 迁移新增,recordType='prefs' 行承载;其余行为 NULL) ----
 
-    /** 配置键(get/put/remove 系列首参;getAll/clear 为 NULL) 首参;getAll/clear 为 NULL)。 */
+    /** 配置键(get/put/remove 系列首参;getAll/clear 为 NULL)。 */
     @ColumnInfo(name = "prefKey") val prefKey: String? = null,
+
+    // ---- 网络环境监听列(v10→v11 迁移新增,recordType='network' 行承载;其余行为 NULL) ----
+
+    /** 请求 URL(REQUEST 类别)。 */
+    @ColumnInfo(name = "url") val url: String? = null,
+
+    /** HTTP 方法(GET/POST 等,REQUEST 类别)。 */
+    @ColumnInfo(name = "method") val httpMethod: String? = null,
+
+    /** HTTP 状态码(REQUEST 响应)。 */
+    @ColumnInfo(name = "statusCode") val statusCode: Int? = null,
+
+    /** 请求头 JSON(REQUEST 类别)。 */
+    @ColumnInfo(name = "requestHeadersJson") val requestHeadersJson: String? = null,
+
+    /** 响应头 JSON(REQUEST 类别)。 */
+    @ColumnInfo(name = "responseHeadersJson") val responseHeadersJson: String? = null,
+
+    /** TLS 协议版本(REQUEST 类别,如 TLSv1.3)。 */
+    @ColumnInfo(name = "sslProtocol") val sslProtocol: String? = null,
+
+    /** 密码套件(REQUEST 类别)。 */
+    @ColumnInfo(name = "cipherSuite") val cipherSuite: String? = null,
+
+    /** 对端证书链 JSON(REQUEST 类别,SHA-256 哈希列表)。 */
+    @ColumnInfo(name = "peerCertificatesJson") val peerCertificatesJson: String? = null,
+
+    /** 代理主机(PROXY 类别)。 */
+    @ColumnInfo(name = "proxyHost") val proxyHost: String? = null,
+
+    /** 代理端口(PROXY 类别)。 */
+    @ColumnInfo(name = "proxyPort") val proxyPort: Int? = null,
+
+    /** VPN 是否活跃(VPN 类别;1=活跃,0=非活跃,NULL=未知)。 */
+    @ColumnInfo(name = "vpnActive") val vpnActive: Int? = null,
 
     @ColumnInfo(name = "contextId") val contextId: Long = 0L,
     @ColumnInfo(name = "threadName") val threadName: String,

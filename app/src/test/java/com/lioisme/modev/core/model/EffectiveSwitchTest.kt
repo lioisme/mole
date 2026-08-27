@@ -224,6 +224,40 @@ class EffectiveSwitchTest {
         assertTrue(on.anyBehaviorEnabled)
     }
 
+    @Test
+    fun `deviceEnv master deviation forces value`() {
+        val off = EffectiveSwitch.resolve(d, AppListenOverride(deviceEnvListen = false))
+        assertFalse(off.deviceEnvListen)
+        assertFalse(off.anyDeviceEnvEnabled)
+
+        val on = EffectiveSwitch.resolve(d.copy(deviceEnvListen = false), AppListenOverride(deviceEnvListen = true))
+        assertTrue(on.deviceEnvListen)
+    }
+
+    @Test
+    fun `readKind and applyKinds are inverses for DeviceEnvKind`() {
+        for (kind in DeviceEnvKind.entries) {
+            val original = when (kind) {
+                DeviceEnvKind.ROOT_FILE -> d.rootFile
+                DeviceEnvKind.ROOT_EXEC -> d.rootExec
+                DeviceEnvKind.ROOT_PACKAGE_MANAGER -> d.rootPackageManager
+                DeviceEnvKind.ROOT_PROPERTY -> d.rootProperty
+                DeviceEnvKind.XPOSED_CLASS -> d.xposedClass
+                DeviceEnvKind.XPOSED_STACK -> d.xposedStack
+                DeviceEnvKind.XPOSED_MAPS -> d.xposedMaps
+                DeviceEnvKind.EMULATOR_BUILD -> d.emulatorBuild
+                DeviceEnvKind.EMULATOR_FILE -> d.emulatorFile
+                DeviceEnvKind.EMULATOR_SENSOR -> d.emulatorSensor
+                DeviceEnvKind.EMULATOR_NETWORK -> d.emulatorNetwork
+                DeviceEnvKind.DETECT_ROOT -> d.detectRoot
+                DeviceEnvKind.DETECT_EMULATOR -> d.detectEmulator
+            }
+            assertEquals("$kind readKind", original, EffectiveSwitch.readKind(d, kind.name))
+            val toggled = EffectiveSwitch.resolve(d, AppListenOverride(kinds = mapOf(kind.name to !original)))
+            assertEquals("$kind applyKinds", !original, EffectiveSwitch.readKind(toggled, kind.name))
+        }
+    }
+
     /** V27 行为微调项:null 位取默认;空路径表不构成偏差。 */
     @Test
     fun `behavior option nulls take default and empty path list is zero deviation`() {

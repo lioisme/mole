@@ -77,7 +77,7 @@ object LegacyPlatform : Platform {
         return args
     }
 
-    /** 调用视图:legacy 参数数组越界安全取值。 */
+    /** 调用视图:legacy 参数数组越界安全取值。[setResult] 通过 MethodHookParam.setResult 实现。 */
     private class LegacyInvocation(
         private val param: XC_MethodHook.MethodHookParam,
         override val result: Any?,
@@ -93,5 +93,9 @@ object LegacyPlatform : Platform {
             get() = param.args?.size ?: 0
 
         override fun getArgUnsafe(index: Int): Any? = param.args?.get(index)
+
+        override fun setResult(value: Any?) {
+            param.result = value
+        }
     }
 }

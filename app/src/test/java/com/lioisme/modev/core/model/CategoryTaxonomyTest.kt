@@ -2,6 +2,7 @@ package com.lioisme.modev.core.model
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -84,6 +85,21 @@ class CategoryTaxonomyTest {
             CategoryTaxonomy.validateOperations(RecordTypes.DATABASE, setOf(SqlOperation.INSERT.name))!!
                 .contains(SqlOperation.INSERT.name),
         )
+    }
+
+    @Test
+    fun `device_env_categories_match_defaults`() {
+        val off = CategoryTaxonomy.forType(RecordType.DEVICE_ENV).filter { !it.defaultEnabled }.map { it.id }.toSet()
+        assertEquals(setOf(DeviceEnvKind.DETECT_ROOT.name, DeviceEnvKind.DETECT_EMULATOR.name), off)
+        val on = CategoryTaxonomy.forType(RecordType.DEVICE_ENV).filter { it.defaultEnabled }.map { it.id }.toSet()
+        assertEquals(11, on.size)
+    }
+
+    @Test
+    fun `validateOperations includes DeviceEnvOperation entries`() {
+        val valid = CategoryTaxonomy.validateOperations(RecordTypes.DEVICE_ENV, setOf("FILE_EXISTS", "CLASS_FOR_NAME"))
+        assertNotNull(valid)
+        assertEquals(2, valid!!.size)
     }
 
     @Test

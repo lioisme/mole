@@ -32,6 +32,8 @@ import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.CryptoKind
+import com.lioisme.modev.core.model.DeviceEnvKind
+import com.lioisme.modev.core.model.NetworkKind
 import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.core.model.WebViewKind
@@ -103,5 +105,37 @@ object KindIcons {
             WebViewKind.JS_BRIDGE -> Icons.Outlined.SwapHoriz
             WebViewKind.DEBUG -> Icons.Outlined.Visibility
             WebViewKind.JS_CRYPTO -> Icons.Outlined.EnhancedEncryption
+        }
+
+    /** 网络环境监听族(V30 一等公民)。 */
+    fun network(kind: NetworkKind): ImageVector =
+        when (kind) {
+            NetworkKind.SSL_CONTEXT,
+            NetworkKind.SSL_TRUST_MANAGER,
+            NetworkKind.SSL_OKHTTP_PINNER,
+            NetworkKind.SSL_OKHTTP_VERIFIER,
+            NetworkKind.SSL_WEBVIEW,
+            NetworkKind.SSL_NETWORK_CONFIG -> Icons.Outlined.Security
+            NetworkKind.PROXY_SYSTEM_PROP,
+            NetworkKind.PROXY_CONNECTIVITY,
+            NetworkKind.PROXY_SETTINGS,
+            NetworkKind.PROXY_OKHTTP -> Icons.Outlined.Public
+            NetworkKind.VPN_CAPABILITIES,
+            NetworkKind.VPN_INTERFACE,
+            NetworkKind.VPN_NETWORK_INFO,
+            NetworkKind.VPN_LINK_PROPERTIES -> Icons.Outlined.Visibility
+            NetworkKind.REQUEST -> Icons.Outlined.ManageSearch
+        }
+
+    /** 设备环境监听族(V31 一等公民)。 */
+    fun deviceEnv(kind: DeviceEnvKind): ImageVector =
+        when (kind) {
+            DeviceEnvKind.ROOT_FILE, DeviceEnvKind.ROOT_EXEC,
+            DeviceEnvKind.ROOT_PACKAGE_MANAGER, DeviceEnvKind.ROOT_PROPERTY -> Icons.Outlined.Security
+            DeviceEnvKind.XPOSED_CLASS, DeviceEnvKind.XPOSED_STACK,
+            DeviceEnvKind.XPOSED_MAPS -> Icons.Outlined.Visibility
+            DeviceEnvKind.EMULATOR_BUILD, DeviceEnvKind.EMULATOR_FILE,
+            DeviceEnvKind.EMULATOR_SENSOR, DeviceEnvKind.EMULATOR_NETWORK -> Icons.Outlined.Construction
+            DeviceEnvKind.DETECT_ROOT, DeviceEnvKind.DETECT_EMULATOR -> Icons.Outlined.ManageSearch
         }
 }

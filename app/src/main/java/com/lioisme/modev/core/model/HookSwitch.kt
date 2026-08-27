@@ -117,14 +117,82 @@ data class HookSwitch(
      * 与内置系统路径清单叠加生效,默认空。
      */
     val ignorePathPrefixes: List<String> = emptyList(),
+
+    // ---- V30 网络环境监听 ----
+
+    /** 网络环境监听全局总开关(V30;false = 全部网络类别停用,分开关保留原态)。 */
+    val networkListen: Boolean = true,
+    /** SSL:SSLContext.init TrustManager 替换。 */
+    val sslContext: Boolean = true,
+    /** SSL:Conscrypt TrustManagerImpl 拦截。 */
+    val sslTrustManager: Boolean = true,
+    /** SSL:OkHttp CertificatePinner.check 拦截(含混淆发现)。 */
+    val sslOkhttpPinner: Boolean = true,
+    /** SSL:OkHttp OkHostnameVerifier.verify 拦截。 */
+    val sslOkhttpVerifier: Boolean = true,
+    /** SSL:WebView onReceivedSslError 自动 proceed。 */
+    val sslWebview: Boolean = true,
+    /** SSL:NetworkSecurityConfig pin 绕过。 */
+    val sslNetworkConfig: Boolean = true,
+    /** 代理:System.getProperty 代理属性隐藏。 */
+    val proxySystemProp: Boolean = true,
+    /** 代理:ConnectivityManager 代理查询隐藏。 */
+    val proxyConnectivity: Boolean = true,
+    /** 代理:Settings.Global 代理隐藏。 */
+    val proxySettings: Boolean = true,
+    /** 代理:OkHttp ProxySelector 隐藏。 */
+    val proxyOkhttp: Boolean = true,
+    /** VPN:NetworkCapabilities TRANSPORT_VPN 隐藏。 */
+    val vpnCapabilities: Boolean = true,
+    /** VPN:NetworkInterface VPN 接口隐藏。 */
+    val vpnInterface: Boolean = true,
+    /** VPN:NetworkInfo TYPE_VPN 隐藏。 */
+    val vpnNetworkInfo: Boolean = true,
+    /** VPN:LinkProperties VPN 路由隐藏。 */
+    val vpnLinkProperties: Boolean = true,
+    /** 网络请求监控(含 Reqable 堆栈)。 */
+    val networkRequest: Boolean = true,
+
+    // ---- V31 设备环境监听 ----
+
+    /** 设备环境监听全局总开关(V31;false = 全部设备环境类别停用,分开关保留原态)。 */
+    val deviceEnvListen: Boolean = true,
+    /** Root:文件存在性检测干预(su/busybox/magisk 路径)。 */
+    val rootFile: Boolean = true,
+    /** Root:命令执行检测干预(Runtime.exec su)。 */
+    val rootExec: Boolean = true,
+    /** Root:包管理器查询干预(root 管理 app 过滤)。 */
+    val rootPackageManager: Boolean = true,
+    /** Root:系统属性检测干预(Build.TAGS/ro.debuggable 等)。 */
+    val rootProperty: Boolean = true,
+    /** Xposed:类存在性检测干预(Class.forName XposedBridge)。 */
+    val xposedClass: Boolean = true,
+    /** Xposed:堆栈检测干预(调用栈含 xposed 帧)。 */
+    val xposedStack: Boolean = true,
+    /** Xposed:/proc/self/maps 扫描干预。 */
+    val xposedMaps: Boolean = true,
+    /** 模拟器:Build 属性伪造(fingerprint/model/product)。 */
+    val emulatorBuild: Boolean = true,
+    /** 模拟器:设备文件检测干预(qemu_pipe/goldfish_pipe)。 */
+    val emulatorFile: Boolean = true,
+    /** 模拟器:传感器伪造(假加速度计/陀螺仪)。 */
+    val emulatorSensor: Boolean = true,
+    /** 模拟器:网络/MAC/IMEI 伪造。 */
+    val emulatorNetwork: Boolean = true,
+    /** 设备环境:Root 检测行为监控(仅记录,不干预;默认关,噪声大)。 */
+    val detectRoot: Boolean = false,
+    /** 设备环境:模拟器检测行为监控(仅记录,不干预;默认关,噪声大)。 */
+    val detectEmulator: Boolean = false,
+
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
     val maxHexChars: Int = RecordLimits.DEFAULT_MAX_HEX_CHARS,
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
     val maxTextChars: Int = RecordLimits.DEFAULT_MAX_TEXT_CHARS,
 ) {
-    /** 是否存在任何需要 Hook 的类别(算法 + 数据库 + 行为 + 偏好 + WebView 任一能力启用)。 */
+    /** 是否存在任何需要 Hook 的类别(算法 + 数据库 + 行为 + 偏好 + WebView + 网络 + 设备环境 任一能力启用)。 */
     val anyEnabled: Boolean
-        get() = anyCryptoEnabled || anyDbEnabled || anyBehaviorEnabled || anyPrefsEnabled || anyWebviewEnabled
+        get() = anyCryptoEnabled || anyDbEnabled || anyBehaviorEnabled || anyPrefsEnabled ||
+            anyWebviewEnabled || anyNetworkEnabled || anyDeviceEnvEnabled
 
     /** 算法捕获相关类别是否任一启用(含全局总开关投影,供算法监听能力判定)。 */
     val anyCryptoEnabled: Boolean
@@ -147,6 +215,21 @@ data class HookSwitch(
     /** WebView 监听相关类别是否任一启用(含全局总开关投影,供 WebView 监听能力判定)。 */
     val anyWebviewEnabled: Boolean
         get() = webviewListen && (wvPageLoad || wvEvaluateJs || wvJsBridge || wvDebug || wvJsCrypto)
+
+    /** 网络环境监听相关类别是否任一启用(含全局总开关投影,供网络监听能力判定)。 */
+    val anyNetworkEnabled: Boolean
+        get() = networkListen && (sslContext || sslTrustManager || sslOkhttpPinner ||
+            sslOkhttpVerifier || sslWebview || sslNetworkConfig ||
+            proxySystemProp || proxyConnectivity || proxySettings || proxyOkhttp ||
+            vpnCapabilities || vpnInterface || vpnNetworkInfo || vpnLinkProperties ||
+            networkRequest)
+
+    /** 设备环境监听相关类别是否任一启用(含全局总开关投影,供设备环境监听能力判定)。 */
+    val anyDeviceEnvEnabled: Boolean
+        get() = deviceEnvListen && (rootFile || rootExec || rootPackageManager || rootProperty ||
+            xposedClass || xposedStack || xposedMaps ||
+            emulatorBuild || emulatorFile || emulatorSensor || emulatorNetwork ||
+            detectRoot || detectEmulator)
 
     fun enabled(kind: CryptoKind): Boolean = cryptoListen && when (kind) {
         CryptoKind.MESSAGE_DIGEST -> messageDigest
@@ -200,6 +283,42 @@ data class HookSwitch(
         WebViewKind.JS_CRYPTO -> wvJsCrypto
     }
 
+    /** 网络类别有效开关(master 门控;与 [CategoryTaxonomy] 默认态对齐由测试强制)。 */
+    fun networkEnabled(kind: NetworkKind): Boolean = networkListen && when (kind) {
+        NetworkKind.SSL_CONTEXT -> sslContext
+        NetworkKind.SSL_TRUST_MANAGER -> sslTrustManager
+        NetworkKind.SSL_OKHTTP_PINNER -> sslOkhttpPinner
+        NetworkKind.SSL_OKHTTP_VERIFIER -> sslOkhttpVerifier
+        NetworkKind.SSL_WEBVIEW -> sslWebview
+        NetworkKind.SSL_NETWORK_CONFIG -> sslNetworkConfig
+        NetworkKind.PROXY_SYSTEM_PROP -> proxySystemProp
+        NetworkKind.PROXY_CONNECTIVITY -> proxyConnectivity
+        NetworkKind.PROXY_SETTINGS -> proxySettings
+        NetworkKind.PROXY_OKHTTP -> proxyOkhttp
+        NetworkKind.VPN_CAPABILITIES -> vpnCapabilities
+        NetworkKind.VPN_INTERFACE -> vpnInterface
+        NetworkKind.VPN_NETWORK_INFO -> vpnNetworkInfo
+        NetworkKind.VPN_LINK_PROPERTIES -> vpnLinkProperties
+        NetworkKind.REQUEST -> networkRequest
+    }
+
+    /** 设备环境类别有效开关(master 门控;与 [CategoryTaxonomy] 默认态对齐由测试强制)。 */
+    fun deviceEnvEnabled(kind: DeviceEnvKind): Boolean = deviceEnvListen && when (kind) {
+        DeviceEnvKind.ROOT_FILE -> rootFile
+        DeviceEnvKind.ROOT_EXEC -> rootExec
+        DeviceEnvKind.ROOT_PACKAGE_MANAGER -> rootPackageManager
+        DeviceEnvKind.ROOT_PROPERTY -> rootProperty
+        DeviceEnvKind.XPOSED_CLASS -> xposedClass
+        DeviceEnvKind.XPOSED_STACK -> xposedStack
+        DeviceEnvKind.XPOSED_MAPS -> xposedMaps
+        DeviceEnvKind.EMULATOR_BUILD -> emulatorBuild
+        DeviceEnvKind.EMULATOR_FILE -> emulatorFile
+        DeviceEnvKind.EMULATOR_SENSOR -> emulatorSensor
+        DeviceEnvKind.EMULATOR_NETWORK -> emulatorNetwork
+        DeviceEnvKind.DETECT_ROOT -> detectRoot
+        DeviceEnvKind.DETECT_EMULATOR -> detectEmulator
+    }
+
     companion object {
         val DEFAULT = HookSwitch()
 
@@ -217,6 +336,8 @@ data class HookSwitch(
                 behaviorListen = obj?.get("behaviorListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
                 prefsListen = obj?.get("prefsListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
                 webviewListen = obj?.get("webviewListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
+                networkListen = obj?.get("networkListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
+                deviceEnvListen = obj?.get("deviceEnvListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
             )
         }.getOrNull()
     }

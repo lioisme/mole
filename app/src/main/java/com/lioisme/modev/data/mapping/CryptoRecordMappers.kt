@@ -130,6 +130,8 @@ internal fun CryptoRecordRow.toRowModelOrNull(): RowModel? = when (recordType) {
     RecordTypes.BEHAVIOR -> behaviorRowModelOrNull()
     RecordTypes.PREFS -> prefsRowModelOrNull()
     RecordTypes.WEBVIEW -> webviewRowModelOrNull()
+    RecordTypes.NETWORK -> networkRowModelOrNull()
+    RecordTypes.DEVICE_ENV -> deviceEnvRowModelOrNull()
     else -> null
 }
 
@@ -217,6 +219,8 @@ internal fun CryptoRecordEntity.toRecordDetailOrNull(): RecordDetailModel? = whe
     RecordTypes.BEHAVIOR -> toBehaviorModelOrNull()?.let(::BehaviorDetail)
     RecordTypes.PREFS -> toPrefsModelOrNull()?.let(::PrefsDetail)
     RecordTypes.WEBVIEW -> toWebViewModelOrNull()?.let(::WebViewDetail)
+    RecordTypes.NETWORK -> toNetworkModelOrNull()?.let(::NetworkDetail)
+    RecordTypes.DEVICE_ENV -> toDeviceEnvModelOrNull()?.let(::DeviceEnvDetail)
     else -> null
 }
 

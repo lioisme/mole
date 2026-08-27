@@ -21,8 +21,13 @@ class LibxposedPlatform(private val xposed: XposedInterface) : Platform {
                 .setPriority(XposedInterface.PRIORITY_DEFAULT)
                 .setExceptionMode(XposedInterface.ExceptionMode.PROTECTIVE)
                 .intercept { chain ->
-                    hook.before(ModernInvocation(chain, null))
-                    val result = chain.proceed()
+                    val invocation = ModernInvocation(chain, null)
+                    hook.before(invocation)
+                    val result = if (invocation.shortCircuited) {
+                        invocation.shortCircuitResult
+                    } else {
+                        chain.proceed()
+                    }
                     hook.after(ModernInvocation(chain, result))
                     result
                 }
@@ -45,11 +50,19 @@ class LibxposedPlatform(private val xposed: XposedInterface) : Platform {
     /**
      * 调用视图。注意:libxposed 的 getThisObject() 对静态方法会抛异常,
      * 统一捕获转为 null,保证业务层空安全。
+     *
+     * [setResult] 通过拦截器短路实现:记录短路值并标记,
+     * 拦截器 lambda 根据标记跳过 [XposedInterface.Chain.proceed]。
      */
     private class ModernInvocation(
         private val chain: XposedInterface.Chain,
         override val result: Any?,
     ) : Invocation() {
+
+        var shortCircuited = false
+            private set
+        var shortCircuitResult: Any? = null
+            private set
 
         override val executable: Executable?
             get() = runCatching { chain.executable }.getOrNull()
@@ -61,5 +74,10 @@ class LibxposedPlatform(private val xposed: XposedInterface) : Platform {
             get() = chain.args.size
 
         override fun getArgUnsafe(index: Int): Any? = runCatching { chain.getArg(index) }.getOrNull()
+
+        override fun setResult(value: Any?) {
+            shortCircuited = true
+            shortCircuitResult = value
+        }
     }
 }

@@ -17,9 +17,13 @@ import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.core.model.WebViewRecord
+import com.lioisme.modev.core.model.NetworkRecord
+import com.lioisme.modev.core.model.DeviceEnvRecord
 import com.lioisme.modev.core.codec.BehaviorRecordCodec
 import com.lioisme.modev.core.codec.PrefsRecordCodec
 import com.lioisme.modev.core.codec.WebViewRecordCodec
+import com.lioisme.modev.core.codec.NetworkRecordCodec
+import com.lioisme.modev.core.codec.DeviceEnvRecordCodec
 import com.lioisme.modev.data.db.CryptoRecordDao
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
@@ -179,6 +183,14 @@ class LogRepository(
                     toPersist.add(decoded.toEntity())
                 }
                 is WebViewRecord -> {
+                    decodableAcks.add(wire.seq to ack)
+                    toPersist.add(decoded.toEntity())
+                }
+                is NetworkRecord -> {
+                    decodableAcks.add(wire.seq to ack)
+                    toPersist.add(decoded.toEntity())
+                }
+                is DeviceEnvRecord -> {
                     decodableAcks.add(wire.seq to ack)
                     toPersist.add(decoded.toEntity())
                 }
@@ -539,6 +551,7 @@ class LogRepository(
                 register(BehaviorRecordCodec.RECORD_TYPE, BehaviorRecordCodec::decode)
                 register(PrefsRecordCodec.RECORD_TYPE, PrefsRecordCodec::decode)
                 register(WebViewRecordCodec.RECORD_TYPE, WebViewRecordCodec::decode)
+                register(NetworkRecordCodec.RECORD_TYPE, NetworkRecordCodec::decode)
             }
 
         private const val MAX_RECORDS = 20_000

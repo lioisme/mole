@@ -16,6 +16,9 @@ class RecordTypeTest {
         assertEquals(RecordType.DATABASE, RecordType.fromWire("db"))
         assertEquals(RecordType.BEHAVIOR, RecordType.fromWire("behavior"))
         assertEquals(RecordType.PREFS, RecordType.fromWire("prefs"))
+        assertEquals(RecordType.WEBVIEW, RecordType.fromWire("webview"))
+        assertEquals(RecordType.NETWORK, RecordType.fromWire("network"))
+        assertEquals(RecordType.DEVICE_ENV, RecordType.fromWire("device_env"))
     }
 
     @Test
@@ -32,5 +35,8 @@ class RecordTypeTest {
         assertEquals(RecordTypes.DATABASE, RecordType.DATABASE.wire)
         assertEquals(RecordTypes.BEHAVIOR, RecordType.BEHAVIOR.wire)
         assertEquals(RecordTypes.PREFS, RecordType.PREFS.wire)
+        assertEquals(RecordTypes.WEBVIEW, RecordType.WEBVIEW.wire)
+        assertEquals(RecordTypes.NETWORK, RecordType.NETWORK.wire)
+        assertEquals(RecordTypes.DEVICE_ENV, RecordType.DEVICE_ENV.wire)
     }
 }

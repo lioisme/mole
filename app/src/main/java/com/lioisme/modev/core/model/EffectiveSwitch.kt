@@ -23,6 +23,8 @@ object EffectiveSwitch {
         override.behaviorListen?.let { result = result.copy(behaviorListen = it) }
         override.prefsListen?.let { result = result.copy(prefsListen = it) }
         override.webviewListen?.let { result = result.copy(webviewListen = it) }
+        override.networkListen?.let { result = result.copy(networkListen = it) }
+        override.deviceEnvListen?.let { result = result.copy(deviceEnvListen = it) }
         if (override.kinds.isNotEmpty()) {
             result = applyKinds(result, override.kinds)
         }
@@ -78,6 +80,34 @@ object EffectiveSwitch {
         WebViewKind.JS_BRIDGE.name -> switch.wvJsBridge
         WebViewKind.DEBUG.name -> switch.wvDebug
         WebViewKind.JS_CRYPTO.name -> switch.wvJsCrypto
+        NetworkKind.SSL_CONTEXT.name -> switch.sslContext
+        NetworkKind.SSL_TRUST_MANAGER.name -> switch.sslTrustManager
+        NetworkKind.SSL_OKHTTP_PINNER.name -> switch.sslOkhttpPinner
+        NetworkKind.SSL_OKHTTP_VERIFIER.name -> switch.sslOkhttpVerifier
+        NetworkKind.SSL_WEBVIEW.name -> switch.sslWebview
+        NetworkKind.SSL_NETWORK_CONFIG.name -> switch.sslNetworkConfig
+        NetworkKind.PROXY_SYSTEM_PROP.name -> switch.proxySystemProp
+        NetworkKind.PROXY_CONNECTIVITY.name -> switch.proxyConnectivity
+        NetworkKind.PROXY_SETTINGS.name -> switch.proxySettings
+        NetworkKind.PROXY_OKHTTP.name -> switch.proxyOkhttp
+        NetworkKind.VPN_CAPABILITIES.name -> switch.vpnCapabilities
+        NetworkKind.VPN_INTERFACE.name -> switch.vpnInterface
+        NetworkKind.VPN_NETWORK_INFO.name -> switch.vpnNetworkInfo
+        NetworkKind.VPN_LINK_PROPERTIES.name -> switch.vpnLinkProperties
+        NetworkKind.REQUEST.name -> switch.networkRequest
+        DeviceEnvKind.ROOT_FILE.name -> switch.rootFile
+        DeviceEnvKind.ROOT_EXEC.name -> switch.rootExec
+        DeviceEnvKind.ROOT_PACKAGE_MANAGER.name -> switch.rootPackageManager
+        DeviceEnvKind.ROOT_PROPERTY.name -> switch.rootProperty
+        DeviceEnvKind.XPOSED_CLASS.name -> switch.xposedClass
+        DeviceEnvKind.XPOSED_STACK.name -> switch.xposedStack
+        DeviceEnvKind.XPOSED_MAPS.name -> switch.xposedMaps
+        DeviceEnvKind.EMULATOR_BUILD.name -> switch.emulatorBuild
+        DeviceEnvKind.EMULATOR_FILE.name -> switch.emulatorFile
+        DeviceEnvKind.EMULATOR_SENSOR.name -> switch.emulatorSensor
+        DeviceEnvKind.EMULATOR_NETWORK.name -> switch.emulatorNetwork
+        DeviceEnvKind.DETECT_ROOT.name -> switch.detectRoot
+        DeviceEnvKind.DETECT_EMULATOR.name -> switch.detectEmulator
         else -> null
     }
 
@@ -123,6 +153,34 @@ object EffectiveSwitch {
                 WebViewKind.JS_BRIDGE.name -> result.copy(wvJsBridge = value)
                 WebViewKind.DEBUG.name -> result.copy(wvDebug = value)
                 WebViewKind.JS_CRYPTO.name -> result.copy(wvJsCrypto = value)
+                NetworkKind.SSL_CONTEXT.name -> result.copy(sslContext = value)
+                NetworkKind.SSL_TRUST_MANAGER.name -> result.copy(sslTrustManager = value)
+                NetworkKind.SSL_OKHTTP_PINNER.name -> result.copy(sslOkhttpPinner = value)
+                NetworkKind.SSL_OKHTTP_VERIFIER.name -> result.copy(sslOkhttpVerifier = value)
+                NetworkKind.SSL_WEBVIEW.name -> result.copy(sslWebview = value)
+                NetworkKind.SSL_NETWORK_CONFIG.name -> result.copy(sslNetworkConfig = value)
+                NetworkKind.PROXY_SYSTEM_PROP.name -> result.copy(proxySystemProp = value)
+                NetworkKind.PROXY_CONNECTIVITY.name -> result.copy(proxyConnectivity = value)
+                NetworkKind.PROXY_SETTINGS.name -> result.copy(proxySettings = value)
+                NetworkKind.PROXY_OKHTTP.name -> result.copy(proxyOkhttp = value)
+                NetworkKind.VPN_CAPABILITIES.name -> result.copy(vpnCapabilities = value)
+                NetworkKind.VPN_INTERFACE.name -> result.copy(vpnInterface = value)
+                NetworkKind.VPN_NETWORK_INFO.name -> result.copy(vpnNetworkInfo = value)
+                NetworkKind.VPN_LINK_PROPERTIES.name -> result.copy(vpnLinkProperties = value)
+                NetworkKind.REQUEST.name -> result.copy(networkRequest = value)
+                DeviceEnvKind.ROOT_FILE.name -> result.copy(rootFile = value)
+                DeviceEnvKind.ROOT_EXEC.name -> result.copy(rootExec = value)
+                DeviceEnvKind.ROOT_PACKAGE_MANAGER.name -> result.copy(rootPackageManager = value)
+                DeviceEnvKind.ROOT_PROPERTY.name -> result.copy(rootProperty = value)
+                DeviceEnvKind.XPOSED_CLASS.name -> result.copy(xposedClass = value)
+                DeviceEnvKind.XPOSED_STACK.name -> result.copy(xposedStack = value)
+                DeviceEnvKind.XPOSED_MAPS.name -> result.copy(xposedMaps = value)
+                DeviceEnvKind.EMULATOR_BUILD.name -> result.copy(emulatorBuild = value)
+                DeviceEnvKind.EMULATOR_FILE.name -> result.copy(emulatorFile = value)
+                DeviceEnvKind.EMULATOR_SENSOR.name -> result.copy(emulatorSensor = value)
+                DeviceEnvKind.EMULATOR_NETWORK.name -> result.copy(emulatorNetwork = value)
+                DeviceEnvKind.DETECT_ROOT.name -> result.copy(detectRoot = value)
+                DeviceEnvKind.DETECT_EMULATOR.name -> result.copy(detectEmulator = value)
                 // 未知 kind 名:忽略(存储漂移兜底)
                 else -> result
             }

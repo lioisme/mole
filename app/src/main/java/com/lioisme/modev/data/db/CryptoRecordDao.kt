@@ -384,7 +384,8 @@ interface CryptoRecordDao {
             keyTruncated, inputTruncated, outputTruncated,
             substr(sql, 1, :previewChars) AS sqlPreview,
             rowCount, affectedCount, rowId,
-            path, destPath, command, fileSize, prefKey
+            path, destPath, command, fileSize, prefKey,
+            proxyHost, vpnActive
             """
 
         /**
@@ -469,4 +470,7 @@ data class CryptoRecordRow(
     val fileSize: Long? = null,
     // 偏好监听投影列(V28;prefs 行承载配置键,其余 NULL)
     val prefKey: String? = null,
+    // 网络环境监听投影列(V30)
+    val proxyHost: String? = null,
+    val vpnActive: Int? = null,
 )

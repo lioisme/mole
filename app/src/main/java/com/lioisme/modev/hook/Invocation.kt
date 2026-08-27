@@ -20,6 +20,15 @@ abstract class Invocation {
     /** after 阶段的原方法返回值;before 阶段恒为 null。 */
     abstract val result: Any?
 
+    /**
+     * 替换原方法返回值(仅 before 阶段有效):
+     * - 设置后原方法不再执行(libxposed)或结果被覆盖(legacy);
+     * - 供 SSL 绕过/代理隐藏/VPN 隐藏等干预型 hook 使用。
+     */
+    open fun setResult(value: Any?) {
+        throw UnsupportedOperationException("setResult not supported by this Invocation")
+    }
+
     /** 实参个数。 */
     abstract val argCount: Int
 

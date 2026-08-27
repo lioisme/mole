@@ -31,12 +31,28 @@ class HookSwitchTest {
             prefsRemove = false, prefsClear = false,
             webviewListen = false,
             wvPageLoad = false, wvEvaluateJs = false, wvJsBridge = false, wvDebug = false, wvJsCrypto = false,
+            networkListen = false,
+            sslContext = false, sslTrustManager = false, sslOkhttpPinner = false,
+            sslOkhttpVerifier = false, sslWebview = false, sslNetworkConfig = false,
+            proxySystemProp = false, proxyConnectivity = false, proxySettings = false,
+            proxyOkhttp = false,
+            vpnCapabilities = false, vpnInterface = false, vpnNetworkInfo = false,
+            vpnLinkProperties = false,
+            networkRequest = false,
+            deviceEnvListen = false,
+            rootFile = false, rootExec = false, rootPackageManager = false, rootProperty = false,
+            xposedClass = false, xposedStack = false, xposedMaps = false,
+            emulatorBuild = false, emulatorFile = false, emulatorSensor = false, emulatorNetwork = false,
+            detectRoot = false, detectEmulator = false,
         )
         assertFalse(s.anyEnabled)
         assertFalse(s.anyCryptoEnabled)
         assertFalse(s.anyDbEnabled)
         assertFalse(s.anyBehaviorEnabled)
         assertFalse(s.anyPrefsEnabled)
+        assertFalse(s.anyWebviewEnabled)
+        assertFalse(s.anyNetworkEnabled)
+        assertFalse(s.anyDeviceEnvEnabled)
     }
 
     @Test
@@ -185,6 +201,19 @@ class HookSwitchTest {
             prefsRemove = false, prefsClear = false,
             webviewListen = false,
             wvPageLoad = false, wvEvaluateJs = false, wvJsBridge = false, wvDebug = false, wvJsCrypto = false,
+            networkListen = false,
+            sslContext = false, sslTrustManager = false, sslOkhttpPinner = false,
+            sslOkhttpVerifier = false, sslWebview = false, sslNetworkConfig = false,
+            proxySystemProp = false, proxyConnectivity = false, proxySettings = false,
+            proxyOkhttp = false,
+            vpnCapabilities = false, vpnInterface = false, vpnNetworkInfo = false,
+            vpnLinkProperties = false,
+            networkRequest = false,
+            deviceEnvListen = false,
+            rootFile = false, rootExec = false, rootPackageManager = false, rootProperty = false,
+            xposedClass = false, xposedStack = false, xposedMaps = false,
+            emulatorBuild = false, emulatorFile = false, emulatorSensor = false, emulatorNetwork = false,
+            detectRoot = false, detectEmulator = false,
         )
         assertFalse(allOff.anyEnabled)
     }
@@ -236,8 +265,8 @@ class HookSwitchTest {
         assertTrue(prefsOff.anyCryptoEnabled)
         assertTrue(prefsOff.anyDbEnabled)
         assertTrue(prefsOff.anyBehaviorEnabled)
-        // 五总开关关:整体停用。
-        assertFalse(cryptoOff.copy(dbListen = false, behaviorListen = false, prefsListen = false, webviewListen = false).anyEnabled)
+        // 七总开关关:整体停用。
+        assertFalse(cryptoOff.copy(dbListen = false, behaviorListen = false, prefsListen = false, webviewListen = false, networkListen = false, deviceEnvListen = false).anyEnabled)
     }
 
     @Test
@@ -299,6 +328,55 @@ class HookSwitchTest {
         assertFalse(s.webviewEnabled(WebViewKind.DEBUG))
         assertTrue(s.webviewEnabled(WebViewKind.JS_CRYPTO))
         assertTrue(s.anyWebviewEnabled)
+    }
+
+    @Test
+    fun `device_env_only_enables_only_device_env_projection`() {
+        val s = HookSwitch(
+            messageDigest = false, cipher = false, mac = false, signature = false,
+            keyParam = false, keyGeneration = false, keyFactory = false,
+            keyStore = false, keyAgreement = false, random = false, base64 = false,
+            webView = false,
+            dbOpen = false, dbQuery = false, dbDml = false, dbExec = false, dbTransaction = false,
+            fileRead = false, fileWrite = false, fileDelete = false, fileRename = false,
+            fileList = false, assetRead = false, shellExec = false,
+            prefsOpen = false, prefsGet = false, prefsPut = false, prefsRemove = false, prefsClear = false,
+            webviewListen = false,
+            wvPageLoad = false, wvEvaluateJs = false, wvJsBridge = false, wvDebug = false, wvJsCrypto = false,
+            networkListen = false,
+            sslContext = false, sslTrustManager = false, sslOkhttpPinner = false,
+            sslOkhttpVerifier = false, sslWebview = false, sslNetworkConfig = false,
+            proxySystemProp = false, proxyConnectivity = false, proxySettings = false,
+            proxyOkhttp = false,
+            vpnCapabilities = false, vpnInterface = false, vpnNetworkInfo = false,
+            vpnLinkProperties = false,
+            networkRequest = false,
+            rootFile = true,
+        )
+        assertTrue(s.anyDeviceEnvEnabled)
+        assertFalse(s.anyCryptoEnabled)
+        assertFalse(s.anyDbEnabled)
+        assertFalse(s.anyBehaviorEnabled)
+        assertFalse(s.anyPrefsEnabled)
+        assertFalse(s.anyWebviewEnabled)
+        assertFalse(s.anyNetworkEnabled)
+    }
+
+    @Test
+    fun `deviceEnvEnabled maps kinds correctly`() {
+        val s = HookSwitch()
+        assertTrue(s.deviceEnvEnabled(DeviceEnvKind.ROOT_FILE))
+        assertTrue(s.deviceEnvEnabled(DeviceEnvKind.XPOSED_CLASS))
+        assertTrue(s.deviceEnvEnabled(DeviceEnvKind.EMULATOR_BUILD))
+        assertFalse(s.deviceEnvEnabled(DeviceEnvKind.DETECT_ROOT))
+        assertFalse(s.deviceEnvEnabled(DeviceEnvKind.DETECT_EMULATOR))
+    }
+
+    @Test
+    fun `deviceEnv_master_off_disables_all`() {
+        val s = HookSwitch(deviceEnvListen = false)
+        assertFalse(s.deviceEnvEnabled(DeviceEnvKind.ROOT_FILE))
+        assertFalse(s.anyDeviceEnvEnabled)
     }
 
     @Test

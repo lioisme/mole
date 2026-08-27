@@ -54,6 +54,7 @@ import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.WebViewKind
+import com.lioisme.modev.core.model.NetworkKind
 import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.ui.components.IntLimitSheet
 import com.lioisme.modev.ui.components.IgnorePathSheet
@@ -116,6 +117,11 @@ class PerAppListenSettingsViewModel(
     /** WebView 监听总开关定制(V29)。 */
     fun setWebviewMaster(value: Boolean) {
         update { it.copy(webviewListen = value) }
+    }
+
+    /** 网络环境监听总开关定制(V30)。 */
+    fun setNetworkMaster(value: Boolean) {
+        update { it.copy(networkListen = value) }
     }
 
     /** 类别定制(kind 名跨枚举;非法名由 AppListenOverride 容错忽略)。 */
@@ -274,6 +280,13 @@ fun PerAppListenSettingsScreen(
                     onCheckedChange = { viewModel.setWebviewMaster(it) },
                     testTag = "listen-row-master-webview",
                 )
+                HorizontalDivider16Compat()
+                ListenRow(
+                    label = res.getString(R.string.network_monitor_master),
+                    checked = effective.networkListen,
+                    onCheckedChange = { viewModel.setNetworkMaster(it) },
+                    testTag = "listen-row-master-network",
+                )
             }
             Spacer(Modifier.height(16.dp))
 
@@ -364,6 +377,20 @@ fun PerAppListenSettingsScreen(
             }
             Spacer(Modifier.height(16.dp))
 
+            // 网络环境监听 15 类别(V30 一等公民)
+            SettingsSection(stringResource(R.string.listen_settings_network)) {
+                CategoryTaxonomy.forType(RecordType.NETWORK).forEachIndexed { index, category ->
+                    if (index > 0) HorizontalDivider16Compat()
+                    ListenRow(
+                        label = res.getString(switchLabelRes(category.id)),
+                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.id, it) },
+                        testTag = "listen-row-${category.id}",
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+
             // V25 记录选项:堆栈开关(行内 Switch)+ 单字段字节上限 / 忽略栈前缀(sheet 编辑)。
             SettingsSection(stringResource(R.string.section_record_options)) {
                 ListenRow(
@@ -431,6 +458,9 @@ fun PerAppListenSettingsScreen(
                         supportingContent = {
                             val n = override.cryptoListen.count() + override.dbListen.count() +
                                 override.behaviorListen.count() +
+                                override.prefsListen.count() +
+                                override.webviewListen.count() +
+                                override.networkListen.count() +
                                 override.kinds.size +
                                 override.logStack.count() +
                                 override.maxBytesPerField.count() +
@@ -646,5 +676,21 @@ private fun switchLabelRes(kindId: String): Int = when (kindId) {
     WebViewKind.JS_BRIDGE.name -> R.string.kind_wv_js_bridge
     WebViewKind.DEBUG.name -> R.string.kind_wv_debug
     WebViewKind.JS_CRYPTO.name -> R.string.kind_wv_js_crypto
+    // 网络环境监听类别(V30 一等公民)
+    NetworkKind.SSL_CONTEXT.name -> R.string.kind_net_ssl_context
+    NetworkKind.SSL_TRUST_MANAGER.name -> R.string.kind_net_ssl_trust_manager
+    NetworkKind.SSL_OKHTTP_PINNER.name -> R.string.kind_net_ssl_okhttp_pinner
+    NetworkKind.SSL_OKHTTP_VERIFIER.name -> R.string.kind_net_ssl_okhttp_verifier
+    NetworkKind.SSL_WEBVIEW.name -> R.string.kind_net_ssl_webview
+    NetworkKind.SSL_NETWORK_CONFIG.name -> R.string.kind_net_ssl_network_config
+    NetworkKind.PROXY_SYSTEM_PROP.name -> R.string.kind_net_proxy_system_prop
+    NetworkKind.PROXY_CONNECTIVITY.name -> R.string.kind_net_proxy_connectivity
+    NetworkKind.PROXY_SETTINGS.name -> R.string.kind_net_proxy_settings
+    NetworkKind.PROXY_OKHTTP.name -> R.string.kind_net_proxy_okhttp
+    NetworkKind.VPN_CAPABILITIES.name -> R.string.kind_net_vpn_capabilities
+    NetworkKind.VPN_INTERFACE.name -> R.string.kind_net_vpn_interface
+    NetworkKind.VPN_NETWORK_INFO.name -> R.string.kind_net_vpn_network_info
+    NetworkKind.VPN_LINK_PROPERTIES.name -> R.string.kind_net_vpn_link_properties
+    NetworkKind.REQUEST.name -> R.string.kind_net_request
     else -> R.string.unknown_error
 }

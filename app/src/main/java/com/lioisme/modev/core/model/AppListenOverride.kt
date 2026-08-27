@@ -28,6 +28,10 @@ data class AppListenOverride(
     val prefsListen: Boolean? = null,
     /** WebView 监听总开关偏差(V29 一等公民;null = 取默认)。 */
     val webviewListen: Boolean? = null,
+    /** 网络环境监听总开关偏差(V30 一等公民;null = 取默认)。 */
+    val networkListen: Boolean? = null,
+    /** 设备环境监听总开关偏差(V31 一等公民;null = 取默认)。 */
+    val deviceEnvListen: Boolean? = null,
     /** 类别级偏差(kind id → 显式开关;仅存偏差条目,缺条目 = 取默认)。 */
     val kinds: Map<String, Boolean> = emptyMap(),
     /** 记录调用栈偏差(null = 取默认)。 */
@@ -59,6 +63,8 @@ data class AppListenOverride(
             behaviorListen == null &&
             prefsListen == null &&
             webviewListen == null &&
+            networkListen == null &&
+            deviceEnvListen == null &&
             kinds.isEmpty() &&
             logStack == null &&
             maxBytesPerField == null &&
@@ -91,6 +97,8 @@ data class AppListenOverride(
                     behaviorListen = boolOf(obj, FIELD_BEHAVIOR),
                     prefsListen = boolOf(obj, FIELD_PREFS),
                     webviewListen = boolOf(obj, FIELD_WEBVIEW),
+                    networkListen = boolOf(obj, FIELD_NETWORK),
+                    deviceEnvListen = boolOf(obj, FIELD_DEVICE_ENV),
                     kinds = kindsOf(obj),
                     logStack = boolOf(obj, FIELD_LOG_STACK),
                     maxBytesPerField = intOf(obj, FIELD_MAX_BYTES),
@@ -160,6 +168,8 @@ data class AppListenOverride(
         private const val FIELD_BEHAVIOR = "behaviorListen"
         private const val FIELD_PREFS = "prefsListen"
         private const val FIELD_WEBVIEW = "webviewListen"
+        private const val FIELD_NETWORK = "networkListen"
+        private const val FIELD_DEVICE_ENV = "deviceEnvListen"
         private const val FIELD_KINDS = "kinds"
         private const val FIELD_LOG_STACK = "logStack"
         private const val FIELD_MAX_BYTES = "maxBytesPerField"
@@ -174,12 +184,14 @@ data class AppListenOverride(
         private const val LEGACY_ON = "ON"
         private const val LEGACY_OFF = "OFF"
 
-        /** 合法类别 id 白名单(CryptoKind ∪ SqlKind ∪ BehaviorKind ∪ PrefsKind ∪ WebViewKind),防存储漂移注入垃圾键。 */
+        /** 合法类别 id 白名单(CryptoKind ∪ SqlKind ∪ BehaviorKind ∪ PrefsKind ∪ WebViewKind ∪ NetworkKind ∪ DeviceEnvKind),防存储漂移注入垃圾键。 */
         private val VALID_KINDS: Set<String> =
             CryptoKind.entries.mapTo(mutableSetOf()) { it.name } +
                 SqlKind.entries.map { it.name } +
                 BehaviorKind.entries.map { it.name } +
                 PrefsKind.entries.map { it.name } +
-                WebViewKind.entries.map { it.name }
+                WebViewKind.entries.map { it.name } +
+                NetworkKind.entries.map { it.name } +
+                DeviceEnvKind.entries.map { it.name }
     }
 }

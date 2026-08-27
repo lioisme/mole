@@ -55,6 +55,13 @@ import com.lioisme.modev.data.mapping.CryptoDetail
 import com.lioisme.modev.data.mapping.PrefsDetail
 import com.lioisme.modev.data.mapping.RecordDetailModel
 import com.lioisme.modev.data.mapping.WebViewDetail
+import com.lioisme.modev.data.mapping.NetworkDetail
+import com.lioisme.modev.core.model.NetworkRecord
+import com.lioisme.modev.data.mapping.DeviceEnvDetail
+import com.lioisme.modev.core.model.DeviceEnvRecord
+import com.lioisme.modev.ui.components.networkKindLabelRes
+import com.lioisme.modev.ui.components.networkOperationLabelRes
+import com.lioisme.modev.ui.logs.detail.networkAnchors
 import com.lioisme.modev.data.mapping.SqlDetail
 import com.lioisme.modev.data.mapping.toJson
 import com.lioisme.modev.ui.components.ModevTopBar
@@ -171,11 +178,13 @@ fun RecordDetailScreen(
     fun startExport(current: RecordDetailModel) {
         val estimatedChars =
             when (current) {
-                is CryptoDetail -> estimateJsonChars(current.record)
-                is SqlDetail -> estimateSqlJsonChars(current.record)
-                is BehaviorDetail -> estimateBehaviorJsonChars(current.record)
-                is PrefsDetail -> estimatePrefsJsonChars(current.record)
-                is WebViewDetail -> estimateWebViewJsonChars(current.record)
+                is CryptoDetail -> estimateJsonChars(current.record).toLong()
+                is SqlDetail -> estimateSqlJsonChars(current.record).toLong()
+                is BehaviorDetail -> estimateBehaviorJsonChars(current.record).toLong()
+                is PrefsDetail -> estimatePrefsJsonChars(current.record).toLong()
+                is WebViewDetail -> estimateWebViewJsonChars(current.record).toLong()
+                is NetworkDetail -> 0L
+                is DeviceEnvDetail -> 0L
             }
         if (estimatedChars > EXPORT_MAX_CHARS) {
             showSnack(context.getString(R.string.export_too_large, estimatedChars))
@@ -191,6 +200,8 @@ fun RecordDetailScreen(
                             is BehaviorDetail -> current.record.toJson()
                             is PrefsDetail -> current.record.toJson()
                             is WebViewDetail -> current.record.toJson()
+                            is NetworkDetail -> "{}" // TODO: implement network toJson
+                            is DeviceEnvDetail -> "{}" // TODO: implement device env toJson
                         }
                     }
                 }
@@ -306,6 +317,8 @@ private fun LoadedContent(
         is BehaviorDetail -> BehaviorLoadedContent(record.record, innerPadding, listState, actions)
         is PrefsDetail -> PrefsLoadedContent(record.record, innerPadding, listState, actions)
         is WebViewDetail -> WebViewLoadedContent(record.record, innerPadding, listState, actions)
+        is NetworkDetail -> NetworkLoadedContent(record.record, innerPadding, listState, actions)
+        is DeviceEnvDetail -> DeviceEnvLoadedContent(record.record, innerPadding, listState, actions)
     }
 }
 
@@ -1085,4 +1098,171 @@ internal fun webviewHeadline(record: WebViewRecord): String {
     return stringResource(webviewOperationLabelRes(record.operation))
 }
 
-// endregion
+// ---- V30 网络环境监听 ----
+
+@Composable
+private fun NetworkLoadedContent(
+    record: NetworkRecord,
+    innerPadding: PaddingValues,
+    listState: LazyListState,
+    actions: DetailCodeActions,
+) {
+    val res = LocalContext.current.resources
+
+    val metaEntries = listOfNotNull(
+        Pair(stringResource(R.string.meta_kind), stringResource(networkKindLabelRes(record.kind))),
+        Pair(stringResource(R.string.meta_operation), stringResource(networkOperationLabelRes(record.operation))),
+        record.url?.let { Pair(stringResource(R.string.meta_url), it) },
+        record.method?.let { Pair(stringResource(R.string.meta_method), it) },
+        record.statusCode?.let { Pair(stringResource(R.string.meta_status_code), it.toString()) },
+        record.sslProtocol?.let { Pair(stringResource(R.string.meta_ssl_protocol), it) },
+        record.cipherSuite?.let { Pair(stringResource(R.string.meta_cipher_suite), it) },
+        record.proxyHost?.let { Pair(stringResource(R.string.meta_proxy), it) },
+        record.proxyPort?.let { Pair(stringResource(R.string.meta_proxy_port), it.toString()) },
+        record.vpnActive?.let { Pair(stringResource(R.string.meta_vpn), it.toString()) },
+        Pair(stringResource(R.string.meta_thread), record.threadName),
+        timestampEntry(record.timestamp),
+    )
+    val metaTitle = stringResource(R.string.section_metadata)
+    val metaTable = metaSectionDoc(metaTitle, metaEntries)
+
+    val accent = accentLine(
+        stringResource(networkKindLabelRes(record.kind)),
+        stringResource(networkOperationLabelRes(record.operation)),
+    )
+    val identityMarkdown = identityDoc(headline = networkHeadline(record), accentLine = accent)
+
+    val anchors = networkAnchors(record)
+    val tocList = tocEntries(anchors)
+
+    val stackTitle = stringResource(R.string.section_stack)
+    val reqHeadersTitle = stringResource(R.string.section_req_headers)
+    val respHeadersTitle = stringResource(R.string.section_resp_headers)
+
+    val stackDoc = if (record.stack.isEmpty()) {
+        null
+    } else {
+        val frames = record.stack.take(STACK_MAX_FRAMES)
+        val omittedFrames = record.stack.size - STACK_MAX_FRAMES
+        val trailer = if (omittedFrames > 0) {
+            listOf(res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames))
+        } else {
+            emptyList()
+        }
+        textSectionDoc(stackTitle, frames.joinToString("\n"), trailerLines = trailer)
+    }
+    val reqHeadersDoc = record.requestHeaders?.takeIf { it.isNotEmpty() }?.let { hdrs ->
+        val body = hdrs.entries.joinToString("\n") { "${it.key}: ${it.value}" }
+        textSectionDoc(reqHeadersTitle, body)
+    }
+    val respHeadersDoc = record.responseHeaders?.takeIf { it.isNotEmpty() }?.let { hdrs ->
+        val body = hdrs.entries.joinToString("\n") { "${it.key}: ${it.value}" }
+        textSectionDoc(respHeadersTitle, body)
+    }
+
+    val book = remember(record.id) { AnchorBookkeeping(listState) }
+    val scrollScope = rememberCoroutineScope()
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+    ) {
+        book.cursor = 0
+        book.advance(identityItem(identityMarkdown))
+        book.advance(tocSectionItems(tocList, onAnchorClick = { book.scrollTo(it, scrollScope) }))
+        book.mark("meta")
+        book.advance(metaTableItems("meta", metaTable))
+        stackDoc?.let { doc ->
+            book.mark("stack")
+            book.advance(markdownSectionItems("stack", doc, actions))
+        }
+        reqHeadersDoc?.let { doc ->
+            book.mark("req-headers")
+            book.advance(markdownSectionItems("req-headers", doc, actions))
+        }
+        respHeadersDoc?.let { doc ->
+            book.mark("resp-headers")
+            book.advance(markdownSectionItems("resp-headers", doc, actions))
+        }
+        item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+/** 网络记录详情顶栏标题(URL host / URL / 操作名)。 */
+@Composable
+internal fun networkHeadline(record: NetworkRecord): String {
+    record.urlHost()?.takeIf { it.isNotBlank() }?.let { return it }
+    record.url?.takeIf { it.isNotBlank() }?.let { return it }
+    return stringResource(networkOperationLabelRes(record.operation))
+}
+
+// ---- V31 设备环境监听 ----
+
+@Composable
+private fun DeviceEnvLoadedContent(
+    record: DeviceEnvRecord,
+    innerPadding: PaddingValues,
+    listState: LazyListState,
+    actions: DetailCodeActions,
+) {
+    val res = LocalContext.current.resources
+
+    val metaEntries = listOfNotNull(
+        Pair(stringResource(R.string.meta_kind), record.kind.name),
+        Pair(stringResource(R.string.meta_operation), record.operation.name),
+        record.originalValue?.let { Pair("Original", it) },
+        record.maskedValue?.let { Pair("Masked", it) },
+        record.targetPath?.let { Pair(stringResource(R.string.meta_url), it) },
+        record.targetClass?.let { Pair("Target Class", it) },
+        record.targetProperty?.let { Pair("Target Property", it) },
+        record.detectionPattern?.let { Pair("Detection Pattern", it) },
+        Pair(stringResource(R.string.meta_thread), record.threadName),
+        timestampEntry(record.timestamp),
+    )
+    val metaTitle = stringResource(R.string.section_metadata)
+    val metaTable = metaSectionDoc(metaTitle, metaEntries)
+
+    val accent = accentLine(record.kind.name, record.operation.name)
+    val identityMarkdown = identityDoc(
+        headline = "${record.kind.name}: ${record.operation.name}",
+        accentLine = accent,
+    )
+
+    val stackTitle = stringResource(R.string.section_stack)
+    val stackDoc = if (record.stack.isEmpty()) {
+        null
+    } else {
+        val frames = record.stack.take(STACK_MAX_FRAMES)
+        val omittedFrames = record.stack.size - STACK_MAX_FRAMES
+        val trailer = if (omittedFrames > 0) {
+            listOf(res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames))
+        } else {
+            emptyList()
+        }
+        textSectionDoc(stackTitle, frames.joinToString("\n"), trailerLines = trailer)
+    }
+
+    val book = remember(record.id) { AnchorBookkeeping(listState) }
+    val scrollScope = rememberCoroutineScope()
+
+    LazyColumn(
+        state = listState,
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(innerPadding),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+    ) {
+        book.cursor = 0
+        book.advance(identityItem(identityMarkdown))
+        book.mark("meta")
+        book.advance(metaTableItems("meta", metaTable))
+        stackDoc?.let { doc ->
+            book.mark("stack")
+            book.advance(markdownSectionItems("stack", doc, actions))
+        }
+        item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
+    }
+}

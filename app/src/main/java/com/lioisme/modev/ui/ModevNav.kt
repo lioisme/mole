@@ -36,6 +36,7 @@ import com.lioisme.modev.ui.records.DatabaseRecordsScreen
 import com.lioisme.modev.ui.records.PrefsRecordsScreen
 import com.lioisme.modev.ui.records.RecordsViewModelFactory
 import com.lioisme.modev.ui.records.WebViewRecordsScreen
+import com.lioisme.modev.ui.records.NetworkRecordsScreen
 import com.lioisme.modev.ui.settings.AboutScreen
 import com.lioisme.modev.ui.settings.DataSettingsScreen
 import com.lioisme.modev.ui.settings.DataSettingsViewModelFactory
@@ -140,6 +141,9 @@ fun ModevNavHost(navController: NavHostController) {
                     },
                     onOpenWebView = {
                         navController.navigateGuarded(ModevRoutes.webviewRecords(pkg))
+                    },
+                    onOpenNetwork = {
+                        navController.navigateGuarded(ModevRoutes.networkRecords(pkg))
                     },
                     onOpenListenSettings = {
                         navController.navigateGuarded(ModevRoutes.appListenSettings(pkg))
@@ -289,6 +293,28 @@ fun ModevNavHost(navController: NavHostController) {
                     viewModel = viewModel(
                         key = "records-webview-$pkg",
                         factory = RecordsViewModelFactory(RecordType.WEBVIEW, pkg, app.container),
+                    ),
+                    onBack = { navController.popGuarded() },
+                    onOpenRecord = { id ->
+                        navController.navigateGuarded(ModevRoutes.recordDetail(id))
+                    },
+                )
+            }
+        }
+        slideComposable(
+            route = ModevRoutes.NETWORK_RECORDS,
+            arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
+        ) { entry ->
+            val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
+            if (pkg.isBlank()) {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
+            BackGuarded(navController) {
+                NetworkRecordsScreen(
+                    viewModel = viewModel(
+                        key = "records-network-$pkg",
+                        factory = RecordsViewModelFactory(RecordType.NETWORK, pkg, app.container),
                     ),
                     onBack = { navController.popGuarded() },
                     onOpenRecord = { id ->

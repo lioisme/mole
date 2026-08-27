@@ -18,12 +18,18 @@ import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.core.model.WebViewRecord
+import com.lioisme.modev.core.model.NetworkRecord
+import com.lioisme.modev.core.model.DeviceEnvRecord
+import com.lioisme.modev.core.codec.NetworkRecordCodec
+import com.lioisme.modev.core.codec.DeviceEnvRecordCodec
 import com.lioisme.modev.framework.RemotePrefsBridge
 import com.lioisme.modev.hook.probes.AlgorithmProbe
 import com.lioisme.modev.hook.probes.BehaviorProbe
 import com.lioisme.modev.hook.probes.DatabaseProbe
+import com.lioisme.modev.hook.probes.DeviceEnvProbe
 import com.lioisme.modev.hook.probes.PrefsProbe
 import com.lioisme.modev.hook.probes.WebViewProbe
+import com.lioisme.modev.hook.probes.NetworkProbe
 import java.io.File
 
 /**
@@ -49,6 +55,8 @@ class HookInstaller(
             BehaviorProbe(),
             PrefsProbe(),
             WebViewProbe(),
+            NetworkProbe(),
+            DeviceEnvProbe(),
         ),
 ) {
 
@@ -86,6 +94,8 @@ class HookInstaller(
                     is BehaviorRecord -> BehaviorRecordCodec.encode(record)
                     is PrefsRecord -> PrefsRecordCodec.encode(record)
                     is WebViewRecord -> WebViewRecordCodec.encode(record)
+                    is NetworkRecord -> NetworkRecordCodec.encode(record)
+                    is DeviceEnvRecord -> DeviceEnvRecordCodec.encode(record)
                 }
                 WireCodec.record(record.seq, record.recordType, payload)
             },

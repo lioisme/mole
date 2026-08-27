@@ -53,11 +53,18 @@ import com.lioisme.modev.data.mapping.PrefsRow
 import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.mapping.SqlRow
 import com.lioisme.modev.data.mapping.WebViewRow
+import com.lioisme.modev.data.mapping.NetworkRow
+import com.lioisme.modev.data.mapping.DeviceEnvRow
+import com.lioisme.modev.core.model.NetworkKind
+import com.lioisme.modev.core.model.NetworkOperation
 import com.lioisme.modev.ui.theme.behaviorKindColor
 import com.lioisme.modev.ui.theme.kindColor
 import com.lioisme.modev.ui.theme.prefsKindColor
 import com.lioisme.modev.ui.theme.sqlKindColor
 import com.lioisme.modev.ui.theme.webviewKindColor
+import com.lioisme.modev.ui.theme.networkKindColor
+import com.lioisme.modev.core.model.DeviceEnvKind
+import com.lioisme.modev.ui.theme.LocalIsDarkTheme
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -94,6 +101,8 @@ fun RecordRow(
                 is BehaviorRow -> behaviorPresentation(record)
                 is PrefsRow -> prefsPresentation(record)
                 is WebViewRow -> webviewPresentation(record)
+                is NetworkRow -> networkPresentation(record)
+                is DeviceEnvRow -> deviceEnvPresentation(record)
             }
         Row(
             modifier =
@@ -606,6 +615,161 @@ fun webviewSummary(context: Context, record: WebViewRow): String {
         append(context.getString(webviewOperationLabelRes(record.operation)))
         record.url?.let { append('\n').append(it) }
         record.bridgeName?.let { append('\n').append("bridge: ").append(it) }
+        append('\n').append(time)
+        append('\n').append(record.packageName)
+    }
+}
+
+// ---- V30 网络环境监听 ----
+
+@Composable
+private fun networkPresentation(record: NetworkRow): RowPresentation {
+    val accent = networkKindColor(record.kind)
+    val kindText = stringResource(networkKindLabelRes(record.kind))
+    val operationText = stringResource(networkOperationLabelRes(record.operation))
+    val headline = record.headlineText() ?: operationText
+    val meta = remember(record.kind, record.operation, kindText, operationText, accent) {
+        buildAnnotatedString {
+            withStyle(SpanStyle(color = accent)) { append(kindText) }
+            append(" · ")
+            append(operationText)
+        }
+    }
+    val preview = remember(record.url, record.method, record.statusCode, record.proxyHost, record.vpnActive) {
+        when (record.kind) {
+            NetworkKind.REQUEST -> record.url?.takeIf { it.isNotBlank() }
+            NetworkKind.PROXY_SYSTEM_PROP, NetworkKind.PROXY_CONNECTIVITY,
+            NetworkKind.PROXY_SETTINGS, NetworkKind.PROXY_OKHTTP ->
+                record.proxyHost?.takeIf { it.isNotBlank() }
+            NetworkKind.VPN_CAPABILITIES, NetworkKind.VPN_INTERFACE,
+            NetworkKind.VPN_NETWORK_INFO, NetworkKind.VPN_LINK_PROPERTIES ->
+                if (record.vpnActive == true) "VPN active" else null
+            else -> null
+        }
+    }
+    return RowPresentation(
+        icon = KindIcons.network(record.kind),
+        accent = accent,
+        headline = headline,
+        meta = meta,
+        preview = preview,
+        badges = emptyList(),
+        timestamp = record.recordTimestamp,
+    )
+}
+
+@Composable
+private fun deviceEnvPresentation(record: DeviceEnvRow): RowPresentation {
+    val accent = deviceEnvKindColor(record.kind)
+    val kindText = record.kind.name
+    val operationText = record.operation.name
+    val headline = record.headlineText() ?: operationText
+    val meta = remember(record.kind, record.operation, kindText, operationText, accent) {
+        buildAnnotatedString {
+            withStyle(SpanStyle(color = accent)) { append(kindText) }
+            append(" · ")
+            append(operationText)
+        }
+    }
+    val preview = remember(record.targetPath, record.targetClass, record.targetProperty) {
+        record.targetPath?.takeIf { it.isNotBlank() }
+            ?: record.targetClass?.takeIf { it.isNotBlank() }
+            ?: record.targetProperty?.takeIf { it.isNotBlank() }
+    }
+    return RowPresentation(
+        icon = KindIcons.deviceEnv(record.kind),
+        accent = accent,
+        headline = headline,
+        meta = meta,
+        preview = preview,
+        badges = emptyList(),
+        timestamp = record.recordTimestamp,
+    )
+}
+
+/** 设备环境监听类别显示色。 */
+@Composable
+fun deviceEnvKindColor(kind: DeviceEnvKind): Color {
+    val isDark = LocalIsDarkTheme.current
+    return when (kind) {
+        DeviceEnvKind.ROOT_FILE, DeviceEnvKind.ROOT_EXEC,
+        DeviceEnvKind.ROOT_PACKAGE_MANAGER, DeviceEnvKind.ROOT_PROPERTY ->
+            if (isDark) Color(0xFFF2B8B5) else Color(0xFFB3261E)
+        DeviceEnvKind.XPOSED_CLASS, DeviceEnvKind.XPOSED_STACK,
+        DeviceEnvKind.XPOSED_MAPS ->
+            if (isDark) Color(0xFFFFB980) else Color(0xFF8A4D00)
+        DeviceEnvKind.EMULATOR_BUILD, DeviceEnvKind.EMULATOR_FILE,
+        DeviceEnvKind.EMULATOR_SENSOR, DeviceEnvKind.EMULATOR_NETWORK ->
+            if (isDark) Color(0xFFDBA3EC) else Color(0xFF7A3F8F)
+        DeviceEnvKind.DETECT_ROOT, DeviceEnvKind.DETECT_EMULATOR ->
+            if (isDark) Color(0xFFB2BAC2) else Color(0xFF495057)
+    }
+}
+
+/** 网络环境监听类别显示名资源。 */
+@StringRes
+fun networkKindLabelRes(kind: NetworkKind): Int = when (kind) {
+    NetworkKind.SSL_CONTEXT -> R.string.kind_net_ssl_context
+    NetworkKind.SSL_TRUST_MANAGER -> R.string.kind_net_ssl_trust_manager
+    NetworkKind.SSL_OKHTTP_PINNER -> R.string.kind_net_ssl_okhttp_pinner
+    NetworkKind.SSL_OKHTTP_VERIFIER -> R.string.kind_net_ssl_okhttp_verifier
+    NetworkKind.SSL_WEBVIEW -> R.string.kind_net_ssl_webview
+    NetworkKind.SSL_NETWORK_CONFIG -> R.string.kind_net_ssl_network_config
+    NetworkKind.PROXY_SYSTEM_PROP -> R.string.kind_net_proxy_system_prop
+    NetworkKind.PROXY_CONNECTIVITY -> R.string.kind_net_proxy_connectivity
+    NetworkKind.PROXY_SETTINGS -> R.string.kind_net_proxy_settings
+    NetworkKind.PROXY_OKHTTP -> R.string.kind_net_proxy_okhttp
+    NetworkKind.VPN_CAPABILITIES -> R.string.kind_net_vpn_capabilities
+    NetworkKind.VPN_INTERFACE -> R.string.kind_net_vpn_interface
+    NetworkKind.VPN_NETWORK_INFO -> R.string.kind_net_vpn_network_info
+    NetworkKind.VPN_LINK_PROPERTIES -> R.string.kind_net_vpn_link_properties
+    NetworkKind.REQUEST -> R.string.kind_net_request
+}
+
+/** 网络环境监听操作标签资源。 */
+@StringRes
+fun networkOperationLabelRes(operation: NetworkOperation): Int = when (operation) {
+    NetworkOperation.SSL_INIT -> R.string.op_net_ssl_init
+    NetworkOperation.SSL_CHECK -> R.string.op_net_ssl_check
+    NetworkOperation.SSL_PIN -> R.string.op_net_ssl_pin
+    NetworkOperation.SSL_VERIFY -> R.string.op_net_ssl_verify
+    NetworkOperation.SSL_WEBVIEW_ERROR -> R.string.op_net_ssl_webview_error
+    NetworkOperation.SSL_CONFIG_CHECK -> R.string.op_net_ssl_config_check
+    NetworkOperation.PROP_GET -> R.string.op_net_prop_get
+    NetworkOperation.PROP_DEFAULT -> R.string.op_net_prop_default
+    NetworkOperation.PROP_LINK -> R.string.op_net_prop_link
+    NetworkOperation.PROP_GLOBAL -> R.string.op_net_prop_global
+    NetworkOperation.PROP_OKHTTP -> R.string.op_net_prop_okhttp
+    NetworkOperation.VPN_HAS_TRANSPORT -> R.string.op_net_vpn_has_transport
+    NetworkOperation.VPN_GET_CAPS -> R.string.op_net_vpn_get_caps
+    NetworkOperation.VPN_TRANSPORT_INFO -> R.string.op_net_vpn_transport_info
+    NetworkOperation.VPN_IS_VIRTUAL -> R.string.op_net_vpn_is_virtual
+    NetworkOperation.VPN_IFACE_NAME -> R.string.op_net_vpn_iface_name
+    NetworkOperation.VPN_IFACE_BY_NAME -> R.string.op_net_vpn_iface_by_name
+    NetworkOperation.VPN_IFACE_ENUM -> R.string.op_net_vpn_iface_enum
+    NetworkOperation.VPN_TYPE -> R.string.op_net_vpn_type
+    NetworkOperation.VPN_TYPE_NAME -> R.string.op_net_vpn_type_name
+    NetworkOperation.VPN_IFACE_PROP -> R.string.op_net_vpn_iface_prop
+    NetworkOperation.VPN_ROUTES -> R.string.op_net_vpn_routes
+    NetworkOperation.REQUEST_START -> R.string.op_net_request_start
+    NetworkOperation.REQUEST_END -> R.string.op_net_request_end
+}
+
+/** 网络记录摘要文本(列表行长按复制)。 */
+fun networkSummary(context: Context, record: NetworkRow): String {
+    val time = SimpleDateFormat(
+        if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
+        Locale.getDefault(),
+    ).format(Date(record.recordTimestamp))
+    return buildString {
+        append(context.getString(networkKindLabelRes(record.kind)))
+        append('\n')
+        append(context.getString(networkOperationLabelRes(record.operation)))
+        record.url?.let { append('\n').append(it) }
+        record.method?.let { append('\n').append(it) }
+        record.statusCode?.let { append('\n').append("HTTP $it") }
+        record.proxyHost?.let { append('\n').append("proxy: $it") }
+        record.vpnActive?.let { append('\n').append("VPN: $it") }
         append('\n').append(time)
         append('\n').append(record.packageName)
     }

@@ -37,6 +37,8 @@ object ModevRoutes {
     const val PREFS_RECORDS = "records/prefs/{packageName}"
     /** 每应用 WebView 记录列表(V29 一等公民)。 */
     const val WEBVIEW_RECORDS = "records/webview/{packageName}"
+    /** 每应用网络环境监听记录列表(V30 一等公民)。 */
+    const val NETWORK_RECORDS = "records/network/{packageName}"
     /** 每应用监听设置页(V24 二态偏差)。 */
     const val APP_LISTEN_SETTINGS = "apps/{packageName}/listen-settings"
 
@@ -53,6 +55,8 @@ object ModevRoutes {
     fun prefsRecords(packageName: String): String = "records/prefs/${enc(packageName)}"
 
     fun webviewRecords(packageName: String): String = "records/webview/${enc(packageName)}"
+
+    fun networkRecords(packageName: String): String = "records/network/${enc(packageName)}"
 
     fun licenseDetail(index: Int): String = "settings/licenses/${index}"
 

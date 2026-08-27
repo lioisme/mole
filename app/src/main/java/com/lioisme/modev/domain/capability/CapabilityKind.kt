@@ -17,4 +17,10 @@ enum class CapabilityKind {
 
     /** 偏好监听(SharedPreferences 读入配置文件 + Get/Put 全家桶,V28 一等公民)。 */
     PREFS_LISTEN,
+
+    /** 网络环境监听(SSL 绕过/代理隐藏/VPN 隐藏/请求监控,V30 一等公民)。 */
+    NETWORK_LISTEN,
+
+    /** 设备环境监听(Root 隐藏/Xposed 隐藏/模拟器隐藏/检测监控,V31 一等公民)。 */
+    DEVICE_ENV_LISTEN,
 }

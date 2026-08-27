@@ -20,7 +20,13 @@ enum class RecordType(val wire: String) {
     PREFS(RecordTypes.PREFS),
 
     /** WebView 监听记录(页面加载/JS 执行/桥注册/调试/JS 密码学,V29 一等公民)。 */
-    WEBVIEW(RecordTypes.WEBVIEW);
+    WEBVIEW(RecordTypes.WEBVIEW),
+
+    /** 网络环境监听记录(SSL 绕过/代理隐藏/VPN 隐藏/请求监控,V30 一等公民)。 */
+    NETWORK(RecordTypes.NETWORK),
+
+    /** 设备环境监听记录(Root 隐藏/Xposed 隐藏/模拟器隐藏/检测监控,V31 一等公民)。 */
+    DEVICE_ENV(RecordTypes.DEVICE_ENV);
 
     companion object {
         fun fromWire(value: String?): RecordType? = entries.firstOrNull { it.wire == value }

@@ -29,6 +29,8 @@ import androidx.compose.material.icons.filled.DataObject
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -88,6 +90,8 @@ import com.lioisme.modev.ui.theme.prefsKindColor
 import com.lioisme.modev.ui.theme.sqlKindColor
 import com.lioisme.modev.ui.theme.statusColor
 import com.lioisme.modev.ui.theme.webviewKindColor
+import com.lioisme.modev.ui.theme.networkKindColor
+import com.lioisme.modev.core.model.NetworkKind
 import androidx.compose.material.icons.outlined.FolderOpen
 
 /**
@@ -107,6 +111,7 @@ fun AppMonitorScreen(
     onOpenBehavior: () -> Unit,
     onOpenPrefs: () -> Unit,
     onOpenWebView: () -> Unit,
+    onOpenNetwork: () -> Unit,
     onOpenListenSettings: () -> Unit,
     onLaunch: (String) -> Unit,
 ) {
@@ -121,6 +126,7 @@ fun AppMonitorScreen(
     val behaviorCount by viewModel.behaviorCount.collectAsStateWithLifecycle()
     val prefsCount by viewModel.prefsCount.collectAsStateWithLifecycle()
     val webviewCount by viewModel.webviewCount.collectAsStateWithLifecycle()
+    val networkCount by viewModel.networkCount.collectAsStateWithLifecycle()
     val listenOverride by viewModel.listenOverride.collectAsStateWithLifecycle()
 
     val label = appInfo?.label?.takeIf { it.isNotBlank() } ?: viewModel.packageName
@@ -170,6 +176,7 @@ fun AppMonitorScreen(
                 behaviorCount = behaviorCount,
                 prefsCount = prefsCount,
                 webviewCount = webviewCount,
+                networkCount = networkCount,
             )
             Spacer(Modifier.height(16.dp))
             SettingsSection(stringResource(R.string.section_monitor_kinds)) {
@@ -209,6 +216,14 @@ fun AppMonitorScreen(
                     value = countText(webviewCount),
                     onClick = onOpenWebView,
                     modifier = Modifier.testTag("monitor-entry-webview"),
+                )
+                HorizontalDivider16()
+                EntryRow(
+                    icon = { Icon(Icons.Filled.Tune, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    title = stringResource(R.string.network_records_title),
+                    value = countText(networkCount),
+                    onClick = onOpenNetwork,
+                    modifier = Modifier.testTag("monitor-entry-network"),
                 )
                 HorizontalDivider16()
                 EntryRow(
@@ -416,9 +431,9 @@ private fun ScopeToggleRow(
 }
 
 /**
- * 统计概览卡(V23 T5.2;V28 四段比例条):总记录数大字(locale 紧凑格式)+
- * 类型分布四色比例条(算法 = CIPHER / 数据库 = QUERY / 行为 = FILE_WRITE /
- * 偏好 = PUT,KindColorTokens 同源)+ 图例计数;
+ * 统计概览卡(V23 T5.2;V28 四段比例条;V30 五段):总记录数大字(locale 紧凑格式)+
+ * 类型分布五色比例条(算法 = CIPHER / 数据库 = QUERY / 行为 = FILE_WRITE /
+ * 偏好 = PUT / 网络 = SSL_CONTEXT,KindColorTokens 同源)+ 图例计数;
  * 零记录时隐藏比例条与图例(空卡仅大数字,不显零除噪)。
  */
 @Composable
@@ -428,13 +443,15 @@ private fun StatsCard(
     behaviorCount: Long,
     prefsCount: Long,
     webviewCount: Long,
+    networkCount: Long,
 ) {
-    val total = cryptoCount + dbCount + behaviorCount + prefsCount + webviewCount
+    val total = cryptoCount + dbCount + behaviorCount + prefsCount + webviewCount + networkCount
     val cryptoColor = kindColor(CryptoKind.CIPHER)
     val dbColor = sqlKindColor(SqlKind.QUERY)
     val behaviorColor = behaviorKindColor(BehaviorKind.FILE_WRITE)
     val prefsColor = prefsKindColor(PrefsKind.PUT)
     val webviewColor = webviewKindColor(WebViewKind.PAGE_LOAD)
+    val networkColor = networkKindColor(NetworkKind.SSL_CONTEXT)
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         shape = MaterialTheme.shapes.medium,
@@ -461,6 +478,7 @@ private fun StatsCard(
                 val behaviorWeight = (behaviorCount.toFloat() / total).coerceAtLeast(0.02f)
                 val prefsWeight = (prefsCount.toFloat() / total).coerceAtLeast(0.02f)
                 val webviewWeight = (webviewCount.toFloat() / total).coerceAtLeast(0.02f)
+                val networkWeight = (networkCount.toFloat() / total).coerceAtLeast(0.02f)
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -498,7 +516,13 @@ private fun StatsCard(
                         Modifier
                             .weight(webviewWeight)
                             .fillMaxSize()
-                            .background(color = webviewColor, shape = RoundedCornerShape(topEnd = 5.dp, bottomEnd = 5.dp)),
+                            .background(color = webviewColor),
+                    )
+                    Box(
+                        Modifier
+                            .weight(networkWeight)
+                            .fillMaxSize()
+                            .background(color = networkColor, shape = RoundedCornerShape(topEnd = 5.dp, bottomEnd = 5.dp)),
                     )
                 }
                 Spacer(Modifier.height(10.dp))
@@ -507,6 +531,7 @@ private fun StatsCard(
                 LegendRow(color = behaviorColor, label = stringResource(R.string.filter_type_behavior), count = behaviorCount)
                 LegendRow(color = prefsColor, label = stringResource(R.string.filter_type_prefs), count = prefsCount)
                 LegendRow(color = webviewColor, label = stringResource(R.string.filter_type_webview), count = webviewCount)
+                LegendRow(color = networkColor, label = stringResource(R.string.filter_type_network), count = networkCount)
             }
         }
     }

@@ -2,6 +2,8 @@ package com.lioisme.modev.data.mapping
 
 import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.DeviceEnvRecord
+import com.lioisme.modev.core.model.NetworkRecord
 import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.core.model.WebViewRecord
@@ -67,6 +69,28 @@ data class PrefsDetail(val record: PrefsRecord) : RecordDetailModel {
 
 /** WebView 记录详情(V29 一等公民)。 */
 data class WebViewDetail(val record: WebViewRecord) : RecordDetailModel {
+    override val id: Long get() = record.id
+    override val recordType: String get() = record.recordType
+    override val packageName: String get() = record.packageName
+    override val processName: String? get() = record.processName
+    override val threadName: String get() = record.threadName
+    override val stack: List<String> get() = record.stack
+    override val timestamp: Long get() = record.timestamp
+}
+
+/** 网络环境监听记录详情(V30 一等公民)。 */
+data class NetworkDetail(val record: NetworkRecord) : RecordDetailModel {
+    override val id: Long get() = record.id
+    override val recordType: String get() = record.recordType
+    override val packageName: String get() = record.packageName
+    override val processName: String? get() = record.processName
+    override val threadName: String get() = record.threadName
+    override val stack: List<String> get() = record.stack
+    override val timestamp: Long get() = record.timestamp
+}
+
+/** 设备环境监听记录详情(V31 一等公民)。 */
+data class DeviceEnvDetail(val record: DeviceEnvRecord) : RecordDetailModel {
     override val id: Long get() = record.id
     override val recordType: String get() = record.recordType
     override val packageName: String get() = record.packageName

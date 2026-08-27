@@ -4,6 +4,10 @@ import androidx.compose.runtime.Immutable
 import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.BehaviorOperation
 import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.DeviceEnvKind
+import com.lioisme.modev.core.model.DeviceEnvOperation
+import com.lioisme.modev.core.model.NetworkKind
+import com.lioisme.modev.core.model.NetworkOperation
 import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.PrefsOperation
 import com.lioisme.modev.core.model.SqlKind
@@ -139,4 +143,71 @@ data class WebViewRow(
     fun headlineText(): String? =
         urlHost?.takeIf { it.isNotBlank() }
             ?: bridgeName?.takeIf { it.isNotBlank() }
+}
+
+/**
+ * 网络环境监听记录行(V30 一等公民;URL/域名/方法摘要预览,零内容/堆栈物化)。
+ */
+@Immutable
+data class NetworkRow(
+    val recordId: Long,
+    val recordTimestamp: Long,
+    override val packageName: String,
+    val kind: NetworkKind,
+    val operation: NetworkOperation,
+    /** 请求 URL(REQUEST 类别)。 */
+    val url: String?,
+    /** URL 域名(列表预览用)。 */
+    val urlHost: String?,
+    /** HTTP 方法(GET/POST 等)。 */
+    val method: String?,
+    /** HTTP 状态码(响应)。 */
+    val statusCode: Int?,
+    /** 代理主机(PROXY 类别)。 */
+    val proxyHost: String?,
+    /** VPN 是否活跃(VPN 类别)。 */
+    val vpnActive: Boolean?,
+    val threadName: String,
+) : RowModel {
+    override val id: Long get() = recordId
+    override val timestamp: Long get() = recordTimestamp
+
+    /** 列表 headline 单一事实源:域名 / 方法+URL / 操作名;恒非空。 */
+    fun headlineText(): String? =
+        urlHost?.takeIf { it.isNotBlank() }
+            ?: method?.takeIf { it.isNotBlank() }?.let { m ->
+                url?.takeIf { u -> u.isNotBlank() }?.let { "$m $it" }
+            }
+            ?: operation.name
+}
+
+/**
+ * 设备环境监听记录行(V31 一等公民;目标路径/类名/属性名摘要预览,零堆栈物化)。
+ */
+@Immutable
+data class DeviceEnvRow(
+    val recordId: Long,
+    val recordTimestamp: Long,
+    override val packageName: String,
+    val kind: DeviceEnvKind,
+    val operation: DeviceEnvOperation,
+    /** 被检测的文件路径(可空)。 */
+    val targetPath: String?,
+    /** 被检测的类名(可空)。 */
+    val targetClass: String?,
+    /** 被检测的属性名(可空)。 */
+    val targetProperty: String?,
+    /** 是否为干预记录(true=隐藏,false=仅监控)。 */
+    val intervention: Boolean,
+    val threadName: String,
+) : RowModel {
+    override val id: Long get() = recordId
+    override val timestamp: Long get() = recordTimestamp
+
+    /** 列表 headline 单一事实源:目标路径 / 类名 / 属性名 / 操作名;恒非空。 */
+    fun headlineText(): String? =
+        targetPath?.takeIf { it.isNotBlank() }
+            ?: targetClass?.takeIf { it.isNotBlank() }
+            ?: targetProperty?.takeIf { it.isNotBlank() }
+            ?: operation.name
 }
