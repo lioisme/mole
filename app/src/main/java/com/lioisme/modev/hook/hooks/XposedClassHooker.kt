@@ -6,36 +6,21 @@ import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
+/**
+ * Xposed 类存在性检测 Hooker(V31):拦截 ClassLoader.loadClass /
+ * BaseDexClassLoader.findClass,仅记录检测事件,不干预返回值。
+ *
+ * 设计决策:Class.forName 的 Xposed hook 会导致框架 bridge 改变
+ * ClassNotFoundException 的传播路径,使 androidx.startup 等库的异常捕获失效
+ * → 目标 App 崩溃。因此不再 hook Class.forName,仅监控 ClassLoader 侧。
+ */
 class XposedClassHooker(
     context: ProbeContext,
 ) : DeviceEnvBaseHooker(context) {
 
     override fun install() {
-        if (!config().xposedClass) return
-        hookClassForName()
         hookLoadClass()
         hookFindClass()
-    }
-
-    private fun hookClassForName() {
-        val method = runCatching {
-            Class::class.java.getMethod("forName", String::class.java)
-        }.getOrNull() ?: return
-        engine.hook(method, object : MethodHook() {
-            override fun before(invocation: Invocation) {
-                if (!config().xposedClass) return
-                val name = invocation.getArg(0) as? String ?: return
-                if (isXposedClassName(name)) {
-                    invocation.setResult(null)
-                    emit(
-                        kind = DeviceEnvKind.XPOSED_CLASS,
-                        operation = DeviceEnvOperation.CLASS_FOR_NAME,
-                        originalValue = name,
-                        targetClass = name,
-                    )
-                }
-            }
-        })
     }
 
     private fun hookLoadClass() {
@@ -43,11 +28,10 @@ class XposedClassHooker(
             ClassLoader::class.java.getMethod("loadClass", String::class.java)
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
-            override fun before(invocation: Invocation) {
+            override fun after(invocation: Invocation) {
                 if (!config().xposedClass) return
                 val name = invocation.getArg(0) as? String ?: return
                 if (isXposedClassName(name)) {
-                    invocation.setResult(null)
                     emit(
                         kind = DeviceEnvKind.XPOSED_CLASS,
                         operation = DeviceEnvOperation.LOAD_CLASS,
@@ -65,11 +49,10 @@ class XposedClassHooker(
             clazz.getMethod("findClass", String::class.java)
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
-            override fun before(invocation: Invocation) {
+            override fun after(invocation: Invocation) {
                 if (!config().xposedClass) return
                 val name = invocation.getArg(0) as? String ?: return
                 if (isXposedClassName(name)) {
-                    invocation.setResult(null)
                     emit(
                         kind = DeviceEnvKind.XPOSED_CLASS,
                         operation = DeviceEnvOperation.FIND_CLASS,
@@ -88,8 +71,6 @@ class XposedClassHooker(
     companion object {
         private val XPOSED_PREFIXES = listOf(
             "de.robv.android.xposed.",
-            "de.robv.android.xposed.core.",
-            "de.robv.android.xposed.callbacks.",
             "com.topjohnwu.lsposed.",
             "org.lsposed.lspd.",
             "org.lsposed.lsplant.",

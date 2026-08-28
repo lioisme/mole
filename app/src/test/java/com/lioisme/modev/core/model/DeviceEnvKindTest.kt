@@ -35,37 +35,37 @@ class DeviceEnvKindTest {
     }
 
     @Test
-    fun `root kinds default to enabled in CategoryTaxonomy`() {
+    fun `root kinds default to disabled in CategoryTaxonomy`() {
         val rootKinds = listOf(
             DeviceEnvKind.ROOT_FILE, DeviceEnvKind.ROOT_EXEC,
             DeviceEnvKind.ROOT_PACKAGE_MANAGER, DeviceEnvKind.ROOT_PROPERTY,
         )
         for (kind in rootKinds) {
             val cat = CategoryTaxonomy.byId(RecordType.DEVICE_ENV, kind.name)!!
-            assertEquals("$kind should default enabled", true, cat.defaultEnabled)
+            assertEquals("$kind should default disabled (safe-first)", false, cat.defaultEnabled)
         }
     }
 
     @Test
-    fun `xposed kinds default to enabled in CategoryTaxonomy`() {
+    fun `xposed kinds default to disabled in CategoryTaxonomy`() {
         val xposedKinds = listOf(
             DeviceEnvKind.XPOSED_CLASS, DeviceEnvKind.XPOSED_STACK, DeviceEnvKind.XPOSED_MAPS,
         )
         for (kind in xposedKinds) {
             val cat = CategoryTaxonomy.byId(RecordType.DEVICE_ENV, kind.name)!!
-            assertEquals("$kind should default enabled", true, cat.defaultEnabled)
+            assertEquals("$kind should default disabled (safe-first)", false, cat.defaultEnabled)
         }
     }
 
     @Test
-    fun `emulator kinds default to enabled in CategoryTaxonomy`() {
+    fun `emulator kinds default to disabled in CategoryTaxonomy`() {
         val emuKinds = listOf(
             DeviceEnvKind.EMULATOR_BUILD, DeviceEnvKind.EMULATOR_FILE,
             DeviceEnvKind.EMULATOR_SENSOR, DeviceEnvKind.EMULATOR_NETWORK,
         )
         for (kind in emuKinds) {
             val cat = CategoryTaxonomy.byId(RecordType.DEVICE_ENV, kind.name)!!
-            assertEquals("$kind should default enabled", true, cat.defaultEnabled)
+            assertEquals("$kind should default disabled (safe-first)", false, cat.defaultEnabled)
         }
     }
 

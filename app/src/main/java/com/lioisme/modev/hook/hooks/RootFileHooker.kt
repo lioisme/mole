@@ -12,6 +12,8 @@ import com.lioisme.modev.hook.ProbeContext
  *
  * 合并自原 RootFileHooker + EmulatorFileHooker 的 File.exists() hook,
  * 减少热路径回调开销(三合一→单一)。
+ *
+ * 路径匹配优化:使用 HashSet 存储路径后缀,O(1) 查找替代 List 遍历。
  */
 class RootFileHooker(
     context: ProbeContext,
@@ -35,8 +37,7 @@ class RootFileHooker(
 
                 // Root 路径检测干预
                 if (switch.rootFile) {
-                    val rootMatch = ROOT_PATHS.any { lower.contains(it) }
-                    if (rootMatch) {
+                    if (matchesRootPath(lower)) {
                         val original = runCatching { invocation.result }.getOrNull()?.toString()
                         invocation.setResult(false)
                         emit(
@@ -53,12 +54,12 @@ class RootFileHooker(
 
                 // 模拟器路径检测干预
                 if (switch.emulatorFile) {
-                    val emuMatch = EMULATOR_PATHS.firstOrNull { lower.contains(it) }
-                    if (emuMatch != null) {
+                    val emuSuffix = matchesEmulatorPath(lower)
+                    if (emuSuffix != null) {
                         invocation.setResult(false)
                         val op = when {
-                            emuMatch.startsWith("/dev/") -> DeviceEnvOperation.DEV_FILE_EXISTS
-                            emuMatch.startsWith("/system/lib") || emuMatch.startsWith("/system/bin") -> DeviceEnvOperation.LIB_FILE_EXISTS
+                            emuSuffix.startsWith("/dev/") -> DeviceEnvOperation.DEV_FILE_EXISTS
+                            emuSuffix.startsWith("/system/lib") || emuSuffix.startsWith("/system/bin") -> DeviceEnvOperation.LIB_FILE_EXISTS
                             else -> DeviceEnvOperation.SYS_FILE_EXISTS
                         }
                         emit(
@@ -67,7 +68,7 @@ class RootFileHooker(
                             originalValue = "true",
                             maskedValue = "false",
                             targetPath = path,
-                            detectionPattern = emuMatch,
+                            detectionPattern = emuSuffix,
                         )
                         return
                     }
@@ -84,7 +85,7 @@ class RootFileHooker(
             override fun before(invocation: Invocation) {
                 if (!config().rootFile) return
                 val path = (invocation.thisObject as? java.io.File)?.path ?: return
-                if (!matchesRootPath(path)) return
+                if (!matchesRootPath(path.lowercase())) return
                 invocation.setResult(0L)
                 emit(
                     kind = DeviceEnvKind.ROOT_FILE,
@@ -106,7 +107,7 @@ class RootFileHooker(
             override fun before(invocation: Invocation) {
                 if (!config().rootFile) return
                 val path = (invocation.thisObject as? java.io.File)?.path ?: return
-                if (!matchesRootPath(path)) return
+                if (!matchesRootPath(path.lowercase())) return
                 invocation.setResult(false)
                 emit(
                     kind = DeviceEnvKind.ROOT_FILE,
@@ -120,58 +121,14 @@ class RootFileHooker(
         })
     }
 
-    private fun matchesRootPath(path: String): Boolean {
-        val lower = path.lowercase()
-        return ROOT_PATHS.any { lower.contains(it) }
-    }
+    private fun matchesRootPath(lower: String): Boolean =
+        DeviceEnvPathMatcher.matchesRootPath(lower)
+
+    private fun matchesEmulatorPath(lower: String): String? =
+        DeviceEnvPathMatcher.matchesEmulatorPath(lower)
 
     companion object {
 
         private const val ROOT_PATTERN = "root-file"
-
-        private val ROOT_PATHS = listOf(
-            "/su",
-            "/su/bin/su",
-            "/system/xbin/su",
-            "/system/bin/su",
-            "/sbin/su",
-            "/data/local/su",
-            "/data/local/bin/su",
-            "/data/local/xbin/su",
-            "/system/app/superuser",
-            "/system/app/Superuser.apk",
-            "/system/app/SuperSU",
-            "/system/app/SuperSU.apk",
-            "/system/bin/.ext/.su",
-            "/system/etc/init.d/99sud",
-            "/system/su.d",
-            "/system/usr/we-need-root",
-            "/cache/su",
-            "/data/su",
-            "/dev/su",
-            "/system/xbin/busybox",
-            "/system/bin/busybox",
-            "/sbin/busybox",
-            "/data/local/busybox",
-            "/data/local/xbin/busybox",
-            "/system/app/Superuser",
-            "/system/app/SuperUser",
-            "/system/app/Magisk",
-            "/system/app/MagiskManager",
-            "/data/adb/magisk",
-            "/data/adb/magisk.db",
-            "/proc/1/root",
-            "/system/etc/permissive.patches",
-        )
-
-        private val EMULATOR_PATHS = listOf(
-            "/dev/qemu_pipe",
-            "/dev/goldfish_pipe",
-            "/dev/socket/qemud",
-            "/dev/qemu_trace",
-            "/system/lib/libc_malloc_debug_qemu.so",
-            "/sys/qemu_trace",
-            "/system/bin/qemu-props",
-        )
     }
 }

@@ -21,17 +21,24 @@ class XposedStackHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                val original = invocation.result as? Array<StackTraceElement> ?: return
-                val filtered = original.filter { !isXposedFrame(it) }
-                if (filtered.size != original.size) {
-                    invocation.setResult(filtered.toTypedArray())
-                    emit(
-                        kind = DeviceEnvKind.XPOSED_STACK,
-                        operation = DeviceEnvOperation.GET_STACK_TRACE,
-                        params = mapOf(
-                            "removed" to (original.size - filtered.size).toString(),
-                        ),
-                    )
+                if (!config().xposedStack) return
+                if (IN_HOOK.get() == true) return
+                IN_HOOK.set(true)
+                try {
+                    val original = invocation.result as? Array<StackTraceElement> ?: return
+                    val filtered = original.filter { !isXposedFrame(it) }
+                    if (filtered.size != original.size) {
+                        invocation.setResult(filtered.toTypedArray())
+                        emit(
+                            kind = DeviceEnvKind.XPOSED_STACK,
+                            operation = DeviceEnvOperation.GET_STACK_TRACE,
+                            params = mapOf(
+                                "removed" to (original.size - filtered.size).toString(),
+                            ),
+                        )
+                    }
+                } finally {
+                    IN_HOOK.set(false)
                 }
             }
         })
@@ -43,17 +50,24 @@ class XposedStackHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                val original = invocation.result as? Array<StackTraceElement> ?: return
-                val filtered = original.filter { !isXposedFrame(it) }
-                if (filtered.size != original.size) {
-                    invocation.setResult(filtered.toTypedArray())
-                    emit(
-                        kind = DeviceEnvKind.XPOSED_STACK,
-                        operation = DeviceEnvOperation.THREAD_STACK,
-                        params = mapOf(
-                            "removed" to (original.size - filtered.size).toString(),
-                        ),
-                    )
+                if (!config().xposedStack) return
+                if (IN_HOOK.get() == true) return
+                IN_HOOK.set(true)
+                try {
+                    val original = invocation.result as? Array<StackTraceElement> ?: return
+                    val filtered = original.filter { !isXposedFrame(it) }
+                    if (filtered.size != original.size) {
+                        invocation.setResult(filtered.toTypedArray())
+                        emit(
+                            kind = DeviceEnvKind.XPOSED_STACK,
+                            operation = DeviceEnvOperation.THREAD_STACK,
+                            params = mapOf(
+                                "removed" to (original.size - filtered.size).toString(),
+                            ),
+                        )
+                    }
+                } finally {
+                    IN_HOOK.set(false)
                 }
             }
         })
@@ -65,6 +79,8 @@ class XposedStackHooker(
     }
 
     companion object {
+        private val IN_HOOK = ThreadLocal.withInitial { false }
+
         private val XPOSED_KEYWORDS = listOf(
             "xposed", "lspd", "lsplant", "de.robv",
         )

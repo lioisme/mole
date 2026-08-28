@@ -8,6 +8,13 @@ import com.lioisme.modev.hook.ProbeContext
 import java.io.BufferedReader
 import java.io.File
 
+/**
+ * 检测行为监控 Hooker(V31):被动监控 root/emulator 检测行为,仅记录不干预。
+ *
+ * 设计决策:当干预型 Hooker 已覆盖同一 API 时,跳过对应的 monitor hook,
+ * 避免双重 hook 开销(RootFileHooker 已覆盖 File.exists,
+ * XposedClassHooker 已覆盖 Class.forName 等)。
+ */
 class DetectionMonitorHooker(
     context: ProbeContext,
 ) : DeviceEnvBaseHooker(context) {
@@ -15,37 +22,32 @@ class DetectionMonitorHooker(
     override fun install() {
         val switch = config()
         if (switch.detectRoot) {
-            monitorClassForName()
-            monitorFileExists()
+            // File.exists 由 RootFileHooker 覆盖,跳过 monitorFileExists
+            if (!switch.rootFile) {
+                monitorFileExists()
+            }
+            // Class.forName hook 在 LSPosed 下易引发 ClassNotFoundException 传播异常,
+            // 跳过 monitorClassForName;root 检测信号已由 File.exists 等覆盖。
         }
         if (switch.detectEmulator) {
-            monitorGetStackTrace()
-            monitorReadLine()
-            monitorGetDefaultSensor()
-            monitorGetMacAddress()
+            // getStackTrace 由 XposedStackHooker 覆盖,跳过 monitorGetStackTrace
+            if (!switch.xposedStack) {
+                monitorGetStackTrace()
+            }
+            // readLine 由 XposedMapsHooker 覆盖,跳过 monitorReadLine
+            if (!switch.xposedMaps) {
+                monitorReadLine()
+            }
+            // getDefaultSensor 由 EmulatorSensorHooker 覆盖,跳过 monitorGetDefaultSensor
+            if (!switch.emulatorSensor) {
+                monitorGetDefaultSensor()
+            }
+            // getMacAddress 由 EmulatorNetworkHooker 覆盖,跳过 monitorGetMacAddress
+            if (!switch.emulatorNetwork) {
+                monitorGetMacAddress()
+            }
             monitorBuildFields()
         }
-    }
-
-    private fun monitorClassForName() {
-        val method = runCatching {
-            Class::class.java.getMethod("forName", String::class.java)
-        }.getOrNull() ?: return
-        engine.hook(method, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                val name = invocation.getArg(0) as? String ?: return
-                val lower = name.lowercase()
-                val matched = DETECT_KEYWORDS.firstOrNull { lower.contains(it) } ?: return
-                emit(
-                    kind = DeviceEnvKind.DETECT_ROOT,
-                    operation = DeviceEnvOperation.ROOT_CHECK_API,
-                    originalValue = name,
-                    targetClass = name,
-                    detectionPattern = matched,
-                    intervention = false,
-                )
-            }
-        })
     }
 
     private fun monitorGetStackTrace() {
@@ -54,6 +56,8 @@ class DetectionMonitorHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
+                // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
+                if (config().xposedStack) return
                 val stack = invocation.result as? Array<StackTraceElement> ?: return
                 val hasDetection = stack.any { frame ->
                     val cn = frame.className.lowercase()
@@ -77,6 +81,8 @@ class DetectionMonitorHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
+                // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
+                if (config().xposedMaps) return
                 val line = invocation.result as? String ?: return
                 val lower = line.lowercase()
                 val matched = MAPS_KEYWORDS.firstOrNull { lower.contains(it) } ?: return
@@ -98,6 +104,8 @@ class DetectionMonitorHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
+                // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
+                if (config().rootFile) return
                 val path = (invocation.thisObject as? File)?.path ?: return
                 val lower = path.lowercase()
                 val matched = ROOT_FILE_KEYWORDS.firstOrNull { lower.contains(it) } ?: return
@@ -119,6 +127,8 @@ class DetectionMonitorHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
+                // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
+                if (config().emulatorSensor) return
                 val result = invocation.result
                 val params = mapOf(
                     "sensorType" to (invocation.getArg(0) as? Int).toString(),
@@ -139,6 +149,8 @@ class DetectionMonitorHooker(
         val method = runCatching { clazz.getMethod("getMacAddress") }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
+                // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
+                if (config().emulatorNetwork) return
                 val mac = invocation.result as? String ?: return
                 emit(
                     kind = DeviceEnvKind.DETECT_EMULATOR,
@@ -157,6 +169,8 @@ class DetectionMonitorHooker(
             val method = runCatching { clazz.getMethod(field) }.getOrNull() ?: continue
             engine.hook(method, object : MethodHook() {
                 override fun after(invocation: Invocation) {
+                    // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
+                    if (config().emulatorBuild) return
                     val value = invocation.result as? String ?: return
                     emit(
                         kind = DeviceEnvKind.DETECT_EMULATOR,
@@ -172,11 +186,6 @@ class DetectionMonitorHooker(
     }
 
     companion object {
-        private val DETECT_KEYWORDS = listOf(
-            "xposed", "lspd", "lsplant", "edxposed", "de.robv",
-            "su", "busybox", "magisk", "superuser",
-        )
-
         private val DETECT_FRAME_KEYWORDS = listOf(
             "xposed", "lspd", "lsplant", "de.robv",
             "frida", "gadget", "substrate",

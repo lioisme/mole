@@ -10,6 +10,9 @@ import com.lioisme.modev.hook.ProbeContext
 /**
  * Root 包管理器查询干预 Hooker(V31):拦截 PackageManager 的包列表查询方法,
  * 从返回结果中过滤 root 管理应用,阻止应用通过已安装包列表检测 root。
+ *
+ * 注意:PackageInfo 的包名是 public field `packageName`,不是方法 `getPackageName()`。
+ * 使用 field 访问而非反射调用不存在的方法。
  */
 class RootPackageManagerHooker(
     context: ProbeContext,
@@ -36,7 +39,7 @@ class RootPackageManagerHooker(
                 val packages = invocation.result as? List<*> ?: return
                 val filtered = packages.filter { pkg ->
                     val name = runCatching {
-                        pkg?.javaClass?.getMethod("getPackageName")?.invoke(pkg) as? String
+                        pkg?.javaClass?.getField("packageName")?.get(pkg) as? String
                     }.getOrNull()
                     name == null || !isRootPackage(name)
                 }
@@ -73,7 +76,7 @@ class RootPackageManagerHooker(
                 val apps = invocation.result as? List<*> ?: return
                 val filtered = apps.filter { app ->
                     val name = runCatching {
-                        app?.javaClass?.getMethod("packageName")?.invoke(app) as? String
+                        app?.javaClass?.getField("packageName")?.get(app) as? String
                     }.getOrNull()
                     name == null || !isRootPackage(name)
                 }
@@ -112,7 +115,7 @@ class RootPackageManagerHooker(
                 val activities = invocation.result as? List<*> ?: return
                 val filtered = activities.filter { activity ->
                     val name = runCatching {
-                        activity?.javaClass?.getMethod("getPackageName")?.invoke(activity) as? String
+                        activity?.javaClass?.getField("packageName")?.get(activity) as? String
                     }.getOrNull()
                     name == null || !isRootPackage(name)
                 }

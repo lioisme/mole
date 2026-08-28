@@ -256,6 +256,11 @@ class SettingsRepository(
                 pkg to AppListenOverride.fromJson(gson, writer.getLocal(key))
             }
             .filterValues { !it.isDefault }
+        // 镜像覆盖到 RemotePreferences:注入侧 install() 在 TCP 推送前读 Remote,
+        // 未镜像的覆盖键对注入侧不可见(仅本地 SP 有值 → effectiveFromRemote() 返回 null)。
+        _overrides.value.forEach { (pkg, override) ->
+            writer.put(ConfigKeys.overrideKey(pkg), override.toJson(gson))
+        }
         // V26:恢复服务监听外部访问偏好(进程重启后重放;默认停用零动作)
         val storedExternalAccess = localPrefs.getBoolean(ConfigKeys.SERVER_EXTERNAL_ACCESS, false)
         _serverExternalAccess.value = storedExternalAccess

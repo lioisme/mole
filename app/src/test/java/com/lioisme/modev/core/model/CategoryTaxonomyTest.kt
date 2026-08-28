@@ -89,10 +89,11 @@ class CategoryTaxonomyTest {
 
     @Test
     fun `device_env_categories_match_defaults`() {
+        // V33:所有 DeviceEnv 干预类 defaultEnabled 改为 false(安全优先,与 HookSwitch.DEFAULT 对齐)
         val off = CategoryTaxonomy.forType(RecordType.DEVICE_ENV).filter { !it.defaultEnabled }.map { it.id }.toSet()
-        assertEquals(setOf(DeviceEnvKind.DETECT_ROOT.name, DeviceEnvKind.DETECT_EMULATOR.name), off)
+        assertEquals(13, off.size)
         val on = CategoryTaxonomy.forType(RecordType.DEVICE_ENV).filter { it.defaultEnabled }.map { it.id }.toSet()
-        assertEquals(11, on.size)
+        assertEquals(0, on.size)
     }
 
     @Test

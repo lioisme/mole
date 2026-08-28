@@ -34,7 +34,10 @@ class RootPropertyHooker(
                 val key = invocation.getArg(0) as? String ?: return
                 val replacement = PROPERTY_REPLACEMENTS[key] ?: return
                 val original = invocation.result as? String
-                if (original == replacement) return
+                if (original == null || original == replacement) return
+                // 仅在原始值确实是 root 指示值时才干预,
+                // 避免修改非 root 环境的合法值导致 App 初始化路径断裂。
+                if (!isRootIndicativeValue(key, original)) return
                 invocation.setResult(replacement)
                 emit(
                     kind = DeviceEnvKind.ROOT_PROPERTY,
@@ -60,5 +63,25 @@ class RootPropertyHooker(
             "ro.build.type" to "user",
             "ro.build.tags" to "release-keys",
         )
+
+        /**
+         * 判断属性原始值是否确实是 root 指示值:
+         * - ro.debuggable = "1" 表示开启了调试(非 user 构建/root 环境)
+         * - ro.secure = "0" 表示安全模式关闭(root 环境)
+         * - ro.build.selinux = "0" 表示 SELinux 关闭(root 环境)
+         * - ro.build.type = "eng"/"userdebug" 表示非 user 构建
+         * - ro.build.tags 不含 "release-keys" 表示非 release 构建
+         *
+         * 仅在原始值确实为 root 指示值时才进行干预,
+         * 避免修改已在正常状态的属性导致 App 初始化路径断裂。
+         */
+        internal fun isRootIndicativeValue(key: String, value: String): Boolean = when (key) {
+            "ro.debuggable" -> value == "1"
+            "ro.secure" -> value == "0"
+            "ro.build.selinux" -> value == "0"
+            "ro.build.type" -> value == "eng" || value == "userdebug"
+            "ro.build.tags" -> !value.contains("release-keys")
+            else -> false
+        }
     }
 }

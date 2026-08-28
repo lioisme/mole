@@ -7,12 +7,13 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * 网络请求监控 Hooker(V30):捕获 HTTP 请求/响应,附带 Reqable 堆栈跟踪。
+ * 网络请求监控 Hooker(V30):捕获 HTTP 请求/响应元数据,附带 Reqable 堆栈跟踪。
  *
  * 设计原则:
  * - 拦截 OkHttp newCall() 和 HttpURLConnection getOutputStream()/getInputStream();
  * - 捕获请求发起时的 Java 调用栈(写入 NetworkRecord.stack),供 Reqable 追溯;
- * - 仅 hook 公开 API,不触碰 socket 句柄(被动红线)。
+ * - 仅 hook 公开 API,不触碰 socket 句柄(被动红线);
+ * - 流量捕获由独立工具 PinProxy 完成,Modev 不负责请求/响应体的完整捕获。
  */
 class NetworkRequestHooker(
     context: ProbeContext,
