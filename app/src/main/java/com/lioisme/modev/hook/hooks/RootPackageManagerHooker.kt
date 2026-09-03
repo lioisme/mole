@@ -22,6 +22,7 @@ class RootPackageManagerHooker(
         hookGetInstalledPackages()
         hookGetInstalledApplications()
         hookQueryIntentActivities()
+        hookGetPackageInfo()
     }
 
     @SuppressLint("DiscouragedPrivateApi")
@@ -140,6 +141,34 @@ class RootPackageManagerHooker(
     private fun isRootPackage(packageName: String): Boolean =
         ROOT_PACKAGES.any { it.equals(packageName, ignoreCase = true) }
 
+    @SuppressLint("DiscouragedPrivateApi")
+    private fun hookGetPackageInfo() {
+        val clazz = runCatching { Class.forName("android.app.ApplicationPackageManager") }.getOrNull()
+            ?: runCatching { Class.forName("android.content.pm.PackageManager") }.getOrNull()
+            ?: return
+        val method = runCatching {
+            clazz.getMethod("getPackageInfo", String::class.java, Int::class.javaPrimitiveType)
+        }.getOrNull() ?: return
+
+        engine.hook(method, object : MethodHook() {
+            override fun before(invocation: Invocation) {
+                if (!config().rootPackageManager) return
+                val packageName = invocation.getArg(0) as? String ?: return
+                if (!isRootPackage(packageName)) return
+                emit(
+                    kind = DeviceEnvKind.ROOT_PACKAGE_MANAGER,
+                    operation = DeviceEnvOperation.GET_INSTALLED_PACKAGES,
+                    originalValue = packageName,
+                    maskedValue = null,
+                    targetClass = clazz.name,
+                    detectionPattern = ROOT_PACKAGE_PATTERN,
+                    params = mapOf("api" to "getPackageInfo"),
+                )
+                invocation.setResult(null)
+            }
+        })
+    }
+
     companion object {
 
         private const val ROOT_PACKAGE_PATTERN = "root-package"
@@ -170,6 +199,12 @@ class RootPackageManagerHooker(
             "com.topjohnwu.magisk.tool",
             "com.kingoroot.rootdeluxetools",
             "com.permutive.root.rootmanagement",
+            // V35: Lsposed/EdXposed/XposedManager
+            "org.lsposed.lspatch",
+            "org.lsposed.manager",
+            "io.github.lsposed.edxposed.manager",
+            "de.robv.android.xposed.installer",
+            "com.topjohnwu.lsposed.manager",
         )
     }
 }

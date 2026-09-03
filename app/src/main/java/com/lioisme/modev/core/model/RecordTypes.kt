@@ -27,4 +27,13 @@ object RecordTypes {
 
     /** 设备环境监听记录(Root 隐藏/Xposed 隐藏/模拟器隐藏/检测监控,V31 一等公民)。 */
     const val DEVICE_ENV = "device_env"
+
+    /** UI 交互监听记录(弹窗/控件文本/Activity 跳转,V33 一等公民)。 */
+    const val UI_INTERACTION = "ui"
+
+    /** 系统信息监听记录(Logcat/App 元数据/签名,V33 一等公民)。 */
+    const val SYSTEM = "system"
+
+    /** 进程控制监听记录(退出拦截/崩溃防止/录屏绕过,V33 一等公民)。 */
+    const val PROCESS_CONTROL = "process"
 }

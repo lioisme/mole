@@ -32,6 +32,12 @@ data class AppListenOverride(
     val networkListen: Boolean? = null,
     /** 设备环境监听总开关偏差(V31 一等公民;null = 取默认)。 */
     val deviceEnvListen: Boolean? = null,
+    /** UI 交互监听总开关偏差(V33 一等公民;null = 取默认)。 */
+    val uiListen: Boolean? = null,
+    /** 系统信息监听总开关偏差(V33 一等公民;null = 取默认)。 */
+    val systemListen: Boolean? = null,
+    /** 进程控制总开关偏差(V33 一等公民;null = 取默认)。 */
+    val processControlListen: Boolean? = null,
     /** 类别级偏差(kind id → 显式开关;仅存偏差条目,缺条目 = 取默认)。 */
     val kinds: Map<String, Boolean> = emptyMap(),
     /** 记录调用栈偏差(null = 取默认)。 */
@@ -54,6 +60,8 @@ data class AppListenOverride(
      * 空表与默认等价([isDefault] 归零)。
      */
     val ignorePathPrefixes: List<String>? = null,
+    /** 弹窗关键字清单偏差(V33;null = 取默认,非空整表替换)。 */
+    val dialogKeywords: List<String>? = null,
 ) {
 
     /** 是否等价于「完全未定制」(与默认配置零偏差):调用方应删除存储键而非落盘。 */
@@ -65,6 +73,9 @@ data class AppListenOverride(
             webviewListen == null &&
             networkListen == null &&
             deviceEnvListen == null &&
+            uiListen == null &&
+            systemListen == null &&
+            processControlListen == null &&
             kinds.isEmpty() &&
             logStack == null &&
             maxBytesPerField == null &&
@@ -72,7 +83,8 @@ data class AppListenOverride(
             maxResultRows == null &&
             maxResultChars == null &&
             fileContentCapture == null &&
-            ignorePathPrefixes.isNullOrEmpty()
+            ignorePathPrefixes.isNullOrEmpty() &&
+            dialogKeywords.isNullOrEmpty()
 
     /** Gson 序列化(null 位由 Gson 默认省略,存储紧凑;构造路径保证无冗余条目)。 */
     fun toJson(gson: Gson): String = gson.toJson(this)
@@ -99,6 +111,9 @@ data class AppListenOverride(
                     webviewListen = boolOf(obj, FIELD_WEBVIEW),
                     networkListen = boolOf(obj, FIELD_NETWORK),
                     deviceEnvListen = boolOf(obj, FIELD_DEVICE_ENV),
+                    uiListen = boolOf(obj, FIELD_UI),
+                    systemListen = boolOf(obj, FIELD_SYSTEM),
+                    processControlListen = boolOf(obj, FIELD_PROCESS_CONTROL),
                     kinds = kindsOf(obj),
                     logStack = boolOf(obj, FIELD_LOG_STACK),
                     maxBytesPerField = intOf(obj, FIELD_MAX_BYTES),
@@ -107,6 +122,7 @@ data class AppListenOverride(
                     maxResultChars = intOf(obj, FIELD_MAX_RESULT_CHARS),
                     fileContentCapture = boolOf(obj, FIELD_FILE_CONTENT),
                     ignorePathPrefixes = stringListOf(obj, FIELD_IGNORE_PATH),
+                    dialogKeywords = stringListOf(obj, FIELD_DIALOG_KEYWORDS),
                 )
             }.getOrDefault(DEFAULT)
         }
@@ -170,6 +186,9 @@ data class AppListenOverride(
         private const val FIELD_WEBVIEW = "webviewListen"
         private const val FIELD_NETWORK = "networkListen"
         private const val FIELD_DEVICE_ENV = "deviceEnvListen"
+        private const val FIELD_UI = "uiListen"
+        private const val FIELD_SYSTEM = "systemListen"
+        private const val FIELD_PROCESS_CONTROL = "processControlListen"
         private const val FIELD_KINDS = "kinds"
         private const val FIELD_LOG_STACK = "logStack"
         private const val FIELD_MAX_BYTES = "maxBytesPerField"
@@ -178,13 +197,14 @@ data class AppListenOverride(
         private const val FIELD_MAX_RESULT_CHARS = "maxResultChars"
         private const val FIELD_FILE_CONTENT = "fileContentCapture"
         private const val FIELD_IGNORE_PATH = "ignorePathPrefixes"
+        private const val FIELD_DIALOG_KEYWORDS = "dialogKeywords"
 
         /** V23 三态遗留:旧 kinds 键名与枚举序列化形态。 */
         private const val LEGACY_FIELD_KINDS = "kindOverrides"
         private const val LEGACY_ON = "ON"
         private const val LEGACY_OFF = "OFF"
 
-        /** 合法类别 id 白名单(CryptoKind ∪ SqlKind ∪ BehaviorKind ∪ PrefsKind ∪ WebViewKind ∪ NetworkKind ∪ DeviceEnvKind),防存储漂移注入垃圾键。 */
+        /** 合法类别 id 白名单(CryptoKind ∪ SqlKind ∪ BehaviorKind ∪ PrefsKind ∪ WebViewKind ∪ NetworkKind ∪ DeviceEnvKind ∪ UiInteractionKind ∪ SystemKind ∪ ProcessKind),防存储漂移注入垃圾键。 */
         private val VALID_KINDS: Set<String> =
             CryptoKind.entries.mapTo(mutableSetOf()) { it.name } +
                 SqlKind.entries.map { it.name } +
@@ -192,6 +212,9 @@ data class AppListenOverride(
                 PrefsKind.entries.map { it.name } +
                 WebViewKind.entries.map { it.name } +
                 NetworkKind.entries.map { it.name } +
-                DeviceEnvKind.entries.map { it.name }
+                DeviceEnvKind.entries.map { it.name } +
+                UiInteractionKind.entries.map { it.name } +
+                SystemKind.entries.map { it.name } +
+                ProcessKind.entries.map { it.name }
     }
 }

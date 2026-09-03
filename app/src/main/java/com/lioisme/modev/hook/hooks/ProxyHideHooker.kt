@@ -23,6 +23,7 @@ class ProxyHideHooker(
         hookConnectivityManager()
         hookSettingsGlobal()
         hookOkHttpProxy()
+        hookWifiInfo()
     }
 
     /**
@@ -139,6 +140,7 @@ class ProxyHideHooker(
         val method = runCatching {
             clazz.getMethod("select", java.net.URI::class.java)
         }.getOrNull() ?: return
+        if (java.lang.reflect.Modifier.isAbstract(method.modifiers)) return
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
@@ -153,5 +155,76 @@ class ProxyHideHooker(
                 }
             }
         })
+    }
+
+    /**
+     * Wi-Fi 信息隐藏:拦截 WifiInfo.getSSID/getBSSID/getNetworkId,
+     * 返回假值防止通过 Wi-Fi 信息检测代理/VPN 环境。
+     */
+    private fun hookWifiInfo() {
+        val clazz = runCatching { Class.forName("android.net.wifi.WifiInfo") }.getOrNull() ?: return
+
+        // getSSID:返回假 SSID(带双引号格式)
+        val getSSID = runCatching { clazz.getMethod("getSSID") }.getOrNull()
+        if (getSSID != null) {
+            engine.hook(getSSID, object : MethodHook() {
+                override fun after(invocation: Invocation) {
+                    if (!config().proxySystemProp) return
+                    val current = invocation.result as? String ?: return
+                    // 仅替换模拟器/空值特征,保留真实设备值
+                    if (current == "<unknown ssid>" || current == "null" || current.isEmpty()) {
+                        invocation.setResult("\"$FAKE_SSID\"")
+                        emit(
+                            kind = NetworkKind.PROXY_SYSTEM_PROP,
+                            operation = NetworkOperation.PROP_GET,
+                            params = mapOf("key" to "wifi_ssid"),
+                        )
+                    }
+                }
+            })
+        }
+
+        // getBSSID:返回假 BSSID
+        val getBSSID = runCatching { clazz.getMethod("getBSSID") }.getOrNull()
+        if (getBSSID != null) {
+            engine.hook(getBSSID, object : MethodHook() {
+                override fun after(invocation: Invocation) {
+                    if (!config().proxySystemProp) return
+                    val current = invocation.result as? String ?: return
+                    if (current == "02:00:00:00:00:00" || current.isEmpty()) {
+                        invocation.setResult(FAKE_BSSID)
+                        emit(
+                            kind = NetworkKind.PROXY_SYSTEM_PROP,
+                            operation = NetworkOperation.PROP_GET,
+                            params = mapOf("key" to "wifi_bssid"),
+                        )
+                    }
+                }
+            })
+        }
+
+        // getNetworkId:返回 0(模拟器通常为 -1 或 0)
+        val getNetworkId = runCatching { clazz.getMethod("getNetworkId") }.getOrNull()
+        if (getNetworkId != null) {
+            engine.hook(getNetworkId, object : MethodHook() {
+                override fun after(invocation: Invocation) {
+                    if (!config().proxySystemProp) return
+                    val current = invocation.result as? Int ?: return
+                    if (current == -1) {
+                        invocation.setResult(1)
+                        emit(
+                            kind = NetworkKind.PROXY_SYSTEM_PROP,
+                            operation = NetworkOperation.PROP_GET,
+                            params = mapOf("key" to "wifi_network_id"),
+                        )
+                    }
+                }
+            })
+        }
+    }
+
+    companion object {
+        private const val FAKE_SSID = "MyNetwork"
+        private const val FAKE_BSSID = "01:02:03:04:05:06"
     }
 }

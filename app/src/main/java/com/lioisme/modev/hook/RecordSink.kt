@@ -80,9 +80,52 @@ class RecordSink(
         }
     }
 
+    /**
+     * 紧急写入(旁路队列,同步落盘+发送):供 System.exit / killProcess 的 before 回调使用。
+     * 不经过 queue,直接写入 spool 并 drain 发送,确保进程退出前记录已持久化/发送。
+     */
+    fun emitUrgent(record: MonitoredRecord) {
+        if (!running) return
+        val seq = seqCounter.incrementAndGet()
+        seqCheckpoint = seq
+        val r = record.withSeq(seq)
+        try {
+            val sp = currentSpool()
+            if (sp != null) {
+                sp.append(seq, jsonOf(r))
+                if (isConnected()) {
+                    sp.drain(sendJson)
+                }
+            } else {
+                sendJson(jsonOf(r))
+            }
+        } catch (_: Throwable) { dropped.incrementAndGet() }
+    }
+
     /** 宿主 ACK 回调(ConfigChannel 读循环线程):推进 spool 已确认游标并裁剪。 */
     fun onAck(seq: Long) {
         spool?.onAck(seq)
+    }
+
+    /**
+     * 同步冲洗队列:将内存队列中所有待发记录落盘并发送(阻塞调用线程直到队列清空)。
+     * 供退出拦截等「即将死亡」场景使用,确保 before 回调产生的记录不因进程退出而丢失。
+     */
+    fun flush() {
+        while (true) {
+            val record = queue.poll() ?: break
+            try {
+                val sp = currentSpool()
+                if (sp == null) {
+                    sendJson(jsonOf(record))
+                } else {
+                    sp.append(record.seq, jsonOf(record))
+                    if (isConnected()) {
+                        sp.drain(sendJson)
+                    }
+                }
+            } catch (_: Throwable) { /* best effort */ }
+        }
     }
 
     /** 重启恢复:上次持久化的 seq(进程重启续号,避免与库内旧记录撞号)。 */

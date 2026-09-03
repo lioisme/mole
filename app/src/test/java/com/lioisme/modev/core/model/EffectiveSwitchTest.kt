@@ -249,6 +249,14 @@ class EffectiveSwitchTest {
                 DeviceEnvKind.EMULATOR_FILE -> d.emulatorFile
                 DeviceEnvKind.EMULATOR_SENSOR -> d.emulatorSensor
                 DeviceEnvKind.EMULATOR_NETWORK -> d.emulatorNetwork
+                DeviceEnvKind.EMULATOR_TELEPHONY -> d.emulatorTelephony
+                DeviceEnvKind.EMULATOR_CPU -> d.emulatorCpu
+                DeviceEnvKind.EMULATOR_BATTERY -> d.emulatorBattery
+                DeviceEnvKind.SYSTEM_PROPERTIES -> d.systemProperties
+                DeviceEnvKind.PROC_STATUS -> d.procStatus
+                DeviceEnvKind.PROC_MOUNT_INFO -> d.procMountInfo
+                DeviceEnvKind.PROC_CGROUP -> d.procCgroup
+                DeviceEnvKind.PROC_NET -> d.procNet
                 DeviceEnvKind.DETECT_ROOT -> d.detectRoot
                 DeviceEnvKind.DETECT_EMULATOR -> d.detectEmulator
             }

@@ -26,6 +26,7 @@ class VpnHideHooker(
         hookNetworkInterface()
         hookNetworkInfo()
         hookLinkProperties()
+        hookHardwareAddress()
     }
 
     private fun hookNetworkCapabilities() {
@@ -216,6 +217,46 @@ class VpnHideHooker(
                 }
             })
         }
+    }
+
+    /**
+     * 硬件 MAC 地址隐藏:拦截 NetworkInterface.getHardwareAddress(),
+     * VPN 接口返回假 MAC 地址,防止通过硬件地址检测 VPN。
+     */
+    private fun hookHardwareAddress() {
+        val clazz = runCatching { Class.forName("java.net.NetworkInterface") }.getOrNull() ?: return
+        val method = runCatching { clazz.getMethod("getHardwareAddress") }.getOrNull() ?: return
+
+        engine.hook(method, object : MethodHook() {
+            override fun after(invocation: Invocation) {
+                if (!config().vpnInterface) return
+                val name = runCatching {
+                    clazz.getMethod("getName").invoke(invocation.thisObject) as? String
+                }.getOrNull() ?: return
+                if (!isVpnInterface(name)) return
+                val current = invocation.result as? ByteArray
+                if (current == null || current.isEmpty()) {
+                    invocation.setResult(generateFakeMac(name))
+                    emit(
+                        kind = NetworkKind.VPN_INTERFACE,
+                        operation = NetworkOperation.VPN_IFACE_NAME,
+                        params = mapOf("iface" to name, "type" to "hardwareAddress"),
+                    )
+                }
+            }
+        })
+    }
+
+    private fun generateFakeMac(seed: String): ByteArray {
+        val hash = seed.hashCode()
+        return byteArrayOf(
+            0x02,
+            ((hash shr 24) and 0xFF).toByte(),
+            ((hash shr 16) and 0xFF).toByte(),
+            ((hash shr 8) and 0xFF).toByte(),
+            (hash and 0xFF).toByte(),
+            0x01,
+        )
     }
 
     private fun isVpnInterface(name: String): Boolean {

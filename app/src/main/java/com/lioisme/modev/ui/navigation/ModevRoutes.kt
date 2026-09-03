@@ -41,6 +41,12 @@ object ModevRoutes {
     const val NETWORK_RECORDS = "records/network/{packageName}"
     /** 每应用设备环境监听记录列表(V31 一等公民)。 */
     const val DEVICE_ENV_RECORDS = "records/device_env/{packageName}"
+    /** 每应用 UI 交互监听记录列表(V33 一等公民)。 */
+    const val UI_INTERACTION_RECORDS = "records/ui_interaction/{packageName}"
+    /** 每应用系统信息监听记录列表(V33 一等公民)。 */
+    const val SYSTEM_RECORDS = "records/system/{packageName}"
+    /** 每应用进程控制监听记录列表(V33 一等公民)。 */
+    const val PROCESS_CONTROL_RECORDS = "records/process_control/{packageName}"
     /** 每应用监听设置页(V24 二态偏差)。 */
     const val APP_LISTEN_SETTINGS = "apps/{packageName}/listen-settings"
 
@@ -61,6 +67,12 @@ object ModevRoutes {
     fun networkRecords(packageName: String): String = "records/network/${enc(packageName)}"
 
     fun deviceEnvRecords(packageName: String): String = "records/device_env/${enc(packageName)}"
+
+    fun uiInteractionRecords(packageName: String): String = "records/ui_interaction/${enc(packageName)}"
+
+    fun systemRecords(packageName: String): String = "records/system/${enc(packageName)}"
+
+    fun processControlRecords(packageName: String): String = "records/process_control/${enc(packageName)}"
 
     fun licenseDetail(index: Int): String = "settings/licenses/${index}"
 

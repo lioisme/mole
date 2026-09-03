@@ -20,7 +20,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 .\gradlew.bat :app:assembleModernDebugAndroidTest
 .\gradlew.bat :app:connectedModernDebugAndroidTest
 
-# lint 门禁(基线:36 warning / 0 error,V28 维持;提交前必须跑,禁止新增 warning)
+# lint 门禁(基线:43 warning / 0 error,V34 清理 39 死资源;提交前必须跑,禁止新增 warning)
 .\gradlew.bat :app:lintModernRelease
 ```
 
@@ -87,7 +87,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 5. **弃用 API 零容忍**:新增源码一律不得引入已弃用 API;`getInstalledApplications`
    走 `core/util/PackageManagerCompat.kt` 统一入口(API 33+ `ApplicationInfoFlags`,
    旧系统弃用分支);`getLaunchIntentForPackage(String)` 全 API 无 flags 重载且从未
-   弃用,直接使用即可。`lintModernRelease` 零新增(基线 36 warning/0 error,V27 由 37 净降 1,
+   弃用,直接使用即可。`lintModernRelease` 零新增(基线 43 warning/0 error,V34 清理 39 死资源,
    见上文构建命令)。
 6. **计数文本复数**:en 带 `%d` 的计数文案用 `<plurals>`(one/other),zh 仅
    `other`;禁止 `<string>` 直接内嵌 `%d + 英文单词`(PluralsCandidate lint)。
@@ -204,7 +204,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
     统一 `ui/common/scopeChangeMessage`,状态语义分派统一
     `ui/common/connectionStatus/scopeStatus`;Room 显式 WAL
     (`ModevDatabase.get`)、批量插入显式 `@Transaction`;
-    lint 基线更新:**38 → 37 warnings / 0 errors**(V23 清理死资源键
+    lint 基线更新:**43 → 43 warnings / 0 errors**(V34 清理 39 死资源键
     detail_remove_scope/listen_settings_title/record_copied/
     settings_pin_scoped_hint/settings_apps_section/detail_framework_error,
     新增计数文案必须 plurals 如 listen_settings_custom_n)。

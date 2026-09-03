@@ -31,10 +31,22 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *   requestHeadersJson / responseHeadersJson / sslProtocol / cipherSuite /
  *   peerCertificatesJson / proxyHost / proxyPort / vpnActive,
  *   recordType='network' 行承载;纯 ALTER TABLE ADD COLUMN,不触碰存量行。
+ * v11 → v12:V33 三大类监听新增 27 个可空列:
+ *   UI 交互(11):dialogTitle / dialogMessage / dialogKeywords / dialogIntercepted /
+ *     widgetText / widgetClassName / activityName / intentAction / intentData /
+ *     intentExtrasJson / intentFlags;
+ *   系统信息(10):logcatTag / logcatLevel / logcatMessage / appVersion / appVersionCode /
+ *     appMinSdk / appTargetSdk / appPermissions / signatureHash / signatureBase64;
+ *   进程控制(6):exitCode / processPid / crashType / crashMessage / crashBlocked /
+ *     screenRecordBlocked;
+ *   recordType='ui'/'system'/'process' 行承载;纯 ALTER TABLE ADD COLUMN,不触碰存量行。
+ * v12 → v13:V34 审计增强新增 3 个可空列:
+ *   interventionAction(TEXT,干预动作标记:"BLOCKED"/"DETECTED"/null);
+ *   同时覆盖进程控制/设备环境/UI交互三类记录;纯 ALTER TABLE ADD COLUMN,不触碰存量行。
  */
 @Database(
     entities = [CryptoRecordEntity::class],
-    version = 11,
+    version = 13,
     exportSchema = true,
 )
 abstract class ModevDatabase : RoomDatabase() {
@@ -199,6 +211,57 @@ abstract class ModevDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v11 → v12:V33 三大类监听新增 27 个可空列;
+         * 纯 ALTER TABLE ADD COLUMN,不触碰存量行(v10→v11 同先例)。
+         */
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val table = "crypto_records"
+                // UI 交互监听列(11)
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `dialogTitle` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `dialogMessage` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `dialogKeywords` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `dialogIntercepted` INTEGER")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `widgetText` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `widgetClassName` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `activityName` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `intentAction` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `intentData` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `intentExtrasJson` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `intentFlags` INTEGER")
+                // 系统信息监听列(10)
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `logcatTag` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `logcatLevel` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `logcatMessage` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `appVersion` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `appVersionCode` INTEGER")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `appMinSdk` INTEGER")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `appTargetSdk` INTEGER")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `appPermissions` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `signatureHash` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `signatureBase64` TEXT")
+                // 进程控制列(6)
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `exitCode` INTEGER")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `processPid` INTEGER")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `crashType` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `crashMessage` TEXT")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `crashBlocked` INTEGER")
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `screenRecordBlocked` INTEGER")
+            }
+        }
+
+        /**
+         * v12 → v13:V34 审计增强新增 interventionAction 列(干预动作标记);
+         * 覆盖进程控制/设备环境/UI交互三类记录;纯 ALTER TABLE ADD COLUMN,不触碰存量行。
+         */
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                val table = "crypto_records"
+                db.execSQL("ALTER TABLE `$table` ADD COLUMN `interventionAction` TEXT")
+            }
+        }
+
         @Volatile
         private var instance: ModevDatabase? = null
 
@@ -215,7 +278,8 @@ abstract class ModevDatabase : RoomDatabase() {
                     .addMigrations(
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                         MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                        MIGRATION_9_10, MIGRATION_10_11,
+                        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+                        MIGRATION_12_13,
                     )
                     .fallbackToDestructiveMigration(false)
                     .build()

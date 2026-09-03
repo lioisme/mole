@@ -10,7 +10,7 @@ import com.lioisme.modev.AppContainer
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.repo.LogRepository
-import com.lioisme.modev.data.repo.RecordFilter
+import com.lioisme.modev.domain.record.RecordFilter
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow

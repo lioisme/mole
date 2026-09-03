@@ -18,6 +18,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 
@@ -34,7 +36,10 @@ fun EmptyState(
     hint: String? = null,
 ) {
     Column(
-        modifier = modifier.fillMaxSize().wrapContentSize(Alignment.Center),
+        modifier = modifier
+            .fillMaxSize()
+            .wrapContentSize(Alignment.Center)
+            .semantics { stateDescription = message },
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(

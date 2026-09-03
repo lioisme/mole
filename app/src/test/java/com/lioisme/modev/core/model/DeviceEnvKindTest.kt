@@ -23,8 +23,8 @@ class DeviceEnvKindTest {
     }
 
     @Test
-    fun `DeviceEnvKind count is 13`() {
-        assertEquals(13, DeviceEnvKind.entries.size)
+    fun `DeviceEnvKind count is 21`() {
+        assertEquals(21, DeviceEnvKind.entries.size)
     }
 
     @Test
@@ -62,8 +62,33 @@ class DeviceEnvKindTest {
         val emuKinds = listOf(
             DeviceEnvKind.EMULATOR_BUILD, DeviceEnvKind.EMULATOR_FILE,
             DeviceEnvKind.EMULATOR_SENSOR, DeviceEnvKind.EMULATOR_NETWORK,
+            DeviceEnvKind.EMULATOR_TELEPHONY, DeviceEnvKind.EMULATOR_CPU,
+            DeviceEnvKind.EMULATOR_BATTERY,
         )
         for (kind in emuKinds) {
+            val cat = CategoryTaxonomy.byId(RecordType.DEVICE_ENV, kind.name)!!
+            assertEquals("$kind should default disabled (safe-first)", false, cat.defaultEnabled)
+        }
+    }
+
+    @Test
+    fun `sysprop kinds default to disabled in CategoryTaxonomy`() {
+        val syspropKinds = listOf(
+            DeviceEnvKind.SYSTEM_PROPERTIES,
+        )
+        for (kind in syspropKinds) {
+            val cat = CategoryTaxonomy.byId(RecordType.DEVICE_ENV, kind.name)!!
+            assertEquals("$kind should default disabled (safe-first)", false, cat.defaultEnabled)
+        }
+    }
+
+    @Test
+    fun `proc kinds default to disabled in CategoryTaxonomy`() {
+        val procKinds = listOf(
+            DeviceEnvKind.PROC_STATUS, DeviceEnvKind.PROC_MOUNT_INFO,
+            DeviceEnvKind.PROC_CGROUP, DeviceEnvKind.PROC_NET,
+        )
+        for (kind in procKinds) {
             val cat = CategoryTaxonomy.byId(RecordType.DEVICE_ENV, kind.name)!!
             assertEquals("$kind should default disabled (safe-first)", false, cat.defaultEnabled)
         }

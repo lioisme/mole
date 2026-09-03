@@ -38,6 +38,9 @@ import com.lioisme.modev.ui.records.RecordsViewModelFactory
 import com.lioisme.modev.ui.records.WebViewRecordsScreen
 import com.lioisme.modev.ui.records.DeviceEnvRecordsScreen
 import com.lioisme.modev.ui.records.NetworkRecordsScreen
+import com.lioisme.modev.ui.records.UiInteractionRecordsScreen
+import com.lioisme.modev.ui.records.SystemRecordsScreen
+import com.lioisme.modev.ui.records.ProcessControlRecordsScreen
 import com.lioisme.modev.ui.settings.AboutScreen
 import com.lioisme.modev.ui.settings.DataSettingsScreen
 import com.lioisme.modev.ui.settings.DataSettingsViewModelFactory
@@ -148,6 +151,15 @@ fun ModevNavHost(navController: NavHostController) {
                     },
                     onOpenDeviceEnv = {
                         navController.navigateGuarded(ModevRoutes.deviceEnvRecords(pkg))
+                    },
+                    onOpenUiInteraction = {
+                        navController.navigateGuarded(ModevRoutes.uiInteractionRecords(pkg))
+                    },
+                    onOpenSystem = {
+                        navController.navigateGuarded(ModevRoutes.systemRecords(pkg))
+                    },
+                    onOpenProcessControl = {
+                        navController.navigateGuarded(ModevRoutes.processControlRecords(pkg))
                     },
                     onOpenListenSettings = {
                         navController.navigateGuarded(ModevRoutes.appListenSettings(pkg))
@@ -341,6 +353,72 @@ fun ModevNavHost(navController: NavHostController) {
                     viewModel = viewModel(
                         key = "records-device-env-$pkg",
                         factory = RecordsViewModelFactory(RecordType.DEVICE_ENV, pkg, app.container),
+                    ),
+                    onBack = { navController.popGuarded() },
+                    onOpenRecord = { id ->
+                        navController.navigateGuarded(ModevRoutes.recordDetail(id))
+                    },
+                )
+            }
+        }
+        slideComposable(
+            route = ModevRoutes.UI_INTERACTION_RECORDS,
+            arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
+        ) { entry ->
+            val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
+            if (pkg.isBlank()) {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
+            BackGuarded(navController) {
+                UiInteractionRecordsScreen(
+                    viewModel = viewModel(
+                        key = "records-ui-interaction-$pkg",
+                        factory = RecordsViewModelFactory(RecordType.UI_INTERACTION, pkg, app.container),
+                    ),
+                    onBack = { navController.popGuarded() },
+                    onOpenRecord = { id ->
+                        navController.navigateGuarded(ModevRoutes.recordDetail(id))
+                    },
+                )
+            }
+        }
+        slideComposable(
+            route = ModevRoutes.SYSTEM_RECORDS,
+            arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
+        ) { entry ->
+            val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
+            if (pkg.isBlank()) {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
+            BackGuarded(navController) {
+                SystemRecordsScreen(
+                    viewModel = viewModel(
+                        key = "records-system-$pkg",
+                        factory = RecordsViewModelFactory(RecordType.SYSTEM, pkg, app.container),
+                    ),
+                    onBack = { navController.popGuarded() },
+                    onOpenRecord = { id ->
+                        navController.navigateGuarded(ModevRoutes.recordDetail(id))
+                    },
+                )
+            }
+        }
+        slideComposable(
+            route = ModevRoutes.PROCESS_CONTROL_RECORDS,
+            arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
+        ) { entry ->
+            val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
+            if (pkg.isBlank()) {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
+            BackGuarded(navController) {
+                ProcessControlRecordsScreen(
+                    viewModel = viewModel(
+                        key = "records-process-control-$pkg",
+                        factory = RecordsViewModelFactory(RecordType.PROCESS_CONTROL, pkg, app.container),
                     ),
                     onBack = { navController.popGuarded() },
                     onOpenRecord = { id ->

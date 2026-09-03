@@ -106,6 +106,21 @@ class AppMonitorViewModel(
         .map { counts -> counts[packageName] ?: 0L }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
+    /** 该应用 UI 交互监听记录数(V33 一等公民;入口副标题)。*/
+    val uiInteractionCount: StateFlow<Long> = logs.observeRecordCounts(RecordTypes.UI_INTERACTION)
+        .map { counts -> counts[packageName] ?: 0L }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
+
+    /** 该应用系统信息监听记录数(V33 一等公民;入口副标题)。*/
+    val systemCount: StateFlow<Long> = logs.observeRecordCounts(RecordTypes.SYSTEM)
+        .map { counts -> counts[packageName] ?: 0L }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
+
+    /** 该应用进程控制监听记录数(V33 一等公民;入口副标题)。*/
+    val processControlCount: StateFlow<Long> = logs.observeRecordCounts(RecordTypes.PROCESS_CONTROL)
+        .map { counts -> counts[packageName] ?: 0L }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
+
     /** 单应用监听覆盖(无覆盖 = [AppListenOverride.DEFAULT];「监听设置」摘要来源)。*/
     val listenOverride: StateFlow<AppListenOverride> = settings.overrides
         .map { it[packageName] ?: AppListenOverride.DEFAULT }

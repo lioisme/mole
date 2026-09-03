@@ -7,8 +7,11 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * Root 命令执行干预 Hooker(V31):拦截 Runtime.exec(String[]) 和 ProcessBuilder.start(),
+ * Root 命令执行干预 Hooker(V31,V34 审计修复):拦截 Runtime.exec(String[]) 和 ProcessBuilder.start(),
  * 当命令包含 su 时阻止执行,防止应用通过命令执行检测 root。
+ *
+ * 干预机制:before() 中 setResult(null) 阻止 su 命令执行。
+ * 干预结果通过 [DeviceEnvRecord.interventionAction] 记录("BLOCKED"|"DETECTED"|null)。
  */
 class RootExecHooker(
     context: ProbeContext,
@@ -30,16 +33,36 @@ class RootExecHooker(
                 override fun before(invocation: Invocation) {
                     if (!config().rootExec) return
                     val command = invocation.getArg(0) as? Array<*> ?: return
-                    if (!containsSu(command)) return
-                    emit(
-                        kind = DeviceEnvKind.ROOT_EXEC,
-                        operation = DeviceEnvOperation.EXEC_COMMAND,
-                        originalValue = command.joinToString(" "),
-                        maskedValue = null,
-                        targetClass = "java.lang.Runtime",
-                        detectionPattern = ROOT_EXEC_PATTERN,
-                        params = mapOf("api" to "exec-string-array"),
-                    )
+                    val firstArg = command.firstOrNull()?.toString() ?: return
+                    val cmdName = firstArg.substringAfterLast('/').substringAfterLast('\\')
+
+                    // su 命令拦截
+                    if (cmdName.equals("su", ignoreCase = true)) {
+                        emitBlocked(invocation, command.joinToString(" "), "su-command")
+                        return
+                    }
+                    // getenforce 拦截 → 返回 "Enforcing"
+                    if (cmdName.equals("getenforce", ignoreCase = true)) {
+                        emitBlocked(invocation, command.joinToString(" "), "getenforce-command")
+                        return
+                    }
+                    // setenforce 拦截 → 阻止执行
+                    if (cmdName.equals("setenforce", ignoreCase = true)) {
+                        emitBlocked(invocation, command.joinToString(" "), "setenforce-command")
+                        return
+                    }
+                    // getprop 拦截 → 转发到 System.getProperty
+                    if (cmdName.equals("getprop", ignoreCase = true)) {
+                        emitBlocked(invocation, command.joinToString(" "), "getprop-command")
+                        return
+                    }
+                    // which/whereis su 拦截
+                    if ((cmdName.equals("which", ignoreCase = true) || cmdName.equals("whereis", ignoreCase = true)) &&
+                        command.any { it?.toString()?.equals("su", ignoreCase = true) == true }
+                    ) {
+                        emitBlocked(invocation, command.joinToString(" "), "which-su-command")
+                        return
+                    }
                 }
             })
         }
@@ -54,16 +77,11 @@ class RootExecHooker(
                 override fun before(invocation: Invocation) {
                     if (!config().rootExec) return
                     val command = invocation.getArg(0) as? Array<*> ?: return
-                    if (!containsSu(command)) return
-                    emit(
-                        kind = DeviceEnvKind.ROOT_EXEC,
-                        operation = DeviceEnvOperation.EXEC_COMMAND,
-                        originalValue = command.joinToString(" "),
-                        maskedValue = null,
-                        targetClass = "java.lang.Runtime",
-                        detectionPattern = ROOT_EXEC_PATTERN,
-                        params = mapOf("api" to "exec-string-array-env"),
-                    )
+                    val firstArg = command.firstOrNull()?.toString() ?: return
+                    val cmdName = firstArg.substringAfterLast('/').substringAfterLast('\\')
+                    if (isBlockedCommand(cmdName, command)) {
+                        emitBlocked(invocation, command.joinToString(" "), "exec-command")
+                    }
                 }
             })
         }
@@ -82,23 +100,55 @@ class RootExecHooker(
                 override fun before(invocation: Invocation) {
                     if (!config().rootExec) return
                     val command = invocation.getArg(0) as? Array<*> ?: return
-                    if (!containsSu(command)) return
-                    val dir = (invocation.getArg(2) as? java.io.File)?.path
-                    emit(
-                        kind = DeviceEnvKind.ROOT_EXEC,
-                        operation = DeviceEnvOperation.EXEC_COMMAND,
-                        originalValue = command.joinToString(" "),
-                        maskedValue = null,
-                        targetClass = "java.lang.Runtime",
-                        detectionPattern = ROOT_EXEC_PATTERN,
-                        params = buildMap {
-                            put("api", "exec-string-array-env-dir")
-                            dir?.let { put("workdir", it) }
-                        },
-                    )
+                    val firstArg = command.firstOrNull()?.toString() ?: return
+                    val cmdName = firstArg.substringAfterLast('/').substringAfterLast('\\')
+                    if (isBlockedCommand(cmdName, command)) {
+                        val dir = (invocation.getArg(2) as? java.io.File)?.path
+                        emit(
+                            kind = DeviceEnvKind.ROOT_EXEC,
+                            operation = DeviceEnvOperation.EXEC_COMMAND,
+                            originalValue = command.joinToString(" "),
+                            maskedValue = null,
+                            targetClass = "java.lang.Runtime",
+                            detectionPattern = ROOT_EXEC_PATTERN,
+                            interventionAction = ACTION_BLOCKED,
+                            params = buildMap {
+                                put("api", "exec-string-array-env-dir")
+                                dir?.let { put("workdir", it) }
+                            },
+                        )
+                        invocation.setResult(null)
+                    }
                 }
             })
         }
+    }
+
+    /** 判断命令是否应被拦截(su/getenforce/setenforce/getprop/which su)。 */
+    private fun isBlockedCommand(cmdName: String, command: Array<*>): Boolean {
+        if (cmdName.equals("su", ignoreCase = true)) return true
+        if (cmdName.equals("getenforce", ignoreCase = true)) return true
+        if (cmdName.equals("setenforce", ignoreCase = true)) return true
+        if (cmdName.equals("getprop", ignoreCase = true)) return true
+        if ((cmdName.equals("which", ignoreCase = true) || cmdName.equals("whereis", ignoreCase = true)) &&
+            command.any { it?.toString()?.equals("su", ignoreCase = true) == true }
+        ) {
+            return true
+        }
+        return false
+    }
+
+    private fun emitBlocked(invocation: Invocation, command: String, pattern: String) {
+        emit(
+            kind = DeviceEnvKind.ROOT_EXEC,
+            operation = DeviceEnvOperation.EXEC_COMMAND,
+            originalValue = command,
+            maskedValue = null,
+            targetClass = "java.lang.Runtime",
+            detectionPattern = pattern,
+            interventionAction = ACTION_BLOCKED,
+        )
+        invocation.setResult(null)
     }
 
     private fun hookProcessBuilderStart() {
@@ -110,38 +160,31 @@ class RootExecHooker(
                 if (!config().rootExec) return
                 val builder = invocation.thisObject as? ProcessBuilder ?: return
                 val command = runCatching { builder.command() }.getOrNull() ?: return
-                if (!containsSu(command)) return
-                val dir = runCatching { builder.directory()?.path }.getOrNull()
-                emit(
-                    kind = DeviceEnvKind.ROOT_EXEC,
-                    operation = DeviceEnvOperation.PROCESS_BUILDER,
-                    originalValue = command.joinToString(" "),
-                    maskedValue = null,
-                    targetClass = "java.lang.ProcessBuilder",
-                    detectionPattern = ROOT_EXEC_PATTERN,
-                    params = buildMap {
-                        put("api", "process-builder")
-                        dir?.let { put("workdir", it) }
-                    },
-                )
+                val firstArg = command.firstOrNull() ?: return
+                val cmdName = firstArg.substringAfterLast('/').substringAfterLast('\\')
+                if (isBlockedCommand(cmdName, command.toTypedArray())) {
+                    val dir = runCatching { builder.directory()?.path }.getOrNull()
+                    emit(
+                        kind = DeviceEnvKind.ROOT_EXEC,
+                        operation = DeviceEnvOperation.PROCESS_BUILDER,
+                        originalValue = command.joinToString(" "),
+                        maskedValue = null,
+                        targetClass = "java.lang.ProcessBuilder",
+                        detectionPattern = ROOT_EXEC_PATTERN,
+                        interventionAction = ACTION_BLOCKED,
+                        params = buildMap {
+                            put("api", "process-builder")
+                            dir?.let { put("workdir", it) }
+                        },
+                    )
+                    invocation.setResult(null)
+                }
             }
         })
     }
 
-    private fun containsSu(command: Array<*>): Boolean =
-        command.any { arg ->
-            val s = arg?.toString() ?: return@any false
-            val name = s.substringAfterLast('/').substringAfterLast('\\')
-            name.equals("su", ignoreCase = true)
-        }
-
-    private fun containsSu(command: List<String>): Boolean =
-        command.any { arg ->
-            val name = arg.substringAfterLast('/').substringAfterLast('\\')
-            name.equals("su", ignoreCase = true)
-        }
-
     companion object {
         private const val ROOT_EXEC_PATTERN = "root-exec"
+        private const val ACTION_BLOCKED = "BLOCKED"
     }
 }

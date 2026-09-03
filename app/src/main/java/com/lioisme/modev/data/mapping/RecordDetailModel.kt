@@ -5,7 +5,10 @@ import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.DeviceEnvRecord
 import com.lioisme.modev.core.model.NetworkRecord
 import com.lioisme.modev.core.model.PrefsRecord
+import com.lioisme.modev.core.model.ProcessRecord
 import com.lioisme.modev.core.model.SqlRecord
+import com.lioisme.modev.core.model.SystemRecord
+import com.lioisme.modev.core.model.UiInteractionRecord
 import com.lioisme.modev.core.model.WebViewRecord
 
 /**
@@ -91,6 +94,39 @@ data class NetworkDetail(val record: NetworkRecord) : RecordDetailModel {
 
 /** 设备环境监听记录详情(V31 一等公民)。 */
 data class DeviceEnvDetail(val record: DeviceEnvRecord) : RecordDetailModel {
+    override val id: Long get() = record.id
+    override val recordType: String get() = record.recordType
+    override val packageName: String get() = record.packageName
+    override val processName: String? get() = record.processName
+    override val threadName: String get() = record.threadName
+    override val stack: List<String> get() = record.stack
+    override val timestamp: Long get() = record.timestamp
+}
+
+/** UI 交互监听记录详情(V33 一等公民)。 */
+data class UiInteractionDetail(val record: UiInteractionRecord) : RecordDetailModel {
+    override val id: Long get() = record.id
+    override val recordType: String get() = record.recordType
+    override val packageName: String get() = record.packageName
+    override val processName: String? get() = record.processName
+    override val threadName: String get() = record.threadName
+    override val stack: List<String> get() = record.stack
+    override val timestamp: Long get() = record.timestamp
+}
+
+/** 系统信息监听记录详情(V33 一等公民)。 */
+data class SystemDetail(val record: SystemRecord) : RecordDetailModel {
+    override val id: Long get() = record.id
+    override val recordType: String get() = record.recordType
+    override val packageName: String get() = record.packageName
+    override val processName: String? get() = record.processName
+    override val threadName: String get() = record.threadName
+    override val stack: List<String> get() = record.stack
+    override val timestamp: Long get() = record.timestamp
+}
+
+/** 进程控制监听记录详情(V33 一等公民)。 */
+data class ProcessDetail(val record: ProcessRecord) : RecordDetailModel {
     override val id: Long get() = record.id
     override val recordType: String get() = record.recordType
     override val packageName: String get() = record.packageName

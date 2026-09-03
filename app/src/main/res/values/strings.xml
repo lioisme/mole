@@ -56,12 +56,12 @@
     <string name="filter_type_webview">WebView</string>
 
     <string name="detail_empty">No records yet</string>
-    <string name="detail_empty_hint">Try adjusting filters or enable more categories in listen settings</string>
+    <string name="detail_empty_hint">Try adjusting filters or enable more categories in Feature Configuration</string>
     <string name="records_count_subtitle">%1$s records</string>
     <string name="record_copied_toast">Record summary copied</string>
     <string name="section_monitor_kinds">Monitor Kinds</string>
     <string name="app_monitor_scope_row">Monitor this app</string>
-    <string name="listen_settings_entry">Listen settings</string>
+    <string name="listen_settings_entry">Feature Configuration</string>
     <string name="listen_summary_default">Uses default configuration</string>
     <plurals name="listen_settings_custom_n">
         <item quantity="one">%1$d item customized</item>
@@ -70,7 +70,7 @@
     <string name="app_monitor_actions_section">Actions</string>
     <string name="listen_settings_hint">Every switch starts from the default configuration. Toggling creates a custom setting for this app and applies instantly.</string>
     <string name="listen_reset_action">Restore default configuration</string>
-    <string name="danger_reset_listen_msg">Restore all listen settings for %1$s to the default configuration?</string>
+    <string name="danger_reset_listen_msg">Restore all feature configurations for %1$s to the default?</string>
     <string name="section_record_options">Record Options</string>
     <string name="algorithm_monitor_master">Enable Algorithm Listen</string>
     <string name="database_monitor_master">Enable Database Listen</string>
@@ -178,8 +178,6 @@
     <string name="meta_status_code">Status</string>
     <string name="meta_proxy">Proxy</string>
     <string name="meta_vpn">VPN</string>
-    <string name="meta_vpn_interface">VPN Interface</string>
-    <string name="meta_vpn_type">VPN Type</string>
     <string name="meta_ssl_protocol">SSL Protocol</string>
     <string name="meta_cipher_suite">Cipher Suite</string>
     <string name="meta_proxy_port">Proxy Port</string>
@@ -221,7 +219,6 @@
     <string name="section_public_key">Public Key</string>
     <string name="section_params">Parameters</string>
     <string name="section_stack">Call Stack</string>
-    <string name="section_headers">Headers</string>
     <string name="section_req_headers">Request Headers</string>
     <string name="section_resp_headers">Response Headers</string>
     <!-- V28 纯 markdown 详情:元数据节标题 / 时间戳行 / 偏好元数据行 -->
@@ -517,7 +514,6 @@
     <string name="op_net_request_end">Response</string>
     <!-- Network listen settings -->
     <string name="listen_settings_network">Network Environment</string>
-    <string name="listen_settings_network_hint">SSL bypass, proxy/VPN hiding, request monitoring</string>
     <string name="network_records_title">Network</string>
     <string name="filter_type_network">Network</string>
     <string name="network_monitor_master">Network environment</string>
@@ -525,25 +521,8 @@
 
     <!-- V31 Device Environment -->
     <string name="filter_type_device_env">Device Environment</string>
-    <string name="device_monitor_entry">Device Environment</string>
-    <string name="device_monitor_entry_desc">Root/Xposed/Emulator detection intervention</string>
     <string name="device_records_title">Device Environment Records</string>
     <string name="device_env_master">Device Environment Listen</string>
-    <string name="device_env_master_desc">Root/Xposed/Emulator detection intervention &amp; monitoring</string>
-    <string name="listen_row_master_device_env">Device Environment Listen</string>
-    <string name="listen_row_rootFile">Root File Detection</string>
-    <string name="listen_row_rootExec">Root Command Execution</string>
-    <string name="listen_row_rootPackageManager">Root Package Query</string>
-    <string name="listen_row_rootProperty">Root Property Detection</string>
-    <string name="listen_row_xposedClass">Xposed Class Detection</string>
-    <string name="listen_row_xposedStack">Xposed Stack Detection</string>
-    <string name="listen_row_xposedMaps">Xposed Maps Scanning</string>
-    <string name="listen_row_emulatorBuild">Emulator Build Spoofing</string>
-    <string name="listen_row_emulatorFile">Emulator File Detection</string>
-    <string name="listen_row_emulatorSensor">Emulator Sensor Spoofing</string>
-    <string name="listen_row_emulatorNetwork">Emulator Network Spoofing</string>
-    <string name="listen_row_detectRoot">Root Detection Monitoring</string>
-    <string name="listen_row_detectEmulator">Emulator Detection Monitoring</string>
     <string name="kind_device_env_ROOT_FILE">Root File Detection</string>
     <string name="kind_device_env_ROOT_EXEC">Root Command Execution</string>
     <string name="kind_device_env_ROOT_PACKAGE_MANAGER">Root Package Query</string>
@@ -555,15 +534,17 @@
     <string name="kind_device_env_EMULATOR_FILE">Emulator File Detection</string>
     <string name="kind_device_env_EMULATOR_SENSOR">Emulator Sensor Spoofing</string>
     <string name="kind_device_env_EMULATOR_NETWORK">Emulator Network Spoofing</string>
+    <string name="kind_device_env_EMULATOR_TELEPHONY">Emulator Telephony Spoofing</string>
+    <string name="kind_device_env_EMULATOR_CPU">Emulator CPU Spoofing</string>
+    <string name="kind_device_env_EMULATOR_BATTERY">Emulator Battery Spoofing</string>
+    <string name="kind_device_env_SYSTEM_PROPERTIES">SystemProperties Hook</string>
+    <string name="kind_device_env_PROC_STATUS">/proc/self/status Filter</string>
+    <string name="kind_device_env_PROC_MOUNT_INFO">/proc/self/mountinfo Filter</string>
+    <string name="kind_device_env_PROC_CGROUP">/proc/self/cgroup Filter</string>
+    <string name="kind_device_env_PROC_NET">/proc/net/tcp Filter</string>
     <string name="kind_device_env_DETECT_ROOT">Root Detection Monitoring</string>
     <string name="kind_device_env_DETECT_EMULATOR">Emulator Detection Monitoring</string>
-    <string name="device_env_section_root">Root Detection Intervention</string>
-    <string name="device_env_section_xposed">Xposed Detection Intervention</string>
-    <string name="device_env_section_emulator">Emulator Detection Intervention</string>
-    <string name="device_env_section_monitor">Detection Behavior Monitoring</string>
-    <string name="detail_device_env_intervention">Intervention</string>
     <string name="detail_device_env_masked">Masked</string>
-    <string name="detail_device_env_observed">Observed</string>
     <string name="detail_device_env_target_path">Target Path</string>
     <string name="detail_device_env_target_class">Target Class</string>
     <string name="detail_device_env_target_property">Target Property</string>
@@ -602,10 +583,80 @@
     <string name="op_device_env_get_device_id">getDeviceId</string>
     <string name="op_device_env_get_imei">getImei</string>
     <string name="op_device_env_android_id">ANDROID_ID</string>
+    <string name="op_device_env_phone_device_id">TelephonyManager.getDeviceId</string>
+    <string name="op_device_env_phone_imei">TelephonyManager.getImei</string>
+    <string name="op_device_env_phone_subscriber_id">TelephonyManager.getSubscriberId</string>
+    <string name="op_device_env_phone_sim_serial">TelephonyManager.getSimSerialNumber</string>
+    <string name="op_device_env_phone_line1_number">TelephonyManager.getLine1Number</string>
+    <string name="op_device_env_cpu_available_processors">Runtime.availableProcessors</string>
+    <string name="op_device_env_cpu_proc_info">/proc/cpuinfo</string>
+    <string name="op_device_env_cpu_sysconf">os.sysconf</string>
+    <string name="op_device_env_battery_int_property">BatteryManager.getIntProperty</string>
+    <string name="op_device_env_battery_is_charging">BatteryManager.isCharging</string>
+    <string name="op_device_env_battery_changed">ACTION_BATTERY_CHANGED</string>
+    <string name="op_device_env_build_device">Build.DEVICE</string>
+    <string name="op_device_env_build_board">Build.BOARD</string>
+    <string name="op_device_env_build_hardware">Build.HARDWARE</string>
+    <string name="op_device_env_build_brand">Build.BRAND</string>
+    <string name="op_device_env_build_host">Build.HOST</string>
+    <string name="op_device_env_build_user">Build.USER</string>
+    <string name="op_device_env_build_display">Build.DISPLAY</string>
+    <string name="op_device_env_build_serial">Build.SERIAL</string>
+    <string name="op_device_env_build_type">Build.TYPE</string>
     <string name="op_device_env_root_check_api">Root check API</string>
     <string name="op_device_env_root_check_file">Root check file</string>
     <string name="op_device_env_root_check_exec">Root check exec</string>
     <string name="op_device_env_emulator_check_build">Emulator build check</string>
     <string name="op_device_env_emulator_check_file">Emulator file check</string>
     <string name="op_device_env_emulator_check_prop">Emulator property check</string>
+    <string name="op_device_env_sys_prop_get">SystemProperties.get</string>
+    <string name="op_device_env_proc_status_read">/proc/self/status read</string>
+    <string name="op_device_env_proc_mount_read">/proc/self/mountinfo read</string>
+    <string name="op_device_env_proc_cgroup_read">/proc/self/cgroup read</string>
+    <string name="op_device_env_proc_net_read">/proc/net/tcp read</string>
+    <string name="op_device_env_settings_global_get">Settings.Global.get</string>
+    <string name="op_device_env_settings_secure_get">Settings.Secure.get</string>
+    <string name="op_device_env_content_query_settings">ContentResolver.query settings</string>
+
+    <!-- V33 UI Interaction -->
+    <string name="filter_type_ui_interaction">UI Interaction</string>
+    <string name="ui_interaction_records_title">UI Interaction Records</string>
+    <string name="listen_row_master_ui">UI Interaction Listen</string>
+    <string name="kind_ui_DIALOG_SHOW">Dialog Show</string>
+    <string name="kind_ui_DIALOG_KEYWORD">Dialog Keyword</string>
+    <string name="kind_ui_WIDGET_TEXT">Widget Text</string>
+    <string name="kind_ui_ACTIVITY_START">Activity Start</string>
+    <string name="kind_ui_ACTIVITY_RESUME">Activity Resume</string>
+    <string name="op_ui_show">show</string>
+    <string name="op_ui_back_dismiss">back_dismiss</string>
+    <string name="op_ui_intercept">intercept</string>
+    <string name="op_ui_assign">assign</string>
+    <string name="op_ui_start">start</string>
+    <string name="op_ui_create">create</string>
+
+    <!-- V33 System Information -->
+    <string name="filter_type_system">System</string>
+    <string name="system_records_title">System Information Records</string>
+    <string name="listen_row_master_system">System Information Listen</string>
+    <string name="kind_system_LOGCAT">Logcat</string>
+    <string name="kind_system_APP_INFO">App Info</string>
+    <string name="kind_system_SIGNATURE">Signature</string>
+    <string name="op_system_capture">capture</string>
+    <string name="op_system_get_info">getInfo</string>
+    <string name="op_system_read">read</string>
+
+    <!-- V33 Process Control -->
+    <string name="filter_type_process_control">Process Control</string>
+    <string name="process_control_records_title">Process Control Records</string>
+    <string name="listen_row_master_process">Process Control Listen</string>
+    <string name="kind_process_EXIT_INTERCEPT">Exit Intercept</string>
+    <string name="kind_process_CRASH_PREVENT">Crash Prevent</string>
+    <string name="kind_process_SCREEN_RECORD">Screen Record Bypass</string>
+    <string name="op_process_system_exit">System.exit</string>
+    <string name="op_process_kill_process">killProcess</string>
+    <string name="op_process_catch">catch</string>
+    <string name="op_process_block">block</string>
+    <string name="ui_interaction_records_search">Search UI interaction records…</string>
+    <string name="system_records_search">Search system records…</string>
+    <string name="process_control_records_search">Search process control records…</string>
 </resources>

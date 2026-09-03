@@ -41,6 +41,9 @@ import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.core.model.WebViewKind
 import com.lioisme.modev.core.model.NetworkKind
 import com.lioisme.modev.core.model.DeviceEnvKind
+import com.lioisme.modev.core.model.UiInteractionKind
+import com.lioisme.modev.core.model.SystemKind
+import com.lioisme.modev.core.model.ProcessKind
 import com.lioisme.modev.ui.components.networkKindLabelRes
 import com.lioisme.modev.data.mapping.BehaviorRow
 import com.lioisme.modev.data.mapping.CryptoRow
@@ -50,6 +53,9 @@ import com.lioisme.modev.data.mapping.SqlRow
 import com.lioisme.modev.data.mapping.WebViewRow
 import com.lioisme.modev.data.mapping.NetworkRow
 import com.lioisme.modev.data.mapping.DeviceEnvRow
+import com.lioisme.modev.data.mapping.UiInteractionRow
+import com.lioisme.modev.data.mapping.SystemRow
+import com.lioisme.modev.data.mapping.ProcessRow
 import com.lioisme.modev.ui.components.networkSummary
 import com.lioisme.modev.ui.apps.AppCountFormat
 import com.lioisme.modev.ui.common.rememberEffectiveLocale
@@ -70,6 +76,12 @@ import com.lioisme.modev.ui.components.webviewKindLabelRes
 import com.lioisme.modev.ui.components.webviewSummary
 import com.lioisme.modev.ui.components.deviceEnvKindLabelRes
 import com.lioisme.modev.ui.components.deviceEnvSummary
+import com.lioisme.modev.ui.components.uiInteractionKindLabelRes
+import com.lioisme.modev.ui.components.uiInteractionSummary
+import com.lioisme.modev.ui.components.systemKindLabelRes
+import com.lioisme.modev.ui.components.systemSummary
+import com.lioisme.modev.ui.components.processKindLabelRes
+import com.lioisme.modev.ui.components.processControlSummary
 import kotlinx.coroutines.launch
 
 /**
@@ -203,6 +215,54 @@ fun DeviceEnvRecordsScreen(
     )
 }
 
+/** 单应用 UI 交互记录列表(V33 一等公民)。 */
+@Composable
+fun UiInteractionRecordsScreen(
+    viewModel: RecordsViewModel,
+    onBack: () -> Unit,
+    onOpenRecord: (Long) -> Unit,
+) {
+    MonitorRecordsContent(
+        viewModel = viewModel,
+        onBack = onBack,
+        onOpenRecord = onOpenRecord,
+        placeholder = stringResource(R.string.ui_interaction_records_search),
+        kinds = UiInteractionKind.entries.map { KindOption(it.name, uiInteractionKindLabelRes(it)) },
+    )
+}
+
+/** 单应用系统信息记录列表(V33 一等公民)。 */
+@Composable
+fun SystemRecordsScreen(
+    viewModel: RecordsViewModel,
+    onBack: () -> Unit,
+    onOpenRecord: (Long) -> Unit,
+) {
+    MonitorRecordsContent(
+        viewModel = viewModel,
+        onBack = onBack,
+        onOpenRecord = onOpenRecord,
+        placeholder = stringResource(R.string.system_records_search),
+        kinds = SystemKind.entries.map { KindOption(it.name, systemKindLabelRes(it)) },
+    )
+}
+
+/** 单应用进程控制记录列表(V33 一等公民)。 */
+@Composable
+fun ProcessControlRecordsScreen(
+    viewModel: RecordsViewModel,
+    onBack: () -> Unit,
+    onOpenRecord: (Long) -> Unit,
+) {
+    MonitorRecordsContent(
+        viewModel = viewModel,
+        onBack = onBack,
+        onOpenRecord = onOpenRecord,
+        placeholder = stringResource(R.string.process_control_records_search),
+        kinds = ProcessKind.entries.map { KindOption(it.name, processKindLabelRes(it)) },
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MonitorRecordsContent(
@@ -238,6 +298,9 @@ private fun MonitorRecordsContent(
                 is WebViewRow -> webviewSummary(context, record)
                 is NetworkRow -> networkSummary(context, record)
                 is DeviceEnvRow -> deviceEnvSummary(context, record)
+                is UiInteractionRow -> uiInteractionSummary(context, record)
+                is SystemRow -> systemSummary(context, record)
+                is ProcessRow -> processControlSummary(context, record)
             }
         clipboard.setText(AnnotatedString(summary))
         scope.launch {

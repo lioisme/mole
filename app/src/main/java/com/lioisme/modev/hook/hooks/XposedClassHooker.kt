@@ -7,16 +7,20 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * Xposed 类存在性检测 Hooker(V31):拦截 ClassLoader.loadClass /
- * BaseDexClassLoader.findClass,仅记录检测事件,不干预返回值。
+ * Xposed 类存在性检测 Hooker(V34 增强):拦截 ClassLoader.loadClass /
+ * BaseDexClassLoader.findClass,当检测到 Xposed 相关类被加载时,
+ * 抛出 ClassNotFoundException 以隐藏 Xposed 框架的存在。
  *
- * 设计决策:Class.forName 的 Xposed hook 会导致框架 bridge 改变
- * ClassNotFoundException 的传播路径,使 androidx.startup 等库的异常捕获失效
- * → 目标 App 崩溃。因此不再 hook Class.forName,仅监控 ClassLoader 侧。
+ * 干预机制:检测到 Xposed 类名时,在 before() 中抛出 ClassNotFoundException,
+ * 阻止类加载完成,使检测框架认为 Xposed 未安装。
+ *
+ * 安全设计:使用 ThreadLocal 防止递归 hook(本 hook 自身触发的类加载不会被二次拦截)。
  */
 class XposedClassHooker(
     context: ProbeContext,
 ) : DeviceEnvBaseHooker(context) {
+
+    private val loadingGuard = ThreadLocal<Boolean>()
 
     override fun install() {
         hookLoadClass()
@@ -28,6 +32,23 @@ class XposedClassHooker(
             ClassLoader::class.java.getMethod("loadClass", String::class.java)
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
+            override fun before(invocation: Invocation) {
+                if (!config().xposedClass) return
+                if (loadingGuard.get() == true) return
+                val name = invocation.getArg(0) as? String ?: return
+                if (isXposedClassName(name)) {
+                    loadingGuard.set(true)
+                    try {
+                        throw ClassNotFoundException(
+                            "Xposed class not found: $name",
+                            Throwable().apply { stackTrace = emptyArray() },
+                        )
+                    } finally {
+                        loadingGuard.remove()
+                    }
+                }
+            }
+
             override fun after(invocation: Invocation) {
                 if (!config().xposedClass) return
                 val name = invocation.getArg(0) as? String ?: return
@@ -37,6 +58,7 @@ class XposedClassHooker(
                         operation = DeviceEnvOperation.LOAD_CLASS,
                         originalValue = name,
                         targetClass = name,
+                        interventionAction = ACTION_BLOCKED,
                     )
                 }
             }
@@ -49,6 +71,23 @@ class XposedClassHooker(
             clazz.getMethod("findClass", String::class.java)
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
+            override fun before(invocation: Invocation) {
+                if (!config().xposedClass) return
+                if (loadingGuard.get() == true) return
+                val name = invocation.getArg(0) as? String ?: return
+                if (isXposedClassName(name)) {
+                    loadingGuard.set(true)
+                    try {
+                        throw ClassNotFoundException(
+                            "Xposed class not found: $name",
+                            Throwable().apply { stackTrace = emptyArray() },
+                        )
+                    } finally {
+                        loadingGuard.remove()
+                    }
+                }
+            }
+
             override fun after(invocation: Invocation) {
                 if (!config().xposedClass) return
                 val name = invocation.getArg(0) as? String ?: return
@@ -58,6 +97,7 @@ class XposedClassHooker(
                         operation = DeviceEnvOperation.FIND_CLASS,
                         originalValue = name,
                         targetClass = name,
+                        interventionAction = ACTION_BLOCKED,
                     )
                 }
             }
@@ -69,6 +109,8 @@ class XposedClassHooker(
     }
 
     companion object {
+        private const val ACTION_BLOCKED = "BLOCKED"
+
         private val XPOSED_PREFIXES = listOf(
             "de.robv.android.xposed.",
             "com.topjohnwu.lsposed.",

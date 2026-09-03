@@ -1,13 +1,58 @@
 package com.lioisme.modev.core.model
 
+import android.util.Log
+
 /**
  * 二态偏差解析(V24;V25 扩展采集微调项):默认配置 [HookSwitch] +
  * 单应用 [AppListenOverride] → 该应用的有效配置(普通 [HookSwitch])。
  *
  * 解析是纯函数、无副作用;产物直接经 wire `config` 消息下发,
  * 注入侧与协议零感知偏差的存在(协议 VERSION 恒 4)。
+ *
+ * V34 审计增强:干预型开关启用时输出 Log.w 安全警告,便于调试和审计。
  */
 object EffectiveSwitch {
+
+    private const val TAG = "EffectiveSwitch"
+
+    /** 干预型 kind 名集合(V34 审计增强,供安全日志)。 */
+    private val INTERVENTION_KINDS = setOf(
+        NetworkKind.SSL_CONTEXT.name,
+        NetworkKind.SSL_TRUST_MANAGER.name,
+        NetworkKind.SSL_OKHTTP_PINNER.name,
+        NetworkKind.SSL_OKHTTP_VERIFIER.name,
+        NetworkKind.SSL_WEBVIEW.name,
+        NetworkKind.SSL_NETWORK_CONFIG.name,
+        NetworkKind.PROXY_SYSTEM_PROP.name,
+        NetworkKind.PROXY_CONNECTIVITY.name,
+        NetworkKind.PROXY_SETTINGS.name,
+        NetworkKind.PROXY_OKHTTP.name,
+        NetworkKind.VPN_CAPABILITIES.name,
+        NetworkKind.VPN_INTERFACE.name,
+        NetworkKind.VPN_NETWORK_INFO.name,
+        NetworkKind.VPN_LINK_PROPERTIES.name,
+        DeviceEnvKind.ROOT_FILE.name,
+        DeviceEnvKind.ROOT_EXEC.name,
+        DeviceEnvKind.ROOT_PACKAGE_MANAGER.name,
+        DeviceEnvKind.ROOT_PROPERTY.name,
+        DeviceEnvKind.XPOSED_CLASS.name,
+        DeviceEnvKind.XPOSED_STACK.name,
+        DeviceEnvKind.XPOSED_MAPS.name,
+        DeviceEnvKind.EMULATOR_BUILD.name,
+        DeviceEnvKind.EMULATOR_FILE.name,
+        DeviceEnvKind.EMULATOR_NETWORK.name,
+        DeviceEnvKind.EMULATOR_TELEPHONY.name,
+        DeviceEnvKind.EMULATOR_CPU.name,
+        DeviceEnvKind.EMULATOR_BATTERY.name,
+        DeviceEnvKind.SYSTEM_PROPERTIES.name,
+        DeviceEnvKind.PROC_STATUS.name,
+        DeviceEnvKind.PROC_MOUNT_INFO.name,
+        DeviceEnvKind.PROC_CGROUP.name,
+        DeviceEnvKind.PROC_NET.name,
+        ProcessKind.EXIT_INTERCEPT.name,
+        ProcessKind.CRASH_PREVENT.name,
+        ProcessKind.SCREEN_RECORD.name,
+    )
 
     /**
      * @param default  默认配置(未定制项的取值来源)。
@@ -25,6 +70,9 @@ object EffectiveSwitch {
         override.webviewListen?.let { result = result.copy(webviewListen = it) }
         override.networkListen?.let { result = result.copy(networkListen = it) }
         override.deviceEnvListen?.let { result = result.copy(deviceEnvListen = it) }
+        override.uiListen?.let { result = result.copy(uiListen = it) }
+        override.systemListen?.let { result = result.copy(systemListen = it) }
+        override.processControlListen?.let { result = result.copy(processControlListen = it) }
         if (override.kinds.isNotEmpty()) {
             result = applyKinds(result, override.kinds)
         }
@@ -41,6 +89,11 @@ object EffectiveSwitch {
         override.ignorePathPrefixes?.takeIf { it.isNotEmpty() }?.let {
             result = result.copy(ignorePathPrefixes = it)
         }
+        override.dialogKeywords?.takeIf { it.isNotEmpty() }?.let {
+            result = result.copy(dialogKeywords = it)
+        }
+        // V34 审计增强:干预型开关启用时输出安全警告日志
+        logInterventionActivation(result, default)
         return result
     }
 
@@ -106,8 +159,27 @@ object EffectiveSwitch {
         DeviceEnvKind.EMULATOR_FILE.name -> switch.emulatorFile
         DeviceEnvKind.EMULATOR_SENSOR.name -> switch.emulatorSensor
         DeviceEnvKind.EMULATOR_NETWORK.name -> switch.emulatorNetwork
+        DeviceEnvKind.EMULATOR_TELEPHONY.name -> switch.emulatorTelephony
+        DeviceEnvKind.EMULATOR_CPU.name -> switch.emulatorCpu
+        DeviceEnvKind.EMULATOR_BATTERY.name -> switch.emulatorBattery
+        DeviceEnvKind.SYSTEM_PROPERTIES.name -> switch.systemProperties
+        DeviceEnvKind.PROC_STATUS.name -> switch.procStatus
+        DeviceEnvKind.PROC_MOUNT_INFO.name -> switch.procMountInfo
+        DeviceEnvKind.PROC_CGROUP.name -> switch.procCgroup
+        DeviceEnvKind.PROC_NET.name -> switch.procNet
         DeviceEnvKind.DETECT_ROOT.name -> switch.detectRoot
         DeviceEnvKind.DETECT_EMULATOR.name -> switch.detectEmulator
+        UiInteractionKind.DIALOG_SHOW.name -> switch.dialogShow
+        UiInteractionKind.DIALOG_KEYWORD.name -> switch.dialogKeyword
+        UiInteractionKind.WIDGET_TEXT.name -> switch.widgetText
+        UiInteractionKind.ACTIVITY_START.name -> switch.activityStart
+        UiInteractionKind.ACTIVITY_RESUME.name -> switch.activityResume
+        SystemKind.LOGCAT.name -> switch.logcatCapture
+        SystemKind.APP_INFO.name -> switch.appInfoCapture
+        SystemKind.SIGNATURE.name -> switch.signatureMonitor
+        ProcessKind.EXIT_INTERCEPT.name -> switch.exitIntercept
+        ProcessKind.CRASH_PREVENT.name -> switch.crashPrevent
+        ProcessKind.SCREEN_RECORD.name -> switch.screenRecordBypass
         else -> null
     }
 
@@ -179,12 +251,46 @@ object EffectiveSwitch {
                 DeviceEnvKind.EMULATOR_FILE.name -> result.copy(emulatorFile = value)
                 DeviceEnvKind.EMULATOR_SENSOR.name -> result.copy(emulatorSensor = value)
                 DeviceEnvKind.EMULATOR_NETWORK.name -> result.copy(emulatorNetwork = value)
+                DeviceEnvKind.EMULATOR_TELEPHONY.name -> result.copy(emulatorTelephony = value)
+                DeviceEnvKind.EMULATOR_CPU.name -> result.copy(emulatorCpu = value)
+                DeviceEnvKind.EMULATOR_BATTERY.name -> result.copy(emulatorBattery = value)
+                DeviceEnvKind.SYSTEM_PROPERTIES.name -> result.copy(systemProperties = value)
+                DeviceEnvKind.PROC_STATUS.name -> result.copy(procStatus = value)
+                DeviceEnvKind.PROC_MOUNT_INFO.name -> result.copy(procMountInfo = value)
+                DeviceEnvKind.PROC_CGROUP.name -> result.copy(procCgroup = value)
+                DeviceEnvKind.PROC_NET.name -> result.copy(procNet = value)
                 DeviceEnvKind.DETECT_ROOT.name -> result.copy(detectRoot = value)
                 DeviceEnvKind.DETECT_EMULATOR.name -> result.copy(detectEmulator = value)
+                UiInteractionKind.DIALOG_SHOW.name -> result.copy(dialogShow = value)
+                UiInteractionKind.DIALOG_KEYWORD.name -> result.copy(dialogKeyword = value)
+                UiInteractionKind.WIDGET_TEXT.name -> result.copy(widgetText = value)
+                UiInteractionKind.ACTIVITY_START.name -> result.copy(activityStart = value)
+                UiInteractionKind.ACTIVITY_RESUME.name -> result.copy(activityResume = value)
+                SystemKind.LOGCAT.name -> result.copy(logcatCapture = value)
+                SystemKind.APP_INFO.name -> result.copy(appInfoCapture = value)
+                SystemKind.SIGNATURE.name -> result.copy(signatureMonitor = value)
+                ProcessKind.EXIT_INTERCEPT.name -> result.copy(exitIntercept = value)
+                ProcessKind.CRASH_PREVENT.name -> result.copy(crashPrevent = value)
+                ProcessKind.SCREEN_RECORD.name -> result.copy(screenRecordBypass = value)
                 // 未知 kind 名:忽略(存储漂移兜底)
                 else -> result
             }
         }
         return result
+    }
+
+    /**
+     * V34 审计增强:检测干预型开关从默认关变为开的状态,输出 Log.w 安全警告。
+     * 仅在 override 生效时触发,不影响解析结果。
+     */
+    private fun logInterventionActivation(result: HookSwitch, default: HookSwitch) {
+        val newlyEnabled = INTERVENTION_KINDS.filter { kindId ->
+            val enabled = readKind(result, kindId) == true
+            val wasDefault = readKind(default, kindId) == true
+            enabled && !wasDefault
+        }
+        if (newlyEnabled.isNotEmpty()) {
+            Log.w(TAG, "干预型功能已启用: ${newlyEnabled.joinToString()}")
+        }
     }
 }

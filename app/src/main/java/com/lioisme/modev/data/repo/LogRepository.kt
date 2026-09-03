@@ -13,9 +13,12 @@ import com.lioisme.modev.core.codec.WireRecord
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.PrefsRecord
+import com.lioisme.modev.core.model.ProcessRecord
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.core.model.SqlRecord
+import com.lioisme.modev.core.model.SystemRecord
+import com.lioisme.modev.core.model.UiInteractionRecord
 import com.lioisme.modev.core.model.WebViewRecord
 import com.lioisme.modev.core.model.NetworkRecord
 import com.lioisme.modev.core.model.DeviceEnvRecord
@@ -24,15 +27,22 @@ import com.lioisme.modev.core.codec.PrefsRecordCodec
 import com.lioisme.modev.core.codec.WebViewRecordCodec
 import com.lioisme.modev.core.codec.NetworkRecordCodec
 import com.lioisme.modev.core.codec.DeviceEnvRecordCodec
+import com.lioisme.modev.core.codec.UiInteractionRecordCodec
+import com.lioisme.modev.core.codec.SystemRecordCodec
+import com.lioisme.modev.core.codec.ProcessRecordCodec
 import com.lioisme.modev.data.db.CryptoRecordDao
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
-import com.lioisme.modev.data.db.RecordTypeCount
 import com.lioisme.modev.data.mapping.RecordDetailModel
 import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.mapping.toEntity
 import com.lioisme.modev.data.mapping.toRecordDetailOrNull
 import com.lioisme.modev.data.mapping.toRowModelOrNull
+import com.lioisme.modev.domain.record.RecordFilter
+import com.lioisme.modev.domain.record.RecordPage
+import com.lioisme.modev.domain.record.RecordService
+import com.lioisme.modev.domain.record.RecordTypeCount
+
 import com.lioisme.modev.data.server.ChannelStats
 import com.lioisme.modev.data.server.ConfigServer
 import kotlinx.coroutines.CoroutineScope
@@ -191,6 +201,18 @@ class LogRepository(
                     toPersist.add(decoded.toEntity())
                 }
                 is DeviceEnvRecord -> {
+                    decodableAcks.add(wire.seq to ack)
+                    toPersist.add(decoded.toEntity())
+                }
+                is UiInteractionRecord -> {
+                    decodableAcks.add(wire.seq to ack)
+                    toPersist.add(decoded.toEntity())
+                }
+                is SystemRecord -> {
+                    decodableAcks.add(wire.seq to ack)
+                    toPersist.add(decoded.toEntity())
+                }
+                is ProcessRecord -> {
                     decodableAcks.add(wire.seq to ack)
                     toPersist.add(decoded.toEntity())
                 }
@@ -553,6 +575,9 @@ class LogRepository(
                 register(WebViewRecordCodec.RECORD_TYPE, WebViewRecordCodec::decode)
                 register(NetworkRecordCodec.RECORD_TYPE, NetworkRecordCodec::decode)
                 register(DeviceEnvRecordCodec.RECORD_TYPE, DeviceEnvRecordCodec::decode)
+                register(UiInteractionRecordCodec.RECORD_TYPE, UiInteractionRecordCodec::decode)
+                register(SystemRecordCodec.RECORD_TYPE, SystemRecordCodec::decode)
+                register(ProcessRecordCodec.RECORD_TYPE, ProcessRecordCodec::decode)
             }
 
         private const val MAX_RECORDS = 20_000

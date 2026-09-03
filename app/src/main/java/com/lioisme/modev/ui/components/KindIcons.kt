@@ -35,7 +35,10 @@ import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.NetworkKind
 import com.lioisme.modev.core.model.PrefsKind
+import com.lioisme.modev.core.model.ProcessKind
 import com.lioisme.modev.core.model.SqlKind
+import com.lioisme.modev.core.model.SystemKind
+import com.lioisme.modev.core.model.UiInteractionKind
 import com.lioisme.modev.core.model.WebViewKind
 
 /**
@@ -135,7 +138,38 @@ object KindIcons {
             DeviceEnvKind.XPOSED_CLASS, DeviceEnvKind.XPOSED_STACK,
             DeviceEnvKind.XPOSED_MAPS -> Icons.Outlined.Visibility
             DeviceEnvKind.EMULATOR_BUILD, DeviceEnvKind.EMULATOR_FILE,
-            DeviceEnvKind.EMULATOR_SENSOR, DeviceEnvKind.EMULATOR_NETWORK -> Icons.Outlined.Construction
+            DeviceEnvKind.EMULATOR_SENSOR, DeviceEnvKind.EMULATOR_NETWORK,
+            DeviceEnvKind.EMULATOR_TELEPHONY, DeviceEnvKind.EMULATOR_CPU,
+            DeviceEnvKind.EMULATOR_BATTERY -> Icons.Outlined.Construction
+            DeviceEnvKind.SYSTEM_PROPERTIES -> Icons.Outlined.Code
+            DeviceEnvKind.PROC_STATUS, DeviceEnvKind.PROC_MOUNT_INFO,
+            DeviceEnvKind.PROC_CGROUP, DeviceEnvKind.PROC_NET -> Icons.Outlined.Description
             DeviceEnvKind.DETECT_ROOT, DeviceEnvKind.DETECT_EMULATOR -> Icons.Outlined.ManageSearch
+        }
+
+    /** UI 交互监听族(V33 一等公民)。 */
+    fun uiInteraction(kind: UiInteractionKind): ImageVector =
+        when (kind) {
+            UiInteractionKind.DIALOG_SHOW,
+            UiInteractionKind.DIALOG_KEYWORD -> Icons.Outlined.Visibility
+            UiInteractionKind.WIDGET_TEXT -> Icons.Outlined.EditNote
+            UiInteractionKind.ACTIVITY_START,
+            UiInteractionKind.ACTIVITY_RESUME -> Icons.Outlined.SwapHoriz
+        }
+
+    /** 系统信息监听族(V33 一等公民)。 */
+    fun system(kind: SystemKind): ImageVector =
+        when (kind) {
+            SystemKind.LOGCAT -> Icons.Outlined.Terminal
+            SystemKind.APP_INFO -> Icons.Outlined.ManageSearch
+            SystemKind.SIGNATURE -> Icons.Outlined.Security
+        }
+
+    /** 进程控制监听族(V33 一等公民)。 */
+    fun process(kind: ProcessKind): ImageVector =
+        when (kind) {
+            ProcessKind.EXIT_INTERCEPT -> Icons.Outlined.DeleteSweep
+            ProcessKind.CRASH_PREVENT -> Icons.Outlined.HistoryEdu
+            ProcessKind.SCREEN_RECORD -> Icons.Outlined.Visibility
         }
 }

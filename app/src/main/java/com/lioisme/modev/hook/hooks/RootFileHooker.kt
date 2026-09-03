@@ -23,6 +23,8 @@ class RootFileHooker(
         hookFileExists()
         hookFileLength()
         hookFileCanRead()
+        hookFileCanWrite()
+        hookFileCanExecute()
     }
 
     private fun hookFileExists() {
@@ -102,6 +104,50 @@ class RootFileHooker(
     private fun hookFileCanRead() {
         val clazz = runCatching { Class.forName("java.io.File") }.getOrNull() ?: return
         val method = runCatching { clazz.getMethod("canRead") }.getOrNull() ?: return
+
+        engine.hook(method, object : MethodHook() {
+            override fun before(invocation: Invocation) {
+                if (!config().rootFile) return
+                val path = (invocation.thisObject as? java.io.File)?.path ?: return
+                if (!matchesRootPath(path.lowercase())) return
+                invocation.setResult(false)
+                emit(
+                    kind = DeviceEnvKind.ROOT_FILE,
+                    operation = DeviceEnvOperation.FILE_READABLE,
+                    originalValue = null,
+                    maskedValue = "false",
+                    targetPath = path,
+                    detectionPattern = ROOT_PATTERN,
+                )
+            }
+        })
+    }
+
+    private fun hookFileCanWrite() {
+        val clazz = runCatching { Class.forName("java.io.File") }.getOrNull() ?: return
+        val method = runCatching { clazz.getMethod("canWrite") }.getOrNull() ?: return
+
+        engine.hook(method, object : MethodHook() {
+            override fun before(invocation: Invocation) {
+                if (!config().rootFile) return
+                val path = (invocation.thisObject as? java.io.File)?.path ?: return
+                if (!matchesRootPath(path.lowercase())) return
+                invocation.setResult(false)
+                emit(
+                    kind = DeviceEnvKind.ROOT_FILE,
+                    operation = DeviceEnvOperation.FILE_READABLE,
+                    originalValue = null,
+                    maskedValue = "false",
+                    targetPath = path,
+                    detectionPattern = ROOT_PATTERN,
+                )
+            }
+        })
+    }
+
+    private fun hookFileCanExecute() {
+        val clazz = runCatching { Class.forName("java.io.File") }.getOrNull() ?: return
+        val method = runCatching { clazz.getMethod("canExecute") }.getOrNull() ?: return
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {

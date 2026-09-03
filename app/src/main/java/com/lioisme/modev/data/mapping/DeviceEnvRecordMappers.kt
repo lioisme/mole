@@ -39,6 +39,7 @@ internal fun DeviceEnvRecord.toEntity() = CryptoRecordEntity(
     proxyHost = originalValue,
     proxyPort = null,
     vpnActive = if (intervention) 1 else 0,
+    interventionAction = interventionAction,
     paramsJson = params?.takeIf { it.isNotEmpty() }?.let { Json.gson.toJson(it) },
     processName = processName,
     threadName = threadName,
@@ -60,6 +61,7 @@ internal fun CryptoRecordEntity.toDeviceEnvModelOrNull(): DeviceEnvRecord? {
         originalValue = proxyHost,
         maskedValue = null,
         intervention = vpnActive?.let { it == 1 } ?: true,
+        interventionAction = interventionAction,
         targetPath = path,
         targetClass = destPath,
         targetProperty = command,
@@ -97,6 +99,7 @@ internal fun CryptoRecordRow.deviceEnvRowModelOrNull(): DeviceEnvRow? {
         targetClass = destPath,
         targetProperty = command,
         intervention = vpnActive?.let { it == 1 } ?: true,
+        interventionAction = interventionAction,
         threadName = threadName,
     )
 }
@@ -110,6 +113,7 @@ internal fun DeviceEnvRecord.toJson(): String = org.json.JSONObject().apply {
     put("kind", kind.name)
     put("operation", operation.name)
     put("intervention", intervention)
+    interventionAction?.let { put("interventionAction", it) }
     originalValue?.let { put("originalValue", it) }
     maskedValue?.let { put("maskedValue", it) }
     targetPath?.let { put("targetPath", it) }

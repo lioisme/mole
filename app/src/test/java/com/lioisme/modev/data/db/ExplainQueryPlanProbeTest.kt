@@ -4,7 +4,7 @@ import androidx.room.Room
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.data.server.ConfigServer
 import com.lioisme.modev.data.repo.LogRepository
-import com.lioisme.modev.data.repo.RecordFilter
+import com.lioisme.modev.domain.record.RecordFilter
 import java.net.ServerSocket
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking

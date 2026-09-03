@@ -14,6 +14,9 @@ import java.io.File
  * 异常不影响宿主。
  *
  * 与 [NetworkBaseHooker]/[BehaviorBaseHooker]/[SqlBaseHooker] 同构。
+ *
+ * V34 审计后:emit 新增 [interventionAction] 参数("BLOCKED"|"DETECTED"|null),
+ * 替代旧 [intervention] boolean 的模糊语义。
  */
 abstract class DeviceEnvBaseHooker(
     context: ProbeContext,
@@ -46,6 +49,7 @@ abstract class DeviceEnvBaseHooker(
         originalValue: String? = null,
         maskedValue: String? = null,
         intervention: Boolean = true,
+        interventionAction: String? = null,
         targetPath: String? = null,
         targetClass: String? = null,
         targetProperty: String? = null,
@@ -66,6 +70,7 @@ abstract class DeviceEnvBaseHooker(
             originalValue = originalValue,
             maskedValue = maskedValue,
             intervention = intervention,
+            interventionAction = interventionAction,
             targetPath = targetPath,
             targetClass = targetClass,
             targetProperty = targetProperty,

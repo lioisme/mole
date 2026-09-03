@@ -174,6 +174,71 @@ data class CryptoRecordEntity(
     /** VPN 是否活跃(VPN 类别;1=活跃,0=非活跃,NULL=未知)。 */
     @ColumnInfo(name = "vpnActive") val vpnActive: Int? = null,
 
+    // ---- UI 交互监听列(v11→v12 迁移新增,recordType='ui' 行承载;其余行为 NULL) ----
+
+    /** 弹窗标题(DIALOG_SHOW/DIALOG_KEYWORD)。 */
+    @ColumnInfo(name = "dialogTitle") val dialogTitle: String? = null,
+    /** 弹窗消息(DIALOG_SHOW/DIALOG_KEYWORD)。 */
+    @ColumnInfo(name = "dialogMessage") val dialogMessage: String? = null,
+    /** 命中关键字列表 JSON 数组(DIALOG_KEYWORD)。 */
+    @ColumnInfo(name = "dialogKeywords") val dialogKeywords: String? = null,
+    /** 弹窗拦截标记(1=拦截,0=放行;DIALOG_KEYWORD)。 */
+    @ColumnInfo(name = "dialogIntercepted") val dialogIntercepted: Int? = null,
+    /** 控件文本内容(WIDGET_TEXT)。 */
+    @ColumnInfo(name = "widgetText") val widgetText: String? = null,
+    /** 控件所在 Activity 类名(WIDGET_TEXT)。 */
+    @ColumnInfo(name = "widgetClassName") val widgetClassName: String? = null,
+    /** 目标 Activity 类名(ACTIVITY_*)。 */
+    @ColumnInfo(name = "activityName") val activityName: String? = null,
+    /** Intent action(ACTIVITY_*)。 */
+    @ColumnInfo(name = "intentAction") val intentAction: String? = null,
+    /** Intent data URI(ACTIVITY_*)。 */
+    @ColumnInfo(name = "intentData") val intentData: String? = null,
+    /** Intent extras 序列化 JSON(ACTIVITY_*)。 */
+    @ColumnInfo(name = "intentExtrasJson") val intentExtrasJson: String? = null,
+    /** Intent flags(ACTIVITY_*)。 */
+    @ColumnInfo(name = "intentFlags") val intentFlags: Int? = null,
+
+    // ---- 系统信息监听列(v11→v12 迁移新增,recordType='system' 行承载;其余行为 NULL) ----
+
+    /** Logcat tag(LOGCAT)。 */
+    @ColumnInfo(name = "logcatTag") val logcatTag: String? = null,
+    /** Logcat level D/I/W/E/V/F(LOGCAT)。 */
+    @ColumnInfo(name = "logcatLevel") val logcatLevel: String? = null,
+    /** Logcat 消息(LOGCAT)。 */
+    @ColumnInfo(name = "logcatMessage") val logcatMessage: String? = null,
+    /** 应用版本名(APP_INFO)。 */
+    @ColumnInfo(name = "appVersion") val appVersion: String? = null,
+    /** 应用版本号(APP_INFO)。 */
+    @ColumnInfo(name = "appVersionCode") val appVersionCode: Int? = null,
+    /** 最低 SDK(APP_INFO)。 */
+    @ColumnInfo(name = "appMinSdk") val appMinSdk: Int? = null,
+    /** 目标 SDK(APP_INFO)。 */
+    @ColumnInfo(name = "appTargetSdk") val appTargetSdk: Int? = null,
+    /** 权限列表 JSON 数组(APP_INFO)。 */
+    @ColumnInfo(name = "appPermissions") val appPermissions: String? = null,
+    /** 签名 SHA-256 哈希(SIGNATURE)。 */
+    @ColumnInfo(name = "signatureHash") val signatureHash: String? = null,
+    /** 签名 Base64(SIGNATURE)。 */
+    @ColumnInfo(name = "signatureBase64") val signatureBase64: String? = null,
+
+    // ---- 进程控制列(v11→v12 迁移新增,recordType='process' 行承载;其余行为 NULL) ----
+
+    /** System.exit 参数(EXIT_INTERCEPT)。 */
+    @ColumnInfo(name = "exitCode") val exitCode: Int? = null,
+    /** killProcess 目标 pid(EXIT_INTERCEPT)。 */
+    @ColumnInfo(name = "processPid") val processPid: Int? = null,
+    /** 异常类名(CRASH_PREVENT)。 */
+    @ColumnInfo(name = "crashType") val crashType: String? = null,
+    /** 异常消息(CRASH_PREVENT)。 */
+    @ColumnInfo(name = "crashMessage") val crashMessage: String? = null,
+    /** 崩溃拦截标记(1=已拦截;CRASH_PREVENT)。 */
+    @ColumnInfo(name = "crashBlocked") val crashBlocked: Int? = null,
+    /** 录屏拦截标记(1=已拦截;SCREEN_RECORD)。 */
+    @ColumnInfo(name = "screenRecordBlocked") val screenRecordBlocked: Int? = null,
+    /** 干预动作标记("BLOCKED"/"DETECTED"/null;V34 审计增强)。 */
+    @ColumnInfo(name = "interventionAction") val interventionAction: String? = null,
+
     @ColumnInfo(name = "contextId") val contextId: Long = 0L,
     @ColumnInfo(name = "threadName") val threadName: String,
     @ColumnInfo(name = "stack") val stackJson: String? = null,

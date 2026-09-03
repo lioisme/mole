@@ -157,6 +157,48 @@ data class HookSwitch(
 
     /** 设备环境监听全局总开关(V31;false = 全部设备环境类别停用,分开关保留原态)。 */
     val deviceEnvListen: Boolean = true,
+
+    // ---- V33 UI 交互监听 ----
+
+    /** UI 交互监听全局总开关(V33;false = 全部 UI 交互类别停用,分开关保留原态)。 */
+    val uiListen: Boolean = true,
+    /** UI:Dialog.show() 记录(低频高信号,默认开)。 */
+    val dialogShow: Boolean = true,
+    /** UI:关键字弹窗拦截记录(低频高信号,默认开)。 */
+    val dialogKeyword: Boolean = true,
+    /** UI:TextView.setText() 文本赋值记录(极高频噪声,默认关)。 */
+    val widgetText: Boolean = false,
+    /** UI:Activity.startActivity() 启动记录(低频高信号,默认开)。 */
+    val activityStart: Boolean = true,
+    /** UI:Activity 生命周期记录(高频,默认关)。 */
+    val activityResume: Boolean = false,
+
+    // ---- V33 系统信息监听 ----
+
+    /** 系统信息监听全局总开关(V33;false = 全部系统信息类别停用,分开关保留原态)。 */
+    val systemListen: Boolean = true,
+    /** 系统:Logcat 输出捕获(极高频噪声,默认关)。 */
+    val logcatCapture: Boolean = false,
+    /** 系统:Application 元数据采集(进程启动一次,低频高信号,默认开)。 */
+    val appInfoCapture: Boolean = true,
+    /** 系统:签名读取监听(低频高信号,默认开)。 */
+    val signatureMonitor: Boolean = true,
+
+    // ---- V33 进程控制 ----
+
+    /** 进程控制全局总开关(V33;false = 全部进程控制类别停用,分开关保留原态)。 */
+    val processControlListen: Boolean = true,
+    /** 进程:退出检测与拦截 System.exit/killProcess(干预型,默认关;before() 中 setResult(null) 阻止执行)。 */
+    val exitIntercept: Boolean = false,
+    /** 进程:崩溃检测与预防未捕获异常(干预型,默认关;注入 wrapper handler + 吞掉异常)。 */
+    val crashPrevent: Boolean = false,
+    /** 进程:录屏限制检测与解除 FLAG_SECURE(干预型,默认关;before() 中清除 FLAG_SECURE 位)。 */
+    val screenRecordBypass: Boolean = false,
+
+    // ---- V33 UI 交互微调项 ----
+
+    /** 弹窗拦截关键字列表(空 = 不拦截;命中任一关键字即拦截)。 */
+    val dialogKeywords: List<String> = emptyList(),
     /** Root:文件存在性检测干预(干预型,默认关)。 */
     val rootFile: Boolean = false,
     /** Root:命令执行检测干预(干预型,默认关)。 */
@@ -179,6 +221,22 @@ data class HookSwitch(
     val emulatorSensor: Boolean = false,
     /** 模拟器:网络/MAC/IMEI 伪造(干预型,默认关)。 */
     val emulatorNetwork: Boolean = false,
+    /** 模拟器:电话信息伪造(干预型,默认关)。 */
+    val emulatorTelephony: Boolean = false,
+    /** 模拟器:CPU信息伪造(干预型,默认关)。 */
+    val emulatorCpu: Boolean = false,
+    /** 模拟器:电池信息伪造(干预型,默认关)。 */
+    val emulatorBattery: Boolean = false,
+    /** 设备环境:android.os.SystemProperties.get() 拦截(干预型,默认关)。 */
+    val systemProperties: Boolean = false,
+    /** 设备环境:/proc/self/status 行过滤(TracerPid,干预型,默认关)。 */
+    val procStatus: Boolean = false,
+    /** 设备环境:/proc/self/mountinfo 行过滤(Magisk overlay,干预型,默认关)。 */
+    val procMountInfo: Boolean = false,
+    /** 设备环境:/proc/self/cgroup 行过滤(Magisk hidden,干预型,默认关)。 */
+    val procCgroup: Boolean = false,
+    /** 设备环境:/proc/net/tcp 行过滤(Frida 端口,干预型,默认关)。 */
+    val procNet: Boolean = false,
     /** 设备环境:Root 检测行为监控(仅记录,不干预;默认关,噪声大)。 */
     val detectRoot: Boolean = false,
     /** 设备环境:模拟器检测行为监控(仅记录,不干预;默认关,噪声大)。 */
@@ -195,10 +253,11 @@ data class HookSwitch(
      */
     val configVersion: Int = 0,
 ) {
-    /** 是否存在任何需要 Hook 的类别(算法 + 数据库 + 行为 + 偏好 + WebView + 网络 + 设备环境 任一能力启用)。 */
+    /** 是否存在任何需要 Hook 的类别(算法 + 数据库 + 行为 + 偏好 + WebView + 网络 + 设备环境 + UI交互 + 系统 + 进程控制 任一能力启用)。 */
     val anyEnabled: Boolean
         get() = anyCryptoEnabled || anyDbEnabled || anyBehaviorEnabled || anyPrefsEnabled ||
-            anyWebviewEnabled || anyNetworkEnabled || anyDeviceEnvEnabled
+            anyWebviewEnabled || anyNetworkEnabled || anyDeviceEnvEnabled ||
+            anyUiEnabled || anySystemEnabled || anyProcessControlEnabled
 
     /** 算法捕获相关类别是否任一启用(含全局总开关投影,供算法监听能力判定)。 */
     val anyCryptoEnabled: Boolean
@@ -235,7 +294,21 @@ data class HookSwitch(
         get() = deviceEnvListen && (rootFile || rootExec || rootPackageManager || rootProperty ||
             xposedClass || xposedStack || xposedMaps ||
             emulatorBuild || emulatorFile || emulatorSensor || emulatorNetwork ||
+            emulatorTelephony || emulatorCpu || emulatorBattery ||
+            systemProperties || procStatus || procMountInfo || procCgroup || procNet ||
             detectRoot || detectEmulator)
+
+    /** UI 交互监听相关类别是否任一启用(含全局总开关投影,供 UI 交互监听能力判定)。 */
+    val anyUiEnabled: Boolean
+        get() = uiListen && (dialogShow || dialogKeyword || widgetText || activityStart || activityResume)
+
+    /** 系统信息监听相关类别是否任一启用(含全局总开关投影,供系统信息监听能力判定)。 */
+    val anySystemEnabled: Boolean
+        get() = systemListen && (logcatCapture || appInfoCapture || signatureMonitor)
+
+    /** 进程控制相关类别是否任一启用(含全局总开关投影,供进程控制能力判定)。 */
+    val anyProcessControlEnabled: Boolean
+        get() = processControlListen && (exitIntercept || crashPrevent || screenRecordBypass)
 
     fun enabled(kind: CryptoKind): Boolean = cryptoListen && when (kind) {
         CryptoKind.MESSAGE_DIGEST -> messageDigest
@@ -321,8 +394,39 @@ data class HookSwitch(
         DeviceEnvKind.EMULATOR_FILE -> emulatorFile
         DeviceEnvKind.EMULATOR_SENSOR -> emulatorSensor
         DeviceEnvKind.EMULATOR_NETWORK -> emulatorNetwork
+        DeviceEnvKind.EMULATOR_TELEPHONY -> emulatorTelephony
+        DeviceEnvKind.EMULATOR_CPU -> emulatorCpu
+        DeviceEnvKind.EMULATOR_BATTERY -> emulatorBattery
+        DeviceEnvKind.SYSTEM_PROPERTIES -> systemProperties
+        DeviceEnvKind.PROC_STATUS -> procStatus
+        DeviceEnvKind.PROC_MOUNT_INFO -> procMountInfo
+        DeviceEnvKind.PROC_CGROUP -> procCgroup
+        DeviceEnvKind.PROC_NET -> procNet
         DeviceEnvKind.DETECT_ROOT -> detectRoot
         DeviceEnvKind.DETECT_EMULATOR -> detectEmulator
+    }
+
+    /** UI 交互类别有效开关(master 门控;与 [CategoryTaxonomy] 默认态对齐由测试强制)。 */
+    fun uiInteractionEnabled(kind: UiInteractionKind): Boolean = uiListen && when (kind) {
+        UiInteractionKind.DIALOG_SHOW -> dialogShow
+        UiInteractionKind.DIALOG_KEYWORD -> dialogKeyword
+        UiInteractionKind.WIDGET_TEXT -> widgetText
+        UiInteractionKind.ACTIVITY_START -> activityStart
+        UiInteractionKind.ACTIVITY_RESUME -> activityResume
+    }
+
+    /** 系统信息类别有效开关(master 门控;与 [CategoryTaxonomy] 默认态对齐由测试强制)。 */
+    fun systemEnabled(kind: SystemKind): Boolean = systemListen && when (kind) {
+        SystemKind.LOGCAT -> logcatCapture
+        SystemKind.APP_INFO -> appInfoCapture
+        SystemKind.SIGNATURE -> signatureMonitor
+    }
+
+    /** 进程控制类别有效开关(master 门控;与 [CategoryTaxonomy] 默认态对齐由测试强制)。 */
+    fun processControlEnabled(kind: ProcessKind): Boolean = processControlListen && when (kind) {
+        ProcessKind.EXIT_INTERCEPT -> exitIntercept
+        ProcessKind.CRASH_PREVENT -> crashPrevent
+        ProcessKind.SCREEN_RECORD -> screenRecordBypass
     }
 
     companion object {
@@ -378,6 +482,14 @@ data class HookSwitch(
                 emulatorFile = if (needsMigration) false else base.emulatorFile,
                 emulatorSensor = if (needsMigration) false else base.emulatorSensor,
                 emulatorNetwork = if (needsMigration) false else base.emulatorNetwork,
+                emulatorTelephony = if (needsMigration) false else base.emulatorTelephony,
+                emulatorCpu = if (needsMigration) false else base.emulatorCpu,
+                emulatorBattery = if (needsMigration) false else base.emulatorBattery,
+                systemProperties = if (needsMigration) false else base.systemProperties,
+                procStatus = if (needsMigration) false else base.procStatus,
+                procMountInfo = if (needsMigration) false else base.procMountInfo,
+                procCgroup = if (needsMigration) false else base.procCgroup,
+                procNet = if (needsMigration) false else base.procNet,
             )
         }.getOrNull()
     }

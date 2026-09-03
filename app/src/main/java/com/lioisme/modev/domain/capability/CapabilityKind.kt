@@ -23,4 +23,13 @@ enum class CapabilityKind {
 
     /** 设备环境监听(Root 隐藏/Xposed 隐藏/模拟器隐藏/检测监控,V31 一等公民)。 */
     DEVICE_ENV_LISTEN,
+
+    /** UI 交互监听(弹窗/控件文本/Activity 跳转,V33 一等公民)。 */
+    UI_INTERACTION_LISTEN,
+
+    /** 系统信息监听(Logcat/App 元数据/签名,V33 一等公民)。 */
+    SYSTEM_LISTEN,
+
+    /** 进程控制(退出拦截/崩溃防止/录屏绕过,V33 一等公民)。 */
+    PROCESS_CONTROL_LISTEN,
 }

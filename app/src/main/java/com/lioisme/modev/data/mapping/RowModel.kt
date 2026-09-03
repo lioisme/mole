@@ -10,8 +10,14 @@ import com.lioisme.modev.core.model.NetworkKind
 import com.lioisme.modev.core.model.NetworkOperation
 import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.PrefsOperation
+import com.lioisme.modev.core.model.ProcessKind
+import com.lioisme.modev.core.model.ProcessOperation
 import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.core.model.SqlOperation
+import com.lioisme.modev.core.model.SystemKind
+import com.lioisme.modev.core.model.SystemOperation
+import com.lioisme.modev.core.model.UiInteractionKind
+import com.lioisme.modev.core.model.UiInteractionOperation
 import com.lioisme.modev.core.model.WebViewKind
 import com.lioisme.modev.core.model.WebViewOperation
 
@@ -197,8 +203,10 @@ data class DeviceEnvRow(
     val targetClass: String?,
     /** 被检测的属性名(可空)。 */
     val targetProperty: String?,
-    /** 是否为干预记录(true=隐藏,false=仅监控)。 */
+    /** 是否为干预记录(true=隐藏,false=仅监控;V34+ 由 interventionAction 替代)。 */
     val intervention: Boolean,
+    /** 干预动作标记("BLOCKED"/"DETECTED"/null;V34 审计增强)。 */
+    val interventionAction: String? = null,
     val threadName: String,
 ) : RowModel {
     override val id: Long get() = recordId
@@ -210,4 +218,102 @@ data class DeviceEnvRow(
             ?: targetClass?.takeIf { it.isNotBlank() }
             ?: targetProperty?.takeIf { it.isNotBlank() }
             ?: operation.name
+}
+
+/**
+ * UI 交互监听记录行(V33 一等公民;弹窗标题/Activity 名摘要预览,零堆栈物化)。
+ */
+@Immutable
+data class UiInteractionRow(
+    val recordId: Long,
+    val recordTimestamp: Long,
+    override val packageName: String,
+    val kind: UiInteractionKind,
+    val operation: UiInteractionOperation,
+    /** 弹窗标题(DIALOG_*)。 */
+    val dialogTitle: String?,
+    /** 弹窗消息(DIALOG_*)。 */
+    val dialogMessage: String?,
+    /** 控件文本(WIDGET_*)。 */
+    val widgetText: String?,
+    /** Activity 名(ACTIVITY_*)。 */
+    val activityName: String?,
+    val threadName: String,
+) : RowModel {
+    override val id: Long get() = recordId
+    override val timestamp: Long get() = recordTimestamp
+
+    /** 列表 headline 单一事实源:弹窗标题 / Activity 名 / 操作名;恒非空。 */
+    fun headlineText(): String? =
+        dialogTitle?.takeIf { it.isNotBlank() }
+            ?: activityName?.takeIf { it.isNotBlank() }
+                ?.substringAfterLast('.')
+            ?: widgetText?.takeIf { it.isNotBlank() }?.take(40)
+            ?: operation.name
+}
+
+/**
+ * 系统信息监听记录行(V33 一等公民;Logcat tag/签名哈希摘要预览,零堆栈物化)。
+ */
+@Immutable
+data class SystemRow(
+    val recordId: Long,
+    val recordTimestamp: Long,
+    override val packageName: String,
+    val kind: SystemKind,
+    val operation: SystemOperation,
+    /** Logcat tag(LOGCAT)。 */
+    val logcatTag: String?,
+    /** Logcat level(LOGCAT)。 */
+    val logcatLevel: String?,
+    /** Logcat message 预览(LOGCAT)。 */
+    val logcatMessage: String?,
+    /** 签名哈希(SIGNATURE)。 */
+    val signatureHash: String?,
+    val threadName: String,
+) : RowModel {
+    override val id: Long get() = recordId
+    override val timestamp: Long get() = recordTimestamp
+
+    /** 列表 headline 单一事实源:Logcat tag / 签名哈希 / 操作名;恒非空。 */
+    fun headlineText(): String? =
+        logcatTag?.takeIf { it.isNotBlank() }?.let { "[$it]" }
+            ?: signatureHash?.takeIf { it.isNotBlank() }?.take(16)?.let { "$it…" }
+            ?: operation.name
+}
+
+/**
+ * 进程控制记录行(V33 一等公民;退出码/异常类型摘要预览,零堆栈物化)。
+ */
+@Immutable
+data class ProcessRow(
+    val recordId: Long,
+    val recordTimestamp: Long,
+    override val packageName: String,
+    val kind: ProcessKind,
+    val operation: ProcessOperation,
+    /** System.exit 参数(EXIT_INTERCEPT)。 */
+    val exitCode: Int?,
+    /** killProcess pid(EXIT_INTERCEPT)。 */
+    val processPid: Int?,
+    /** 异常类名(CRASH_PREVENT)。 */
+    val crashType: String?,
+    /** 崩溃拦截标记(CRASH_PREVENT;V34+ 由 interventionAction 替代)。 */
+    val crashBlocked: Int?,
+    /** 录屏拦截标记(SCREEN_RECORD;V34+ 由 interventionAction 替代)。 */
+    val screenRecordBlocked: Int?,
+    /** 干预动作标记("BLOCKED"/"DETECTED"/null;V34 审计增强)。 */
+    val interventionAction: String? = null,
+    val threadName: String,
+) : RowModel {
+    override val id: Long get() = recordId
+    override val timestamp: Long get() = recordTimestamp
+
+    /** 列表 headline 单一事实源:退出码 / 异常类型 / 拦截标记 / 操作名;恒非空。 */
+    fun headlineText(): String? = when (kind) {
+        ProcessKind.EXIT_INTERCEPT -> "exit=${exitCode ?: "?"}"
+        ProcessKind.CRASH_PREVENT -> crashType?.takeIf { it.isNotBlank() }?.substringAfterLast('.')
+            ?: operation.name
+        ProcessKind.SCREEN_RECORD -> interventionAction?.lowercase() ?: "detected"
+    }
 }

@@ -385,7 +385,13 @@ interface CryptoRecordDao {
             substr(sql, 1, :previewChars) AS sqlPreview,
             rowCount, affectedCount, rowId,
             path, destPath, command, fileSize, prefKey,
-            proxyHost, vpnActive
+            proxyHost, vpnActive,
+            dialogTitle, dialogMessage, dialogKeywords, dialogIntercepted,
+            widgetText, widgetClassName, activityName,
+            intentAction, intentData, intentExtrasJson, intentFlags,
+            logcatTag, logcatLevel, logcatMessage, signatureHash,
+            exitCode, processPid, crashType, crashBlocked, screenRecordBlocked,
+            interventionAction
             """
 
         /**
@@ -410,12 +416,21 @@ interface CryptoRecordDao {
                  OR outputText LIKE :query ESCAPE '\'
                  OR outputHex LIKE :query ESCAPE '\'
                  OR threadName LIKE :query ESCAPE '\'
-                  OR sql LIKE :query ESCAPE '\'
-                  OR resultText LIKE :query ESCAPE '\'
-                  OR path LIKE :query ESCAPE '\'
-                  OR destPath LIKE :query ESCAPE '\'
-                  OR command LIKE :query ESCAPE '\'
-                  OR prefKey LIKE :query ESCAPE '\')
+                   OR sql LIKE :query ESCAPE '\'
+                   OR resultText LIKE :query ESCAPE '\'
+                   OR path LIKE :query ESCAPE '\'
+                   OR destPath LIKE :query ESCAPE '\'
+                   OR command LIKE :query ESCAPE '\'
+                   OR prefKey LIKE :query ESCAPE '\'
+                   OR dialogTitle LIKE :query ESCAPE '\'
+                   OR dialogMessage LIKE :query ESCAPE '\'
+                   OR widgetText LIKE :query ESCAPE '\'
+                   OR activityName LIKE :query ESCAPE '\'
+                   OR logcatTag LIKE :query ESCAPE '\'
+                   OR logcatMessage LIKE :query ESCAPE '\'
+                   OR signatureHash LIKE :query ESCAPE '\'
+                   OR crashType LIKE :query ESCAPE '\'
+                   OR crashMessage LIKE :query ESCAPE '\')
              """
     }
 }
@@ -426,11 +441,11 @@ data class RecordCount(
     @ColumnInfo(name = "recordCount") val count: Long,
 )
 
-/** 按记录类型的记录计数(V17 R2)。 */
-data class RecordTypeCount(
-    val recordType: String,
-    @ColumnInfo(name = "recordCount") val count: Long,
-)
+/**
+ * 按记录类型的记录计数(V17 R2)。
+ * 类型别名:兼容旧导入路径,实际数据类已迁移至 [com.lioisme.modev.domain.record.RecordTypeCount]。
+ */
+typealias RecordTypeCount = com.lioisme.modev.domain.record.RecordTypeCount
 
 /** 按类别的记录计数(筛选菜单徽标)。 */
 data class KindCount(
@@ -473,4 +488,29 @@ data class CryptoRecordRow(
     // 网络环境监听投影列(V30)
     val proxyHost: String? = null,
     val vpnActive: Int? = null,
+    // UI 交互监听投影列(V33)
+    val dialogTitle: String? = null,
+    val dialogMessage: String? = null,
+    val dialogKeywords: String? = null,
+    val dialogIntercepted: Int? = null,
+    val widgetText: String? = null,
+    val widgetClassName: String? = null,
+    val activityName: String? = null,
+    val intentAction: String? = null,
+    val intentData: String? = null,
+    val intentExtrasJson: String? = null,
+    val intentFlags: Int? = null,
+    // 系统信息监听投影列(V33)
+    val logcatTag: String? = null,
+    val logcatLevel: String? = null,
+    val logcatMessage: String? = null,
+    val signatureHash: String? = null,
+    // 进程控制投影列(V33)
+    val exitCode: Int? = null,
+    val processPid: Int? = null,
+    val crashType: String? = null,
+    val crashBlocked: Int? = null,
+    val screenRecordBlocked: Int? = null,
+    // V34 审计增强
+    val interventionAction: String? = null,
 )

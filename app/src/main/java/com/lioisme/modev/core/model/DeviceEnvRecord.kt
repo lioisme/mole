@@ -37,7 +37,9 @@ data class DeviceEnvRecord(
     val operation: DeviceEnvOperation,
     val originalValue: String? = null,
     val maskedValue: String? = null,
+    @Deprecated("V34+ 由 interventionAction 替代", ReplaceWith("interventionAction"))
     val intervention: Boolean = true,
+    val interventionAction: String? = null,
     val targetPath: String? = null,
     val targetClass: String? = null,
     val targetProperty: String? = null,

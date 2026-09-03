@@ -2,6 +2,7 @@ package com.lioisme.modev.hook
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import com.lioisme.modev.core.codec.BehaviorRecordCodec
 import com.lioisme.modev.core.codec.CryptoRecordCodec
 import com.lioisme.modev.core.codec.Json
@@ -20,8 +21,14 @@ import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.core.model.WebViewRecord
 import com.lioisme.modev.core.model.NetworkRecord
 import com.lioisme.modev.core.model.DeviceEnvRecord
+import com.lioisme.modev.core.model.UiInteractionRecord
+import com.lioisme.modev.core.model.SystemRecord
+import com.lioisme.modev.core.model.ProcessRecord
 import com.lioisme.modev.core.codec.NetworkRecordCodec
 import com.lioisme.modev.core.codec.DeviceEnvRecordCodec
+import com.lioisme.modev.core.codec.UiInteractionRecordCodec
+import com.lioisme.modev.core.codec.SystemRecordCodec
+import com.lioisme.modev.core.codec.ProcessRecordCodec
 import com.lioisme.modev.framework.RemotePrefsBridge
 import com.lioisme.modev.hook.probes.AlgorithmProbe
 import com.lioisme.modev.hook.probes.BehaviorProbe
@@ -30,6 +37,9 @@ import com.lioisme.modev.hook.probes.DeviceEnvProbe
 import com.lioisme.modev.hook.probes.PrefsProbe
 import com.lioisme.modev.hook.probes.WebViewProbe
 import com.lioisme.modev.hook.probes.NetworkProbe
+import com.lioisme.modev.hook.probes.UiInteractionProbe
+import com.lioisme.modev.hook.probes.SystemProbe
+import com.lioisme.modev.hook.probes.ProcessControlProbe
 import java.io.File
 
 /**
@@ -57,6 +67,9 @@ class HookInstaller(
             WebViewProbe(),
             NetworkProbe(),
             DeviceEnvProbe(),
+            UiInteractionProbe(),
+            SystemProbe(),
+            ProcessControlProbe(),
         ),
 ) {
 
@@ -96,6 +109,9 @@ class HookInstaller(
                     is WebViewRecord -> WebViewRecordCodec.encode(record)
                     is NetworkRecord -> NetworkRecordCodec.encode(record)
                     is DeviceEnvRecord -> DeviceEnvRecordCodec.encode(record)
+                    is UiInteractionRecord -> UiInteractionRecordCodec.encode(record)
+                    is SystemRecord -> SystemRecordCodec.encode(record)
+                    is ProcessRecord -> ProcessRecordCodec.encode(record)
                 }
                 WireCodec.record(record.seq, record.recordType, payload)
             },
@@ -145,6 +161,23 @@ class HookInstaller(
             }
         }
 
+        // V35 兜底:Vector Xposed 不投递 XposedService,RemotePreferences 中
+        // 可能只有全局配置而无 per-app override;始终尝试从磁盘加载 override。
+        runCatching {
+            val file = java.io.File("/data/local/tmp/modev_config_$packageName.json")
+            if (file.exists() && file.canRead()) {
+                val json = file.readText(Charsets.UTF_8).trim()
+                if (json.isNotEmpty()) {
+                    val override = AppListenOverride.fromJson(Json.gson, json)
+                    if (!override.isDefault) {
+                        val resolved = EffectiveSwitch.resolve(channel.currentConfig, override)
+                        channel.updateConfig(resolved)
+                        Log.i(TAG, "V35 兜底:从磁盘加载 $packageName override 成功")
+                    }
+                }
+            }
+        }
+
         channel.start()
         sink.start()
 
@@ -156,7 +189,15 @@ class HookInstaller(
             packageName = packageName,
         )
         for (probe in probes) {
-            probe.install(context)
+            try {
+                probe.install(context)
+                // V34 审计增强:干预型探针安装时输出日志,便于调试和审计
+                if (probe is InterventionProbeMarker) {
+                    Log.i(TAG, "干预型探针已安装: ${probe.javaClass.simpleName}")
+                }
+            } catch (e: Throwable) {
+                Log.e(TAG, "探针安装失败: ${probe.javaClass.simpleName}", e)
+            }
         }
     }
 
@@ -169,4 +210,34 @@ class HookInstaller(
 
     private fun parseSwitch(json: String?): HookSwitch? =
         json?.let { HookSwitch.fromJson(Json.gson, it) }
+
+    /**
+     * V35 兜底:从磁盘 JSON 文件加载 per-app 配置。
+     * 文件路径:/data/local/tmp/modev_config_{packageName}.json
+     * 格式:与 SharedPreferences override_{pkg} 键值相同(JSON 对象)。
+     */
+    private fun loadConfigFromDisk(): HookSwitch? = runCatching {
+        val file = java.io.File("/data/local/tmp/modev_config_$packageName.json")
+        if (!file.exists()) return null
+        val json = file.readText(Charsets.UTF_8).trim()
+        if (json.isEmpty()) return null
+        val globalJson = parseSwitch(
+            runCatching { file.resolveSibling("modev_config_global.json").readText(Charsets.UTF_8).trim() }
+                .getOrNull()
+        )
+        val override = AppListenOverride.fromJson(Json.gson, json)
+        EffectiveSwitch.resolve(globalJson ?: HookSwitch.DEFAULT, override).also {
+            Log.i(TAG, "V35 兜底:从磁盘加载 $packageName 配置成功")
+        }
+    }.getOrNull()
+
+    companion object {
+        private const val TAG = "HookInstaller"
+    }
 }
+
+/**
+ * V34 审计增强:标记干预型探针,安装时输出日志。
+ * 实现此接口的 Probe 在安装时会被记录到 logcat。
+ */
+interface InterventionProbeMarker

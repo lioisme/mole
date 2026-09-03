@@ -1,11 +1,13 @@
 package com.lioisme.modev.core.model
 
 /**
- * 设备环境监听类别(V31):覆盖 Root 检测干预 / Xposed 检测干预 / 模拟器检测干预 / 检测行为监控四大子域。
+ * 设备环境监听类别(V31;V35 momo 增强扩展至 21 项):
+ * 覆盖 Root 检测干预 / Xposed 检测干预 / 模拟器检测干预 /
+ * 系统属性 Hook / 进程文件过滤 / 检测行为监控六大子域。
  *
  * 默认启用态与 [CategoryTaxonomy] 噪点分级一致:
- * - 干预类(Root/Xposed/Emulator)默认开:使隐藏生效;
- * - 观测类(DETECT_ROOT/DETECT_EMULATOR)默认关:检测行为监控噪声大。
+ * - 干预类(Root/Xposed/Emulator/SysProp/Proc)默认关(安全优先,需显式启用);
+ * - 观测类(DETECT_ROOT/DETECT_EMULATOR)默认关(检测行为监控噪声大)。
  */
 enum class DeviceEnvKind {
     // ---- Root 检测干预(干预类) ----
@@ -46,6 +48,32 @@ enum class DeviceEnvKind {
 
     /** 模拟器网络/MAC/IMEI 伪造。 */
     EMULATOR_NETWORK,
+
+    /** 模拟器电话信息伪造(IMEI/DeviceId/SubscriberId)。 */
+    EMULATOR_TELEPHONY,
+
+    /** 模拟器CPU信息伪造(核心数/频率/proc/cpuinfo)。 */
+    EMULATOR_CPU,
+
+    /** 模拟器电池信息伪造(电量/状态)。 */
+    EMULATOR_BATTERY,
+
+    // ---- 系统属性 / 进程文件检测干预(V35 momo 增强) ----
+
+    /** android.os.SystemProperties.get() 拦截(ro.debuggable/ro.build.tags 等)。 */
+    SYSTEM_PROPERTIES,
+
+    /** /proc/self/status 行过滤(TracerPid/Frida 检测)。 */
+    PROC_STATUS,
+
+    /** /proc/self/mountinfo 行过滤(Magisk overlay mounts)。 */
+    PROC_MOUNT_INFO,
+
+    /** /proc/self/cgroup 行过滤(Magisk hidden processes)。 */
+    PROC_CGROUP,
+
+    /** /proc/net/tcp 行过滤(Frida 端口隐藏)。 */
+    PROC_NET,
 
     // ---- 检测行为监控(观测类,默认关) ----
 

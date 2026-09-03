@@ -25,8 +25,17 @@ enum class RecordType(val wire: String) {
     /** 网络环境监听记录(SSL 绕过/代理隐藏/VPN 隐藏/请求监控,V30 一等公民)。 */
     NETWORK(RecordTypes.NETWORK),
 
-    /** 设备环境监听记录(Root 隐藏/Xposed 隐藏/模拟器隐藏/检测监控,V31 一等公民)。 */
-    DEVICE_ENV(RecordTypes.DEVICE_ENV);
+    /** 设备环境监听记录(干预型:Root/Xposed/模拟器隐藏 + 观测型:检测监控,V31 一等公民)。 */
+    DEVICE_ENV(RecordTypes.DEVICE_ENV),
+
+    /** UI 交互监听记录(弹窗/控件文本/Activity 跳转,V33 一等公民)。 */
+    UI_INTERACTION(RecordTypes.UI_INTERACTION),
+
+    /** 系统信息监听记录(Logcat/App 元数据/签名,V33 一等公民)。 */
+    SYSTEM(RecordTypes.SYSTEM),
+
+    /** 进程控制监听记录(退出拦截/崩溃防止/录屏绕过,V33 一等公民)。 */
+    PROCESS_CONTROL(RecordTypes.PROCESS_CONTROL);
 
     companion object {
         fun fromWire(value: String?): RecordType? = entries.firstOrNull { it.wire == value }

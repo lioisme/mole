@@ -90,6 +90,33 @@ enum class DeviceEnvOperation(
     /** Build.MANUFACTURER 替换。 */
     BUILD_MANUFACTURER(DeviceEnvKind.EMULATOR_BUILD),
 
+    /** Build.DEVICE 替换。 */
+    BUILD_DEVICE(DeviceEnvKind.EMULATOR_BUILD),
+
+    /** Build.BOARD 替换。 */
+    BUILD_BOARD(DeviceEnvKind.EMULATOR_BUILD),
+
+    /** Build.HARDWARE 替换。 */
+    BUILD_HARDWARE(DeviceEnvKind.EMULATOR_BUILD),
+
+    /** Build.BRAND 替换。 */
+    BUILD_BRAND(DeviceEnvKind.EMULATOR_BUILD),
+
+    /** Build.HOST 替换。 */
+    BUILD_HOST(DeviceEnvKind.EMULATOR_BUILD),
+
+    /** Build.USER 替换。 */
+    BUILD_USER(DeviceEnvKind.EMULATOR_BUILD),
+
+    /** Build.DISPLAY 替换。 */
+    BUILD_DISPLAY(DeviceEnvKind.EMULATOR_BUILD),
+
+    /** Build.SERIAL 替换。 */
+    BUILD_SERIAL(DeviceEnvKind.EMULATOR_BUILD),
+
+    /** Build.TYPE 替换。 */
+    BUILD_TYPE(DeviceEnvKind.EMULATOR_BUILD),
+
     // ---- 模拟器文件 ----
 
     /** /dev/qemu_pipe 存在性拦截。 */
@@ -122,6 +149,81 @@ enum class DeviceEnvOperation(
 
     /** Settings.Secure.ANDROID_ID 拦截。 */
     ANDROID_ID(DeviceEnvKind.EMULATOR_NETWORK),
+
+    // ---- 模拟器电话信息 ----
+
+    /** TelephonyManager.getDeviceId 拦截。 */
+    PHONE_DEVICE_ID(DeviceEnvKind.EMULATOR_TELEPHONY),
+
+    /** TelephonyManager.getImei 拦截(双卡)。 */
+    PHONE_IMEI(DeviceEnvKind.EMULATOR_TELEPHONY),
+
+    /** TelephonyManager.getSubscriberId 拦截(IMSI)。 */
+    PHONE_SUBSCRIBER_ID(DeviceEnvKind.EMULATOR_TELEPHONY),
+
+    /** TelephonyManager.getSimSerialNumber 拦截。 */
+    PHONE_SIM_SERIAL(DeviceEnvKind.EMULATOR_TELEPHONY),
+
+    /** TelephonyManager.getLine1Number 拦截。 */
+    PHONE_LINE1_NUMBER(DeviceEnvKind.EMULATOR_TELEPHONY),
+
+    // ---- 模拟器CPU信息 ----
+
+    /** Runtime.availableProcessors 拦截。 */
+    CPU_AVAILABLE_PROCESSORS(DeviceEnvKind.EMULATOR_CPU),
+
+    /** /proc/cpuinfo 读取拦截。 */
+    CPU_PROC_INFO(DeviceEnvKind.EMULATOR_CPU),
+
+    /** os.sysconf 读取拦截。 */
+    CPU_SYSCONF(DeviceEnvKind.EMULATOR_CPU),
+
+    // ---- 模拟器电池信息 ----
+
+    /** BatteryManager.getIntProperty 拦截。 */
+    BATTERY_INT_PROPERTY(DeviceEnvKind.EMULATOR_BATTERY),
+
+    /** BatteryManager.isCharging 拦截。 */
+    BATTERY_IS_CHARGING(DeviceEnvKind.EMULATOR_BATTERY),
+
+    /** Intent.ACTION_BATTERY_CHANGED 拦截。 */
+    BATTERY_CHANGED(DeviceEnvKind.EMULATOR_BATTERY),
+
+    // ---- 系统属性(V35) ----
+
+    /** android.os.SystemProperties.get 读取拦截(ro.debuggable 等)。 */
+    SYS_PROP_GET(DeviceEnvKind.SYSTEM_PROPERTIES),
+
+    // ---- /proc/self/status (V35) ----
+
+    /** /proc/self/status 行读取过滤(TracerPid)。 */
+    PROC_STATUS_READ(DeviceEnvKind.PROC_STATUS),
+
+    // ---- /proc/self/mountinfo (V35) ----
+
+    /** /proc/self/mountinfo 行读取过滤(Magisk overlay)。 */
+    PROC_MOUNT_READ(DeviceEnvKind.PROC_MOUNT_INFO),
+
+    // ---- /proc/self/cgroup (V35) ----
+
+    /** /proc/self/cgroup 行读取过滤(Magisk cgroup)。 */
+    PROC_CGROUP_READ(DeviceEnvKind.PROC_CGROUP),
+
+    // ---- /proc/net/tcp (V35) ----
+
+    /** /proc/net/tcp 行读取过滤(Frida 端口)。 */
+    PROC_NET_READ(DeviceEnvKind.PROC_NET),
+
+    // ---- Settings Global (V35) ----
+
+    /** Settings.Global get 读取拦截(ADB/开发者选项)。 */
+    SETTINGS_GLOBAL_GET(DeviceEnvKind.ROOT_PROPERTY),
+
+    /** Settings.Secure get 读取拦截(OEM unlock)。 */
+    SETTINGS_SECURE_GET(DeviceEnvKind.ROOT_PROPERTY),
+
+    /** ContentResolver.query Settings 过滤。 */
+    CONTENT_QUERY_SETTINGS(DeviceEnvKind.ROOT_PROPERTY),
 
     // ---- 检测行为监控 ----
 

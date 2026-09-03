@@ -91,9 +91,30 @@ class CategoryTaxonomyTest {
     fun `device_env_categories_match_defaults`() {
         // V33:所有 DeviceEnv 干预类 defaultEnabled 改为 false(安全优先,与 HookSwitch.DEFAULT 对齐)
         val off = CategoryTaxonomy.forType(RecordType.DEVICE_ENV).filter { !it.defaultEnabled }.map { it.id }.toSet()
-        assertEquals(13, off.size)
+        assertEquals(21, off.size)
         val on = CategoryTaxonomy.forType(RecordType.DEVICE_ENV).filter { it.defaultEnabled }.map { it.id }.toSet()
         assertEquals(0, on.size)
+    }
+
+    @Test
+    fun `network_intervention_categories_match_hookswitch_defaults`() {
+        // V34 审计:干预类(SSL/代理/VPN) defaultEnabled 应为 false,与 HookSwitch 一致
+        val off = CategoryTaxonomy.forType(RecordType.NETWORK).filter { !it.defaultEnabled }.map { it.id }.toSet()
+        assertEquals(
+            setOf(
+                NetworkKind.SSL_CONTEXT.name, NetworkKind.SSL_TRUST_MANAGER.name,
+                NetworkKind.SSL_OKHTTP_PINNER.name, NetworkKind.SSL_OKHTTP_VERIFIER.name,
+                NetworkKind.SSL_WEBVIEW.name, NetworkKind.SSL_NETWORK_CONFIG.name,
+                NetworkKind.PROXY_SYSTEM_PROP.name, NetworkKind.PROXY_CONNECTIVITY.name,
+                NetworkKind.PROXY_SETTINGS.name, NetworkKind.PROXY_OKHTTP.name,
+                NetworkKind.VPN_CAPABILITIES.name, NetworkKind.VPN_INTERFACE.name,
+                NetworkKind.VPN_NETWORK_INFO.name, NetworkKind.VPN_LINK_PROPERTIES.name,
+            ),
+            off,
+        )
+        // 观测类(REQUEST) defaultEnabled 应为 true
+        val on = CategoryTaxonomy.forType(RecordType.NETWORK).filter { it.defaultEnabled }.map { it.id }.toSet()
+        assertEquals(setOf(NetworkKind.REQUEST.name), on)
     }
 
     @Test
@@ -109,5 +130,35 @@ class CategoryTaxonomyTest {
             CategoryTaxonomy.forType(RecordType.CRYPTO).filter { it.defaultEnabled }.map { it.id }.toSet(),
             CategoryTaxonomy.defaultEnabledIds(RecordType.CRYPTO),
         )
+    }
+
+    @Test
+    fun `all CategoryTaxonomy entries have valid enum kind ids`() {
+        for (recordType in RecordType.entries) {
+            val categories = CategoryTaxonomy.forType(recordType)
+            assert(categories.isNotEmpty()) { "CategoryTaxonomy has no entries for $recordType" }
+            for (category in categories) {
+                val validId = when (recordType) {
+                    RecordType.CRYPTO -> CryptoKind.entries.any { it.name == category.id }
+                    RecordType.DATABASE -> SqlKind.entries.any { it.name == category.id }
+                    RecordType.BEHAVIOR -> BehaviorKind.entries.any { it.name == category.id }
+                    RecordType.PREFS -> PrefsKind.entries.any { it.name == category.id }
+                    RecordType.WEBVIEW -> WebViewKind.entries.any { it.name == category.id }
+                    RecordType.NETWORK -> NetworkKind.entries.any { it.name == category.id }
+                    RecordType.DEVICE_ENV -> DeviceEnvKind.entries.any { it.name == category.id }
+                    RecordType.UI_INTERACTION -> UiInteractionKind.entries.any { it.name == category.id }
+                    RecordType.SYSTEM -> SystemKind.entries.any { it.name == category.id }
+                    RecordType.PROCESS_CONTROL -> ProcessKind.entries.any { it.name == category.id }
+                }
+                assert(validId) {
+                    "CategoryTaxonomy entry '${category.id}' for $recordType has no matching enum value"
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `DeviceEnv taxonomy has 21 entries`() {
+        assertEquals(21, CategoryTaxonomy.forType(RecordType.DEVICE_ENV).size)
     }
 }

@@ -58,7 +58,19 @@ import com.lioisme.modev.data.mapping.WebViewDetail
 import com.lioisme.modev.data.mapping.NetworkDetail
 import com.lioisme.modev.core.model.NetworkRecord
 import com.lioisme.modev.data.mapping.DeviceEnvDetail
+import com.lioisme.modev.data.mapping.UiInteractionDetail
+import com.lioisme.modev.data.mapping.SystemDetail
+import com.lioisme.modev.data.mapping.ProcessDetail
+import com.lioisme.modev.ui.components.uiInteractionKindLabelRes
+import com.lioisme.modev.ui.components.uiInteractionOperationLabelRes
+import com.lioisme.modev.ui.components.systemKindLabelRes
+import com.lioisme.modev.ui.components.systemOperationLabelRes
+import com.lioisme.modev.ui.components.processKindLabelRes
+import com.lioisme.modev.ui.components.processOperationLabelRes
 import com.lioisme.modev.core.model.DeviceEnvRecord
+import com.lioisme.modev.core.model.UiInteractionRecord
+import com.lioisme.modev.core.model.SystemRecord
+import com.lioisme.modev.core.model.ProcessRecord
 import com.lioisme.modev.ui.components.networkKindLabelRes
 import com.lioisme.modev.ui.components.networkOperationLabelRes
 import com.lioisme.modev.ui.components.deviceEnvKindLabelRes
@@ -188,6 +200,9 @@ fun RecordDetailScreen(
                 is WebViewDetail -> estimateWebViewJsonChars(current.record).toLong()
                 is NetworkDetail -> 0L
                 is DeviceEnvDetail -> 0L
+                is UiInteractionDetail -> 0L
+                is SystemDetail -> 0L
+                is ProcessDetail -> 0L
             }
         if (estimatedChars > EXPORT_MAX_CHARS) {
             showSnack(context.getString(R.string.export_too_large, estimatedChars))
@@ -203,8 +218,11 @@ fun RecordDetailScreen(
                             is BehaviorDetail -> current.record.toJson()
                             is PrefsDetail -> current.record.toJson()
                             is WebViewDetail -> current.record.toJson()
-                            is NetworkDetail -> "{}" // TODO: implement network toJson
-                            is DeviceEnvDetail -> "{}" // TODO: implement device env toJson
+                            is NetworkDetail -> current.record.toJson()
+                            is DeviceEnvDetail -> current.record.toJson()
+                            is UiInteractionDetail -> current.record.toJson()
+                            is SystemDetail -> current.record.toJson()
+                            is ProcessDetail -> current.record.toJson()
                         }
                     }
                 }
@@ -322,6 +340,9 @@ private fun LoadedContent(
         is WebViewDetail -> WebViewLoadedContent(record.record, innerPadding, listState, actions)
         is NetworkDetail -> NetworkLoadedContent(record.record, innerPadding, listState, actions)
         is DeviceEnvDetail -> DeviceEnvLoadedContent(record.record, innerPadding, listState, actions)
+        is UiInteractionDetail -> UiInteractionLoadedContent(record.record, innerPadding, listState, actions)
+        is SystemDetail -> SystemLoadedContent(record.record, innerPadding, listState, actions)
+        is ProcessDetail -> ProcessLoadedContent(record.record, innerPadding, listState, actions)
     }
 }
 
@@ -1267,6 +1288,178 @@ private fun DeviceEnvLoadedContent(
         book.cursor = 0
         book.advance(identityItem(identityMarkdown))
         book.advance(tocSectionItems(tocList, onAnchorClick = { book.scrollTo(it, scrollScope) }))
+        book.mark("meta")
+        book.advance(metaTableItems("meta", metaTable))
+        stackDoc?.let { doc ->
+            book.mark("stack")
+            book.advance(markdownSectionItems("stack", doc, actions))
+        }
+        item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun UiInteractionLoadedContent(
+    record: UiInteractionRecord,
+    innerPadding: PaddingValues,
+    listState: LazyListState,
+    actions: DetailCodeActions,
+) {
+    val res = LocalContext.current.resources
+    val metaEntries = listOfNotNull(
+        Pair(stringResource(R.string.meta_kind), stringResource(uiInteractionKindLabelRes(record.kind))),
+        Pair(stringResource(R.string.meta_operation), stringResource(uiInteractionOperationLabelRes(record.operation))),
+        record.dialogTitle?.let { Pair("Title", it) },
+        record.dialogMessage?.let { Pair("Message", it) },
+        record.dialogKeywords?.let { Pair("Keywords", it.joinToString(", ")) },
+        record.dialogIntercepted?.let { Pair("Intercepted", it.toString()) },
+        record.widgetText?.let { Pair("Widget Text", it) },
+        record.widgetClassName?.let { Pair("Widget Class", it) },
+        record.activityName?.let { Pair("Activity", it) },
+        record.intentAction?.let { Pair("Intent Action", it) },
+        record.intentData?.let { Pair("Intent Data", it) },
+        Pair(stringResource(R.string.meta_thread), record.threadName),
+        timestampEntry(record.timestamp),
+    )
+    val metaTitle = stringResource(R.string.section_metadata)
+    val metaTable = metaSectionDoc(metaTitle, metaEntries)
+    val accent = accentLine(
+        stringResource(uiInteractionKindLabelRes(record.kind)),
+        stringResource(uiInteractionOperationLabelRes(record.operation)),
+    )
+    val identityMarkdown = identityDoc(
+        headline = stringResource(uiInteractionKindLabelRes(record.kind)),
+        accentLine = accent,
+    )
+    val stackTitle = stringResource(R.string.section_stack)
+    val stackDoc = if (record.stack.isEmpty()) null else {
+        val frames = record.stack.take(STACK_MAX_FRAMES)
+        val omittedFrames = record.stack.size - STACK_MAX_FRAMES
+        val trailer = if (omittedFrames > 0) listOf(res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames)) else emptyList()
+        textSectionDoc(stackTitle, frames.joinToString("\n"), trailerLines = trailer)
+    }
+    val book = remember(record.id) { AnchorBookkeeping(listState) }
+    val scrollScope = rememberCoroutineScope()
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize().padding(innerPadding),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+    ) {
+        book.cursor = 0
+        book.advance(identityItem(identityMarkdown))
+        book.mark("meta")
+        book.advance(metaTableItems("meta", metaTable))
+        stackDoc?.let { doc ->
+            book.mark("stack")
+            book.advance(markdownSectionItems("stack", doc, actions))
+        }
+        item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun SystemLoadedContent(
+    record: SystemRecord,
+    innerPadding: PaddingValues,
+    listState: LazyListState,
+    actions: DetailCodeActions,
+) {
+    val res = LocalContext.current.resources
+    val metaEntries = listOfNotNull(
+        Pair(stringResource(R.string.meta_kind), stringResource(systemKindLabelRes(record.kind))),
+        Pair(stringResource(R.string.meta_operation), stringResource(systemOperationLabelRes(record.operation))),
+        record.logcatTag?.let { Pair("Logcat Tag", it) },
+        record.logcatLevel?.let { Pair("Logcat Level", it) },
+        record.logcatMessage?.let { Pair("Logcat Message", it) },
+        record.appVersion?.let { Pair("App Version", it) },
+        record.appVersionCode?.let { Pair("Version Code", it.toString()) },
+        record.signatureHash?.let { Pair("Signature Hash", it) },
+        Pair(stringResource(R.string.meta_thread), record.threadName),
+        timestampEntry(record.timestamp),
+    )
+    val metaTitle = stringResource(R.string.section_metadata)
+    val metaTable = metaSectionDoc(metaTitle, metaEntries)
+    val accent = accentLine(
+        stringResource(systemKindLabelRes(record.kind)),
+        stringResource(systemOperationLabelRes(record.operation)),
+    )
+    val identityMarkdown = identityDoc(
+        headline = stringResource(systemKindLabelRes(record.kind)),
+        accentLine = accent,
+    )
+    val stackTitle = stringResource(R.string.section_stack)
+    val stackDoc = if (record.stack.isEmpty()) null else {
+        val frames = record.stack.take(STACK_MAX_FRAMES)
+        val omittedFrames = record.stack.size - STACK_MAX_FRAMES
+        val trailer = if (omittedFrames > 0) listOf(res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames)) else emptyList()
+        textSectionDoc(stackTitle, frames.joinToString("\n"), trailerLines = trailer)
+    }
+    val book = remember(record.id) { AnchorBookkeeping(listState) }
+    val scrollScope = rememberCoroutineScope()
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize().padding(innerPadding),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+    ) {
+        book.cursor = 0
+        book.advance(identityItem(identityMarkdown))
+        book.mark("meta")
+        book.advance(metaTableItems("meta", metaTable))
+        stackDoc?.let { doc ->
+            book.mark("stack")
+            book.advance(markdownSectionItems("stack", doc, actions))
+        }
+        item(key = "bottom-spacer") { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+@Composable
+private fun ProcessLoadedContent(
+    record: ProcessRecord,
+    innerPadding: PaddingValues,
+    listState: LazyListState,
+    actions: DetailCodeActions,
+) {
+    val res = LocalContext.current.resources
+    val metaEntries = listOfNotNull(
+        Pair(stringResource(R.string.meta_kind), stringResource(processKindLabelRes(record.kind))),
+        Pair(stringResource(R.string.meta_operation), stringResource(processOperationLabelRes(record.operation))),
+        record.exitCode?.let { Pair("Exit Code", it.toString()) },
+        record.processPid?.let { Pair("PID", it.toString()) },
+        record.crashType?.let { Pair("Crash Type", it) },
+        record.crashMessage?.let { Pair("Crash Message", it) },
+        record.interventionAction?.let { Pair("Intervention", it) },
+        record.crashBlocked?.let { Pair("Crash Blocked (legacy)", it.toString()) },
+        record.screenRecordBlocked?.let { Pair("Screen Record Blocked (legacy)", it.toString()) },
+        Pair(stringResource(R.string.meta_thread), record.threadName),
+        timestampEntry(record.timestamp),
+    )
+    val metaTitle = stringResource(R.string.section_metadata)
+    val metaTable = metaSectionDoc(metaTitle, metaEntries)
+    val accent = accentLine(
+        stringResource(processKindLabelRes(record.kind)),
+        stringResource(processOperationLabelRes(record.operation)),
+    )
+    val identityMarkdown = identityDoc(
+        headline = stringResource(processKindLabelRes(record.kind)),
+        accentLine = accent,
+    )
+    val stackTitle = stringResource(R.string.section_stack)
+    val stackDoc = if (record.stack.isEmpty()) null else {
+        val frames = record.stack.take(STACK_MAX_FRAMES)
+        val omittedFrames = record.stack.size - STACK_MAX_FRAMES
+        val trailer = if (omittedFrames > 0) listOf(res.getQuantityString(R.plurals.stack_more, omittedFrames, omittedFrames)) else emptyList()
+        textSectionDoc(stackTitle, frames.joinToString("\n"), trailerLines = trailer)
+    }
+    val book = remember(record.id) { AnchorBookkeeping(listState) }
+    val scrollScope = rememberCoroutineScope()
+    LazyColumn(
+        state = listState,
+        modifier = Modifier.fillMaxSize().padding(innerPadding),
+        contentPadding = PaddingValues(horizontal = 16.dp),
+    ) {
+        book.cursor = 0
+        book.advance(identityItem(identityMarkdown))
         book.mark("meta")
         book.advance(metaTableItems("meta", metaTable))
         stackDoc?.let { doc ->

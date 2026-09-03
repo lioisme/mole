@@ -1,0 +1,656 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 13,
+    "identityHash": "5b0632865d00babd0d739369c937bdc4",
+    "entities": [
+      {
+        "tableName": "crypto_records",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `recordType` TEXT NOT NULL, `packageName` TEXT NOT NULL, `kind` TEXT NOT NULL, `operation` TEXT NOT NULL, `algorithm` TEXT NOT NULL, `provider` TEXT, `direction` INTEGER, `keyHex` TEXT, `keyB64` TEXT, `keyText` TEXT, `keyLength` INTEGER, `keyTruncated` INTEGER NOT NULL, `ivHex` TEXT, `ivB64` TEXT, `ivText` TEXT, `ivLength` INTEGER, `ivTruncated` INTEGER NOT NULL, `keyAlias` TEXT, `keyExportable` INTEGER NOT NULL, `inputHex` TEXT, `inputB64` TEXT, `inputText` TEXT, `inputLength` INTEGER, `inputTruncated` INTEGER NOT NULL, `outputHex` TEXT, `outputB64` TEXT, `outputText` TEXT, `outputLength` INTEGER, `outputTruncated` INTEGER NOT NULL, `saltHex` TEXT, `saltB64` TEXT, `saltText` TEXT, `saltLength` INTEGER, `saltTruncated` INTEGER NOT NULL, `aadHex` TEXT, `aadB64` TEXT, `aadText` TEXT, `aadLength` INTEGER, `aadTruncated` INTEGER NOT NULL, `publicKeyHex` TEXT, `publicKeyB64` TEXT, `publicKeyText` TEXT, `publicKeyLength` INTEGER, `publicKeyTruncated` INTEGER NOT NULL, `paramsJson` TEXT, `verifyResult` INTEGER, `processName` TEXT, `sql` TEXT, `dbPath` TEXT, `bindArgsJson` TEXT, `rowsJson` TEXT, `rowCount` INTEGER, `affectedCount` INTEGER, `rowId` INTEGER, `resultText` TEXT, `path` TEXT, `destPath` TEXT, `command` TEXT, `fileSize` INTEGER, `contentHex` TEXT, `contentB64` TEXT, `contentText` TEXT, `contentLength` INTEGER, `contentTruncated` INTEGER NOT NULL, `prefKey` TEXT, `url` TEXT, `method` TEXT, `statusCode` INTEGER, `requestHeadersJson` TEXT, `responseHeadersJson` TEXT, `sslProtocol` TEXT, `cipherSuite` TEXT, `peerCertificatesJson` TEXT, `proxyHost` TEXT, `proxyPort` INTEGER, `vpnActive` INTEGER, `dialogTitle` TEXT, `dialogMessage` TEXT, `dialogKeywords` TEXT, `dialogIntercepted` INTEGER, `widgetText` TEXT, `widgetClassName` TEXT, `activityName` TEXT, `intentAction` TEXT, `intentData` TEXT, `intentExtrasJson` TEXT, `intentFlags` INTEGER, `logcatTag` TEXT, `logcatLevel` TEXT, `logcatMessage` TEXT, `appVersion` TEXT, `appVersionCode` INTEGER, `appMinSdk` INTEGER, `appTargetSdk` INTEGER, `appPermissions` TEXT, `signatureHash` TEXT, `signatureBase64` TEXT, `exitCode` INTEGER, `processPid` INTEGER, `crashType` TEXT, `crashMessage` TEXT, `crashBlocked` INTEGER, `screenRecordBlocked` INTEGER, `interventionAction` TEXT, `contextId` INTEGER NOT NULL, `threadName` TEXT NOT NULL, `stack` TEXT, `timestamp` INTEGER NOT NULL, `seq` INTEGER)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "recordType",
+            "columnName": "recordType",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "packageName",
+            "columnName": "packageName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "kind",
+            "columnName": "kind",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operation",
+            "columnName": "operation",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "algorithm",
+            "columnName": "algorithm",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "direction",
+            "columnName": "direction",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "keyHex",
+            "columnName": "keyHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "keyB64",
+            "columnName": "keyB64",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "keyText",
+            "columnName": "keyText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "keyLength",
+            "columnName": "keyLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "keyTruncated",
+            "columnName": "keyTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "ivHex",
+            "columnName": "ivHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "ivB64",
+            "columnName": "ivB64",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "ivText",
+            "columnName": "ivText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "ivLength",
+            "columnName": "ivLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "ivTruncated",
+            "columnName": "ivTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "keyAlias",
+            "columnName": "keyAlias",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "keyExportable",
+            "columnName": "keyExportable",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "inputHex",
+            "columnName": "inputHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "inputB64",
+            "columnName": "inputB64",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "inputText",
+            "columnName": "inputText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "inputLength",
+            "columnName": "inputLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "inputTruncated",
+            "columnName": "inputTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "outputHex",
+            "columnName": "outputHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "outputB64",
+            "columnName": "outputB64",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "outputText",
+            "columnName": "outputText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "outputLength",
+            "columnName": "outputLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "outputTruncated",
+            "columnName": "outputTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "saltHex",
+            "columnName": "saltHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "saltB64",
+            "columnName": "saltB64",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "saltText",
+            "columnName": "saltText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "saltLength",
+            "columnName": "saltLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "saltTruncated",
+            "columnName": "saltTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "aadHex",
+            "columnName": "aadHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "aadB64",
+            "columnName": "aadB64",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "aadText",
+            "columnName": "aadText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "aadLength",
+            "columnName": "aadLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "aadTruncated",
+            "columnName": "aadTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "publicKeyHex",
+            "columnName": "publicKeyHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "publicKeyB64",
+            "columnName": "publicKeyB64",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "publicKeyText",
+            "columnName": "publicKeyText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "publicKeyLength",
+            "columnName": "publicKeyLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "publicKeyTruncated",
+            "columnName": "publicKeyTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "paramsJson",
+            "columnName": "paramsJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "verifyResult",
+            "columnName": "verifyResult",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "processName",
+            "columnName": "processName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sql",
+            "columnName": "sql",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "dbPath",
+            "columnName": "dbPath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "bindArgsJson",
+            "columnName": "bindArgsJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "rowsJson",
+            "columnName": "rowsJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "rowCount",
+            "columnName": "rowCount",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "affectedCount",
+            "columnName": "affectedCount",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "rowId",
+            "columnName": "rowId",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "resultText",
+            "columnName": "resultText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "path",
+            "columnName": "path",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "destPath",
+            "columnName": "destPath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "command",
+            "columnName": "command",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "fileSize",
+            "columnName": "fileSize",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "contentHex",
+            "columnName": "contentHex",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "contentB64",
+            "columnName": "contentB64",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "contentText",
+            "columnName": "contentText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "contentLength",
+            "columnName": "contentLength",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "contentTruncated",
+            "columnName": "contentTruncated",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "prefKey",
+            "columnName": "prefKey",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "url",
+            "columnName": "url",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "httpMethod",
+            "columnName": "method",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "statusCode",
+            "columnName": "statusCode",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "requestHeadersJson",
+            "columnName": "requestHeadersJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "responseHeadersJson",
+            "columnName": "responseHeadersJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "sslProtocol",
+            "columnName": "sslProtocol",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "cipherSuite",
+            "columnName": "cipherSuite",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "peerCertificatesJson",
+            "columnName": "peerCertificatesJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "proxyHost",
+            "columnName": "proxyHost",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "proxyPort",
+            "columnName": "proxyPort",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "vpnActive",
+            "columnName": "vpnActive",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "dialogTitle",
+            "columnName": "dialogTitle",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "dialogMessage",
+            "columnName": "dialogMessage",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "dialogKeywords",
+            "columnName": "dialogKeywords",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "dialogIntercepted",
+            "columnName": "dialogIntercepted",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "widgetText",
+            "columnName": "widgetText",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "widgetClassName",
+            "columnName": "widgetClassName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "activityName",
+            "columnName": "activityName",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "intentAction",
+            "columnName": "intentAction",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "intentData",
+            "columnName": "intentData",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "intentExtrasJson",
+            "columnName": "intentExtrasJson",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "intentFlags",
+            "columnName": "intentFlags",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "logcatTag",
+            "columnName": "logcatTag",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "logcatLevel",
+            "columnName": "logcatLevel",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "logcatMessage",
+            "columnName": "logcatMessage",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "appVersion",
+            "columnName": "appVersion",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "appVersionCode",
+            "columnName": "appVersionCode",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "appMinSdk",
+            "columnName": "appMinSdk",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "appTargetSdk",
+            "columnName": "appTargetSdk",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "appPermissions",
+            "columnName": "appPermissions",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "signatureHash",
+            "columnName": "signatureHash",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "signatureBase64",
+            "columnName": "signatureBase64",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "exitCode",
+            "columnName": "exitCode",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "processPid",
+            "columnName": "processPid",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "crashType",
+            "columnName": "crashType",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "crashMessage",
+            "columnName": "crashMessage",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "crashBlocked",
+            "columnName": "crashBlocked",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "screenRecordBlocked",
+            "columnName": "screenRecordBlocked",
+            "affinity": "INTEGER"
+          },
+          {
+            "fieldPath": "interventionAction",
+            "columnName": "interventionAction",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "contextId",
+            "columnName": "contextId",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "threadName",
+            "columnName": "threadName",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "stackJson",
+            "columnName": "stack",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "timestamp",
+            "columnName": "timestamp",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "seq",
+            "columnName": "seq",
+            "affinity": "INTEGER"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_crypto_records_packageName_timestamp",
+            "unique": false,
+            "columnNames": [
+              "packageName",
+              "timestamp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_crypto_records_packageName_timestamp` ON `${TABLE_NAME}` (`packageName`, `timestamp`)"
+          },
+          {
+            "name": "index_crypto_records_packageName_kind",
+            "unique": false,
+            "columnNames": [
+              "packageName",
+              "kind"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_crypto_records_packageName_kind` ON `${TABLE_NAME}` (`packageName`, `kind`)"
+          },
+          {
+            "name": "index_crypto_records_recordType_kind",
+            "unique": false,
+            "columnNames": [
+              "recordType",
+              "kind"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_crypto_records_recordType_kind` ON `${TABLE_NAME}` (`recordType`, `kind`)"
+          },
+          {
+            "name": "index_crypto_records_recordType_packageName_timestamp",
+            "unique": false,
+            "columnNames": [
+              "recordType",
+              "packageName",
+              "timestamp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_crypto_records_recordType_packageName_timestamp` ON `${TABLE_NAME}` (`recordType`, `packageName`, `timestamp`)"
+          },
+          {
+            "name": "index_crypto_records_timestamp",
+            "unique": false,
+            "columnNames": [
+              "timestamp"
+            ],
+            "orders": [],
+            "createSql": "CREATE INDEX IF NOT EXISTS `index_crypto_records_timestamp` ON `${TABLE_NAME}` (`timestamp`)"
+          },
+          {
+            "name": "index_crypto_records_packageName_processName_seq",
+            "unique": true,
+            "columnNames": [
+              "packageName",
+              "processName",
+              "seq"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_crypto_records_packageName_processName_seq` ON `${TABLE_NAME}` (`packageName`, `processName`, `seq`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '5b0632865d00babd0d739369c937bdc4')"
+    ]
+  }
+}
