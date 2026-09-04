@@ -25,6 +25,37 @@ class XposedClassHooker(
     override fun install() {
         hookLoadClass()
         hookFindClass()
+        hookForName()
+    }
+
+    /**
+     * D-12b:ART 的 Class.forName 走原生解析可绕过 Java 层 loadClass 钩子,
+     * 检测框架首选 forName → 必须直接钩 java.lang.Class 静态方法(记录探测尝试;
+     * 类本不存在时自然 CNFE,存在时由 loadClass/findClass 钩子拦截)。
+     */
+    private fun hookForName() {
+        val clazz = runCatching { Class.forName("java.lang.Class") }.getOrNull() ?: return
+        val overloads = listOf<Array<Class<*>>>(
+            arrayOf(String::class.java),
+            arrayOf(String::class.java, Boolean::class.javaPrimitiveType!!, ClassLoader::class.java),
+        )
+        for (types in overloads) {
+            val method = runCatching { clazz.getMethod("forName", *types) }.getOrNull() ?: continue
+            engine.hook(method, object : MethodHook() {
+                override fun before(invocation: Invocation) {
+                    if (!config().xposedClass) return
+                    val name = invocation.getArg(0) as? String ?: return
+                    if (!isXposedClassName(name)) return
+                    emit(
+                        kind = DeviceEnvKind.XPOSED_CLASS,
+                        operation = DeviceEnvOperation.CLASS_FOR_NAME,
+                        originalValue = name,
+                        targetClass = name,
+                        interventionAction = ACTION_DETECTED,
+                    )
+                }
+            })
+        }
     }
 
     private fun hookLoadClass() {
@@ -37,6 +68,14 @@ class XposedClassHooker(
                 if (loadingGuard.get() == true) return
                 val name = invocation.getArg(0) as? String ?: return
                 if (isXposedClassName(name)) {
+                    // D-12 修复:记录必须先于抛出(after() 在异常路径永不执行)
+                    emit(
+                        kind = DeviceEnvKind.XPOSED_CLASS,
+                        operation = DeviceEnvOperation.LOAD_CLASS,
+                        originalValue = name,
+                        targetClass = name,
+                        interventionAction = ACTION_BLOCKED,
+                    )
                     loadingGuard.set(true)
                     try {
                         throw ClassNotFoundException(
@@ -46,20 +85,6 @@ class XposedClassHooker(
                     } finally {
                         loadingGuard.remove()
                     }
-                }
-            }
-
-            override fun after(invocation: Invocation) {
-                if (!config().xposedClass) return
-                val name = invocation.getArg(0) as? String ?: return
-                if (isXposedClassName(name)) {
-                    emit(
-                        kind = DeviceEnvKind.XPOSED_CLASS,
-                        operation = DeviceEnvOperation.LOAD_CLASS,
-                        originalValue = name,
-                        targetClass = name,
-                        interventionAction = ACTION_BLOCKED,
-                    )
                 }
             }
         })
@@ -76,6 +101,14 @@ class XposedClassHooker(
                 if (loadingGuard.get() == true) return
                 val name = invocation.getArg(0) as? String ?: return
                 if (isXposedClassName(name)) {
+                    // D-12 修复:记录先于抛出
+                    emit(
+                        kind = DeviceEnvKind.XPOSED_CLASS,
+                        operation = DeviceEnvOperation.FIND_CLASS,
+                        originalValue = name,
+                        targetClass = name,
+                        interventionAction = ACTION_BLOCKED,
+                    )
                     loadingGuard.set(true)
                     try {
                         throw ClassNotFoundException(
@@ -87,20 +120,6 @@ class XposedClassHooker(
                     }
                 }
             }
-
-            override fun after(invocation: Invocation) {
-                if (!config().xposedClass) return
-                val name = invocation.getArg(0) as? String ?: return
-                if (isXposedClassName(name)) {
-                    emit(
-                        kind = DeviceEnvKind.XPOSED_CLASS,
-                        operation = DeviceEnvOperation.FIND_CLASS,
-                        originalValue = name,
-                        targetClass = name,
-                        interventionAction = ACTION_BLOCKED,
-                    )
-                }
-            }
         })
     }
 
@@ -110,6 +129,7 @@ class XposedClassHooker(
 
     companion object {
         private const val ACTION_BLOCKED = "BLOCKED"
+        private const val ACTION_DETECTED = "DETECTED"
 
         private val XPOSED_PREFIXES = listOf(
             "de.robv.android.xposed.",

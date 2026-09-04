@@ -1,4 +1,4 @@
-# 00-env-verify.ps1 - Environment baseline check
+﻿# 00-env-verify.ps1 - Environment baseline check
 param()
 
 $ADB = "D:\leidian\LDPlayer14\adb.exe"

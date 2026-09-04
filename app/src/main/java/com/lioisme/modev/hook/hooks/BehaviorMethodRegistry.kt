@@ -12,11 +12,24 @@ class BehaviorMethodRegistry private constructor(
     clazz: Class<*>,
 ) {
 
-    /** 公开方法全集(含继承;重载按「名称+签名」去重)。 */
-    private val byName: Map<String, List<Method>> =
-        runCatching { clazz.methods }
-            .getOrElse { emptyArray() }
+    /**
+     * 方法全集:public(含继承)∪ 各类自身声明方法(含 protected,如 Activity.onCreate)。
+     * D-13 修复:`clazz.methods` 仅 public,protected 生命周期回调(onCreate/onResume/
+     * onPause/onDestroy)此前从未被枚举 → 对应钩子静默零安装。
+     * 重载按「名称+签名」去重。
+     */
+    private val byName: Map<String, List<Method>> = run {
+        val collected = ArrayList<Method>()
+        runCatching { collected.addAll(clazz.methods) }
+        var c: Class<*>? = clazz
+        while (c != null && c != Any::class.java) {
+            runCatching { collected.addAll(c.declaredMethods) }
+            c = c.superclass
+        }
+        collected
+            .distinctBy { it.name + it.parameterTypes.contentToString() }
             .groupBy { it.name }
+    }
 
     /** 按方法名取全部重载(无匹配返回空列表)。 */
     fun named(name: String): List<Method> = byName[name].orEmpty()

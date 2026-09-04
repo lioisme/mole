@@ -1,4 +1,4 @@
-# check-spool.ps1 — 检查 Modev Spool 文件状态
+﻿# check-spool.ps1 — 检查 Modev Spool 文件状态
 # 验证注入侧写入是否正常
 
 param(

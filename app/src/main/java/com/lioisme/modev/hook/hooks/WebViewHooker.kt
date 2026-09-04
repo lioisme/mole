@@ -78,8 +78,9 @@ class WebViewHooker(
             injectProbe(view)
         }
 
-        // WebView 构造器:确保 JS 桥注册
-        hookCtorBefore(f.findCtor("android.webkit.WebView", Context::class.java)) { inv ->
+        // WebView 构造器:确保 JS 桥注册(D-16:改 after —— 构造器 before 阶段
+        // provider 未就绪,addJavascriptInterface 静默失败致页面 JS 永远看不到桥)
+        hookCtorAfter(f.findCtor("android.webkit.WebView", Context::class.java)) { inv ->
             (inv.thisObject as? WebView)?.let(::ensureBridge)
         }
 
@@ -219,11 +220,11 @@ class WebViewHooker(
         })
     }
 
-    private fun hookCtorBefore(ctor: Constructor<*>?, before: (Invocation) -> Unit) {
+    private fun hookCtorAfter(ctor: Constructor<*>?, after: (Invocation) -> Unit) {
         if (ctor == null) return
         engine.hook(ctor, object : MethodHook() {
-            override fun before(invocation: Invocation) {
-                before(invocation)
+            override fun after(invocation: Invocation) {
+                after(invocation)
             }
         })
     }

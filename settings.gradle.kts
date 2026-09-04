@@ -27,3 +27,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Modev"
 include(":app")
+include(":testtarget")

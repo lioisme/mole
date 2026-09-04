@@ -23,10 +23,11 @@ class LibxposedPlatform(private val xposed: XposedInterface) : Platform {
                 .intercept { chain ->
                     val invocation = ModernInvocation(chain, null)
                     hook.before(invocation)
-                    val result = if (invocation.shortCircuited) {
-                        invocation.shortCircuitResult
-                    } else {
-                        chain.proceed()
+                    val overrides = invocation.argOverrides
+                    val result = when {
+                        invocation.shortCircuited -> invocation.shortCircuitResult
+                        overrides != null -> chain.proceed(overrides)
+                        else -> chain.proceed()
                     }
                     hook.after(ModernInvocation(chain, result))
                     result
@@ -74,6 +75,14 @@ class LibxposedPlatform(private val xposed: XposedInterface) : Platform {
             get() = chain.args.size
 
         override fun getArgUnsafe(index: Int): Any? = runCatching { chain.getArg(index) }.getOrNull()
+
+        /** D-11:入参改写缓冲(Chain 无 setArg,经 proceed(Array) 重入生效)。 */
+        var argOverrides: Array<Any?>? = null
+
+        override fun setArg(index: Int, value: Any?) {
+            val args = argOverrides ?: chain.args.toTypedArray().also { argOverrides = it }
+            if (index in args.indices) args[index] = value
+        }
 
         override fun setResult(value: Any?) {
             shortCircuited = true

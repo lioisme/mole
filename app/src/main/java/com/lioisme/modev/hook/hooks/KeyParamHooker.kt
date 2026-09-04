@@ -45,7 +45,9 @@ class KeyParamHooker(
     }
 
     private fun afterConstruct(invocation: Invocation, result: Any?) {
-        val target = result ?: return
+        // D-2 修复:构造器 hook 的 chain.proceed() 返回 void/null,
+        // 新实例经 thisObject 获取(after 阶段 LSPlant 已绑定)
+        val target = result ?: invocation.thisObject ?: return
         val ext = SpecExtractor.extractKeystoreSpec(target) ?: SpecExtractor.extract(target)
         emit(
             operation = CryptoOperation.CONSTRUCT,

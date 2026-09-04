@@ -161,8 +161,8 @@ class HookInstaller(
             }
         }
 
-        // V35 兜底:Vector Xposed 不投递 XposedService,RemotePreferences 中
-        // 可能只有全局配置而无 per-app override;始终尝试从磁盘加载 override。
+        // V36 D-1 修复:磁盘兜底偏差进入通道持久偏差层(localDeviation),
+        // 宿主 TCP 推送仅更新全局层,有效配置恒为「推送全局 ⊕ 磁盘偏差」,不再被覆盖。
         runCatching {
             val file = java.io.File("/data/local/tmp/modev_config_$packageName.json")
             if (file.exists() && file.canRead()) {
@@ -170,9 +170,8 @@ class HookInstaller(
                 if (json.isNotEmpty()) {
                     val override = AppListenOverride.fromJson(Json.gson, json)
                     if (!override.isDefault) {
-                        val resolved = EffectiveSwitch.resolve(channel.currentConfig, override)
-                        channel.updateConfig(resolved)
-                        Log.i(TAG, "V35 兜底:从磁盘加载 $packageName override 成功")
+                        channel.localDeviation = override
+                        Log.i(TAG, "V35 兜底:从磁盘加载 $packageName override 成功(偏差层)")
                     }
                 }
             }
@@ -210,26 +209,6 @@ class HookInstaller(
 
     private fun parseSwitch(json: String?): HookSwitch? =
         json?.let { HookSwitch.fromJson(Json.gson, it) }
-
-    /**
-     * V35 兜底:从磁盘 JSON 文件加载 per-app 配置。
-     * 文件路径:/data/local/tmp/modev_config_{packageName}.json
-     * 格式:与 SharedPreferences override_{pkg} 键值相同(JSON 对象)。
-     */
-    private fun loadConfigFromDisk(): HookSwitch? = runCatching {
-        val file = java.io.File("/data/local/tmp/modev_config_$packageName.json")
-        if (!file.exists()) return null
-        val json = file.readText(Charsets.UTF_8).trim()
-        if (json.isEmpty()) return null
-        val globalJson = parseSwitch(
-            runCatching { file.resolveSibling("modev_config_global.json").readText(Charsets.UTF_8).trim() }
-                .getOrNull()
-        )
-        val override = AppListenOverride.fromJson(Json.gson, json)
-        EffectiveSwitch.resolve(globalJson ?: HookSwitch.DEFAULT, override).also {
-            Log.i(TAG, "V35 兜底:从磁盘加载 $packageName 配置成功")
-        }
-    }.getOrNull()
 
     companion object {
         private const val TAG = "HookInstaller"

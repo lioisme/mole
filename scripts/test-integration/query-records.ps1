@@ -1,4 +1,4 @@
-# query-records.ps1 — Modev 数据库通用查询工具
+﻿# query-records.ps1 — Modev 数据库通用查询工具
 # 用法:
 #   .\query-records.ps1                          # 统计所有记录类型
 #   .\query-records.ps1 -RecordType crypto       # 查询算法记录

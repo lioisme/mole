@@ -29,6 +29,14 @@ abstract class Invocation {
         throw UnsupportedOperationException("setResult not supported by this Invocation")
     }
 
+    /**
+     * 改写第 index 个实参(仅 before 阶段有效,原方法以新值执行):
+     * 供 FLAG_SECURE 位清除等「修改入参而非短路调用」的干预使用(D-11)。
+     */
+    open fun setArg(index: Int, value: Any?) {
+        throw UnsupportedOperationException("setArg not supported by this Invocation")
+    }
+
     /** 实参个数。 */
     abstract val argCount: Int
 

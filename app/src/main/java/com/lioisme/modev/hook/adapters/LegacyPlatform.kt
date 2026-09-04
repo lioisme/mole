@@ -94,6 +94,10 @@ object LegacyPlatform : Platform {
 
         override fun getArgUnsafe(index: Int): Any? = param.args?.get(index)
 
+        override fun setArg(index: Int, value: Any?) {
+            param.args?.set(index, value)
+        }
+
         override fun setResult(value: Any?) {
             param.result = value
         }

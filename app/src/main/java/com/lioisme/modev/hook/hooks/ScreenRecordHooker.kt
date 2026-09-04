@@ -8,19 +8,17 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * 录屏限制解除 Hooker(V34 增强):多路径干预 FLAG_SECURE 设置,
+ * 录屏限制解除 Hooker(V36 D-11 重写):入参改写式干预 FLAG_SECURE,
  * 阻止应用通过任何途径设置安全窗口标志。
  *
  * 覆盖路径:
- * - Window.setFlags(flags, mask):清除 mask 中的 FLAG_SECURE 位
- * - Window.addFlags(flags):清除 flags 中的 FLAG_SECURE 位
- * - Window.clearFlags(flags):若含 FLAG_SECURE 则阻止清除(保留清除效果)
+ * - Window.setFlags(flags, mask):双入参清除 FLAG_SECURE 位,原方法以净化参数执行
+ * - Window.addFlags(flags):入参清除 FLAG_SECURE 位
+ * - Window.clearFlags(flags):若 FLAG_SECURE 已被本模块清除,抑制冗余清除调用
  *
- * 干预机制:在 before() 中通过反射清除 Window.mFlags 中的 FLAG_SECURE(0x2000) 位,
- * 原方法正常执行但 FLAG_SECURE 位已被清除。
- *
- * 设计决策:不使用 setResult(null) 阻止 setFlags/addFlags,因为这些方法可能携带其他
- * 正常标志位(如 FLAG_LAYOUT_IN_SCREEN),阻止会导致窗口布局异常。
+ * 干预机制(D-11 根因):此前版本在 before() 反射清 mFlags,但原方法随即
+ * `mFlags |= flags` 把位设回 → 绕过无效;且 getDeclaredField 在 PhoneWindow 上
+ * 找不到声明于父类 Window 的 mFlags。现改为改写实参,原方法正常执行但位已被剔除。
  */
 class ScreenRecordHooker(
     context: ProbeContext,
@@ -35,7 +33,7 @@ class ScreenRecordHooker(
     }
 
     /**
-     * hook Window.setFlags(int, int):原始路径,清除 mask 中的 FLAG_SECURE 位。
+     * hook Window.setFlags(int, int):从 flags 与 mask 双入参清除 FLAG_SECURE 位。
      */
     private fun hookSetFlags() {
         val methods = registry?.named("setFlags").orEmpty()
@@ -45,26 +43,26 @@ class ScreenRecordHooker(
                     if (!config().screenRecordBypass) return
                     val flags = (invocation.getArg(0) as? Number)?.toInt() ?: return
                     if (flags and FLAG_SECURE == 0) return
-                    val window = invocation.thisObject ?: return
-                    if (clearFlagSecure(window)) {
-                        emit(
-                            kind = ProcessKind.SCREEN_RECORD,
-                            operation = ProcessOperation.FLAG_SECURE,
-                            interventionAction = ACTION_BLOCKED,
-                            params = mapOf(
-                                "windowClass" to window.javaClass.name,
-                                "originalFlags" to flags.toString(),
-                                "path" to "setFlags",
-                            ),
-                        )
-                    }
+                    val mask = (invocation.getArg(1) as? Number)?.toInt() ?: return
+                    invocation.setArg(0, flags and FLAG_SECURE.inv())
+                    invocation.setArg(1, mask and FLAG_SECURE.inv())
+                    emit(
+                        kind = ProcessKind.SCREEN_RECORD,
+                        operation = ProcessOperation.FLAG_SECURE,
+                        interventionAction = ACTION_BLOCKED,
+                        params = mapOf(
+                            "windowClass" to (invocation.thisObject?.javaClass?.name ?: ""),
+                            "originalFlags" to flags.toString(),
+                            "path" to "setFlags",
+                        ),
+                    )
                 }
             })
         }
     }
 
     /**
-     * hook Window.addFlags(int):拦截通过 addFlags 设置 FLAG_SECURE 的路径。
+     * hook Window.addFlags(int):入参清除 FLAG_SECURE 位后放行原方法。
      */
     private fun hookAddFlags() {
         val methods = registry?.named("addFlags").orEmpty()
@@ -74,27 +72,25 @@ class ScreenRecordHooker(
                     if (!config().screenRecordBypass) return
                     val flags = (invocation.getArg(0) as? Number)?.toInt() ?: return
                     if (flags and FLAG_SECURE == 0) return
-                    val window = invocation.thisObject ?: return
-                    if (clearFlagSecure(window)) {
-                        emit(
-                            kind = ProcessKind.SCREEN_RECORD,
-                            operation = ProcessOperation.ADD_FLAGS,
-                            interventionAction = ACTION_BLOCKED,
-                            params = mapOf(
-                                "windowClass" to window.javaClass.name,
-                                "originalFlags" to flags.toString(),
-                                "path" to "addFlags",
-                            ),
-                        )
-                    }
+                    invocation.setArg(0, flags and FLAG_SECURE.inv())
+                    emit(
+                        kind = ProcessKind.SCREEN_RECORD,
+                        operation = ProcessOperation.ADD_FLAGS,
+                        interventionAction = ACTION_BLOCKED,
+                        params = mapOf(
+                            "windowClass" to (invocation.thisObject?.javaClass?.name ?: ""),
+                            "originalFlags" to flags.toString(),
+                            "path" to "addFlags",
+                        ),
+                    )
                 }
             })
         }
     }
 
     /**
-     * hook Window.clearFlags(int):阻止应用通过 clearFlags 移除我们已清除的 FLAG_SECURE。
-     * 如果应用调用 clearFlags(FLAG_SECURE),我们阻止该操作(因为 FLAG_SECURE 已被清除)。
+     * hook Window.clearFlags(int):若窗口已无 FLAG_SECURE(被本模块入参改写拦截),
+     * 抑制应用的冗余清除调用(setResult(null) 短路,原方法不执行)。
      */
     private fun hookClearFlags() {
         val methods = registry?.named("clearFlags").orEmpty()
@@ -105,12 +101,7 @@ class ScreenRecordHooker(
                     val flags = (invocation.getArg(0) as? Number)?.toInt() ?: return
                     if (flags and FLAG_SECURE == 0) return
                     val window = invocation.thisObject ?: return
-                    // 如果 Window 已经没有 FLAG_SECURE,阻止 clearFlags(避免重复操作)
-                    val currentFlags = runCatching {
-                        val field = window.javaClass.getDeclaredField("mFlags")
-                        field.isAccessible = true
-                        field.getInt(window)
-                    }.getOrDefault(0)
+                    val currentFlags = readFlags(window) ?: return
                     if (currentFlags and FLAG_SECURE == 0) {
                         invocation.setResult(null)
                         emit(
@@ -129,21 +120,25 @@ class ScreenRecordHooker(
     }
 
     /**
-     * 通过反射清除 Window.mFlags 中的 FLAG_SECURE 位。
-     * 返回 true 表示成功清除。
+     * D-11:mFlags 声明于 android.view.Window(protected),PhoneWindow 等子类的
+     * getDeclaredField 找不到 → 沿父类链查找。
      */
     @SuppressLint("SoonBlockedPrivateApi")
-    private fun clearFlagSecure(window: Any): Boolean = runCatching {
-        val flagsField = window.javaClass.getDeclaredField("mFlags")
-        flagsField.isAccessible = true
-        val currentFlags = flagsField.getInt(window)
-        if (currentFlags and FLAG_SECURE != 0) {
-            flagsField.setInt(window, currentFlags and FLAG_SECURE.inv())
-            true
-        } else {
-            false
+    private fun findFlagsField(window: Any): java.lang.reflect.Field? {
+        var c: Class<*>? = window.javaClass
+        while (c != null) {
+            val f = runCatching { c.getDeclaredField("mFlags") }.getOrNull()
+            if (f != null) {
+                f.isAccessible = true
+                return f
+            }
+            c = c.superclass
         }
-    }.getOrDefault(false)
+        return null
+    }
+
+    private fun readFlags(window: Any): Int? =
+        runCatching { findFlagsField(window)?.getInt(window) }.getOrNull()
 
     companion object {
         /** WindowManager.LayoutParams.FLAG_SECURE */

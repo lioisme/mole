@@ -1,4 +1,4 @@
-# run-all.ps1 - Full regression test for Modev x Twilight Toolbox
+﻿# run-all.ps1 - Full regression test for Modev x Twilight Toolbox
 # Usage: powershell -ExecutionPolicy Bypass -File run-all.ps1
 
 $ADB = "D:\leidian\LDPlayer14\adb.exe"

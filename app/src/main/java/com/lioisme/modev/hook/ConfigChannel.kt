@@ -2,6 +2,8 @@ package com.lioisme.modev.hook
 
 import com.lioisme.modev.core.codec.WireCodec
 import com.lioisme.modev.core.codec.WireProtocol
+import com.lioisme.modev.core.model.AppListenOverride
+import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.HookSwitch
 import java.io.BufferedReader
 import java.io.BufferedWriter
@@ -33,10 +35,32 @@ class ConfigChannel(
     var currentConfig: HookSwitch = HookSwitch.DEFAULT
         private set
 
-    /** 更新当前配置并回调(RemotePreferences 直读/变更监听路径用;TCP 推送路径在类内直接设置)。 */
+    /**
+     * 全局配置层(TCP 推送/远程偏好直读写入;V36 D-1 修复:与本地偏差层分离)。
+     */
+    @Volatile
+    private var globalConfig: HookSwitch = HookSwitch.DEFAULT
+
+    /**
+     * 本地持久偏差层(V36 D-1 修复):Vector 2.2 不投递 XposedService,per-app 偏差经
+     * V35 磁盘兜底进入本字段;宿主 TCP 推送仅更新全局层,有效配置恒为「全局 ⊕ 偏差」,
+     * 推送不再覆盖磁盘兜底偏差。赋值即重解析生效。
+     */
+    @Volatile
+    var localDeviation: AppListenOverride? = null
+        set(value) {
+            field = value
+            currentConfig = applyDeviation(globalConfig)
+        }
+
+    private fun applyDeviation(global: HookSwitch): HookSwitch =
+        localDeviation?.let { EffectiveSwitch.resolve(global, it) } ?: global
+
+    /** 更新全局配置层并叠加本地偏差后回调(RemotePreferences 直读/变更监听路径用)。 */
     fun updateConfig(switch: HookSwitch) {
-        currentConfig = switch
-        onConfig(switch)
+        globalConfig = switch
+        currentConfig = applyDeviation(switch)
+        onConfig(currentConfig)
     }
 
     @Volatile
@@ -62,6 +86,7 @@ class ConfigChannel(
     private var writeInFlight = false
 
     private var watchdog: Thread? = null
+    private var heartbeat: Thread? = null
 
     @Volatile
     private var running = false
@@ -73,6 +98,39 @@ class ConfigChannel(
         worker = Thread(::connectLoop, "modev-config-channel").apply {
             isDaemon = true
             start()
+        }
+        // D-3 修复:主动心跳(20s)——协议定义 ping/pong 但注入侧从不发送,
+        // 空闲连接被宿主 120s 读超时杀死后形成半开连接,记录写入已死 socket 丢失 ACK。
+        heartbeat = Thread(::heartbeatLoop, "modev-heartbeat").apply {
+            isDaemon = true
+            start()
+        }
+    }
+
+    private fun heartbeatLoop() {
+        while (running) {
+            try {
+                Thread.sleep(HEARTBEAT_MS)
+            } catch (ie: InterruptedException) {
+                break
+            }
+            if (!connected) continue
+            synchronized(writerLock) {
+                val w = writer
+                if (w != null) {
+                    writeInFlight = true
+                    lastWriteMs = System.currentTimeMillis()
+                    try {
+                        w.write(WireCodec.ping())
+                        w.newLine()
+                        w.flush()
+                    } catch (t: Throwable) {
+                        closeSocket()
+                    } finally {
+                        writeInFlight = false
+                    }
+                }
+            }
         }
     }
 
@@ -176,8 +234,7 @@ class ConfigChannel(
                             }
                             val cfg = WireCodec.configOf(msg.payload)
                             if (cfg != null) {
-                                currentConfig = cfg
-                                onConfig(cfg)
+                                updateConfig(cfg)
                             }
                         }
                         WireProtocol.TYPE_ACK -> {
@@ -240,5 +297,8 @@ class ConfigChannel(
         private const val INITIAL_RETRY_MS = 2000L
         private const val MAX_RETRY_DELAY_MS = 30000L
         private const val WRITE_TIMEOUT_MS = 10000L
+
+        /** 主动心跳间隔(D-3):远小于宿主 120s / 注入侧 60s 读超时,保活并快速探测半开。 */
+        private const val HEARTBEAT_MS = 20_000L
     }
 }

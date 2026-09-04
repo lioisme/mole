@@ -345,3 +345,31 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
   CodeGroupExtractor / TimelineGroup / RecordType…)。
 - Android 框架依赖 → Robolectric(`@Config(sdk=[34])`,resources + android.icu 可用)。
 - 组合/导航/手势 → `app/src/androidTest` Compose UI 测试(实机或模拟器)。
+
+## V36 注入侧硬约束(2026-09-04 全功能验收沉淀,改前必读)
+
+- **配置偏差层(V36 D-1)**:注入侧 `ConfigChannel` 持双态——`globalConfig`(宿主 TCP
+  推送/远程偏好写)+ `localDeviation`(V35 磁盘兜底 `/data/local/tmp/modev_config_{pkg}.json`
+  的 `AppListenOverride`)。有效配置恒为 `global ⊕ deviation`;**禁止**让推送路径直接覆盖
+  currentConfig 或让磁盘兜底一次性 resolve 后即失效(Vector 2.2 不投递 XposedService,per-app
+  偏差唯一可靠入口是磁盘兜底 + 偏差层)。回归测试 `ConfigChannelDeviationTest`。
+- **主动心跳(V36 D-3)**:`ConfigChannel` 连接后每 20s 发 `ping`(远小于宿主 120s/注入侧
+  60s 读超时)。协议定义 ping/pong 但**只收不发**会造成空闲半开连接 → 记录滞留 spool。
+- **构造器/字段反射钩子(V36 D-2/D-11)**:libxposed 构造器 `chain.proceed()` 返回 void,
+  新实例取 `invocation.thisObject`(非 result);声明于父类的字段(如 `Window.mFlags`)
+  反射必须**沿 superclass 链**查找。入参改写型干预用 `Invocation.setArg`(libxposed 经
+  `proceed(Array)`,legacy 经 args 写回),**禁止** before 清字段后放行原方法(会被设回)。
+- **方法注册表含 protected(V36 D-13)**:`BehaviorMethodRegistry` 枚举 `methods ∪ 父类链
+  declaredMethods`;`Activity.onCreate/onResume` 等 protected 生命周期此前漏装。
+- **WebView 桥注册时机(V36 D-16)**:`addJavascriptInterface` 必须在 WebView 构造器
+  **after**(before 阶段 provider 未就绪静默失败,JS 侧永远看不到 `modevJsBridge`);
+  探针注入在 `WebViewClient.onPageFinished`(靶 App 须调 super)。
+- **类探测钩面(V36 D-12b)**:ART `Class.forName` 走原生解析绕过 Java `loadClass`,
+  Xposed 隐藏钩子必须**同时**钩 `ClassLoader.loadClass`/`BaseDexClassLoader.findClass`/
+  `java.lang.Class.forName`;emit 须在 before **抛 CNFE 之前**(after 在异常路径不执行)。
+- **HttpURLConnection/OkHttp 钩面(V36 D-8/D-9)**:抽象类 `getInputStream/getOutputStream`
+  无方法体钩不触发,挂 `com.android.okhttp.internal.huc.*Impl`;应用侧 okhttp 类安装期未
+  加载,经 loadClass 监视器**惰性安装**(幂等)。
+- **集成测试环境(LDPlayer x64)**:靶程序 `:testtarget`(debuggable,run-as 零 su 查询);
+  adb 独立端口 5038;`cached_apps_freezer` 禁用;VM 死亡 WaitDevice 冷重启自愈。掩蔽型
+  device_env kind 在预干净模拟器「无脏可掩即零记录」属正确行为,矩阵标 SKIP。

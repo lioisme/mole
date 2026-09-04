@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>TT Crypto</title></head>
+<body>
+<script>
+  // 探针在 onPageFinished 后注入包装器;延迟多轮调用确保命中注入窗口。
+  // CryptoJS / JSEncrypt 桩:仅提供被包装的调用面,无真实算法。
+  window.CryptoJS = {
+    enc: { Hex: { stringify: function (w) { return "stubhex"; } } },
+    MD5: function (m) { return { sig: { words: [1, 2], sigBytes: 16 }, toString: function () { return "md5stub"; } }; },
+    SHA256: function (m) { return { sig: { words: [3, 4], sigBytes: 32 }, toString: function () { return "sha256stub"; } }; },
+    HmacSHA256: function (m, k) { return { sig: { words: [5, 6], sigBytes: 32 }, toString: function () { return "hmacstub"; } }; },
+    AES: {
+      encrypt: function (m, k) { return { ciphertext: { words: [7, 8], sigBytes: 16 }, toString: function () { return "aes-stub-ct"; } }; },
+      decrypt: function (ct, k) { return { toString: function (enc) { return "aes-stub-pt"; } }; },
+    },
+  };
+  window.JSEncrypt = function () {};
+  JSEncrypt.prototype.setPublicKey = function (k) { this.k = k; };
+  JSEncrypt.prototype.encrypt = function (m) { return "jsencrypt-stub-ct"; };
+  JSEncrypt.prototype.decrypt = function (c) { return "jsencrypt-stub-pt"; };
+
+  function hex(buf) {
+    var a = new Uint8Array(buf), s = "";
+    for (var i = 0; i < a.length; i++) s += ("0" + a[i].toString(16)).slice(-2);
+    return s;
+  }
+  function callCrypto(round) {
+    // 顺序:桩库调用在前(WebCrypto 若不可用不得吞掉后续调用)
+    try {
+      var cj = window.CryptoJS;
+      cj.MD5("abc"); cj.SHA256("abc"); cj.HmacSHA256("abc", "key");
+      var enc = cj.AES.encrypt("hello", "key123key123key1");
+      cj.AES.decrypt(enc, "key123key123key1");
+      var je = new JSEncrypt();
+      je.setPublicKey("pubkey"); je.encrypt("secret"); je.decrypt("cipher");
+    } catch (e) {}
+    try {
+      var data = new TextEncoder().encode("modev-js-" + round);
+      crypto.subtle.digest("SHA-256", data).then(function (d) {
+        try { window.modevJsBridge && window.modevJsBridge.report("digest:" + hex(d).slice(0, 16)); } catch (e) {}
+      }).catch(function () {});
+      crypto.subtle.importKey("raw", data, { name: "AES-GCM" }, false, ["encrypt", "decrypt"]).then(function (key) {
+        return crypto.subtle.encrypt({ name: "AES-GCM", iv: new Uint8Array(12), tagLength: 128 }, key, data);
+      }).then(function (ct) {
+        try { window.modevJsBridge && window.modevJsBridge.report("aesgcm:" + hex(ct).slice(0, 16)); } catch (e) {}
+      }).catch(function () {});
+    } catch (e) {}
+  }
+  callCrypto(1);
+  setTimeout(function () {
+    try {
+      if (window.modevJsBridge && window.modevJsBridge.report) {
+        window.modevJsBridge.report('{"op":"digest","alg":"SHA-256","inputText":"direct-probe","outputHex":"00ff"}');
+      }
+    } catch (e) {}
+    callCrypto(2);
+  }, 1500);
+  setTimeout(function () { callCrypto(3); }, 3000);
+</script>
+</body>
+</html>
