@@ -311,6 +311,22 @@ class ConfigServer(
         return pushed
     }
 
+    /**
+     * 向全部在线会话按包重推各自有效配置(V37 T2.2:全局关键词库等
+     * 跨包共享数据变更后调用;各包无 resolver 配置时该会话跳过)。
+     * @return 实际推送的会话数(诊断/测试用)。
+     */
+    fun pushToAllConnected(): Int {
+        var pushed = 0
+        for ((_, session) in clients) {
+            val pkg = session.packageName ?: continue
+            val config = effectiveConfigFor(pkg) ?: continue
+            pushConfig(session, pkg, config)
+            pushed++
+        }
+        return pushed
+    }
+
     private fun removeClient(socket: Socket) {
         val session = clients.remove(socket) ?: return
         session.packageName?.let { pkg ->

@@ -41,7 +41,7 @@ class MediaProjectionHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().screenRecordBypass) return
+                if (!featureOn(ProcessKind.SCREEN_RECORD)) return
                 val intent = invocation.getArg(0) as? android.content.Intent ?: return
                 if (!isMediaProjectionIntent(intent)) return
                 // 自动授权:阻止实际启动,记录事件

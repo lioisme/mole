@@ -2,6 +2,7 @@ package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.DeviceEnvOperation
+import com.lioisme.modev.core.model.activeSpoofProfile
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
@@ -38,12 +39,12 @@ class SystemPropertiesHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().systemProperties) return
+                if (!featureOn(DeviceEnvKind.SYSTEM_PROPERTIES)) return
                 if (inHook.get() == true) return
                 inHook.set(true)
                 try {
                     val key = invocation.getArg(0) as? String ?: return
-                    val replacement = ALL_REPLACEMENTS[key] ?: return
+                    val replacement = replacementFor(key) ?: return
                     val original = invocation.result as? String
                     if (original == null || original == replacement) return
                     if (!isIndicativeValue(key, original)) return
@@ -72,12 +73,12 @@ class SystemPropertiesHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().systemProperties) return
+                if (!featureOn(DeviceEnvKind.SYSTEM_PROPERTIES)) return
                 if (inHook.get() == true) return
                 inHook.set(true)
                 try {
                     val key = invocation.getArg(0) as? String ?: return
-                    val replacement = ALL_REPLACEMENTS[key] ?: return
+                    val replacement = replacementFor(key) ?: return
                     val original = invocation.result as? String
                     if (original == null || original == replacement) return
                     if (!isIndicativeValue(key, original)) return
@@ -129,6 +130,12 @@ class SystemPropertiesHooker(
         }
     }
 
+    /**
+     * 替换值解析(V37 T2.3 画像化):Root 安全属性内置基线 ∪ 生效伪装画像 ro.* 组。
+     */
+    private fun replacementFor(key: String): String? =
+        ROOT_REPLACEMENTS[key] ?: config().activeSpoofProfile().roProperties[key]
+
     companion object {
         private const val ACTION_BLOCKED = "BLOCKED"
 
@@ -138,29 +145,13 @@ class SystemPropertiesHooker(
             "android_x86", "android_x86_64",
         )
 
-        /** 合并 root 属性 + 模拟器属性的完整映射表。 */
-        private val ALL_REPLACEMENTS = mapOf(
-            // Root 属性
+        /** Root 安全属性内置基线(模拟器属性归画像,见 [replacementFor])。 */
+        private val ROOT_REPLACEMENTS = mapOf(
             "ro.debuggable" to "0",
             "ro.secure" to "1",
             "ro.build.selinux" to "1",
             "ro.build.type" to "user",
             "ro.build.tags" to "release-keys",
-            // 模拟器属性(Pixel 7 Pro 组)
-            "ro.hardware" to "qcom",
-            "ro.product.model" to "Pixel 7 Pro",
-            "ro.product.brand" to "google",
-            "ro.product.device" to "raven",
-            "ro.product.board" to "raven",
-            "ro.build.display.id" to "UP1A.231105.001",
-            "ro.build.host" to "abfarm-release-rbe-64-00069",
-            "ro.build.user" to "android-build",
-            "ro.product.name" to "raven",
-            "ro.product.manufacturer" to "Google",
-            "ro.board.platform" to "taro",
-            "ro.hardware.chipname" to "qcom",
-            "ro.soc.model" to "SM8550",
-            "ro.soc.manufacturer" to "Qualcomm",
         )
     }
 }

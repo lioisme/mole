@@ -74,7 +74,7 @@ class SSLBypassHooker(
 
         engine.hook(methods, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().sslContext) return
+                if (!featureOn(NetworkKind.SSL_CONTEXT)) return
                 if (sslReflectionDisabled) return
                 // 替换 context 内的 TrustManager 为 trust-all
                 try {
@@ -138,7 +138,7 @@ class SSLBypassHooker(
         val method = runCatching { clazz.getMethod(methodName, *paramTypes) }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().sslTrustManager) return
+                if (!featureOn(NetworkKind.SSL_TRUST_MANAGER)) return
                 // 返回空集合/void:绕过验证
                 val exec = invocation.executable
                 val returnType = if (exec is java.lang.reflect.Method) exec.returnType else Void.TYPE
@@ -196,7 +196,7 @@ class SSLBypassHooker(
             if (verifySession != null) {
                 engine.hook(verifySession, object : MethodHook() {
                     override fun before(invocation: Invocation) {
-                        if (!config().sslOkhttpVerifier) return
+                        if (!featureOn(NetworkKind.SSL_OKHTTP_VERIFIER)) return
                         invocation.setResult(true)
                         emit(
                             kind = NetworkKind.SSL_OKHTTP_VERIFIER,
@@ -213,7 +213,7 @@ class SSLBypassHooker(
             if (verifyCert != null) {
                 engine.hook(verifyCert, object : MethodHook() {
                     override fun before(invocation: Invocation) {
-                        if (!config().sslOkhttpVerifier) return
+                        if (!featureOn(NetworkKind.SSL_OKHTTP_VERIFIER)) return
                         invocation.setResult(true)
                         emit(
                             kind = NetworkKind.SSL_OKHTTP_VERIFIER,
@@ -243,7 +243,7 @@ class SSLBypassHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().sslWebview) return
+                if (!featureOn(NetworkKind.SSL_WEBVIEW)) return
                 // handler.proceed()
                 try {
                     val handler = invocation.getArg(1) ?: return
@@ -273,7 +273,7 @@ class SSLBypassHooker(
             if (method != null) {
                 engine.hook(method, object : MethodHook() {
                     override fun before(invocation: Invocation) {
-                        if (!config().sslNetworkConfig) return
+                        if (!featureOn(NetworkKind.SSL_NETWORK_CONFIG)) return
                     invocation.setResult(null)
                     emit(
                         kind = NetworkKind.SSL_CONTEXT,
@@ -301,7 +301,7 @@ class SSLBypassHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().sslOkhttpPinner || !config().sslOkhttpVerifier) return
+                if (!featureOn(NetworkKind.SSL_OKHTTP_PINNER) || !featureOn(NetworkKind.SSL_OKHTTP_VERIFIER)) return
                 // 每个 SSL 连接触发一次堆栈分析
                 analyzeStackForObfuscatedClasses()
             }
@@ -377,7 +377,7 @@ class SSLBypassHooker(
             if (pinnerMethod != null) {
                 engine.hook(pinnerMethod, object : MethodHook() {
                     override fun before(invocation: Invocation) {
-                        if (!config().sslOkhttpPinner) return
+                        if (!featureOn(NetworkKind.SSL_OKHTTP_PINNER)) return
                         invocation.setResult(null)
                         emit(
                             kind = NetworkKind.SSL_OKHTTP_PINNER,
@@ -395,7 +395,7 @@ class SSLBypassHooker(
             if (verifierMethod != null) {
                 engine.hook(verifierMethod, object : MethodHook() {
                     override fun before(invocation: Invocation) {
-                        if (!config().sslOkhttpVerifier) return
+                        if (!featureOn(NetworkKind.SSL_OKHTTP_VERIFIER)) return
                         invocation.setResult(true)
                         emit(
                             kind = NetworkKind.SSL_OKHTTP_VERIFIER,

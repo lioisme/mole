@@ -20,30 +20,31 @@ class DetectionMonitorHooker(
 ) : DeviceEnvBaseHooker(context) {
 
     override fun install() {
-        val switch = config()
-        if (switch.detectRoot) {
+        // V37 T0.1:让位判定统一走 featureOn(master ∧ kind),
+        // 干预型 master 关闭时监控不再误让位。
+        if (featureOn(DeviceEnvKind.DETECT_ROOT)) {
             // File.exists 由 RootFileHooker 覆盖,跳过 monitorFileExists
-            if (!switch.rootFile) {
+            if (!featureOn(DeviceEnvKind.ROOT_FILE)) {
                 monitorFileExists()
             }
             // Class.forName hook 在 LSPosed 下易引发 ClassNotFoundException 传播异常,
             // 跳过 monitorClassForName;root 检测信号已由 File.exists 等覆盖。
         }
-        if (switch.detectEmulator) {
+        if (featureOn(DeviceEnvKind.DETECT_EMULATOR)) {
             // getStackTrace 由 XposedStackHooker 覆盖,跳过 monitorGetStackTrace
-            if (!switch.xposedStack) {
+            if (!featureOn(DeviceEnvKind.XPOSED_STACK)) {
                 monitorGetStackTrace()
             }
             // readLine 由 XposedMapsHooker 覆盖,跳过 monitorReadLine
-            if (!switch.xposedMaps) {
+            if (!featureOn(DeviceEnvKind.XPOSED_MAPS)) {
                 monitorReadLine()
             }
             // getDefaultSensor 由 EmulatorSensorHooker 覆盖,跳过 monitorGetDefaultSensor
-            if (!switch.emulatorSensor) {
+            if (!featureOn(DeviceEnvKind.EMULATOR_SENSOR)) {
                 monitorGetDefaultSensor()
             }
             // getMacAddress 由 EmulatorNetworkHooker 覆盖,跳过 monitorGetMacAddress
-            if (!switch.emulatorNetwork) {
+            if (!featureOn(DeviceEnvKind.EMULATOR_NETWORK)) {
                 monitorGetMacAddress()
             }
             monitorBuildFields()
@@ -57,7 +58,7 @@ class DetectionMonitorHooker(
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
                 // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
-                if (config().xposedStack) return
+                if (featureOn(DeviceEnvKind.XPOSED_STACK)) return
                 val stack = invocation.result as? Array<StackTraceElement> ?: return
                 val hasDetection = stack.any { frame ->
                     val cn = frame.className.lowercase()
@@ -82,7 +83,7 @@ class DetectionMonitorHooker(
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
                 // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
-                if (config().xposedMaps) return
+                if (featureOn(DeviceEnvKind.XPOSED_MAPS)) return
                 val line = invocation.result as? String ?: return
                 val lower = line.lowercase()
                 val matched = MAPS_KEYWORDS.firstOrNull { lower.contains(it) } ?: return
@@ -105,7 +106,7 @@ class DetectionMonitorHooker(
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
                 // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
-                if (config().rootFile) return
+                if (featureOn(DeviceEnvKind.ROOT_FILE)) return
                 val path = (invocation.thisObject as? File)?.path ?: return
                 val lower = path.lowercase()
                 val matched = ROOT_FILE_KEYWORDS.firstOrNull { lower.contains(it) } ?: return
@@ -128,7 +129,7 @@ class DetectionMonitorHooker(
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
                 // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
-                if (config().emulatorSensor) return
+                if (featureOn(DeviceEnvKind.EMULATOR_SENSOR)) return
                 val result = invocation.result
                 val params = mapOf(
                     "sensorType" to (invocation.getArg(0) as? Int).toString(),
@@ -150,7 +151,7 @@ class DetectionMonitorHooker(
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
                 // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
-                if (config().emulatorNetwork) return
+                if (featureOn(DeviceEnvKind.EMULATOR_NETWORK)) return
                 val mac = invocation.result as? String ?: return
                 emit(
                     kind = DeviceEnvKind.DETECT_EMULATOR,
@@ -170,7 +171,7 @@ class DetectionMonitorHooker(
             engine.hook(method, object : MethodHook() {
                 override fun after(invocation: Invocation) {
                     // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
-                    if (config().emulatorBuild) return
+                    if (featureOn(DeviceEnvKind.EMULATOR_BUILD)) return
                     val value = invocation.result as? String ?: return
                     emit(
                         kind = DeviceEnvKind.DETECT_EMULATOR,

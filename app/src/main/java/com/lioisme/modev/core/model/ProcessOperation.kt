@@ -19,7 +19,7 @@ enum class ProcessOperation(
     /** Process.killProcess(int) 调用拦截。 */
     KILL_PROCESS(ProcessKind.EXIT_INTERCEPT),
 
-    /** Runtime.exit(int) 调用拦截。 */
+    /** Runtime.exit(int) 调用拦截(V37 T0.5:补齐 emit 点,直调 Runtime.exit 不再漏拦)。 */
     RUNTIME_EXIT(ProcessKind.EXIT_INTERCEPT),
 
     // ---- 崩溃防止 ----
@@ -27,13 +27,7 @@ enum class ProcessOperation(
     /** UncaughtExceptionHandler 捕获异常。 */
     UNCAUGHT_EXCEPTION(ProcessKind.CRASH_PREVENT),
 
-    /** AndroidRuntime.handleException 捕获异常。 */
-    RUNTIME_EXCEPTION(ProcessKind.CRASH_PREVENT),
-
     // ---- 录屏绕过 ----
-
-    /** MediaProjection 权限 Intent 绕过。 */
-    SCREEN_CAPTURE_INTENT(ProcessKind.SCREEN_RECORD),
 
     /** FLAG_SECURE 检测拦截。 */
     FLAG_SECURE(ProcessKind.SCREEN_RECORD),

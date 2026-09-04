@@ -40,7 +40,7 @@ class ScreenRecordHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().screenRecordBypass) return
+                    if (!featureOn(ProcessKind.SCREEN_RECORD)) return
                     val flags = (invocation.getArg(0) as? Number)?.toInt() ?: return
                     if (flags and FLAG_SECURE == 0) return
                     val mask = (invocation.getArg(1) as? Number)?.toInt() ?: return
@@ -69,7 +69,7 @@ class ScreenRecordHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().screenRecordBypass) return
+                    if (!featureOn(ProcessKind.SCREEN_RECORD)) return
                     val flags = (invocation.getArg(0) as? Number)?.toInt() ?: return
                     if (flags and FLAG_SECURE == 0) return
                     invocation.setArg(0, flags and FLAG_SECURE.inv())
@@ -97,7 +97,7 @@ class ScreenRecordHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().screenRecordBypass) return
+                    if (!featureOn(ProcessKind.SCREEN_RECORD)) return
                     val flags = (invocation.getArg(0) as? Number)?.toInt() ?: return
                     if (flags and FLAG_SECURE == 0) return
                     val window = invocation.thisObject ?: return

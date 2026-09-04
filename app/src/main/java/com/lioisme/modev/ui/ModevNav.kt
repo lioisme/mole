@@ -19,10 +19,12 @@ import com.lioisme.modev.ui.apps.AppMonitorScreen
 import com.lioisme.modev.ui.apps.AppMonitorViewModelFactory
 import com.lioisme.modev.ui.apps.AppsScreen
 import com.lioisme.modev.ui.apps.AppsViewModelFactory
+import com.lioisme.modev.ui.apps.PerAppFeatureSettingsScreen
+import com.lioisme.modev.ui.apps.PerAppFeatureSettingsViewModelFactory
 import com.lioisme.modev.ui.apps.PerAppListenSettingsScreen
 import com.lioisme.modev.ui.apps.PerAppListenSettingsViewModelFactory
-import com.lioisme.modev.ui.logs.RecordDetailScreen
-import com.lioisme.modev.ui.logs.RecordDetailViewModelFactory
+import com.lioisme.modev.ui.detail.RecordDetailScreen
+import com.lioisme.modev.ui.detail.RecordDetailViewModelFactory
 import com.lioisme.modev.ui.navigation.ModevRoutes
 import com.lioisme.modev.ui.navigation.NavTransitions
 import com.lioisme.modev.ui.navigation.drainNavigationQueue
@@ -50,6 +52,12 @@ import com.lioisme.modev.ui.settings.LicenseDetailScreen
 import com.lioisme.modev.ui.settings.LicensesScreen
 import com.lioisme.modev.ui.settings.SettingsScreen
 import com.lioisme.modev.ui.settings.SettingsViewModelFactory
+import com.lioisme.modev.ui.settings.features.FeatureBlacklistScreen
+import com.lioisme.modev.ui.settings.features.FeatureBlacklistViewModelFactory
+import com.lioisme.modev.ui.settings.features.KeywordLibraryScreen
+import com.lioisme.modev.ui.settings.features.KeywordLibraryViewModelFactory
+import com.lioisme.modev.ui.settings.features.SpoofProfileScreen
+import com.lioisme.modev.ui.settings.features.SpoofProfileViewModelFactory
 
 /**
  * 单栈导航宿主(2026-08-16 V4,五界面收敛;2026-08-17 V10 设置分级;V18 应用监听入口;
@@ -164,7 +172,32 @@ fun ModevNavHost(navController: NavHostController) {
                     onOpenListenSettings = {
                         navController.navigateGuarded(ModevRoutes.appListenSettings(pkg))
                     },
+                    onOpenFeatureSettings = {
+                        navController.navigateGuarded(ModevRoutes.appFeatureSettings(pkg))
+                    },
                     onLaunch = launchApp,
+                )
+            }
+        }
+        slideComposable(
+            route = ModevRoutes.APP_FEATURE_SETTINGS,
+            arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
+        ) { entry ->
+            val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
+            if (pkg.isBlank()) {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
+            BackGuarded(navController) {
+                PerAppFeatureSettingsScreen(
+                    viewModel = viewModel(
+                        key = "feature-settings-$pkg",
+                        factory = PerAppFeatureSettingsViewModelFactory(pkg, app.container),
+                    ),
+                    onBack = { navController.popGuarded() },
+                    onOpenKeywordLibrary = {
+                        navController.navigateGuarded(ModevRoutes.KEYWORD_LIBRARY)
+                    },
                 )
             }
         }
@@ -438,9 +471,42 @@ fun ModevNavHost(navController: NavHostController) {
                     onOpenDiagnostics = {
                         navController.navigateGuarded(ModevRoutes.DIAGNOSTICS_SETTINGS)
                     },
+                    onOpenKeywords = {
+                        navController.navigateGuarded(ModevRoutes.KEYWORD_LIBRARY)
+                    },
+                    onOpenProfiles = {
+                        navController.navigateGuarded(ModevRoutes.SPOOF_PROFILES)
+                    },
+                    onOpenBlacklist = {
+                        navController.navigateGuarded(ModevRoutes.FEATURE_BLACKLIST)
+                    },
                     onOpenAbout = {
                         navController.navigateGuarded(ModevRoutes.ABOUT)
                     },
+                )
+            }
+        }
+        slideComposable(route = ModevRoutes.KEYWORD_LIBRARY) {
+            BackGuarded(navController) {
+                KeywordLibraryScreen(
+                    viewModel = viewModel(factory = KeywordLibraryViewModelFactory(app.container)),
+                    onBack = { navController.popGuarded() },
+                )
+            }
+        }
+        slideComposable(route = ModevRoutes.SPOOF_PROFILES) {
+            BackGuarded(navController) {
+                SpoofProfileScreen(
+                    viewModel = viewModel(factory = SpoofProfileViewModelFactory(app.container)),
+                    onBack = { navController.popGuarded() },
+                )
+            }
+        }
+        slideComposable(route = ModevRoutes.FEATURE_BLACKLIST) {
+            BackGuarded(navController) {
+                FeatureBlacklistScreen(
+                    viewModel = viewModel(factory = FeatureBlacklistViewModelFactory(app.container)),
+                    onBack = { navController.popGuarded() },
                 )
             }
         }

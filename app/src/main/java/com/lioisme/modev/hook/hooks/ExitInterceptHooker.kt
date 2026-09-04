@@ -22,10 +22,32 @@ class ExitInterceptHooker(
 
     private val systemRegistry = BehaviorMethodRegistry.forName("java.lang.System")
     private val processRegistry = BehaviorMethodRegistry.forName("android.os.Process")
+    private val runtimeRegistry = BehaviorMethodRegistry.forName("java.lang.Runtime")
 
     override fun install() {
         hookSystemExit()
+        hookRuntimeExit()
         hookKillProcess()
+    }
+
+    /** V37 T0.5:直调 Runtime.exit(int) 的退出路径同样拦截(此前漏装)。 */
+    private fun hookRuntimeExit() {
+        val methods = runtimeRegistry?.named("exit").orEmpty()
+        if (methods.isEmpty()) return
+        for (method in methods) {
+            engine.hook(method, object : MethodHook() {
+                override fun before(invocation: Invocation) {
+                    if (!featureOn(ProcessKind.EXIT_INTERCEPT)) return
+                    val code = (invocation.getArg(0) as? Number)?.toInt() ?: -1
+                    emitUrgent(
+                        kind = ProcessKind.EXIT_INTERCEPT,
+                        operation = ProcessOperation.RUNTIME_EXIT,
+                        exitCode = code,
+                    )
+                    invocation.setResult(null)
+                }
+            })
+        }
     }
 
     private fun hookSystemExit() {
@@ -34,7 +56,7 @@ class ExitInterceptHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().exitIntercept) return
+                    if (!featureOn(ProcessKind.EXIT_INTERCEPT)) return
                     val code = (invocation.getArg(0) as? Number)?.toInt() ?: -1
                     emitUrgent(
                         kind = ProcessKind.EXIT_INTERCEPT,
@@ -53,7 +75,7 @@ class ExitInterceptHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().exitIntercept) return
+                    if (!featureOn(ProcessKind.EXIT_INTERCEPT)) return
                     val pid = (invocation.getArg(0) as? Number)?.toInt() ?: -1
                     emitUrgent(
                         kind = ProcessKind.EXIT_INTERCEPT,

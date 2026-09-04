@@ -6,9 +6,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExpandedFullScreenSearchBar
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
@@ -16,6 +20,7 @@ import androidx.compose.material3.SearchBarValue
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -29,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
@@ -63,6 +69,7 @@ import com.lioisme.modev.ui.components.CollapsedSearchInput
 import com.lioisme.modev.ui.components.KindFilterMenu
 import com.lioisme.modev.ui.components.KindOption
 import com.lioisme.modev.ui.components.SearchInputField
+import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.components.behaviorKindLabelRes
 import com.lioisme.modev.ui.components.behaviorSummary
 import com.lioisme.modev.ui.components.kindLabelRes
@@ -278,6 +285,7 @@ private fun MonitorRecordsContent(
     val search = rememberSearchController<Long>(onNavigate = onOpenRecord)
     var selectedKindName by rememberSaveable { mutableStateOf<String?>(null) }
     var filterMenuOpen by remember { mutableStateOf(false) }
+    var confirmClear by remember { mutableStateOf(false) }
     val focusManager = LocalFocusManager.current
 
     // V30:计数副标使用 records.itemCount(消除独立 Room COUNT Flow 的重组触发)。
@@ -315,6 +323,7 @@ private fun MonitorRecordsContent(
     }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             CenterAlignedTopAppBar(
@@ -341,6 +350,20 @@ private fun MonitorRecordsContent(
                         },
                         modifier = Modifier.fillMaxWidth(0.92f),
                     )
+                },
+                // V37 T3.2:清空本类上移 Appbar(危险操作居中含确认,契约 4/13)
+                actions = {
+                    TipIconButton(
+                        tooltip = stringResource(R.string.records_clear_action),
+                        onClick = { confirmClear = true },
+                        modifier = Modifier.testTag("records-clear-type"),
+                    ) {
+                        Icon(
+                            Icons.Filled.Delete,
+                            contentDescription = stringResource(R.string.records_clear_action),
+                            tint = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 },
                 colors =
                     TopAppBarDefaults.topAppBarColors(
@@ -382,8 +405,7 @@ private fun MonitorRecordsContent(
     }
 
     // 全屏搜索视图:Dialog 新窗口承载(官方组件,返回键/缩放动画/键盘管理内置)。
-    if (search.searchBarState.currentValue == SearchBarValue.Expanded) {
-        ExpandedFullScreenSearchBar(
+    if (search.searchBarState.currentValue == SearchBarValue.Expanded) {        ExpandedFullScreenSearchBar(
             state = search.searchBarState,
             inputField = {
                 SearchInputField(
@@ -425,5 +447,31 @@ private fun MonitorRecordsContent(
                 onRecordLongPress = ::copySummary,
             )
         }
+    }
+
+    if (confirmClear) {
+        AlertDialog(
+            onDismissRequest = { confirmClear = false },
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            icon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+            title = { Text(stringResource(R.string.danger_title)) },
+            text = { Text(stringResource(R.string.danger_clear_page_records_msg)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.clearCurrentScope { }
+                        confirmClear = false
+                    },
+                    modifier = Modifier.testTag("records-clear-confirm"),
+                ) {
+                    Text(stringResource(R.string.confirm))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { confirmClear = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
     }
 }

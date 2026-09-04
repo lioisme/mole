@@ -16,6 +16,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.launch
 
 /**
  * 单应用记录列表 ViewModel(V24 G2 收敛:records/all 退役,预设语境必选):
@@ -63,6 +64,16 @@ class RecordsViewModel(
     /** 类别过滤(名称跨枚举;null = 不限)。 */
     fun setKindName(value: String?) {
         kindName.value = value
+    }
+
+    /**
+     * 清空本应用当前类型全部记录(V37 T3.2:Appbar 动作;忽略搜索词与类别过滤,
+     * 按预设语境 deleteByFilter;结果计数回调供确认提示)。
+     */
+    fun clearCurrentScope(onResult: (Long) -> Unit) {
+        viewModelScope.launch {
+            onResult(logs.deleteByFilter(buildFilter("", null)))
+        }
     }
 }
 

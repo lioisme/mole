@@ -76,7 +76,7 @@ class ProcMountInfoHooker(
                     trackedReaders.remove(reader)
                     return
                 }
-                if (!config().procMountInfo) return
+                if (!featureOn(DeviceEnvKind.PROC_MOUNT_INFO)) return
                 val line = invocation.result as? String ?: return
                 if (isMagiskMountLine(line)) {
                     invocation.setResult(null)
@@ -93,14 +93,22 @@ class ProcMountInfoHooker(
         })
     }
 
+    /** 生效掩码词表(V37 T2.4):内置基线 ∪ 用户追加关键词(extraMaskKeywords)。 */
+    private fun maskKeywords(): List<String> =
+        if (config().feature.extraMaskKeywords.isEmpty()) {
+            MAGISK_MOUNT_KEYWORDS
+        } else {
+            MAGISK_MOUNT_KEYWORDS + config().feature.extraMaskKeywords.map { it.lowercase() }
+        }
+
     private fun isMagiskMountLine(line: String): Boolean {
         val lower = line.lowercase()
-        return MAGISK_MOUNT_KEYWORDS.any { lower.contains(it) }
+        return maskKeywords().any { lower.contains(it) }
     }
 
     private fun extractMountKeyword(line: String): String? {
         val lower = line.lowercase()
-        return MAGISK_MOUNT_KEYWORDS.firstOrNull { lower.contains(it) }
+        return maskKeywords().firstOrNull { lower.contains(it) }
     }
 
     private fun isProcMountInfoPath(path: String): Boolean {

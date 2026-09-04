@@ -1,7 +1,7 @@
 # AGENTS.md
 
-Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名/密钥/BASE64/WebView)+ 数据库监听 + 行为监听(文件系统/Assets/Shell)+ 偏好监听(SharedPreferences)+ 宿主双进程日志。
-构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀;2026-08-26 V27 记录列表重构/行为监听一等公民增量沉淀;2026-08-26 V28 详情页纯 markdown 化/偏好监听一等公民增量沉淀)。
+Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法/数据库/行为/偏好/WebView/系统信息 + 环境观测)+ 功能域(退出拦截/崩溃预防/解除录屏/弹窗关键词拦截/SSL 绕过/代理 VPN 隐藏/设备环境伪装)+ 宿主双进程日志。
+构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀;2026-08-26 V27 记录列表重构/行为监听一等公民增量沉淀;2026-08-26 V28 详情页纯 markdown 化/偏好监听一等公民增量沉淀;2026-09-04 V37 双域拆分/FeatureGate 红线/关键词库与画像契约增量沉淀)。
 
 ## 构建 / 测试(Windows,gradlew.bat)
 
@@ -20,7 +20,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 .\gradlew.bat :app:assembleModernDebugAndroidTest
 .\gradlew.bat :app:connectedModernDebugAndroidTest
 
-# lint 门禁(基线:43 warning / 0 error,V34 清理 39 死资源;提交前必须跑,禁止新增 warning)
+# lint 门禁(基线:49 warning / 0 error,V37 双域重构后实测;V34 曾 43,V35/V36 漂移 +6;提交前必须跑,禁止新增 warning)
 .\gradlew.bat :app:lintModernRelease
 ```
 
@@ -45,6 +45,11 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 | 外部访问 External Access | 服务监听 0.0.0.0(默认停用 = 127.0.0.1 仅本机);诊断页开关即写即重启改绑 | 监听 IP、开放端口 |
 | 行为监听 Behavior Listen | 文件读/写/删/重命名/列目录 + Assets 资源 + Shell 命令三类域(V27 一等公民,与算法/数据库并列) | 文件日志、hook 日志 |
 | 内容捕获 fileContentCapture | 仅「随调用即可得」的整读 API 正文预览(Files.readAllBytes/readAllLines/write/copy 与 AssetManager.open 元数据;流式路径绝不触碰句柄) | 文件内容抓取、全量读取 |
+| 监听域 Listen Domain | 被动采集能力域(算法/数据库/行为/偏好/WebView/系统信息 + 请求监控/检测监控/弹窗·控件·Activity 观测);`CategoryTaxonomy.domain = LISTEN` | 把干预功能称「××监听」 |
+| 功能域 Feature Domain | 主动干预能力域(退出拦截/崩溃预防/解除录屏/弹窗关键词拦截/SSL 绕过/代理 VPN 隐藏/Root·Xposed·模拟器伪装);`domain = FEATURE` | 伪装成监听类型 |
+| 关键词库 Keyword Library | 全局弹窗拦截关键词资产(Room `keyword_library`,text 唯一 + matchMode + 全局启停);每应用默认跟随全局,可显式子集 | 仅 override 扁平词表、无库 |
+| 伪装画像 Spoof Profile | 设备/网络伪装值组(auto/pixel7pro/xiaomi13 内置档位 + 字段覆写);`SpoofProfiles` 为机型字面量唯一事实源 | 钩子内硬编码机型值 |
+| 检测黑名单追加项 extra* | Root 包名/Xposed 前缀/Frida 端口/掩码词的用户追加项(内置基线 ∪ 追加,只增不删) | 覆盖内置基线 |
 
 ## 强约束(改了会挂测试/降级质量)
 
@@ -273,8 +278,40 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
     StatsCard 四段比例条(min weight 0.02f)、监听设置 prefs 分区
     (`listen-row-master-prefs`;**switchLabelRes 中 PrefsKind.OPEN/CLEAR 与 SQL
     kind 名碰撞,分支必须前置**)。新增类别五处同步清单同 #20
-    (+PrefsRecordMappers dispatch 双臂 + LogRepository writeBatch/registry +
-    HookInstaller probes/jsonOf + CapabilityKind.PREFS_LISTEN)。
+     (+PrefsRecordMappers dispatch 双臂 + LogRepository writeBatch/registry +
+     HookInstaller probes/jsonOf + CapabilityKind.PREFS_LISTEN)。
+23. **双域拆分契约(V37,最高架构优先级)**:`CapabilityDomain { LISTEN, FEATURE }`
+     为类别归属唯一事实源,`CategoryTaxonomy.RecordCategory.domain` **必填无默认**
+     (新增类别未标域编译即红);FEATURE 37 类 / LISTEN 44 类,快照测试锁定
+     (kind id 跨类型碰撞 OPEN/SIGNATURE,域完备断言必须用 (type,id) 对)。
+     **FeatureGate 红线**:一切干预动作(setResult/字段改写/弹窗拦截/进程拦截/
+     掩码)必须经基类 `featureOn(kind)` = master∧kind 双门控,**禁止裸布尔位直读**
+     (`InterventionGateConventionTest` 源码扫描门禁 + `FeatureGateBypassTest`
+     行为门禁;开关全关 = 零副作用,含安装期 Build 静态字段改写——
+     EmulatorBuildHooker 经 `ConfigWatcher` 惰性幂等补写,永不无条件篡改)。
+     功能域数据一律走 `HookSwitch.feature: FeatureConfig`(词表规则/画像/黑名单
+     追加,wire 信封 VERSION 恒 4、configVersion=2 读旧写新迁移);干预功能 UI
+     唯一入口 = 每应用「功能设置」(`apps/{pkg}/feature-settings`,六功能卡由
+     `FeatureGroups` 驱动,完备性测试锁定 FEATURE 域↔组并集),监听页只留
+     LISTEN 域(环境观测分区由 taxonomy 驱动);全局功能资产 = 设置页
+     「拦截与伪装」区(关键词库 `settings/keywords` / 画像 `settings/profiles`
+     / 黑名单 `settings/blacklist`,写 `feature_global` 本地键并入 switch_global
+     种子);机型字面量唯一事实源 `SpoofProfiles`(钩子禁内置);
+     关键词库 Room `keyword_library`(v14)+ 每应用 keywordIds/keywordFollowGlobal
+     宿主端解析(`SettingsRepository.withKeywordRules`),库变更
+     `pushToAllConnected` 重推。Capability 层(domain/capability)已整体退役,
+     **禁止恢复**(双域 UI 唯一驱动源 = CategoryTaxonomy)。
+24. **Appbar 动作契约(V37)**:每应用监控页「启动/清空记录」= TopBar actions
+     (`app-launch`/`app-clear-records` testTag,正文操作卡退役);10 记录列表页
+     统一「清空本类」Appbar 动作(`records-clear-type` → 居中确认
+     `records-clear-confirm`,deleteByFilter 按预设语境);危险确认恒居中
+     AlertDialog + surfaceContainerHigh。
+25. **视觉 token 契约(V37 T4)**:alpha 魔法数一律 `ui/theme/Tokens`
+     (pillContainerAlpha/badgeContainerAlpha/chevronAlpha/disabledContentAlpha/
+     emptyIcon*/codeBorderAlpha);记录行内边距 16dp 统一(旧 14dp 已归一);
+     设置类行开关统一 `ToggleListItem`(PerAppSettingRows 共享);
+     kind→标签映射唯一入口 `KindLabelRes.resolve`(监听/功能两页共用,
+     Prefs OPEN/CLEAR 碰撞前置规则不变)。
 
 ## 已知工具链坑
 

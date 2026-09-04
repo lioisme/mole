@@ -30,7 +30,7 @@ class RootPropertyHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().rootProperty) return
+                if (!featureOn(DeviceEnvKind.ROOT_PROPERTY)) return
                 val key = invocation.getArg(0) as? String ?: return
                 val replacement = PROPERTY_REPLACEMENTS[key] ?: return
                 val original = invocation.result as? String

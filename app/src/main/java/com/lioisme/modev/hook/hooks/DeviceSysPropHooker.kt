@@ -1,6 +1,7 @@
 package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.DeviceEnvKind
+import com.lioisme.modev.core.model.activeSpoofProfile
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
@@ -32,7 +33,8 @@ class DeviceSysPropHooker(
             override fun before(invocation: Invocation) {
                 if (!config().deviceEnvEnabled(DeviceEnvKind.EMULATOR_BUILD)) return
                 val key = invocation.getArg(0) as? String ?: return
-                val fakeValue = PROP_REPLACEMENTS[key] ?: return
+                // V37 T2.3:替换值来自生效伪装画像(内置档位 + 用户覆写)
+                val fakeValue = config().activeSpoofProfile().roProperties[key] ?: return
                 val currentValue = runCatching {
                     System.getProperty(key)
                 }.getOrNull()
@@ -63,23 +65,6 @@ class DeviceSysPropHooker(
             "generic", "sdk", "emulator", "goldfish", "ranchu",
             "vbox", "genymotion", "nox", "bluestacks", "ldnews",
             "android_x86", "android_x86_64",
-        )
-
-        private val PROP_REPLACEMENTS = mapOf(
-            "ro.hardware" to "qcom",
-            "ro.product.model" to "Pixel 7 Pro",
-            "ro.product.brand" to "google",
-            "ro.product.device" to "raven",
-            "ro.product.board" to "raven",
-            "ro.build.display.id" to "UP1A.231105.001",
-            "ro.build.host" to "abfarm-release-rbe-64-00069",
-            "ro.build.user" to "android-build",
-            "ro.product.name" to "raven",
-            "ro.product.manufacturer" to "Google",
-            "ro.board.platform" to "taro",
-            "ro.hardware.chipname" to "qcom",
-            "ro.soc.model" to "SM8550",
-            "ro.soc.manufacturer" to "Qualcomm",
         )
     }
 }

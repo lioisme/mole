@@ -81,7 +81,7 @@ class ProcStatusHooker(
                     trackedReaders.remove(reader)
                     return
                 }
-                if (!config().procStatus) return
+                if (!featureOn(DeviceEnvKind.PROC_STATUS)) return
                 val line = invocation.result as? String ?: return
                 if (line.startsWith("TracerPid:")) {
                     val pidValue = line.substringAfter(":").trim()

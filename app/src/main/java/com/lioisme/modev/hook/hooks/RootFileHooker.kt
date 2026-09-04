@@ -35,10 +35,9 @@ class RootFileHooker(
             override fun before(invocation: Invocation) {
                 val path = (invocation.thisObject as? java.io.File)?.path ?: return
                 val lower = path.lowercase()
-                val switch = config()
 
                 // Root 路径检测干预
-                if (switch.rootFile) {
+                if (featureOn(DeviceEnvKind.ROOT_FILE)) {
                     if (matchesRootPath(lower)) {
                         val original = runCatching { invocation.result }.getOrNull()?.toString()
                         invocation.setResult(false)
@@ -55,7 +54,7 @@ class RootFileHooker(
                 }
 
                 // 模拟器路径检测干预
-                if (switch.emulatorFile) {
+                if (featureOn(DeviceEnvKind.EMULATOR_FILE)) {
                     val emuSuffix = matchesEmulatorPath(lower)
                     if (emuSuffix != null) {
                         invocation.setResult(false)
@@ -85,7 +84,7 @@ class RootFileHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().rootFile) return
+                if (!featureOn(DeviceEnvKind.ROOT_FILE)) return
                 val path = (invocation.thisObject as? java.io.File)?.path ?: return
                 if (!matchesRootPath(path.lowercase())) return
                 invocation.setResult(0L)
@@ -107,7 +106,7 @@ class RootFileHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().rootFile) return
+                if (!featureOn(DeviceEnvKind.ROOT_FILE)) return
                 val path = (invocation.thisObject as? java.io.File)?.path ?: return
                 if (!matchesRootPath(path.lowercase())) return
                 invocation.setResult(false)
@@ -129,7 +128,7 @@ class RootFileHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().rootFile) return
+                if (!featureOn(DeviceEnvKind.ROOT_FILE)) return
                 val path = (invocation.thisObject as? java.io.File)?.path ?: return
                 if (!matchesRootPath(path.lowercase())) return
                 invocation.setResult(false)
@@ -151,7 +150,7 @@ class RootFileHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().rootFile) return
+                if (!featureOn(DeviceEnvKind.ROOT_FILE)) return
                 val path = (invocation.thisObject as? java.io.File)?.path ?: return
                 if (!matchesRootPath(path.lowercase())) return
                 invocation.setResult(false)

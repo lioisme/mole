@@ -58,7 +58,7 @@ class NetworkRequestHooker(
         installed += "newCall"
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().networkRequest) return
+                if (!featureOn(NetworkKind.REQUEST)) return
                 val request = invocation.getArg(0) ?: return
                 val url = runCatching {
                     requestClass.getMethod("url").invoke(request).toString()
@@ -114,7 +114,7 @@ class NetworkRequestHooker(
         if (getOutputStream != null) {
             engine.hook(getOutputStream, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().networkRequest) return
+                    if (!featureOn(NetworkKind.REQUEST)) return
                     val conn = invocation.thisObject ?: return
                     val url = runCatching { conn.javaClass.getMethod("getURL").invoke(conn).toString() }.getOrNull()
                     val method = runCatching { conn.javaClass.getMethod("getRequestMethod").invoke(conn) as? String }.getOrNull()
@@ -131,7 +131,7 @@ class NetworkRequestHooker(
         if (getInputStream != null) {
             engine.hook(getInputStream, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().networkRequest) return
+                    if (!featureOn(NetworkKind.REQUEST)) return
                     val conn = invocation.thisObject ?: return
                     val url = runCatching { conn.javaClass.getMethod("getURL").invoke(conn).toString() }.getOrNull()
                     val statusCode = runCatching {

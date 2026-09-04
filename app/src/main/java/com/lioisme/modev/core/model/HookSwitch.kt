@@ -197,8 +197,18 @@ data class HookSwitch(
 
     // ---- V33 UI 交互微调项 ----
 
-    /** 弹窗拦截关键字列表(空 = 不拦截;命中任一关键字即拦截)。 */
+    /**
+     * 弹窗拦截关键字列表(空 = 不拦截;命中任一关键字即拦截)。
+     * @deprecated V37 T1.2:迁移至 [FeatureConfig.dialogKeywords];
+     * 保留字段仅作旧配置 JSON 读取兼容,消费侧一律走 [activeDialogKeywords]。
+     */
+    @Deprecated("use feature.dialogKeywords / activeDialogKeywords (V37 T1.2)")
     val dialogKeywords: List<String> = emptyList(),
+
+    // ---- V37 功能域数据段 ----
+
+    /** 功能域干预参数(画像/词表/黑名单追加;见 [FeatureConfig])。 */
+    val feature: FeatureConfig = FeatureConfig(),
     /** Root:文件存在性检测干预(干预型,默认关)。 */
     val rootFile: Boolean = false,
     /** Root:命令执行检测干预(干预型,默认关)。 */
@@ -309,6 +319,23 @@ data class HookSwitch(
     /** 进程控制相关类别是否任一启用(含全局总开关投影,供进程控制能力判定)。 */
     val anyProcessControlEnabled: Boolean
         get() = processControlListen && (exitIntercept || crashPrevent || screenRecordBypass)
+
+    /**
+     * 弹窗拦截有效关键词表(V37 T1.2):feature 段优先,
+     * 旧扁平字段兜底(fromJson 已做迁移,此处双保险覆盖手工构造路径)。
+     */
+    @Suppress("DEPRECATION")
+    val activeDialogKeywords: List<String>
+        get() = feature.dialogKeywords.ifEmpty { dialogKeywords }
+
+    /**
+     * 弹窗拦截有效规则(V37 T2.1):结构化规则优先,
+     * 旧字符串列表按 CONTAINS 语义降级适配。
+     */
+    val activeKeywordRules: List<KeywordRule>
+        get() = feature.dialogKeywordRules.ifEmpty {
+            activeDialogKeywords.map { KeywordRule(it, KeywordMatchMode.CONTAINS) }
+        }
 
     fun enabled(kind: CryptoKind): Boolean = cryptoListen && when (kind) {
         CryptoKind.MESSAGE_DIGEST -> messageDigest
@@ -430,23 +457,28 @@ data class HookSwitch(
     }
 
     companion object {
-        /** 当前配置版本号:V32 干预型 hook 默认关闭迁移。 */
-        private const val CURRENT_CONFIG_VERSION = 1
+        /** 当前配置版本号:V32 干预型 hook 默认关闭迁移;V37 功能域数据段(feature)。 */
+        private const val CURRENT_CONFIG_VERSION = 2
 
         val DEFAULT = HookSwitch(configVersion = CURRENT_CONFIG_VERSION)
 
         /**
          * Gson 反序列化 + 缺字段默认值补齐 + 版本迁移:
          * - 旧字段缺失时按 JsonObject 键存在性补齐默认值;
-         * - configVersion < CURRENT_CONFIG_VERSION 时重置干预型 hook 为安全默认(false),
-         *   防止 V31 及更早版本遗留的旧 true 值导致宿主崩溃。
+         * - configVersion < 1 时重置干预型 hook 为安全默认(false),
+         *   防止 V31 及更早版本遗留的旧 true 值导致宿主崩溃;
+         * - configVersion < 2 时把扁平 [dialogKeywords] 迁入 [FeatureConfig] 数据段
+         *   (V37 T1.2 读旧写新;消费侧经 [activeDialogKeywords] 双保险)。
          */
         fun fromJson(gson: Gson, json: String): HookSwitch? = runCatching {
             val base = gson.fromJson(json, HookSwitch::class.java) ?: return null
             val obj = gson.fromJson(json, JsonObject::class.java)
             val version = obj?.get("configVersion")
                 ?.takeIf { it.isJsonPrimitive }?.asInt ?: 0
-            val needsMigration = version < CURRENT_CONFIG_VERSION
+            val needsInterventionReset = version < VERSION_INTERVENTION_DEFAULTS_OFF
+            val needsFeatureMigration = version < CURRENT_CONFIG_VERSION
+            @Suppress("DEPRECATION")
+            val legacyDialogKeywords = base.dialogKeywords
             base.copy(
                 cryptoListen = obj?.get("cryptoListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
                 dbListen = obj?.get("dbListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
@@ -457,40 +489,51 @@ data class HookSwitch(
                 deviceEnvListen = obj?.get("deviceEnvListen")?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isBoolean }?.asBoolean ?: true,
                 configVersion = CURRENT_CONFIG_VERSION,
                 // V32 迁移:干预型 hook 强制重置为 false(旧版默认 true 导致宿主崩溃)
-                sslContext = if (needsMigration) false else base.sslContext,
-                sslTrustManager = if (needsMigration) false else base.sslTrustManager,
-                sslOkhttpPinner = if (needsMigration) false else base.sslOkhttpPinner,
-                sslOkhttpVerifier = if (needsMigration) false else base.sslOkhttpVerifier,
-                sslWebview = if (needsMigration) false else base.sslWebview,
-                sslNetworkConfig = if (needsMigration) false else base.sslNetworkConfig,
-                proxySystemProp = if (needsMigration) false else base.proxySystemProp,
-                proxyConnectivity = if (needsMigration) false else base.proxyConnectivity,
-                proxySettings = if (needsMigration) false else base.proxySettings,
-                proxyOkhttp = if (needsMigration) false else base.proxyOkhttp,
-                vpnCapabilities = if (needsMigration) false else base.vpnCapabilities,
-                vpnInterface = if (needsMigration) false else base.vpnInterface,
-                vpnNetworkInfo = if (needsMigration) false else base.vpnNetworkInfo,
-                vpnLinkProperties = if (needsMigration) false else base.vpnLinkProperties,
-                rootFile = if (needsMigration) false else base.rootFile,
-                rootExec = if (needsMigration) false else base.rootExec,
-                rootPackageManager = if (needsMigration) false else base.rootPackageManager,
-                rootProperty = if (needsMigration) false else base.rootProperty,
-                xposedClass = if (needsMigration) false else base.xposedClass,
-                xposedStack = if (needsMigration) false else base.xposedStack,
-                xposedMaps = if (needsMigration) false else base.xposedMaps,
-                emulatorBuild = if (needsMigration) false else base.emulatorBuild,
-                emulatorFile = if (needsMigration) false else base.emulatorFile,
-                emulatorSensor = if (needsMigration) false else base.emulatorSensor,
-                emulatorNetwork = if (needsMigration) false else base.emulatorNetwork,
-                emulatorTelephony = if (needsMigration) false else base.emulatorTelephony,
-                emulatorCpu = if (needsMigration) false else base.emulatorCpu,
-                emulatorBattery = if (needsMigration) false else base.emulatorBattery,
-                systemProperties = if (needsMigration) false else base.systemProperties,
-                procStatus = if (needsMigration) false else base.procStatus,
-                procMountInfo = if (needsMigration) false else base.procMountInfo,
-                procCgroup = if (needsMigration) false else base.procCgroup,
-                procNet = if (needsMigration) false else base.procNet,
+                sslContext = if (needsInterventionReset) false else base.sslContext,
+                sslTrustManager = if (needsInterventionReset) false else base.sslTrustManager,
+                sslOkhttpPinner = if (needsInterventionReset) false else base.sslOkhttpPinner,
+                sslOkhttpVerifier = if (needsInterventionReset) false else base.sslOkhttpVerifier,
+                sslWebview = if (needsInterventionReset) false else base.sslWebview,
+                sslNetworkConfig = if (needsInterventionReset) false else base.sslNetworkConfig,
+                proxySystemProp = if (needsInterventionReset) false else base.proxySystemProp,
+                proxyConnectivity = if (needsInterventionReset) false else base.proxyConnectivity,
+                proxySettings = if (needsInterventionReset) false else base.proxySettings,
+                proxyOkhttp = if (needsInterventionReset) false else base.proxyOkhttp,
+                vpnCapabilities = if (needsInterventionReset) false else base.vpnCapabilities,
+                vpnInterface = if (needsInterventionReset) false else base.vpnInterface,
+                vpnNetworkInfo = if (needsInterventionReset) false else base.vpnNetworkInfo,
+                vpnLinkProperties = if (needsInterventionReset) false else base.vpnLinkProperties,
+                rootFile = if (needsInterventionReset) false else base.rootFile,
+                rootExec = if (needsInterventionReset) false else base.rootExec,
+                rootPackageManager = if (needsInterventionReset) false else base.rootPackageManager,
+                rootProperty = if (needsInterventionReset) false else base.rootProperty,
+                xposedClass = if (needsInterventionReset) false else base.xposedClass,
+                xposedStack = if (needsInterventionReset) false else base.xposedStack,
+                xposedMaps = if (needsInterventionReset) false else base.xposedMaps,
+                emulatorBuild = if (needsInterventionReset) false else base.emulatorBuild,
+                emulatorFile = if (needsInterventionReset) false else base.emulatorFile,
+                emulatorSensor = if (needsInterventionReset) false else base.emulatorSensor,
+                emulatorNetwork = if (needsInterventionReset) false else base.emulatorNetwork,
+                emulatorTelephony = if (needsInterventionReset) false else base.emulatorTelephony,
+                emulatorCpu = if (needsInterventionReset) false else base.emulatorCpu,
+                emulatorBattery = if (needsInterventionReset) false else base.emulatorBattery,
+                systemProperties = if (needsInterventionReset) false else base.systemProperties,
+                procStatus = if (needsInterventionReset) false else base.procStatus,
+                procMountInfo = if (needsInterventionReset) false else base.procMountInfo,
+                procCgroup = if (needsInterventionReset) false else base.procCgroup,
+                procNet = if (needsInterventionReset) false else base.procNet,
+                // V37 T1.2 迁移:扁平 dialogKeywords → feature 数据段(读旧写新)
+                feature = if (needsFeatureMigration &&
+                    base.feature.dialogKeywords.isEmpty() &&
+                    legacyDialogKeywords.isNotEmpty()
+                ) {
+                    base.feature.copy(dialogKeywords = legacyDialogKeywords)
+                } else {
+                    base.feature
+                },
             )
         }.getOrNull()
+
+        private const val VERSION_INTERVENTION_DEFAULTS_OFF = 1
     }
 }

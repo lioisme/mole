@@ -462,6 +462,7 @@ class CryptoRecordDaoTest {
             ModevDatabase.MIGRATION_10_11,
             ModevDatabase.MIGRATION_11_12,
             ModevDatabase.MIGRATION_12_13,
+            ModevDatabase.MIGRATION_13_14,
         ).build()
         val migratedDao = migrated.cryptoRecordDao()
 
@@ -541,6 +542,7 @@ class CryptoRecordDaoTest {
             ModevDatabase.MIGRATION_10_11,
             ModevDatabase.MIGRATION_11_12,
             ModevDatabase.MIGRATION_12_13,
+            ModevDatabase.MIGRATION_13_14,
         ).build()
         val migratedDao = migrated.cryptoRecordDao()
 
@@ -678,6 +680,7 @@ class CryptoRecordDaoTest {
             ModevDatabase.MIGRATION_10_11,
             ModevDatabase.MIGRATION_11_12,
             ModevDatabase.MIGRATION_12_13,
+            ModevDatabase.MIGRATION_13_14,
             ).build()
             val migratedDao = migrated.cryptoRecordDao()
 
@@ -730,6 +733,7 @@ class CryptoRecordDaoTest {
             ModevDatabase.MIGRATION_10_11,
             ModevDatabase.MIGRATION_11_12,
             ModevDatabase.MIGRATION_12_13,
+            ModevDatabase.MIGRATION_13_14,
             ).build()
             val migratedDao = migrated.cryptoRecordDao()
 
@@ -785,7 +789,7 @@ class CryptoRecordDaoTest {
             RuntimeEnvironment.getApplication(),
             ModevDatabase::class.java,
             "mig-v7.db",
-        ).addMigrations(ModevDatabase.MIGRATION_7_8, ModevDatabase.MIGRATION_8_9, ModevDatabase.MIGRATION_9_10, ModevDatabase.MIGRATION_10_11, ModevDatabase.MIGRATION_11_12, ModevDatabase.MIGRATION_12_13).build()
+        ).addMigrations(ModevDatabase.MIGRATION_7_8, ModevDatabase.MIGRATION_8_9, ModevDatabase.MIGRATION_9_10, ModevDatabase.MIGRATION_10_11, ModevDatabase.MIGRATION_11_12, ModevDatabase.MIGRATION_12_13, ModevDatabase.MIGRATION_13_14).build()
         val migratedDao = migrated.cryptoRecordDao()
 
         // v7 存量数据完整保留
@@ -827,7 +831,7 @@ class CryptoRecordDaoTest {
             RuntimeEnvironment.getApplication(),
             ModevDatabase::class.java,
             "mig-v8.db",
-        ).addMigrations(ModevDatabase.MIGRATION_8_9, ModevDatabase.MIGRATION_9_10, ModevDatabase.MIGRATION_10_11, ModevDatabase.MIGRATION_11_12, ModevDatabase.MIGRATION_12_13).build()
+        ).addMigrations(ModevDatabase.MIGRATION_8_9, ModevDatabase.MIGRATION_9_10, ModevDatabase.MIGRATION_10_11, ModevDatabase.MIGRATION_11_12, ModevDatabase.MIGRATION_12_13, ModevDatabase.MIGRATION_13_14).build()
         val migratedDao = migrated.cryptoRecordDao()
 
         // v8 存量数据完整保留
@@ -885,7 +889,7 @@ class CryptoRecordDaoTest {
             RuntimeEnvironment.getApplication(),
             ModevDatabase::class.java,
             "mig-v9.db",
-        ).addMigrations(ModevDatabase.MIGRATION_9_10, ModevDatabase.MIGRATION_10_11, ModevDatabase.MIGRATION_11_12, ModevDatabase.MIGRATION_12_13).build()
+        ).addMigrations(ModevDatabase.MIGRATION_9_10, ModevDatabase.MIGRATION_10_11, ModevDatabase.MIGRATION_11_12, ModevDatabase.MIGRATION_12_13, ModevDatabase.MIGRATION_13_14).build()
         val migratedDao = migrated.cryptoRecordDao()
 
         // v9 存量数据完整保留

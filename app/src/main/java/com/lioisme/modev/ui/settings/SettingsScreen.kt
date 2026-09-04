@@ -23,6 +23,8 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Chat
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Dns
@@ -99,6 +101,9 @@ fun SettingsScreen(
     onBack: () -> Unit = {},
     onOpenDataSettings: () -> Unit = {},
     onOpenDiagnostics: () -> Unit = {},
+    onOpenKeywords: () -> Unit = {},
+    onOpenProfiles: () -> Unit = {},
+    onOpenBlacklist: () -> Unit = {},
     onOpenAbout: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -189,6 +194,29 @@ fun SettingsScreen(
                     icon = Icons.Default.Dns,
                     title = stringResource(R.string.diagnostics_settings_title),
                     onClick = onOpenDiagnostics,
+                )
+            }
+
+            // V37 T3.5 功能域全局资产:关键词库 / 伪装画像 / 检测黑名单
+            Spacer(Modifier.height(24.dp))
+            SettingsSection(stringResource(R.string.settings_interception_section)) {
+                SettingsItem(
+                    icon = Icons.Default.Chat,
+                    title = stringResource(R.string.settings_keywords_entry),
+                    subtitle = stringResource(R.string.settings_keywords_entry_hint),
+                    onClick = onOpenKeywords,
+                )
+                SettingsItem(
+                    icon = Icons.Default.PhoneAndroid,
+                    title = stringResource(R.string.settings_profiles_entry),
+                    subtitle = stringResource(R.string.settings_profiles_entry_hint),
+                    onClick = onOpenProfiles,
+                )
+                SettingsItem(
+                    icon = Icons.Default.Block,
+                    title = stringResource(R.string.settings_blacklist_entry),
+                    subtitle = stringResource(R.string.settings_blacklist_entry_hint),
+                    onClick = onOpenBlacklist,
                 )
             }
 

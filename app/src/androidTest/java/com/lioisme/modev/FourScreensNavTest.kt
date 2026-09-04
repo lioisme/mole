@@ -211,12 +211,9 @@ class FourScreensNavTest {
         assumeTrue(openedLaunchable)
         rule.onAllNodesWithTag("app-launch").assertCountEquals(1)
 
-        // V23 重构:更多菜单退役,清空记录归位操作卡(error 行,仅断言存在不触发);
+        // V37 T3.2:启动/清空 = Appbar actions(图标 testTag 锚定);
         // 移出作用域升级为 Hero 卡作用域 Switch(app-scope-row)。
-        // (旧版此处 pressBack 用于关闭 DropdownMenu 弹层,V23 无弹层,不再退页。)
-        rule.onNodeWithText(str(R.string.detail_clear_records))
-            .performScrollTo()
-            .assertIsDisplayed()
+        rule.onAllNodesWithTag("app-clear-records").assertCountEquals(1)
         rule.onNodeWithTag("app-scope-row")
             .performScrollTo()
             .assertIsDisplayed()

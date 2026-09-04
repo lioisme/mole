@@ -1,5 +1,7 @@
 package com.lioisme.modev.hook.hooks
 
+import com.lioisme.modev.core.model.HookSwitch
+import com.lioisme.modev.core.model.KeywordRule
 import com.lioisme.modev.core.model.UiInteractionKind
 import com.lioisme.modev.core.model.UiInteractionOperation
 import com.lioisme.modev.hook.Invocation
@@ -7,11 +9,13 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * 对话框关键词拦截 Hooker(V33,V34 审计修复):hook AlertDialog.Builder 构造后的 show(),
- * 在 before() 中检查 title/message 是否命中配置中的 dialogKeywords 列表,
- * 命中则调用 setResult(null) 阻止弹窗显示。
+ * 对话框关键词拦截 Hooker(V33,V34 审计修复;V37 T0.1 闸门收口):
+ * hook AlertDialog.Builder 构造后的 show(),在 before() 中检查 title/message
+ * 是否命中配置中的 dialogKeywords 列表,命中则调用 setResult(null) 阻止弹窗显示。
  *
- * 干预机制:before() 中 setResult(null) 阻止 AlertDialog.show() 执行,弹窗不显示。
+ * 干预机制:before() 中经 [matchedKeywords] 统一闸门(uiListen master ∧ DIALOG_KEYWORD
+ * ∧ 词表非空)判定,命中才 setResult(null) 阻止弹窗显示——开关关闭时即使词表命中
+ * 也一律放行(V37 FeatureGate 红线,修复「只压记录不压干预」旁路)。
  * 干预结果通过 [UiInteractionRecord.interventionAction] 记录("BLOCKED"|"DETECTED"|null)。
  *
  * 安全注意:此功能会阻止匹配关键词的弹窗显示,可能影响应用正常交互。
@@ -32,11 +36,7 @@ class DialogKeywordInterceptHooker(
                     val dialog = invocation.thisObject ?: return
                     val title = extractTitle(dialog)
                     val message = extractMessage(dialog)
-                    val keywords = config().dialogKeywords
-                    if (keywords.isEmpty()) return
-                    val matched = mutableListOf<String>()
-                    title?.let { t -> keywords.filter { t.contains(it, ignoreCase = true) }.let(matched::addAll) }
-                    message?.let { m -> keywords.filter { m.contains(it, ignoreCase = true) }.let(matched::addAll) }
+                    val matched = matchedKeywords(config(), title, message)
                     if (matched.isEmpty()) return
                     emit(
                         kind = UiInteractionKind.DIALOG_KEYWORD,
@@ -69,5 +69,23 @@ class DialogKeywordInterceptHooker(
     companion object {
         /** interventionAction:已阻止弹窗显示 */
         private const val ACTION_BLOCKED = "BLOCKED"
+
+        /**
+         * 拦截判定纯函数(V37 T0.1,可 JVM 直测;T2.1 规则化):
+         * master ∧ kind 门控 → 有效规则表 → 标题/消息命中集(命中词文本)。
+         * 任一前置不满足返回空集(= 不拦截)。
+         */
+        internal fun matchedKeywords(switch: HookSwitch, title: String?, message: String?): List<String> {
+            if (!switch.uiInteractionEnabled(UiInteractionKind.DIALOG_KEYWORD)) return emptyList()
+            val rules = switch.activeKeywordRules
+            if (rules.isEmpty()) return emptyList()
+            val matched = mutableListOf<String>()
+            for (rule in rules) {
+                if (KeywordRule.matches(rule, title) || KeywordRule.matches(rule, message)) {
+                    matched += rule.text
+                }
+            }
+            return matched
+        }
     }
 }

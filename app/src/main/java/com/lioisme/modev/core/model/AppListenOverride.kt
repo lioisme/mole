@@ -62,6 +62,29 @@ data class AppListenOverride(
     val ignorePathPrefixes: List<String>? = null,
     /** 弹窗关键字清单偏差(V33;null = 取默认,非空整表替换)。 */
     val dialogKeywords: List<String>? = null,
+    // ---- V37 T1.2 功能域数据偏差 ----
+    /** 伪装画像档位偏差(null = 取默认;非空整值替换)。 */
+    val spoofProfileId: String? = null,
+    /** 画像字段覆写偏差(null = 取默认;非空整表替换)。 */
+    val spoofOverrides: Map<String, String>? = null,
+    /** Root 包名黑名单追加偏差(null = 取默认;非空整表替换)。 */
+    val extraRootPackages: List<String>? = null,
+    /** Xposed 前缀黑名单追加偏差(null = 取默认;非空整表替换)。 */
+    val extraXposedPrefixes: List<String>? = null,
+    /** Frida 端口追加偏差(null = 取默认;非空整表替换)。 */
+    val extraFridaPorts: List<Int>? = null,
+    /** 掩码关键词追加偏差(null = 取默认;非空整表替换)。 */
+    val extraMaskKeywords: List<String>? = null,
+    /**
+     * 关键词库启用条目偏差(V37 T2.1;宿主端解析为 [FeatureConfig.dialogKeywords] 后
+     * 不再下发 id 集,注入侧零感知;仅存储/回显用)。
+     */
+    val keywordIds: List<Long>? = null,
+    /**
+     * 关键词「跟随全局启用集」偏差(V37 T3.4;宿主端消费,不入 wire):
+     * null/true = 跟随全局;false = 显式使用 [keywordIds] 子集(空 = 全部不启用)。
+     */
+    val keywordFollowGlobal: Boolean? = null,
 ) {
 
     /** 是否等价于「完全未定制」(与默认配置零偏差):调用方应删除存储键而非落盘。 */
@@ -84,7 +107,49 @@ data class AppListenOverride(
             maxResultChars == null &&
             fileContentCapture == null &&
             ignorePathPrefixes.isNullOrEmpty() &&
-            dialogKeywords.isNullOrEmpty()
+            dialogKeywords.isNullOrEmpty() &&
+            spoofProfileId == null &&
+            spoofOverrides.isNullOrEmpty() &&
+            extraRootPackages.isNullOrEmpty() &&
+            extraXposedPrefixes.isNullOrEmpty() &&
+            extraFridaPorts.isNullOrEmpty() &&
+            extraMaskKeywords.isNullOrEmpty() &&
+            keywordIds.isNullOrEmpty() &&
+            keywordFollowGlobal == null
+
+    /**
+     * 自定义偏差计数(V37 C8 单一事实源:入口页摘要与恢复默认行共用;
+     * 清单类偏差整表计 1)。
+     */
+    val deviationCount: Int
+        get() =
+            (if (cryptoListen != null) 1 else 0) +
+            (if (dbListen != null) 1 else 0) +
+            (if (behaviorListen != null) 1 else 0) +
+            (if (prefsListen != null) 1 else 0) +
+            (if (webviewListen != null) 1 else 0) +
+            (if (networkListen != null) 1 else 0) +
+            (if (deviceEnvListen != null) 1 else 0) +
+            (if (uiListen != null) 1 else 0) +
+            (if (systemListen != null) 1 else 0) +
+            (if (processControlListen != null) 1 else 0) +
+            kinds.size +
+            (if (logStack != null) 1 else 0) +
+            (if (maxBytesPerField != null) 1 else 0) +
+            (if (!ignoreStackPrefixes.isNullOrEmpty()) 1 else 0) +
+            (if (maxResultRows != null) 1 else 0) +
+            (if (maxResultChars != null) 1 else 0) +
+            (if (fileContentCapture != null) 1 else 0) +
+            (if (!ignorePathPrefixes.isNullOrEmpty()) 1 else 0) +
+            (if (!dialogKeywords.isNullOrEmpty()) 1 else 0) +
+            (if (spoofProfileId != null) 1 else 0) +
+            (if (!spoofOverrides.isNullOrEmpty()) 1 else 0) +
+            (if (!extraRootPackages.isNullOrEmpty()) 1 else 0) +
+            (if (!extraXposedPrefixes.isNullOrEmpty()) 1 else 0) +
+            (if (!extraFridaPorts.isNullOrEmpty()) 1 else 0) +
+            (if (!extraMaskKeywords.isNullOrEmpty()) 1 else 0) +
+            (if (!keywordIds.isNullOrEmpty()) 1 else 0) +
+            (if (keywordFollowGlobal != null) 1 else 0)
 
     /** Gson 序列化(null 位由 Gson 默认省略,存储紧凑;构造路径保证无冗余条目)。 */
     fun toJson(gson: Gson): String = gson.toJson(this)
@@ -123,6 +188,14 @@ data class AppListenOverride(
                     fileContentCapture = boolOf(obj, FIELD_FILE_CONTENT),
                     ignorePathPrefixes = stringListOf(obj, FIELD_IGNORE_PATH),
                     dialogKeywords = stringListOf(obj, FIELD_DIALOG_KEYWORDS),
+                    spoofProfileId = stringOf(obj, FIELD_SPOOF_PROFILE),
+                    spoofOverrides = stringMapOf(obj, FIELD_SPOOF_OVERRIDES),
+                    extraRootPackages = stringListOf(obj, FIELD_EXTRA_ROOT_PACKAGES),
+                    extraXposedPrefixes = stringListOf(obj, FIELD_EXTRA_XPOSED_PREFIXES),
+                    extraFridaPorts = intListOf(obj, FIELD_EXTRA_FRIDA_PORTS),
+                    extraMaskKeywords = stringListOf(obj, FIELD_EXTRA_MASK_KEYWORDS),
+                    keywordIds = longListOf(obj, FIELD_KEYWORD_IDS),
+                    keywordFollowGlobal = boolOf(obj, FIELD_KEYWORD_FOLLOW_GLOBAL),
                 )
             }.getOrDefault(DEFAULT)
         }
@@ -152,6 +225,40 @@ data class AppListenOverride(
             val array = obj.get(field)?.takeIf { it.isJsonArray } ?: return null
             val entries = array.asJsonArray
                 .mapNotNull { it?.takeIf { e -> e.isJsonPrimitive }?.asString }
+            return entries.ifEmpty { null }
+        }
+
+        /** 单值字符串偏差解析(V37 画像档位):仅接受字符串原样;缺失/空串 → 取默认。 */
+        private fun stringOf(obj: JsonObject, field: String): String? =
+            obj.get(field)?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
+                ?.asString?.takeIf { it.isNotEmpty() }
+
+        /** 字符串映射偏差解析(V37 画像覆写):仅接受字符串→字符串对象;缺失/空对象 → 取默认。 */
+        private fun stringMapOf(obj: JsonObject, field: String): Map<String, String>? {
+            val map = obj.get(field)?.takeIf { it.isJsonObject }?.asJsonObject ?: return null
+            if (map.entrySet().isEmpty()) return null
+            return map.entrySet()
+                .mapNotNull { (k, v) ->
+                    val value = v?.takeIf { e -> e.isJsonPrimitive && e.asJsonPrimitive.isString }?.asString
+                    if (value == null) null else k to value
+                }
+                .toMap()
+                .ifEmpty { null }
+        }
+
+        /** 整型清单偏差解析(V37 Frida 端口追加):仅接受数值数组;缺失/空表 → 取默认。 */
+        private fun intListOf(obj: JsonObject, field: String): List<Int>? {
+            val array = obj.get(field)?.takeIf { it.isJsonArray } ?: return null
+            val entries = array.asJsonArray
+                .mapNotNull { it?.takeIf { e -> e.isJsonPrimitive && e.asJsonPrimitive.isNumber }?.asInt }
+            return entries.ifEmpty { null }
+        }
+
+        /** 长整型清单偏差解析(V37 关键词库启用条目):仅接受数值数组;缺失/空表 → 取默认。 */
+        private fun longListOf(obj: JsonObject, field: String): List<Long>? {
+            val array = obj.get(field)?.takeIf { it.isJsonArray } ?: return null
+            val entries = array.asJsonArray
+                .mapNotNull { it?.takeIf { e -> e.isJsonPrimitive && e.asJsonPrimitive.isNumber }?.asLong }
             return entries.ifEmpty { null }
         }
 
@@ -198,6 +305,14 @@ data class AppListenOverride(
         private const val FIELD_FILE_CONTENT = "fileContentCapture"
         private const val FIELD_IGNORE_PATH = "ignorePathPrefixes"
         private const val FIELD_DIALOG_KEYWORDS = "dialogKeywords"
+        private const val FIELD_SPOOF_PROFILE = "spoofProfileId"
+        private const val FIELD_SPOOF_OVERRIDES = "spoofOverrides"
+        private const val FIELD_EXTRA_ROOT_PACKAGES = "extraRootPackages"
+        private const val FIELD_EXTRA_XPOSED_PREFIXES = "extraXposedPrefixes"
+        private const val FIELD_EXTRA_FRIDA_PORTS = "extraFridaPorts"
+        private const val FIELD_EXTRA_MASK_KEYWORDS = "extraMaskKeywords"
+        private const val FIELD_KEYWORD_IDS = "keywordIds"
+        private const val FIELD_KEYWORD_FOLLOW_GLOBAL = "keywordFollowGlobal"
 
         /** V23 三态遗留:旧 kinds 键名与枚举序列化形态。 */
         private const val LEGACY_FIELD_KINDS = "kindOverrides"

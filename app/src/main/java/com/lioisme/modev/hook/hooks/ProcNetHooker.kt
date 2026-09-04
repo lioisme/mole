@@ -80,7 +80,7 @@ class ProcNetHooker(
                     trackedReaders.remove(reader)
                     return
                 }
-                if (!config().procNet) return
+                if (!featureOn(DeviceEnvKind.PROC_NET)) return
                 val line = invocation.result as? String ?: return
                 if (isFridaPortLine(line)) {
                     invocation.setResult(null)
@@ -110,7 +110,8 @@ class ProcNetHooker(
         val portHex = localAddress.substringAfterLast(':', "")
         if (portHex.isEmpty()) return false
         val portValue = runCatching { portHex.toInt(16) }.getOrNull() ?: return false
-        return FRIDA_PORTS.contains(portValue)
+        // V37 T2.4:内置 Frida 端口基线 ∪ 用户追加端口
+        return FRIDA_PORTS.contains(portValue) || config().feature.extraFridaPorts.contains(portValue)
     }
 
     private fun isProcNetPath(path: String): Boolean {

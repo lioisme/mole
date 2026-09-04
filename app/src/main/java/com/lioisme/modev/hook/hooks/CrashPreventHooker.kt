@@ -39,7 +39,7 @@ class CrashPreventHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().crashPrevent) return
+                    if (!featureOn(ProcessKind.CRASH_PREVENT)) return
                     val thread = invocation.thisObject as? JavaThread ?: return
                     val currentHandler = runCatching {
                         val field = JavaThread::class.java.getDeclaredField("uncaughtExceptionHandler")
@@ -67,7 +67,7 @@ class CrashPreventHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().crashPrevent) return
+                    if (!featureOn(ProcessKind.CRASH_PREVENT)) return
                     val thread = invocation.thisObject as? JavaThread ?: return
                     val throwable = invocation.getArg(0) as? Throwable ?: return
                     recordCrash(thread, throwable)

@@ -161,4 +161,74 @@ class CategoryTaxonomyTest {
     fun `DeviceEnv taxonomy has 21 entries`() {
         assertEquals(21, CategoryTaxonomy.forType(RecordType.DEVICE_ENV).size)
     }
+
+    // ── V37 T1.1 双域拆分(D-0 基线)快照锁定 ───────────────────────────
+
+    @Test
+    fun `feature domain snapshot matches D-0 baseline`() {
+        val featureCats = CategoryTaxonomy.forDomain(CapabilityDomain.FEATURE)
+        assertEquals(37, featureCats.size)
+        val feature = featureCats.map { it.id }.toSet()
+        val expected = setOf(
+            // 进程控制 3
+            ProcessKind.EXIT_INTERCEPT.name, ProcessKind.CRASH_PREVENT.name, ProcessKind.SCREEN_RECORD.name,
+            // UI 拦截 1
+            UiInteractionKind.DIALOG_KEYWORD.name,
+            // 网络干预 14(SSL×6 + 代理×4 + VPN×4)
+            NetworkKind.SSL_CONTEXT.name, NetworkKind.SSL_TRUST_MANAGER.name,
+            NetworkKind.SSL_OKHTTP_PINNER.name, NetworkKind.SSL_OKHTTP_VERIFIER.name,
+            NetworkKind.SSL_WEBVIEW.name, NetworkKind.SSL_NETWORK_CONFIG.name,
+            NetworkKind.PROXY_SYSTEM_PROP.name, NetworkKind.PROXY_CONNECTIVITY.name,
+            NetworkKind.PROXY_SETTINGS.name, NetworkKind.PROXY_OKHTTP.name,
+            NetworkKind.VPN_CAPABILITIES.name, NetworkKind.VPN_INTERFACE.name,
+            NetworkKind.VPN_NETWORK_INFO.name, NetworkKind.VPN_LINK_PROPERTIES.name,
+            // 设备环境干预 19
+            DeviceEnvKind.ROOT_FILE.name, DeviceEnvKind.ROOT_EXEC.name,
+            DeviceEnvKind.ROOT_PACKAGE_MANAGER.name, DeviceEnvKind.ROOT_PROPERTY.name,
+            DeviceEnvKind.XPOSED_CLASS.name, DeviceEnvKind.XPOSED_STACK.name, DeviceEnvKind.XPOSED_MAPS.name,
+            DeviceEnvKind.EMULATOR_BUILD.name, DeviceEnvKind.EMULATOR_FILE.name,
+            DeviceEnvKind.EMULATOR_SENSOR.name, DeviceEnvKind.EMULATOR_NETWORK.name,
+            DeviceEnvKind.EMULATOR_TELEPHONY.name, DeviceEnvKind.EMULATOR_CPU.name,
+            DeviceEnvKind.EMULATOR_BATTERY.name, DeviceEnvKind.SYSTEM_PROPERTIES.name,
+            DeviceEnvKind.PROC_STATUS.name, DeviceEnvKind.PROC_MOUNT_INFO.name,
+            DeviceEnvKind.PROC_CGROUP.name, DeviceEnvKind.PROC_NET.name,
+        )
+        assertEquals(expected, feature)
+    }
+
+    @Test
+    fun `listen domain snapshot covers remaining categories`() {
+        // 注意:kind id 跨类型存在同名碰撞(OPEN: SQL/PREFS;SIGNATURE: CRYPTO/SYSTEM),
+        // 域完备性断言必须用 (type,id) 对而非裸 id 集合。
+        val listen = CategoryTaxonomy.forDomain(CapabilityDomain.LISTEN)
+        assertEquals(44, listen.size)
+        val listenIds = listen.map { it.id }.toSet()
+        // 观测子类不得混入功能域
+        assertTrue(listenIds.contains(NetworkKind.REQUEST.name))
+        assertTrue(listenIds.contains(DeviceEnvKind.DETECT_ROOT.name))
+        assertTrue(listenIds.contains(DeviceEnvKind.DETECT_EMULATOR.name))
+        assertTrue(listenIds.contains(UiInteractionKind.DIALOG_SHOW.name))
+        // 两域互斥且完备((type,id) 对级)
+        val pairs = { cats: List<RecordCategory> -> cats.map { it.type to it.id }.toSet() }
+        val feature = CategoryTaxonomy.forDomain(CapabilityDomain.FEATURE)
+        assertEquals(pairs(CategoryTaxonomy.all()), pairs(listen) + pairs(feature))
+        assertTrue(pairs(listen).intersect(pairs(feature)).isEmpty())
+    }
+
+    @Test
+    fun `feature domain defaults off except data-gated dialog keyword`() {
+        val enabledFeature = CategoryTaxonomy.forDomain(CapabilityDomain.FEATURE).filter { it.defaultEnabled }
+        assertEquals(
+            "功能域默认全关(数据门控类别除外)",
+            setOf(UiInteractionKind.DIALOG_KEYWORD.name),
+            enabledFeature.map { it.id }.toSet(),
+        )
+    }
+
+    @Test
+    fun `isFeature resolves domain by type and id`() {
+        assertTrue(CategoryTaxonomy.isFeature(RecordType.PROCESS_CONTROL, ProcessKind.EXIT_INTERCEPT.name))
+        assertFalse(CategoryTaxonomy.isFeature(RecordType.NETWORK, NetworkKind.REQUEST.name))
+        assertFalse(CategoryTaxonomy.isFeature(RecordType.NETWORK, "UNKNOWN_KIND"))
+    }
 }

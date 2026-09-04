@@ -43,15 +43,20 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * v12 → v13:V34 审计增强新增 3 个可空列:
  *   interventionAction(TEXT,干预动作标记:"BLOCKED"/"DETECTED"/null);
  *   同时覆盖进程控制/设备环境/UI交互三类记录;纯 ALTER TABLE ADD COLUMN,不触碰存量行。
+ * v13 → v14:V37 T2.1 功能域数据层新增 `keyword_library` 表
+ *   (全局弹窗拦截关键词库:id/text 唯一/matchMode/enabled/createdAt),
+ *   纯 CREATE TABLE + UNIQUE INDEX,不触碰存量记录。
  */
 @Database(
-    entities = [CryptoRecordEntity::class],
-    version = 13,
+    entities = [CryptoRecordEntity::class, KeywordEntity::class],
+    version = 14,
     exportSchema = true,
 )
 abstract class ModevDatabase : RoomDatabase() {
 
     abstract fun cryptoRecordDao(): CryptoRecordDao
+
+    abstract fun keywordLibraryDao(): KeywordLibraryDao
 
     companion object {
         /** v1 → v2:纯新增可空列,ALTER TABLE ADD COLUMN 即可,不触碰存量数据。 */
@@ -262,6 +267,27 @@ abstract class ModevDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v13 → v14:V37 T2.1 新增关键词库表(建表 SQL 与 Room 生成 schema 逐字一致,
+         * 否则运行时校验抛异常);纯增量,不触碰存量记录。
+         */
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `keyword_library` (" +
+                        "`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "`text` TEXT NOT NULL, " +
+                        "`matchMode` TEXT NOT NULL, " +
+                        "`enabled` INTEGER NOT NULL, " +
+                        "`createdAt` INTEGER NOT NULL)"
+                )
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS `index_keyword_library_text` " +
+                        "ON `keyword_library` (`text`)"
+                )
+            }
+        }
+
         @Volatile
         private var instance: ModevDatabase? = null
 
@@ -279,7 +305,7 @@ abstract class ModevDatabase : RoomDatabase() {
                         MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
                         MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
                         MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-                        MIGRATION_12_13,
+                        MIGRATION_12_13, MIGRATION_13_14,
                     )
                     .fallbackToDestructiveMigration(false)
                     .build()

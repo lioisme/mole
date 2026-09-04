@@ -1,4 +1,4 @@
-﻿package com.lioisme.modev.ui.settings
+package com.lioisme.modev.ui.settings
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
@@ -51,6 +51,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -184,7 +185,7 @@ fun DiagnosticsScreen(
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
-            Spacer(Modifier.padding(top = 8.dp))
+            Spacer(Modifier.height(8.dp))
             SettingsSection(stringResource(R.string.settings_framework_section)) {
                 when (val framework = frameworkState) {
                     is ScopeState.Connecting -> {
@@ -272,7 +273,7 @@ fun DiagnosticsScreen(
             // 管道统计分区(V21 T5:卡片化,与 Data 页分区视觉对齐;折叠头行
             // 即分区标题——标题唯一,不与 Section 重复;卡片 token 与
             // SettingsSection 同源 surfaceContainerLow)。
-            Spacer(Modifier.padding(top = 8.dp))
+            Spacer(Modifier.height(8.dp))
             Card(
                 colors =
                     CardDefaults.cardColors(
@@ -370,14 +371,23 @@ fun DiagnosticsScreen(
         )
     }
 
-    // V29 端口设置 BottomSheet(M3 ModalBottomSheet,输入契约)。
+    // V29 端口设置 BottomSheet(M3 ModalBottomSheet,输入契约;
+    // V37 T4.5:sheetState + hide 退场动画收口,与 SettingsSheets 统一)。
     if (portSheetOpen) {
-        ModalBottomSheet(
-            onDismissRequest = {
+        val portSheetState = rememberModalBottomSheetState()
+        val portSheetScope = rememberCoroutineScope()
+        fun closePortSheet(reset: Boolean) {
+            portSheetScope.launch { portSheetState.hide() }.invokeOnCompletion {
+                if (reset) {
+                    portInputValue = port.toString()
+                    portInputError = false
+                }
                 portSheetOpen = false
-                portInputValue = port.toString()
-                portInputError = false
-            },
+            }
+        }
+        ModalBottomSheet(
+            onDismissRequest = { closePortSheet(reset = true) },
+            sheetState = portSheetState,
             containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
             modifier = Modifier.testTag("port-setting-sheet"),
         ) {
@@ -390,7 +400,7 @@ fun DiagnosticsScreen(
             ) {
                 Text(
                     text = stringResource(R.string.settings_port_edit),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
@@ -417,11 +427,7 @@ fun DiagnosticsScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End,
                 ) {
-                    TextButton(onClick = {
-                        portSheetOpen = false
-                        portInputValue = port.toString()
-                        portInputError = false
-                    }) {
+                    TextButton(onClick = { closePortSheet(reset = true) }) {
                         Text(stringResource(R.string.cancel))
                     }
                     Spacer(Modifier.width(8.dp))
@@ -430,8 +436,7 @@ fun DiagnosticsScreen(
                             val parsed = portInputValue.toIntOrNull()
                             if (parsed != null && parsed in 1..65535) {
                                 viewModel.setPort(parsed)
-                                portSheetOpen = false
-                                portInputError = false
+                                closePortSheet(reset = false)
                             } else {
                                 portInputError = true
                             }

@@ -124,29 +124,9 @@ class PerAppListenSettingsViewModel(
         update { it.copy(webviewListen = value) }
     }
 
-    /** 网络环境监听总开关定制(V30)。 */
-    fun setNetworkMaster(value: Boolean) {
-        update { it.copy(networkListen = value) }
-    }
-
-    /** 设备环境监听总开关定制(V31)。 */
-    fun setDeviceEnvMaster(value: Boolean) {
-        update { it.copy(deviceEnvListen = value) }
-    }
-
-    /** UI 交互监听总开关定制(V33)。 */
-    fun setUiMaster(value: Boolean) {
-        update { it.copy(uiListen = value) }
-    }
-
     /** 系统信息监听总开关定制(V33)。 */
     fun setSystemMaster(value: Boolean) {
         update { it.copy(systemListen = value) }
-    }
-
-    /** 进程控制监听总开关定制(V33)。 */
-    fun setProcessControlMaster(value: Boolean) {
-        update { it.copy(processControlListen = value) }
     }
 
     /** 类别定制(kind 名跨枚举;非法名由 AppListenOverride 容错忽略)。 */
@@ -307,38 +287,10 @@ fun PerAppListenSettingsScreen(
                 )
                 HorizontalDivider16()
                 ListenRow(
-                    label = res.getString(R.string.network_monitor_master),
-                    checked = effective.networkListen,
-                    onCheckedChange = { viewModel.setNetworkMaster(it) },
-                    testTag = "listen-row-master-network",
-                )
-                HorizontalDivider16()
-                ListenRow(
-                    label = res.getString(R.string.device_env_master),
-                    checked = effective.deviceEnvListen,
-                    onCheckedChange = { viewModel.setDeviceEnvMaster(it) },
-                    testTag = "listen-row-master-device-env",
-                )
-                HorizontalDivider16()
-                ListenRow(
-                    label = res.getString(R.string.listen_row_master_ui),
-                    checked = effective.uiListen,
-                    onCheckedChange = { viewModel.setUiMaster(it) },
-                    testTag = "listen-row-master-ui",
-                )
-                HorizontalDivider16()
-                ListenRow(
                     label = res.getString(R.string.listen_row_master_system),
                     checked = effective.systemListen,
                     onCheckedChange = { viewModel.setSystemMaster(it) },
                     testTag = "listen-row-master-system",
-                )
-                HorizontalDivider16()
-                ListenRow(
-                    label = res.getString(R.string.listen_row_master_process),
-                    checked = effective.processControlListen,
-                    onCheckedChange = { viewModel.setProcessControlMaster(it) },
-                    testTag = "listen-row-master-process",
                 )
             }
             Spacer(Modifier.height(16.dp))
@@ -348,7 +300,7 @@ fun PerAppListenSettingsScreen(
                 CategoryTaxonomy.forType(RecordType.CRYPTO).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ListenRow(
-                        label = res.getString(switchLabelRes(category.id)),
+                        label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
                         testTag = "listen-row-${category.id}",
@@ -362,7 +314,7 @@ fun PerAppListenSettingsScreen(
                 CategoryTaxonomy.forType(RecordType.DATABASE).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ListenRow(
-                        label = res.getString(switchLabelRes(category.id)),
+                        label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
                         testTag = "listen-row-${category.id}",
@@ -376,7 +328,7 @@ fun PerAppListenSettingsScreen(
                 CategoryTaxonomy.forType(RecordType.BEHAVIOR).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ListenRow(
-                        label = res.getString(switchLabelRes(category.id)),
+                        label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
                         testTag = "listen-row-${category.id}",
@@ -407,7 +359,7 @@ fun PerAppListenSettingsScreen(
                 CategoryTaxonomy.forType(RecordType.PREFS).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ListenRow(
-                        label = res.getString(switchLabelRes(category.id)),
+                        label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
                         testTag = "listen-row-${category.id}",
@@ -421,7 +373,7 @@ fun PerAppListenSettingsScreen(
                 CategoryTaxonomy.forType(RecordType.WEBVIEW).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ListenRow(
-                        label = res.getString(switchLabelRes(category.id)),
+                        label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
                         testTag = "listen-row-${category.id}",
@@ -430,40 +382,17 @@ fun PerAppListenSettingsScreen(
             }
             Spacer(Modifier.height(16.dp))
 
-            // 网络环境监听 15 类别(V30 一等公民)
-            SettingsSection(stringResource(R.string.listen_settings_network)) {
-                CategoryTaxonomy.forType(RecordType.NETWORK).forEachIndexed { index, category ->
+            // 环境观测(V37 双域拆分):NETWORK/DEVICE_ENV/UI_INTERACTION 三类型中属
+            // 监听域的观测类别(请求监控/检测监控/弹窗·控件·Activity 观测),
+            // 由 CategoryTaxonomy LISTEN 域驱动;干预类别一律在「功能设置」页管理。
+            SettingsSection(stringResource(R.string.listen_section_env_observe)) {
+                val envObserveKinds = listOf(RecordType.NETWORK, RecordType.DEVICE_ENV, RecordType.UI_INTERACTION)
+                    .flatMap { type -> CategoryTaxonomy.forType(type) }
+                    .filter { it.domain == com.lioisme.modev.core.model.CapabilityDomain.LISTEN }
+                envObserveKinds.forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ListenRow(
-                        label = res.getString(switchLabelRes(category.id)),
-                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
-                        onCheckedChange = { viewModel.setKind(category.id, it) },
-                        testTag = "listen-row-${category.id}",
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-
-            // 设备环境监听 21 类别(V31 一等公民;V35 momo 增强 9 项)
-            SettingsSection(stringResource(R.string.filter_type_device_env)) {
-                CategoryTaxonomy.forType(RecordType.DEVICE_ENV).forEachIndexed { index, category ->
-                    if (index > 0) HorizontalDivider16()
-                    ListenRow(
-                        label = res.getString(switchLabelRes(category.id)),
-                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
-                        onCheckedChange = { viewModel.setKind(category.id, it) },
-                        testTag = "listen-row-${category.id}",
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-
-            // UI 交互 5 类别(V33 一等公民)
-            SettingsSection(stringResource(R.string.filter_type_ui_interaction)) {
-                CategoryTaxonomy.forType(RecordType.UI_INTERACTION).forEachIndexed { index, category ->
-                    if (index > 0) HorizontalDivider16()
-                    ListenRow(
-                        label = res.getString(switchLabelRes(category.id)),
+                        label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
                         testTag = "listen-row-${category.id}",
@@ -477,21 +406,7 @@ fun PerAppListenSettingsScreen(
                 CategoryTaxonomy.forType(RecordType.SYSTEM).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ListenRow(
-                        label = res.getString(switchLabelRes(category.id)),
-                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
-                        onCheckedChange = { viewModel.setKind(category.id, it) },
-                        testTag = "listen-row-${category.id}",
-                    )
-                }
-            }
-            Spacer(Modifier.height(16.dp))
-
-            // 进程控制 3 类别(V33 一等公民;干预型,默认关)
-            SettingsSection(stringResource(R.string.filter_type_process_control)) {
-                CategoryTaxonomy.forType(RecordType.PROCESS_CONTROL).forEachIndexed { index, category ->
-                    if (index > 0) HorizontalDivider16()
-                    ListenRow(
-                        label = res.getString(switchLabelRes(category.id)),
+                        label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
                         testTag = "listen-row-${category.id}",
@@ -565,23 +480,8 @@ fun PerAppListenSettingsScreen(
                             )
                         },
                         supportingContent = {
-                        val n = override.cryptoListen.count() + override.dbListen.count() +
-                            override.behaviorListen.count() +
-                            override.prefsListen.count() +
-                            override.webviewListen.count() +
-                            override.networkListen.count() +
-                            override.deviceEnvListen.count() +
-                            override.uiListen.count() +
-                            override.systemListen.count() +
-                            override.processControlListen.count() +
-                            override.kinds.size +
-                                override.logStack.count() +
-                                override.maxBytesPerField.count() +
-                                (if (override.ignoreStackPrefixes != null) 1 else 0) +
-                                override.maxResultRows.count() +
-                                override.maxResultChars.count() +
-                                override.fileContentCapture.count() +
-                                (if (override.ignorePathPrefixes != null) 1 else 0)
+                            // V37 C8:偏差计数收敛单一事实源 AppListenOverride.deviationCount
+                            val n = override.deviationCount
                             Text(
                                 pluralStringResource(R.plurals.listen_settings_custom_n, n, n),
                                 style = MaterialTheme.typography.bodySmall,
@@ -684,12 +584,6 @@ fun PerAppListenSettingsScreen(
     }
 }
 
-/** Boolean?.count():非 null 记 1(null 即取默认不计),用于定制计数摘要。 */
-private fun Boolean?.count(): Int = if (this != null) 1 else 0
-
-/** Int?.count():非 null 记 1(定制计数摘要)。 */
-private fun Int?.count(): Int = if (this != null) 1 else 0
-
 /** 上限值显示惯例:≤0 = 不限(∞),否则十进制数值。 */
 private fun limitValue(value: Int): String = if (value <= 0) "∞" else value.toString()
 
@@ -742,99 +636,3 @@ private fun ListenRow(
     )
 }
 
-/**
- * kind id → 设置页类别开关标签资源(switch_* 组与 HookSwitch 字段一一对应;
- * 全 App 类别标签单一事实源,V25 起仅本页消费)。
- */
-private fun switchLabelRes(kindId: String): Int = when (kindId) {
-    // 偏好类别(V28):OPEN/CLEAR 与 SQL kind 名碰撞,必须前置匹配
-    PrefsKind.OPEN.name -> R.string.kind_prefs_open
-    PrefsKind.GET.name -> R.string.kind_prefs_get
-    PrefsKind.PUT.name -> R.string.kind_prefs_put
-    PrefsKind.REMOVE.name -> R.string.kind_prefs_remove
-    PrefsKind.CLEAR.name -> R.string.kind_prefs_clear
-    "MESSAGE_DIGEST" -> R.string.switch_message_digest
-    "CIPHER" -> R.string.switch_cipher
-    "MAC" -> R.string.switch_mac
-    "SIGNATURE" -> R.string.switch_signature
-    "KEY_PARAM" -> R.string.switch_key_param
-    "KEY_GENERATION" -> R.string.switch_key_generation
-    "KEY_FACTORY" -> R.string.switch_key_factory
-    "KEY_STORE" -> R.string.switch_key_store
-    "KEY_AGREEMENT" -> R.string.switch_key_agreement
-    "RANDOM" -> R.string.switch_random
-    "BASE64" -> R.string.switch_base64
-    "WEB_CRYPTO" -> R.string.switch_webview
-    "OPEN" -> R.string.switch_db_open
-    "QUERY" -> R.string.switch_db_query
-    "DML" -> R.string.switch_db_dml
-    "EXEC" -> R.string.switch_db_exec
-    "TRANSACTION" -> R.string.switch_db_transaction
-    // 行为类别(V27):复用 kind 标签单一事实源(设置页行标签 = 筛选/详情同文案)
-    BehaviorKind.FILE_READ.name -> R.string.kind_behavior_file_read
-    BehaviorKind.FILE_WRITE.name -> R.string.kind_behavior_file_write
-    BehaviorKind.FILE_DELETE.name -> R.string.kind_behavior_file_delete
-    BehaviorKind.FILE_RENAME.name -> R.string.kind_behavior_file_rename
-    BehaviorKind.FILE_LIST.name -> R.string.kind_behavior_file_list
-    BehaviorKind.ASSET_READ.name -> R.string.kind_behavior_asset_read
-    BehaviorKind.SHELL_EXEC.name -> R.string.kind_behavior_shell_exec
-    // WebView 类别(V29 一等公民)
-    WebViewKind.PAGE_LOAD.name -> R.string.kind_wv_page_load
-    WebViewKind.EVALUATE_JS.name -> R.string.kind_wv_evaluate_js
-    WebViewKind.JS_BRIDGE.name -> R.string.kind_wv_js_bridge
-    WebViewKind.DEBUG.name -> R.string.kind_wv_debug
-    WebViewKind.JS_CRYPTO.name -> R.string.kind_wv_js_crypto
-    // 网络环境监听类别(V30 一等公民)
-    NetworkKind.SSL_CONTEXT.name -> R.string.kind_net_ssl_context
-    NetworkKind.SSL_TRUST_MANAGER.name -> R.string.kind_net_ssl_trust_manager
-    NetworkKind.SSL_OKHTTP_PINNER.name -> R.string.kind_net_ssl_okhttp_pinner
-    NetworkKind.SSL_OKHTTP_VERIFIER.name -> R.string.kind_net_ssl_okhttp_verifier
-    NetworkKind.SSL_WEBVIEW.name -> R.string.kind_net_ssl_webview
-    NetworkKind.SSL_NETWORK_CONFIG.name -> R.string.kind_net_ssl_network_config
-    NetworkKind.PROXY_SYSTEM_PROP.name -> R.string.kind_net_proxy_system_prop
-    NetworkKind.PROXY_CONNECTIVITY.name -> R.string.kind_net_proxy_connectivity
-    NetworkKind.PROXY_SETTINGS.name -> R.string.kind_net_proxy_settings
-    NetworkKind.PROXY_OKHTTP.name -> R.string.kind_net_proxy_okhttp
-    NetworkKind.VPN_CAPABILITIES.name -> R.string.kind_net_vpn_capabilities
-    NetworkKind.VPN_INTERFACE.name -> R.string.kind_net_vpn_interface
-    NetworkKind.VPN_NETWORK_INFO.name -> R.string.kind_net_vpn_network_info
-    NetworkKind.VPN_LINK_PROPERTIES.name -> R.string.kind_net_vpn_link_properties
-    NetworkKind.REQUEST.name -> R.string.kind_net_request
-    // 设备环境监听类别(V31 一等公民;V35 补全 momo 增强 9 项)
-    DeviceEnvKind.ROOT_FILE.name -> R.string.kind_device_env_ROOT_FILE
-    DeviceEnvKind.ROOT_EXEC.name -> R.string.kind_device_env_ROOT_EXEC
-    DeviceEnvKind.ROOT_PACKAGE_MANAGER.name -> R.string.kind_device_env_ROOT_PACKAGE_MANAGER
-    DeviceEnvKind.ROOT_PROPERTY.name -> R.string.kind_device_env_ROOT_PROPERTY
-    DeviceEnvKind.XPOSED_CLASS.name -> R.string.kind_device_env_XPOSED_CLASS
-    DeviceEnvKind.XPOSED_STACK.name -> R.string.kind_device_env_XPOSED_STACK
-    DeviceEnvKind.XPOSED_MAPS.name -> R.string.kind_device_env_XPOSED_MAPS
-    DeviceEnvKind.EMULATOR_BUILD.name -> R.string.kind_device_env_EMULATOR_BUILD
-    DeviceEnvKind.EMULATOR_FILE.name -> R.string.kind_device_env_EMULATOR_FILE
-    DeviceEnvKind.EMULATOR_SENSOR.name -> R.string.kind_device_env_EMULATOR_SENSOR
-    DeviceEnvKind.EMULATOR_NETWORK.name -> R.string.kind_device_env_EMULATOR_NETWORK
-    DeviceEnvKind.EMULATOR_TELEPHONY.name -> R.string.kind_device_env_EMULATOR_TELEPHONY
-    DeviceEnvKind.EMULATOR_CPU.name -> R.string.kind_device_env_EMULATOR_CPU
-    DeviceEnvKind.EMULATOR_BATTERY.name -> R.string.kind_device_env_EMULATOR_BATTERY
-    DeviceEnvKind.SYSTEM_PROPERTIES.name -> R.string.kind_device_env_SYSTEM_PROPERTIES
-    DeviceEnvKind.PROC_STATUS.name -> R.string.kind_device_env_PROC_STATUS
-    DeviceEnvKind.PROC_MOUNT_INFO.name -> R.string.kind_device_env_PROC_MOUNT_INFO
-    DeviceEnvKind.PROC_CGROUP.name -> R.string.kind_device_env_PROC_CGROUP
-    DeviceEnvKind.PROC_NET.name -> R.string.kind_device_env_PROC_NET
-    DeviceEnvKind.DETECT_ROOT.name -> R.string.kind_device_env_DETECT_ROOT
-    DeviceEnvKind.DETECT_EMULATOR.name -> R.string.kind_device_env_DETECT_EMULATOR
-    // UI 交互类别(V33 一等公民)
-    UiInteractionKind.DIALOG_SHOW.name -> R.string.kind_ui_DIALOG_SHOW
-    UiInteractionKind.DIALOG_KEYWORD.name -> R.string.kind_ui_DIALOG_KEYWORD
-    UiInteractionKind.WIDGET_TEXT.name -> R.string.kind_ui_WIDGET_TEXT
-    UiInteractionKind.ACTIVITY_START.name -> R.string.kind_ui_ACTIVITY_START
-    UiInteractionKind.ACTIVITY_RESUME.name -> R.string.kind_ui_ACTIVITY_RESUME
-    // 系统信息类别(V33 一等公民)
-    SystemKind.LOGCAT.name -> R.string.kind_system_LOGCAT
-    SystemKind.APP_INFO.name -> R.string.kind_system_APP_INFO
-    SystemKind.SIGNATURE.name -> R.string.kind_system_SIGNATURE
-    // 进程控制类别(V33 一等公民)
-    ProcessKind.EXIT_INTERCEPT.name -> R.string.kind_process_EXIT_INTERCEPT
-    ProcessKind.CRASH_PREVENT.name -> R.string.kind_process_CRASH_PREVENT
-    ProcessKind.SCREEN_RECORD.name -> R.string.kind_process_SCREEN_RECORD
-    else -> R.string.unknown_error
-}

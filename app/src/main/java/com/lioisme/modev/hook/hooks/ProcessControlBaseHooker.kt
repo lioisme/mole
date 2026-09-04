@@ -37,6 +37,12 @@ abstract class ProcessControlBaseHooker(
 
     abstract fun install()
 
+    /**
+     * 干预闸门(V37 T0.1 FeatureGate 红线):干预动作本身必须经 master ∧ kind 双门控,
+     * 禁止裸布尔位直读——master=false 或 kind=false 时 setResult 等干预一律不得发生。
+     */
+    protected fun featureOn(kind: ProcessKind): Boolean = config().processControlEnabled(kind)
+
     protected fun emit(
         kind: ProcessKind,
         operation: ProcessOperation,

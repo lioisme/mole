@@ -34,7 +34,7 @@ class DnsHideHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().networkRequest) return
+                if (!featureOn(NetworkKind.REQUEST)) return
                 val host = invocation.getArg(0) as? String ?: return
                 if (isLocalHost(host)) return
                 val result = invocation.result as? java.net.InetAddress ?: return
@@ -58,7 +58,7 @@ class DnsHideHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().networkRequest) return
+                if (!featureOn(NetworkKind.REQUEST)) return
                 val host = invocation.getArg(0) as? String ?: return
                 if (isLocalHost(host)) return
                 val results = invocation.result as? Array<*> ?: return
@@ -84,7 +84,7 @@ class DnsHideHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().networkRequest) return
+                if (!featureOn(NetworkKind.REQUEST)) return
                 val result = invocation.result as? String ?: return
                 if (isLocalHost(result)) return
                 val thisObj = invocation.thisObject as? java.net.InetAddress ?: return

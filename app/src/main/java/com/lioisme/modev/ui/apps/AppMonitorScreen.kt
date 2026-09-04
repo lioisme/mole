@@ -1,10 +1,12 @@
-﻿package com.lioisme.modev.ui.apps
+package com.lioisme.modev.ui.apps
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -21,18 +23,20 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.GppBad
 import androidx.compose.material.icons.filled.GppGood
+import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Sensors
-import androidx.compose.material.icons.filled.PhoneAndroid
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material.icons.filled.DataObject
-import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -56,6 +60,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
@@ -72,13 +77,14 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.CryptoKind
-import com.lioisme.modev.core.model.PrefsKind
-import com.lioisme.modev.core.model.SqlKind
-import com.lioisme.modev.core.model.WebViewKind
 import com.lioisme.modev.core.model.DeviceEnvKind
-import com.lioisme.modev.core.model.UiInteractionKind
-import com.lioisme.modev.core.model.SystemKind
+import com.lioisme.modev.core.model.NetworkKind
+import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.ProcessKind
+import com.lioisme.modev.core.model.SqlKind
+import com.lioisme.modev.core.model.SystemKind
+import com.lioisme.modev.core.model.UiInteractionKind
+import com.lioisme.modev.core.model.WebViewKind
 import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.ui.common.StatusSemantic
 import com.lioisme.modev.ui.common.connectionStatus
@@ -87,31 +93,31 @@ import com.lioisme.modev.ui.common.scopeStatus
 import com.lioisme.modev.ui.components.AppIcon
 import com.lioisme.modev.ui.components.HorizontalDivider16
 import com.lioisme.modev.ui.components.ModevTopBar
-import com.lioisme.modev.ui.components.SettingsItem
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.components.StatusDot
+import com.lioisme.modev.ui.components.TipIconButton
+import com.lioisme.modev.ui.theme.Dimens
 import com.lioisme.modev.ui.theme.behaviorKindColor
+import com.lioisme.modev.ui.theme.deviceEnvKindColor
 import com.lioisme.modev.ui.theme.kindColor
+import com.lioisme.modev.ui.theme.networkKindColor
 import com.lioisme.modev.ui.theme.prefsKindColor
+import com.lioisme.modev.ui.theme.processKindColor
 import com.lioisme.modev.ui.theme.sqlKindColor
 import com.lioisme.modev.ui.theme.statusColor
-import com.lioisme.modev.ui.theme.webviewKindColor
-import com.lioisme.modev.ui.theme.networkKindColor
-import com.lioisme.modev.ui.theme.deviceEnvKindColor
-import com.lioisme.modev.ui.theme.uiInteractionKindColor
+import com.lioisme.modev.ui.theme.Tokens
 import com.lioisme.modev.ui.theme.systemKindColor
-import com.lioisme.modev.ui.theme.processKindColor
-import com.lioisme.modev.core.model.NetworkKind
-import androidx.compose.material.icons.outlined.FolderOpen
+import com.lioisme.modev.ui.theme.uiInteractionKindColor
+import com.lioisme.modev.ui.theme.webviewKindColor
 
 /**
- * 应用监听入口页(V18 单击应用先到本页;V20 整合「查看记录」头部职责;
- * **V23 T5.2 重构**:Hero 头卡(图标 + 名称 + 状态胶囊 + 作用域开关)、
- * 统计概览卡(总数大字 + 类型分布双色比例条,KindColorTokens 语义色)、
- * 功能入口卡(算法记录 / 数据库记录 / 监听设置)+ 操作卡(启动 / 清空记录);
- * 危险操作均居中 AlertDialog 确认(契约保留);死代码 globalSwitch 删除,
- * VM 拆分至 [AppMonitorViewModel](V23 T5.1)。
+ * 应用监听入口页(V18 单击应用先到本页;V23 T5.2 Hero/统计/入口卡;
+ * **V37 T3.1/T3.2 双域重构**:「启动 / 清空记录」上移 Appbar actions;
+ * 正文 = Hero 卡 + 双段统计卡(监听域/功能域各自比例条)+「监听」区
+ * (监听设置 + 6 记录列表)+「功能」区(功能设置 + 4 功能记录列表);
+ * 危险操作居中 AlertDialog 确认契约保留)。
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppMonitorScreen(
     viewModel: AppMonitorViewModel,
@@ -127,6 +133,7 @@ fun AppMonitorScreen(
     onOpenSystem: () -> Unit,
     onOpenProcessControl: () -> Unit,
     onOpenListenSettings: () -> Unit,
+    onOpenFeatureSettings: () -> Unit,
     onLaunch: (String) -> Unit,
 ) {
     val appInfo by viewModel.appInfo.collectAsStateWithLifecycle()
@@ -166,6 +173,19 @@ fun AppMonitorScreen(
             ModevTopBar(
                 title = label,
                 onBack = onBack,
+                actions = {
+                    // V37 T3.2:启动/清空上移 Appbar(仅存在启动入口时展示,防闪烁契约保留)
+                    if (launchable == true) {
+                        TooltipAction(
+                            tooltip = stringResource(R.string.apps_launch),
+                            testTag = "app-launch",
+                        ) { onLaunch(viewModel.packageName) }
+                    }
+                    TooltipAction(
+                        tooltip = stringResource(R.string.detail_clear_records),
+                        testTag = "app-clear-records",
+                    ) { pendingDanger = DangerAction.CLEAR_LOGS }
+                },
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -175,7 +195,7 @@ fun AppMonitorScreen(
                 .fillMaxSize()
                 .padding(innerPadding)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = Dimens.pagePadding),
         ) {
             HeroCard(
                 label = label,
@@ -187,47 +207,59 @@ fun AppMonitorScreen(
                 scopeReady = scopeState is ScopeState.Ready,
                 onToggleScope = viewModel::toggleScope,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(Dimens.sectionGapDense))
             StatsCard(
-                cryptoCount = cryptoCount,
-                dbCount = dbCount,
-                behaviorCount = behaviorCount,
-                prefsCount = prefsCount,
-                webviewCount = webviewCount,
-                networkCount = networkCount,
-                deviceEnvCount = deviceEnvCount,
-                uiInteractionCount = uiInteractionCount,
-                systemCount = systemCount,
-                processControlCount = processControlCount,
+                listenCounts = listOf(
+                    stringResource(R.string.filter_type_crypto) to
+                        (kindColor(CryptoKind.CIPHER) to cryptoCount),
+                    stringResource(R.string.filter_type_database) to
+                        (sqlKindColor(SqlKind.QUERY) to dbCount),
+                    stringResource(R.string.filter_type_behavior) to
+                        (behaviorKindColor(BehaviorKind.FILE_WRITE) to behaviorCount),
+                    stringResource(R.string.filter_type_prefs) to
+                        (prefsKindColor(PrefsKind.PUT) to prefsCount),
+                    stringResource(R.string.filter_type_webview) to
+                        (webviewKindColor(WebViewKind.PAGE_LOAD) to webviewCount),
+                    stringResource(R.string.filter_type_system) to
+                        (systemKindColor(SystemKind.APP_INFO) to systemCount),
+                ),
+                featureCounts = listOf(
+                    stringResource(R.string.filter_type_ui_interaction) to
+                        (uiInteractionKindColor(UiInteractionKind.DIALOG_KEYWORD) to uiInteractionCount),
+                    stringResource(R.string.filter_type_network) to
+                        (networkKindColor(NetworkKind.SSL_CONTEXT) to networkCount),
+                    stringResource(R.string.filter_type_device_env) to
+                        (deviceEnvKindColor(DeviceEnvKind.ROOT_FILE) to deviceEnvCount),
+                    stringResource(R.string.filter_type_process_control) to
+                        (processKindColor(ProcessKind.EXIT_INTERCEPT) to processControlCount),
+                ),
             )
-            Spacer(Modifier.height(16.dp))
-            SettingsSection(stringResource(R.string.listen_settings_entry)) {
+            Spacer(Modifier.height(Dimens.sectionGapDense))
+            SettingsSection(stringResource(R.string.monitor_section_listen)) {
                 EntryRow(
-                    icon = { Icon(Icons.Filled.Tune, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    icon = Icons.Filled.Tune,
                     title = stringResource(R.string.listen_settings_entry),
                     value = listenSummary(listenOverride),
                     onClick = onOpenListenSettings,
                     modifier = Modifier.testTag("monitor-entry-listen-settings"),
                 )
-            }
-            Spacer(Modifier.height(16.dp))
-            SettingsSection(stringResource(R.string.section_monitor_kinds)) {
+                HorizontalDivider16()
                 EntryRow(
-                    icon = { Icon(Icons.Filled.Sensors, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    icon = Icons.Filled.Sensors,
                     title = stringResource(R.string.algorithm_records_title),
                     value = countText(cryptoCount),
                     onClick = onOpenAlgorithm,
                 )
                 HorizontalDivider16()
                 EntryRow(
-                    icon = { Icon(Icons.Filled.Storage, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    icon = Icons.Filled.Storage,
                     title = stringResource(R.string.database_records_title),
                     value = countText(dbCount),
                     onClick = onOpenDatabase,
                 )
                 HorizontalDivider16()
                 EntryRow(
-                    icon = { Icon(Icons.Outlined.FolderOpen, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    icon = Icons.Outlined.FolderOpen,
                     title = stringResource(R.string.behavior_records_title),
                     value = countText(behaviorCount),
                     onClick = onOpenBehavior,
@@ -235,7 +267,7 @@ fun AppMonitorScreen(
                 )
                 HorizontalDivider16()
                 EntryRow(
-                    icon = { Icon(Icons.Filled.DataObject, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    icon = Icons.Filled.Settings,
                     title = stringResource(R.string.prefs_records_title),
                     value = countText(prefsCount),
                     onClick = onOpenPrefs,
@@ -243,7 +275,7 @@ fun AppMonitorScreen(
                 )
                 HorizontalDivider16()
                 EntryRow(
-                    icon = { Icon(Icons.Default.Language, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    icon = Icons.Filled.Language,
                     title = stringResource(R.string.webview_records_title),
                     value = countText(webviewCount),
                     onClick = onOpenWebView,
@@ -251,23 +283,25 @@ fun AppMonitorScreen(
                 )
                 HorizontalDivider16()
                 EntryRow(
-                    icon = { Icon(Icons.Filled.Tune, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
-                    title = stringResource(R.string.network_records_title),
-                    value = countText(networkCount),
-                    onClick = onOpenNetwork,
-                    modifier = Modifier.testTag("monitor-entry-network"),
+                    icon = Icons.Filled.PhoneAndroid,
+                    title = stringResource(R.string.system_records_title),
+                    value = countText(systemCount),
+                    onClick = onOpenSystem,
+                    modifier = Modifier.testTag("monitor-entry-system"),
+                )
+            }
+            Spacer(Modifier.height(Dimens.sectionGapDense))
+            SettingsSection(stringResource(R.string.monitor_section_feature)) {
+                EntryRow(
+                    icon = Icons.Filled.Shield,
+                    title = stringResource(R.string.feature_settings_entry),
+                    value = listenSummary(listenOverride),
+                    onClick = onOpenFeatureSettings,
+                    modifier = Modifier.testTag("monitor-entry-feature-settings"),
                 )
                 HorizontalDivider16()
                 EntryRow(
-                    icon = { Icon(Icons.Filled.GppBad, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
-                    title = stringResource(R.string.device_records_title),
-                    value = countText(deviceEnvCount),
-                    onClick = onOpenDeviceEnv,
-                    modifier = Modifier.testTag("monitor-entry-device-env"),
-                )
-                HorizontalDivider16()
-                EntryRow(
-                    icon = { Icon(Icons.Filled.Sensors, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    icon = Icons.Filled.Warning,
                     title = stringResource(R.string.ui_interaction_records_title),
                     value = countText(uiInteractionCount),
                     onClick = onOpenUiInteraction,
@@ -275,40 +309,30 @@ fun AppMonitorScreen(
                 )
                 HorizontalDivider16()
                 EntryRow(
-                    icon = { Icon(Icons.Filled.PhoneAndroid, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
-                    title = stringResource(R.string.system_records_title),
-                    value = countText(systemCount),
-                    onClick = onOpenSystem,
-                    modifier = Modifier.testTag("monitor-entry-system"),
+                    icon = Icons.Filled.Dns,
+                    title = stringResource(R.string.network_records_title),
+                    value = countText(networkCount),
+                    onClick = onOpenNetwork,
+                    modifier = Modifier.testTag("monitor-entry-network"),
                 )
                 HorizontalDivider16()
                 EntryRow(
-                    icon = { Icon(Icons.Filled.Warning, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp)) },
+                    icon = Icons.Filled.Memory,
+                    title = stringResource(R.string.device_records_title),
+                    value = countText(deviceEnvCount),
+                    onClick = onOpenDeviceEnv,
+                    modifier = Modifier.testTag("monitor-entry-device-env"),
+                )
+                HorizontalDivider16()
+                EntryRow(
+                    icon = Icons.Filled.GppBad,
                     title = stringResource(R.string.process_control_records_title),
                     value = countText(processControlCount),
                     onClick = onOpenProcessControl,
                     modifier = Modifier.testTag("monitor-entry-process-control"),
                 )
             }
-            Spacer(Modifier.height(16.dp))
-            SettingsSection(stringResource(R.string.app_monitor_actions_section)) {
-                // 仅存在启动入口时展示,解析完成前不渲染防闪烁(V16 R4)。
-                if (launchable == true) {
-                    EntryRow(
-                        icon = { Icon(Icons.Filled.PlayArrow, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(24.dp)) },
-                        title = stringResource(R.string.apps_launch),
-                        value = "",
-                        onClick = { onLaunch(viewModel.packageName) },
-                        modifier = Modifier.testTag("app-launch"),
-                    )
-                    HorizontalDivider16()
-                }
-                DangerRow(
-                    text = stringResource(R.string.detail_clear_records),
-                    onClick = { pendingDanger = DangerAction.CLEAR_LOGS },
-                )
-            }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(Dimens.pageBottom))
         }
     }
 
@@ -350,6 +374,24 @@ fun AppMonitorScreen(
 }
 
 private enum class DangerAction { REMOVE_SCOPE, CLEAR_LOGS }
+
+/** Appbar 图标动作(TipIconButton 自带 tooltip + 长按振动;testTag 锚定)。 */
+@Composable
+private fun TooltipAction(
+    tooltip: String,
+    testTag: String,
+    onClick: () -> Unit,
+) {
+    TipIconButton(tooltip = tooltip, onClick = onClick, modifier = Modifier.testTag(testTag)) {
+        Icon(
+            when (testTag) {
+                "app-launch" -> Icons.Filled.PlayArrow
+                else -> Icons.Filled.Delete
+            },
+            contentDescription = tooltip,
+        )
+    }
+}
 
 /**
  * Hero 头卡(V23 T5.2):AppIcon 56dp + 名称(titleLarge Medium)+ 包名 +
@@ -397,7 +439,7 @@ private fun HeroCard(
                     )
                 }
             }
-            Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.padding(horizontal = Dimens.pagePadding), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 val conn = connectionStatus(connected)
                 StatusPill(conn)
                 val scope = scopeStatus(scopeState, packageName)
@@ -415,15 +457,12 @@ private fun HeroCard(
 
 /**
  * 状态胶囊:圆点 + 文案的 tonal pill(StatusColorTokens AA 语义色)。
- * V25 视觉整改:点↔文字 6dp 间距(对齐全 App 点标惯例:AppsScreen 行内 /
- * 统计卡图例),内边距对齐 TimelineHeader 惯例(horizontal 10 / vertical 3),
- * 消除旧版 start6/end10 非对称补偿与 0dp 挤贴。
  */
 @Composable
 private fun StatusPill(semantic: StatusSemantic) {
     val color = statusColor(semantic.kind)
     val label = stringResource(semantic.labelRes)
-    Surface(shape = CircleShape, color = color.copy(alpha = 0.15f)) {
+    Surface(shape = CircleShape, color = color.copy(alpha = Tokens.pillContainerAlpha)) {
         Row(
             Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -454,14 +493,14 @@ private fun ScopeToggleRow(
             Text(
                 stringResource(R.string.app_monitor_scope_row),
                 style = MaterialTheme.typography.bodyLarge,
-                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                color = if (enabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurface.copy(alpha = Tokens.disabledContentAlpha),
             )
         },
         leadingContent = {
             Icon(
                 Icons.Filled.GppGood,
                 null,
-                tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f),
+                tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface.copy(alpha = Tokens.disabledContentAlpha),
                 modifier = Modifier.size(24.dp),
             )
         },
@@ -478,6 +517,7 @@ private fun ScopeToggleRow(
         modifier = Modifier
             .fillMaxWidth()
             .testTag("app-scope-row")
+            .semantics { role = Role.Switch }
             .toggleable(
                 value = checked,
                 enabled = enabled,
@@ -488,35 +528,18 @@ private fun ScopeToggleRow(
 }
 
 /**
- * 统计概览卡(V23 T5.2;V28 四段比例条;V30 五段;V31 七段;V33 十段):
- * 总记录数大字(locale 紧凑格式)+ 类型分布十色比例条 + 图例计数;
- * 零记录时隐藏比例条与图例(空卡仅大数字,不显零除噪)。
+ * 双段统计卡(V37 T3.3):监听域/功能域各自「计数 + 比例条 + FlowRow 图例」,
+ * 替代 V33 十段单条不可读形态;零记录域隐藏比例条与图例。
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StatsCard(
-    cryptoCount: Long,
-    dbCount: Long,
-    behaviorCount: Long,
-    prefsCount: Long,
-    webviewCount: Long,
-    networkCount: Long,
-    deviceEnvCount: Long,
-    uiInteractionCount: Long,
-    systemCount: Long,
-    processControlCount: Long,
+    listenCounts: List<Pair<String, Pair<Color, Long>>>,
+    featureCounts: List<Pair<String, Pair<Color, Long>>>,
 ) {
-    val total = cryptoCount + dbCount + behaviorCount + prefsCount + webviewCount + networkCount + deviceEnvCount +
-        uiInteractionCount + systemCount + processControlCount
-    val cryptoColor = kindColor(CryptoKind.CIPHER)
-    val dbColor = sqlKindColor(SqlKind.QUERY)
-    val behaviorColor = behaviorKindColor(BehaviorKind.FILE_WRITE)
-    val prefsColor = prefsKindColor(PrefsKind.PUT)
-    val webviewColor = webviewKindColor(WebViewKind.PAGE_LOAD)
-    val networkColor = networkKindColor(NetworkKind.SSL_CONTEXT)
-    val deviceEnvColor = deviceEnvKindColor(DeviceEnvKind.ROOT_FILE)
-    val uiInteractionColor = uiInteractionKindColor(UiInteractionKind.DIALOG_SHOW)
-    val systemColor = systemKindColor(SystemKind.LOGCAT)
-    val processControlColor = processKindColor(ProcessKind.EXIT_INTERCEPT)
+    val listenTotal = listenCounts.sumOf { it.second.second }
+    val featureTotal = featureCounts.sumOf { it.second.second }
+    val total = listenTotal + featureTotal
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
         shape = MaterialTheme.shapes.medium,
@@ -538,105 +561,90 @@ private fun StatsCard(
             )
             if (total > 0) {
                 Spacer(Modifier.height(14.dp))
-                val cryptoWeight = (cryptoCount.toFloat() / total).coerceAtLeast(0.02f)
-                val dbWeight = (dbCount.toFloat() / total).coerceAtLeast(0.02f)
-                val behaviorWeight = (behaviorCount.toFloat() / total).coerceAtLeast(0.02f)
-                val prefsWeight = (prefsCount.toFloat() / total).coerceAtLeast(0.02f)
-                val webviewWeight = (webviewCount.toFloat() / total).coerceAtLeast(0.02f)
-                val networkWeight = (networkCount.toFloat() / total).coerceAtLeast(0.02f)
-                val deviceEnvWeight = (deviceEnvCount.toFloat() / total).coerceAtLeast(0.02f)
-                val uiInteractionWeight = (uiInteractionCount.toFloat() / total).coerceAtLeast(0.02f)
-                val systemWeight = (systemCount.toFloat() / total).coerceAtLeast(0.02f)
-                val processControlWeight = (processControlCount.toFloat() / total).coerceAtLeast(0.02f)
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(10.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
-                            shape = RoundedCornerShape(5.dp),
-                        ),
-                ) {
+                DomainBlock(
+                    label = stringResource(R.string.monitor_domain_listen),
+                    counts = listenCounts,
+                    total = listenTotal,
+                )
+                Spacer(Modifier.height(12.dp))
+                DomainBlock(
+                    label = stringResource(R.string.monitor_domain_feature),
+                    counts = featureCounts,
+                    total = featureTotal,
+                )
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun DomainBlock(
+    label: String,
+    counts: List<Pair<String, Pair<Color, Long>>>,
+    total: Long,
+) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                countText(total),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Medium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        Spacer(Modifier.height(6.dp))
+        if (total > 0) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(8.dp)
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                        shape = RoundedCornerShape(4.dp),
+                    ),
+            ) {
+                counts.filter { it.second.second > 0 }.forEachIndexed { index, (_, pair) ->
+                    val (color, count) = pair
                     Box(
                         Modifier
-                            .weight(cryptoWeight)
+                            .weight(count.toFloat())
                             .fillMaxSize()
-                            .background(color = cryptoColor, shape = RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp)),
-                    )
-                    Box(
-                        Modifier
-                            .weight(dbWeight)
-                            .fillMaxSize()
-                            .background(color = dbColor),
-                    )
-                    Box(
-                        Modifier
-                            .weight(behaviorWeight)
-                            .fillMaxSize()
-                            .background(color = behaviorColor),
-                    )
-                    Box(
-                        Modifier
-                            .weight(prefsWeight)
-                            .fillMaxSize()
-                            .background(color = prefsColor),
-                    )
-                    Box(
-                        Modifier
-                            .weight(webviewWeight)
-                            .fillMaxSize()
-                            .background(color = webviewColor),
-                    )
-                    Box(
-                        Modifier
-                            .weight(networkWeight)
-                            .fillMaxSize()
-                            .background(color = networkColor),
-                    )
-                    Box(
-                        Modifier
-                            .weight(deviceEnvWeight)
-                            .fillMaxSize()
-                            .background(color = deviceEnvColor),
-                    )
-                    Box(
-                        Modifier
-                            .weight(uiInteractionWeight)
-                            .fillMaxSize()
-                            .background(color = uiInteractionColor),
-                    )
-                    Box(
-                        Modifier
-                            .weight(systemWeight)
-                            .fillMaxSize()
-                            .background(color = systemColor),
-                    )
-                    Box(
-                        Modifier
-                            .weight(processControlWeight)
-                            .fillMaxSize()
-                            .background(color = processControlColor, shape = RoundedCornerShape(topEnd = 5.dp, bottomEnd = 5.dp)),
+                            .background(
+                                color = color,
+                                shape = when {
+                                    counts.size == 1 -> RoundedCornerShape(4.dp)
+                                    index == 0 -> RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp)
+                                    index == counts.count { it.second.second > 0 } - 1 ->
+                                        RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp)
+                                    else -> RoundedCornerShape(0.dp)
+                                },
+                            ),
                     )
                 }
-                Spacer(Modifier.height(10.dp))
-                LegendRow(color = cryptoColor, label = stringResource(R.string.filter_type_crypto), count = cryptoCount)
-                LegendRow(color = dbColor, label = stringResource(R.string.filter_type_database), count = dbCount)
-                LegendRow(color = behaviorColor, label = stringResource(R.string.filter_type_behavior), count = behaviorCount)
-                LegendRow(color = prefsColor, label = stringResource(R.string.filter_type_prefs), count = prefsCount)
-                LegendRow(color = webviewColor, label = stringResource(R.string.filter_type_webview), count = webviewCount)
-                LegendRow(color = networkColor, label = stringResource(R.string.filter_type_network), count = networkCount)
-                LegendRow(color = deviceEnvColor, label = stringResource(R.string.filter_type_device_env), count = deviceEnvCount)
-                LegendRow(color = uiInteractionColor, label = stringResource(R.string.filter_type_ui_interaction), count = uiInteractionCount)
-                LegendRow(color = systemColor, label = stringResource(R.string.filter_type_system), count = systemCount)
-                LegendRow(color = processControlColor, label = stringResource(R.string.filter_type_process_control), count = processControlCount)
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            counts.forEach { (name, pair) ->
+                LegendItem(color = pair.first, label = name, count = pair.second)
             }
         }
     }
 }
 
 @Composable
-private fun LegendRow(color: androidx.compose.ui.graphics.Color, label: String, count: Long) {
-    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 2.dp)) {
+private fun LegendItem(color: Color, label: String, count: Long) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.padding(vertical = 2.dp),
+    ) {
         Box(Modifier.size(8.dp).background(color = color, shape = CircleShape))
         Spacer(Modifier.width(6.dp))
         Text(
@@ -644,7 +652,7 @@ private fun LegendRow(color: androidx.compose.ui.graphics.Color, label: String, 
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(6.dp))
         Text(
             countText(count),
             style = MaterialTheme.typography.bodySmall,
@@ -658,7 +666,7 @@ private fun LegendRow(color: androidx.compose.ui.graphics.Color, label: String, 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EntryRow(
-    icon: @Composable () -> Unit,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     title: String,
     value: String,
     onClick: () -> Unit,
@@ -673,7 +681,9 @@ private fun EntryRow(
                 color = MaterialTheme.colorScheme.onSurface,
             )
         },
-        leadingContent = icon,
+        leadingContent = {
+            Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
+        },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (value.isNotEmpty()) {
@@ -687,41 +697,14 @@ private fun EntryRow(
                     Spacer(Modifier.width(6.dp))
                 }
                 Icon(
-                    Icons.Default.ChevronRight,
+                    Icons.Filled.ChevronRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = Tokens.chevronAlpha),
                     modifier = Modifier.size(20.dp),
                 )
             }
         },
         modifier = modifier.fillMaxWidth().clickable(onClick = onClick),
-    )
-}
-
-/** 危险操作行(error 语义:Delete 图标 error 色居左,点击唤起居中确认)。 */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun DangerRow(
-    text: String,
-    onClick: () -> Unit,
-) {
-    ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        headlineContent = {
-            Text(text, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.error)
-        },
-        leadingContent = {
-            Icon(Icons.Filled.Delete, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(24.dp))
-        },
-        trailingContent = {
-            Icon(
-                Icons.Default.ChevronRight,
-                null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                modifier = Modifier.size(20.dp),
-            )
-        },
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     )
 }
 
@@ -732,25 +715,15 @@ private fun countText(count: Long): String {
 }
 
 /**
- * 「监听设置」摘要(V24 G3):未定制 → 「使用默认配置」;
- * 有自定义 → 「N 项已自定义」(N = 总开关偏差数 + 类别偏差数)。
+ * 「设置」摘要(V24 G3;V37 C8 计数收敛 [AppListenOverride.deviationCount]):
+ * 未定制 → 「使用默认配置」;有自定义 → 「N 项已自定义」。
  */
 @Composable
 private fun listenSummary(override: AppListenOverride): String {
     if (override.isDefault) {
         return stringResource(R.string.listen_summary_default)
     }
-    val n = (if (override.cryptoListen != null) 1 else 0) +
-        (if (override.dbListen != null) 1 else 0) +
-        (if (override.behaviorListen != null) 1 else 0) +
-        (if (override.prefsListen != null) 1 else 0) +
-        (if (override.webviewListen != null) 1 else 0) +
-        (if (override.networkListen != null) 1 else 0) +
-        (if (override.deviceEnvListen != null) 1 else 0) +
-        (if (override.uiListen != null) 1 else 0) +
-        (if (override.systemListen != null) 1 else 0) +
-        (if (override.processControlListen != null) 1 else 0) +
-        override.kinds.size
+    val n = override.deviationCount
     // 复数契约 6:计数文案走 plurals(one/other;zh 仅 other)。
     return pluralStringResource(R.plurals.listen_settings_custom_n, n, n)
 }

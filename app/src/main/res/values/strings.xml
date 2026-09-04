@@ -513,16 +513,15 @@
     <string name="op_net_request_start">Request Start</string>
     <string name="op_net_request_end">Response</string>
     <!-- Network listen settings -->
-    <string name="listen_settings_network">Network Environment</string>
-    <string name="network_records_title">Network</string>
+    <string name="network_records_title">Network Records</string>
     <string name="filter_type_network">Network</string>
-    <string name="network_monitor_master">Network environment</string>
+    <string name="network_monitor_master">Network Interventions</string>
     <string name="network_records_search">Search network records</string>
 
     <!-- V31 Device Environment -->
     <string name="filter_type_device_env">Device Environment</string>
     <string name="device_records_title">Device Environment Records</string>
-    <string name="device_env_master">Device Environment Listen</string>
+    <string name="device_env_master">Device Spoofing</string>
     <string name="kind_device_env_ROOT_FILE">Root File Detection</string>
     <string name="kind_device_env_ROOT_EXEC">Root Command Execution</string>
     <string name="kind_device_env_ROOT_PACKAGE_MANAGER">Root Package Query</string>
@@ -621,7 +620,7 @@
     <!-- V33 UI Interaction -->
     <string name="filter_type_ui_interaction">UI Interaction</string>
     <string name="ui_interaction_records_title">UI Interaction Records</string>
-    <string name="listen_row_master_ui">UI Interaction Listen</string>
+    <string name="listen_row_master_ui">UI Interaction</string>
     <string name="kind_ui_DIALOG_SHOW">Dialog Show</string>
     <string name="kind_ui_DIALOG_KEYWORD">Dialog Keyword</string>
     <string name="kind_ui_WIDGET_TEXT">Widget Text</string>
@@ -648,7 +647,7 @@
     <!-- V33 Process Control -->
     <string name="filter_type_process_control">Process Control</string>
     <string name="process_control_records_title">Process Control Records</string>
-    <string name="listen_row_master_process">Process Control Listen</string>
+    <string name="listen_row_master_process">Process Guard</string>
     <string name="kind_process_EXIT_INTERCEPT">Exit Intercept</string>
     <string name="kind_process_CRASH_PREVENT">Crash Prevent</string>
     <string name="kind_process_SCREEN_RECORD">Screen Record Bypass</string>
@@ -659,4 +658,100 @@
     <string name="ui_interaction_records_search">Search UI interaction records…</string>
     <string name="system_records_search">Search system records…</string>
     <string name="process_control_records_search">Search process control records…</string>
+
+    <!-- V37 dual-domain: monitor screen sections -->
+    <string name="monitor_section_listen">Monitoring</string>
+    <string name="monitor_section_feature">Features</string>
+    <string name="monitor_domain_listen">Listen records</string>
+    <string name="monitor_domain_feature">Interventions</string>
+    <!-- V37 dual-domain: per-app feature settings -->
+    <string name="feature_settings_entry">Feature Settings</string>
+    <string name="feature_settings_hint">Active measures change the app\'s behavior. Each takes effect immediately after being enabled.</string>
+    <string name="feature_masters_section">Feature Masters</string>
+    <string name="feature_group_dialog_intercept">Dialog Keyword Intercept</string>
+    <string name="feature_group_process_guard">Process Guard</string>
+    <string name="feature_group_ssl_bypass">SSL Pinning Bypass</string>
+    <string name="feature_group_proxy_vpn_hide">Proxy &amp; VPN Hiding</string>
+    <string name="feature_group_root_xposed_hide">Root &amp; Xposed Hiding</string>
+    <string name="feature_group_device_spoof">Emulator &amp; Device Spoofing</string>
+    <string name="feature_profile_row">Spoof Profile</string>
+    <string name="feature_profile_row_hint">Device identity values used by spoofing hooks</string>
+    <string name="feature_profile_sheet_title">Choose Spoof Profile</string>
+    <string name="feature_profile_follow_global">Follow Global</string>
+    <string name="feature_profile_auto">Auto (by emulator family)</string>
+    <string name="feature_profile_pixel7pro">Pixel 7 Pro</string>
+    <string name="feature_profile_xiaomi13">Xiaomi 13</string>
+    <string name="feature_keyword_follow_global">Follow Global Keyword Library</string>
+    <string name="feature_keyword_follow_global_hint">When on, every globally enabled keyword applies to this app</string>
+    <string name="feature_keyword_library_empty">The keyword library is empty</string>
+    <string name="feature_keyword_open_library">Open Library</string>
+    <string name="feature_keyword_subset_title">Enabled Keywords</string>
+    <string name="danger_reset_feature_msg">Remove all feature customizations for %1$s and restore defaults?</string>
+    <!-- V37 dual-domain: listen page environment observation section -->
+    <string name="listen_section_env_observe">Environment Observation</string>
+    <!-- V37 T3.5: global keyword library -->
+    <string name="keywords_title">Dialog Intercept Keywords</string>
+    <string name="keywords_add_action">Add keyword</string>
+    <string name="keywords_add_title">Add Keyword</string>
+    <string name="keywords_edit_title">Edit Keyword</string>
+    <string name="keywords_text_label">Keyword text</string>
+    <string name="keywords_mode_label">Match mode</string>
+    <string name="keyword_mode_contains">Contains</string>
+    <string name="keyword_mode_regex">Regex</string>
+    <string name="keyword_mode_equals">Equals</string>
+    <string name="keywords_empty_title">No keywords yet</string>
+    <string name="keywords_empty_hint">Add a keyword so matching dialogs can be blocked in scoped apps.</string>
+    <string name="keywords_delete_action">Delete</string>
+    <string name="keywords_delete_confirm_msg">Delete keyword \"%1$s\"? Scoped apps stop intercepting it immediately.</string>
+    <!-- V37 T3.5: spoof profiles -->
+    <string name="profiles_title">Spoof Profiles</string>
+    <string name="profiles_hint">Built-in presets cover common device identities; field overrides apply on top of the selected preset.</string>
+    <string name="profiles_global_section">Profile Preset</string>
+    <string name="profiles_overrides_section">Field Overrides</string>
+    <string name="profiles_overrides_empty">No field overrides</string>
+    <string name="profiles_override_add">Add override</string>
+    <string name="profiles_override_delete">Remove override</string>
+    <string name="profiles_override_delete_confirm">Remove override \"%1$s\"?</string>
+    <string name="profiles_override_key_label">Key (e.g. build.MODEL, ro.hardware, wifi.ssid)</string>
+    <string name="profiles_override_value_label">Value</string>
+    <string name="profiles_override_key_hint">Prefixes: build. / ro. / telephony. / wifi. / cpu.</string>
+    <!-- V37 T3.5: detection blacklist -->
+    <string name="blacklist_title">Detection Blacklist</string>
+    <string name="blacklist_hint">Additions take effect unioned with the built-in baseline; built-in entries cannot be removed.</string>
+    <string name="blacklist_root_packages">Root Packages</string>
+    <string name="blacklist_xposed_prefixes">Xposed Class Prefixes</string>
+    <string name="blacklist_frida_ports">Frida Ports</string>
+    <string name="blacklist_mask_keywords">Mask Keywords</string>
+    <string name="blacklist_section_empty">No additions</string>
+    <string name="blacklist_add_action">Add</string>
+    <string name="blacklist_value_label">Value</string>
+    <!-- V37 T3.5: settings hub entries -->
+    <string name="settings_interception_section">Interception &amp; Spoofing</string>
+    <string name="settings_keywords_entry">Keyword Library</string>
+    <string name="settings_keywords_entry_hint">Global dialog intercept keywords</string>
+    <string name="settings_profiles_entry">Spoof Profiles</string>
+    <string name="settings_profiles_entry_hint">Device identity presets and field overrides</string>
+    <string name="settings_blacklist_entry">Detection Blacklist</string>
+    <string name="settings_blacklist_entry_hint">Extra packages, prefixes and ports to hide</string>
+
+    <!-- V37 T3.6: data management for the 5 late-added record types -->
+    <string name="settings_records_network">Network Records</string>
+    <string name="settings_records_device_env">Device Environment Records</string>
+    <string name="settings_records_ui_interaction">UI Interaction Records</string>
+    <string name="settings_records_system">System Information Records</string>
+    <string name="settings_records_process_control">Process Control Records</string>
+    <string name="settings_clear_network_records">Clear network records</string>
+    <string name="settings_clear_device_env_records">Clear device environment records</string>
+    <string name="settings_clear_ui_interaction_records">Clear UI interaction records</string>
+    <string name="settings_clear_system_records">Clear system records</string>
+    <string name="settings_clear_process_control_records">Clear process control records</string>
+    <string name="danger_clear_network_msg">Permanently delete all network records? This cannot be undone.</string>
+    <string name="danger_clear_device_env_msg">Permanently delete all device environment records? This cannot be undone.</string>
+    <string name="danger_clear_ui_interaction_msg">Permanently delete all UI interaction records? This cannot be undone.</string>
+    <string name="danger_clear_system_msg">Permanently delete all system records? This cannot be undone.</string>
+    <string name="danger_clear_process_control_msg">Permanently delete all process control records? This cannot be undone.</string>
+
+    <!-- V37 T3.2: record list appbar clear action -->
+    <string name="records_clear_action">Clear this type</string>
+    <string name="danger_clear_page_records_msg">Permanently delete all records of this type for this app? This cannot be undone.</string>
 </resources>

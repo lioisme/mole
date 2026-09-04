@@ -2,6 +2,7 @@ package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.DeviceEnvOperation
+import com.lioisme.modev.core.model.activeSpoofProfile
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
@@ -19,6 +20,9 @@ class DeviceCpuHooker(
     context: ProbeContext,
 ) : DeviceEnvBaseHooker(context) {
 
+    /** 假核数(V37 T2.3):取自生效伪装画像。 */
+    private fun fakeCores(): Int = config().activeSpoofProfile().cpuCores
+
     override fun install() {
         hookAvailableProcessors()
         hookProcCpuInfo()
@@ -33,13 +37,14 @@ class DeviceCpuHooker(
             override fun after(invocation: Invocation) {
                 if (!config().deviceEnvEnabled(DeviceEnvKind.EMULATOR_CPU)) return
                 val current = invocation.result as? Int ?: return
-                if (current <= FAKE_CORE_COUNT) return
-                invocation.setResult(FAKE_CORE_COUNT)
+                val cores = fakeCores()
+                if (current <= cores) return
+                invocation.setResult(cores)
                 emit(
                     kind = DeviceEnvKind.EMULATOR_CPU,
                     operation = DeviceEnvOperation.CPU_AVAILABLE_PROCESSORS,
                     originalValue = current.toString(),
-                    maskedValue = FAKE_CORE_COUNT.toString(),
+                    maskedValue = cores.toString(),
                     interventionAction = ACTION_BLOCKED,
                     targetClass = "Runtime",
                     targetProperty = "availableProcessors",
@@ -64,12 +69,13 @@ class DeviceCpuHooker(
                     if (path != PROC_CPUINFO) return
                     val original = invocation.result as? String ?: return
                     if (original.contains("processor")) return
-                    invocation.setResult(buildFakeCpuInfo())
+                    val cores = fakeCores()
+                    invocation.setResult(buildFakeCpuInfo(cores))
                     emit(
                         kind = DeviceEnvKind.EMULATOR_CPU,
                         operation = DeviceEnvOperation.CPU_PROC_INFO,
                         originalValue = "empty",
-                        maskedValue = "8 cores",
+                        maskedValue = "$cores cores",
                         interventionAction = ACTION_BLOCKED,
                         targetPath = PROC_CPUINFO,
                     )
@@ -78,9 +84,9 @@ class DeviceCpuHooker(
         }
     }
 
-    private fun buildFakeCpuInfo(): String {
+    private fun buildFakeCpuInfo(cores: Int): String {
         val sb = StringBuilder()
-        for (i in 0 until FAKE_CORE_COUNT) {
+        for (i in 0 until cores) {
             sb.appendLine("processor\t: $i")
             sb.appendLine("BogoMIPS\t: 38.40")
             sb.appendLine("Features\t: fp asimd evtstrm aes pmull sha1 sha2 crc32")
@@ -95,7 +101,6 @@ class DeviceCpuHooker(
     }
 
     companion object {
-        private const val FAKE_CORE_COUNT = 8
         private const val PROC_CPUINFO = "/proc/cpuinfo"
         private const val ACTION_BLOCKED = "BLOCKED"
     }

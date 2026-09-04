@@ -37,7 +37,7 @@ class XposedClassHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().xposedClass) return
+                if (!featureOn(DeviceEnvKind.XPOSED_CLASS)) return
                 if (loadingGuard.get() == true) return
                 val name = invocation.getArg(0) as? String ?: return
                 if (isXposedClassName(name)) {
@@ -70,7 +70,7 @@ class XposedClassHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().xposedClass) return
+                if (!featureOn(DeviceEnvKind.XPOSED_CLASS)) return
                 if (loadingGuard.get() == true) return
                 val name = invocation.getArg(0) as? String ?: return
                 if (isXposedClassName(name)) {
@@ -96,8 +96,10 @@ class XposedClassHooker(
         })
     }
 
+    /** Xposed 类名判定(V37 T2.4):内置前缀基线 ∪ 用户追加前缀(extraXposedPrefixes)。 */
     private fun isXposedClassName(name: String): Boolean {
-        return XPOSED_PREFIXES.any { name.startsWith(it) }
+        return XPOSED_PREFIXES.any { name.startsWith(it) } ||
+            config().feature.extraXposedPrefixes.any { it.isNotBlank() && name.startsWith(it) }
     }
 
     companion object {

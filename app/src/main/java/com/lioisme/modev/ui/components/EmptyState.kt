@@ -1,5 +1,7 @@
 package com.lioisme.modev.ui.components
 
+import com.lioisme.modev.ui.theme.Tokens
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -47,13 +49,13 @@ fun EmptyState(
                 Modifier
                     .size(ICON_CONTAINER.dp)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.08f)),
+                    .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = Tokens.emptyIconContainerAlpha)),
             contentAlignment = Alignment.Center,
         ) {
             Icon(
                 icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = Tokens.emptyIconAlpha),
                 modifier = Modifier.size(28.dp),
             )
         }
@@ -70,7 +72,7 @@ fun EmptyState(
             Text(
                 text = hint,
                 style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = Tokens.emptyIconHintAlpha),
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 32.dp),
             )

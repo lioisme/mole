@@ -89,7 +89,7 @@ class XposedMapsHooker(
                     mapsReaders.remove(reader)
                     return
                 }
-                if (!config().xposedMaps) return
+                if (!featureOn(DeviceEnvKind.XPOSED_MAPS)) return
                 val line = invocation.result as? String ?: return
                 if (isFilteredLine(line)) {
                     invocation.setResult(null)
@@ -110,14 +110,22 @@ class XposedMapsHooker(
         return canonical.endsWith("/maps") && canonical.contains("/proc/")
     }
 
+    /** 生效掩码词表(V37 T2.4):内置基线 ∪ 用户追加关键词(extraMaskKeywords)。 */
+    private fun maskKeywords(): List<String> =
+        if (config().feature.extraMaskKeywords.isEmpty()) {
+            MAPS_KEYWORDS
+        } else {
+            MAPS_KEYWORDS + config().feature.extraMaskKeywords.map { it.lowercase() }
+        }
+
     private fun isFilteredLine(line: String): Boolean {
         val lower = line.lowercase()
-        return MAPS_KEYWORDS.any { lower.contains(it) }
+        return maskKeywords().any { lower.contains(it) }
     }
 
     private fun extractKeyword(line: String): String? {
         val lower = line.lowercase()
-        return MAPS_KEYWORDS.firstOrNull { lower.contains(it) }
+        return maskKeywords().firstOrNull { lower.contains(it) }
     }
 
     companion object {

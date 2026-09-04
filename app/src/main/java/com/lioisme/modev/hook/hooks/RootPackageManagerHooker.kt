@@ -36,7 +36,7 @@ class RootPackageManagerHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().rootPackageManager) return
+                if (!featureOn(DeviceEnvKind.ROOT_PACKAGE_MANAGER)) return
                 val packages = invocation.result as? List<*> ?: return
                 val filtered = packages.filter { pkg ->
                     val name = runCatching {
@@ -73,7 +73,7 @@ class RootPackageManagerHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().rootPackageManager) return
+                if (!featureOn(DeviceEnvKind.ROOT_PACKAGE_MANAGER)) return
                 val apps = invocation.result as? List<*> ?: return
                 val filtered = apps.filter { app ->
                     val name = runCatching {
@@ -112,7 +112,7 @@ class RootPackageManagerHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().rootPackageManager) return
+                if (!featureOn(DeviceEnvKind.ROOT_PACKAGE_MANAGER)) return
                 val activities = invocation.result as? List<*> ?: return
                 val filtered = activities.filter { activity ->
                     val name = runCatching {
@@ -138,8 +138,10 @@ class RootPackageManagerHooker(
         })
     }
 
+    /** Root 包名判定(V37 T2.4):内置基线 ∪ 用户追加项(extraRootPackages)。 */
     private fun isRootPackage(packageName: String): Boolean =
-        ROOT_PACKAGES.any { it.equals(packageName, ignoreCase = true) }
+        ROOT_PACKAGES.any { it.equals(packageName, ignoreCase = true) } ||
+            config().feature.extraRootPackages.any { it.isNotBlank() && it.equals(packageName, ignoreCase = true) }
 
     @SuppressLint("DiscouragedPrivateApi")
     private fun hookGetPackageInfo() {
@@ -152,7 +154,7 @@ class RootPackageManagerHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().rootPackageManager) return
+                if (!featureOn(DeviceEnvKind.ROOT_PACKAGE_MANAGER)) return
                 val packageName = invocation.getArg(0) as? String ?: return
                 if (!isRootPackage(packageName)) return
                 emit(

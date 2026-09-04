@@ -41,7 +41,7 @@ class SurfaceBypassHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().screenRecordBypass) return
+                if (!featureOn(ProcessKind.SCREEN_RECORD)) return
                 val result = invocation.result
                 if (result != null) return
                 // lockCanvas 返回 null 表示被 FLAG_SECURE 阻止
@@ -72,7 +72,7 @@ class SurfaceBypassHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().screenRecordBypass) return
+                if (!featureOn(ProcessKind.SCREEN_RECORD)) return
                 val result = invocation.result
                 if (result != null) return
                 val fakeCanvas = android.graphics.Canvas()
@@ -102,7 +102,7 @@ class SurfaceBypassHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().screenRecordBypass) return
+                if (!featureOn(ProcessKind.SCREEN_RECORD)) return
                 val result = invocation.result
                 if (result != null) return
                 // screenshot 返回 null 表示被 FLAG_SECURE 阻止

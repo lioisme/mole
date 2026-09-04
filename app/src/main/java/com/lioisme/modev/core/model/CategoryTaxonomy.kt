@@ -28,13 +28,17 @@ enum class NoiseTier {
  *
  * @param id       类别标识,等于对应枚举名([CryptoKind]/[SqlKind])。
  * @param type     所属记录类型([RecordType.CRYPTO]/[RecordType.DATABASE])。
- * @param defaultEnabled 新安装默认是否启用(噪点类别默认关)。
+ * @param domain   能力域归属(V37 D-0 基线:[CapabilityDomain.LISTEN] 被动采集 /
+ *                 [CapabilityDomain.FEATURE] 主动干预;新增类别必须显式标注,无默认值)。
+ * @param defaultEnabled 新安装默认是否启用(噪点类别默认关;功能域类别默认关,
+ *                 例外:数据门控类别如 DIALOG_KEYWORD 默认可开——空数据列表即真实停用)。
  * @param noiseTier 噪点分级(仅文档/排序用)。
  * @param order    同类型内展示顺序(升序)。
  */
 data class RecordCategory(
     val id: String,
     val type: RecordType,
+    val domain: CapabilityDomain,
     val defaultEnabled: Boolean,
     val noiseTier: NoiseTier,
     val order: Int,
@@ -43,112 +47,122 @@ data class RecordCategory(
 /** 记录类别分类法(进程级单例,不可变)。 */
 object CategoryTaxonomy {
 
+    private val L = CapabilityDomain.LISTEN
+    private val F = CapabilityDomain.FEATURE
+
     private val entries: List<RecordCategory> = buildList {
         // 算法类别(顺序对齐原设置页,保持用户肌肉记忆)
-        add(RecordCategory(CryptoKind.CIPHER.name, RecordType.CRYPTO, true, NoiseTier.SIGNAL, 0))
-        add(RecordCategory(CryptoKind.MESSAGE_DIGEST.name, RecordType.CRYPTO, true, NoiseTier.SIGNAL, 1))
-        add(RecordCategory(CryptoKind.MAC.name, RecordType.CRYPTO, true, NoiseTier.SIGNAL, 2))
-        add(RecordCategory(CryptoKind.SIGNATURE.name, RecordType.CRYPTO, true, NoiseTier.SIGNAL, 3))
-        add(RecordCategory(CryptoKind.KEY_PARAM.name, RecordType.CRYPTO, false, NoiseTier.NOISE_HIGH, 4))
-        add(RecordCategory(CryptoKind.KEY_GENERATION.name, RecordType.CRYPTO, false, NoiseTier.NOISE_HIGH, 5))
-        add(RecordCategory(CryptoKind.KEY_FACTORY.name, RecordType.CRYPTO, false, NoiseTier.NOISE_HIGH, 6))
-        add(RecordCategory(CryptoKind.KEY_STORE.name, RecordType.CRYPTO, false, NoiseTier.NOISE_HIGH, 7))
-        add(RecordCategory(CryptoKind.KEY_AGREEMENT.name, RecordType.CRYPTO, false, NoiseTier.NOISE_HIGH, 8))
-        add(RecordCategory(CryptoKind.RANDOM.name, RecordType.CRYPTO, false, NoiseTier.NOISE_HIGH, 9))
-        add(RecordCategory(CryptoKind.BASE64.name, RecordType.CRYPTO, false, NoiseTier.NOISE_HIGH, 10))
-        add(RecordCategory(CryptoKind.WEB_CRYPTO.name, RecordType.CRYPTO, false, NoiseTier.NOISE_HIGH, 11))
+        add(RecordCategory(CryptoKind.CIPHER.name, RecordType.CRYPTO, L, true, NoiseTier.SIGNAL, 0))
+        add(RecordCategory(CryptoKind.MESSAGE_DIGEST.name, RecordType.CRYPTO, L, true, NoiseTier.SIGNAL, 1))
+        add(RecordCategory(CryptoKind.MAC.name, RecordType.CRYPTO, L, true, NoiseTier.SIGNAL, 2))
+        add(RecordCategory(CryptoKind.SIGNATURE.name, RecordType.CRYPTO, L, true, NoiseTier.SIGNAL, 3))
+        add(RecordCategory(CryptoKind.KEY_PARAM.name, RecordType.CRYPTO, L, false, NoiseTier.NOISE_HIGH, 4))
+        add(RecordCategory(CryptoKind.KEY_GENERATION.name, RecordType.CRYPTO, L, false, NoiseTier.NOISE_HIGH, 5))
+        add(RecordCategory(CryptoKind.KEY_FACTORY.name, RecordType.CRYPTO, L, false, NoiseTier.NOISE_HIGH, 6))
+        add(RecordCategory(CryptoKind.KEY_STORE.name, RecordType.CRYPTO, L, false, NoiseTier.NOISE_HIGH, 7))
+        add(RecordCategory(CryptoKind.KEY_AGREEMENT.name, RecordType.CRYPTO, L, false, NoiseTier.NOISE_HIGH, 8))
+        add(RecordCategory(CryptoKind.RANDOM.name, RecordType.CRYPTO, L, false, NoiseTier.NOISE_HIGH, 9))
+        add(RecordCategory(CryptoKind.BASE64.name, RecordType.CRYPTO, L, false, NoiseTier.NOISE_HIGH, 10))
+        add(RecordCategory(CryptoKind.WEB_CRYPTO.name, RecordType.CRYPTO, L, false, NoiseTier.NOISE_HIGH, 11))
         // 数据库类别(顺序对齐原设置页)
-        add(RecordCategory(SqlKind.OPEN.name, RecordType.DATABASE, false, NoiseTier.NOISE_HIGH, 0))
-        add(RecordCategory(SqlKind.QUERY.name, RecordType.DATABASE, true, NoiseTier.SIGNAL, 1))
-        add(RecordCategory(SqlKind.DML.name, RecordType.DATABASE, true, NoiseTier.SIGNAL, 2))
-        add(RecordCategory(SqlKind.EXEC.name, RecordType.DATABASE, true, NoiseTier.SIGNAL, 3))
-        add(RecordCategory(SqlKind.TRANSACTION.name, RecordType.DATABASE, false, NoiseTier.NOISE_HIGH, 4))
+        add(RecordCategory(SqlKind.OPEN.name, RecordType.DATABASE, L, false, NoiseTier.NOISE_HIGH, 0))
+        add(RecordCategory(SqlKind.QUERY.name, RecordType.DATABASE, L, true, NoiseTier.SIGNAL, 1))
+        add(RecordCategory(SqlKind.DML.name, RecordType.DATABASE, L, true, NoiseTier.SIGNAL, 2))
+        add(RecordCategory(SqlKind.EXEC.name, RecordType.DATABASE, L, true, NoiseTier.SIGNAL, 3))
+        add(RecordCategory(SqlKind.TRANSACTION.name, RecordType.DATABASE, L, false, NoiseTier.NOISE_HIGH, 4))
         // 行为类别(V27;默认态与 HookSwitch.DEFAULT 对齐:写/删/重命名/Shell 高信号默认开,
         // 读/列目录/Assets 高频噪声默认关)
-        add(RecordCategory(BehaviorKind.FILE_READ.name, RecordType.BEHAVIOR, false, NoiseTier.NOISE_HIGH, 0))
-        add(RecordCategory(BehaviorKind.FILE_WRITE.name, RecordType.BEHAVIOR, true, NoiseTier.SIGNAL, 1))
-        add(RecordCategory(BehaviorKind.FILE_DELETE.name, RecordType.BEHAVIOR, true, NoiseTier.SIGNAL, 2))
-        add(RecordCategory(BehaviorKind.FILE_RENAME.name, RecordType.BEHAVIOR, true, NoiseTier.SIGNAL, 3))
-        add(RecordCategory(BehaviorKind.FILE_LIST.name, RecordType.BEHAVIOR, false, NoiseTier.NOISE_HIGH, 4))
-        add(RecordCategory(BehaviorKind.ASSET_READ.name, RecordType.BEHAVIOR, false, NoiseTier.NOISE_HIGH, 5))
-        add(RecordCategory(BehaviorKind.SHELL_EXEC.name, RecordType.BEHAVIOR, true, NoiseTier.SIGNAL, 6))
+        add(RecordCategory(BehaviorKind.FILE_READ.name, RecordType.BEHAVIOR, L, false, NoiseTier.NOISE_HIGH, 0))
+        add(RecordCategory(BehaviorKind.FILE_WRITE.name, RecordType.BEHAVIOR, L, true, NoiseTier.SIGNAL, 1))
+        add(RecordCategory(BehaviorKind.FILE_DELETE.name, RecordType.BEHAVIOR, L, true, NoiseTier.SIGNAL, 2))
+        add(RecordCategory(BehaviorKind.FILE_RENAME.name, RecordType.BEHAVIOR, L, true, NoiseTier.SIGNAL, 3))
+        add(RecordCategory(BehaviorKind.FILE_LIST.name, RecordType.BEHAVIOR, L, false, NoiseTier.NOISE_HIGH, 4))
+        add(RecordCategory(BehaviorKind.ASSET_READ.name, RecordType.BEHAVIOR, L, false, NoiseTier.NOISE_HIGH, 5))
+        add(RecordCategory(BehaviorKind.SHELL_EXEC.name, RecordType.BEHAVIOR, L, true, NoiseTier.SIGNAL, 6))
         // 偏好类别(V28;默认态与 HookSwitch.DEFAULT 对齐:OPEN/写/删/清空 高信号默认开,
         // GET 高频噪声默认关——决策 D4)
-        add(RecordCategory(PrefsKind.OPEN.name, RecordType.PREFS, true, NoiseTier.SIGNAL, 0))
-        add(RecordCategory(PrefsKind.GET.name, RecordType.PREFS, false, NoiseTier.NOISE_HIGH, 1))
-        add(RecordCategory(PrefsKind.PUT.name, RecordType.PREFS, true, NoiseTier.SIGNAL, 2))
-        add(RecordCategory(PrefsKind.REMOVE.name, RecordType.PREFS, true, NoiseTier.SIGNAL, 3))
-        add(RecordCategory(PrefsKind.CLEAR.name, RecordType.PREFS, true, NoiseTier.SIGNAL, 4))
+        add(RecordCategory(PrefsKind.OPEN.name, RecordType.PREFS, L, true, NoiseTier.SIGNAL, 0))
+        add(RecordCategory(PrefsKind.GET.name, RecordType.PREFS, L, false, NoiseTier.NOISE_HIGH, 1))
+        add(RecordCategory(PrefsKind.PUT.name, RecordType.PREFS, L, true, NoiseTier.SIGNAL, 2))
+        add(RecordCategory(PrefsKind.REMOVE.name, RecordType.PREFS, L, true, NoiseTier.SIGNAL, 3))
+        add(RecordCategory(PrefsKind.CLEAR.name, RecordType.PREFS, L, true, NoiseTier.SIGNAL, 4))
         // WebView 类别(V29 一等公民;默认态与 HookSwitch.DEFAULT 对齐:PAGE_LOAD/EVALUATE_JS/
         // JS_BRIDGE/DEBUG 高信号默认开,JS_CRYPTO 高频噪声默认关)
-        add(RecordCategory(WebViewKind.PAGE_LOAD.name, RecordType.WEBVIEW, true, NoiseTier.SIGNAL, 0))
-        add(RecordCategory(WebViewKind.EVALUATE_JS.name, RecordType.WEBVIEW, true, NoiseTier.SIGNAL, 1))
-        add(RecordCategory(WebViewKind.JS_BRIDGE.name, RecordType.WEBVIEW, true, NoiseTier.SIGNAL, 2))
-        add(RecordCategory(WebViewKind.DEBUG.name, RecordType.WEBVIEW, true, NoiseTier.SIGNAL, 3))
-        add(RecordCategory(WebViewKind.JS_CRYPTO.name, RecordType.WEBVIEW, false, NoiseTier.NOISE_HIGH, 4))
-        // 网络环境监听类别(V30 一等公民;干预类(SSL/代理/VPN)默认关(安全优先),
-        // 观测类(REQUEST)默认开——与 HookSwitch.DEFAULT 对齐)
-        add(RecordCategory(NetworkKind.SSL_CONTEXT.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 0))
-        add(RecordCategory(NetworkKind.SSL_TRUST_MANAGER.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 1))
-        add(RecordCategory(NetworkKind.SSL_OKHTTP_PINNER.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 2))
-        add(RecordCategory(NetworkKind.SSL_OKHTTP_VERIFIER.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 3))
-        add(RecordCategory(NetworkKind.SSL_WEBVIEW.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 4))
-        add(RecordCategory(NetworkKind.SSL_NETWORK_CONFIG.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 5))
-        add(RecordCategory(NetworkKind.PROXY_SYSTEM_PROP.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 6))
-        add(RecordCategory(NetworkKind.PROXY_CONNECTIVITY.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 7))
-        add(RecordCategory(NetworkKind.PROXY_SETTINGS.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 8))
-        add(RecordCategory(NetworkKind.PROXY_OKHTTP.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 9))
-        add(RecordCategory(NetworkKind.VPN_CAPABILITIES.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 10))
-        add(RecordCategory(NetworkKind.VPN_INTERFACE.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 11))
-        add(RecordCategory(NetworkKind.VPN_NETWORK_INFO.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 12))
-        add(RecordCategory(NetworkKind.VPN_LINK_PROPERTIES.name, RecordType.NETWORK, false, NoiseTier.SIGNAL, 13))
-        add(RecordCategory(NetworkKind.REQUEST.name, RecordType.NETWORK, true, NoiseTier.SIGNAL, 14))
-        // 设备环境监听类别(V31 一等公民;干预类(Root/Xposed/Emulator)默认关(安全优先),
-        // 观测类(Monitor)默认关——与 HookSwitch.DEFAULT 对齐)
-        add(RecordCategory(DeviceEnvKind.ROOT_FILE.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 0))
-        add(RecordCategory(DeviceEnvKind.ROOT_EXEC.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 1))
-        add(RecordCategory(DeviceEnvKind.ROOT_PACKAGE_MANAGER.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 2))
-        add(RecordCategory(DeviceEnvKind.ROOT_PROPERTY.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 3))
-        add(RecordCategory(DeviceEnvKind.XPOSED_CLASS.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 4))
-        add(RecordCategory(DeviceEnvKind.XPOSED_STACK.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 5))
-        add(RecordCategory(DeviceEnvKind.XPOSED_MAPS.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 6))
-        add(RecordCategory(DeviceEnvKind.EMULATOR_BUILD.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 7))
-        add(RecordCategory(DeviceEnvKind.EMULATOR_FILE.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 8))
-        add(RecordCategory(DeviceEnvKind.EMULATOR_SENSOR.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 9))
-        add(RecordCategory(DeviceEnvKind.EMULATOR_NETWORK.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 10))
-        add(RecordCategory(DeviceEnvKind.EMULATOR_TELEPHONY.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 11))
-        add(RecordCategory(DeviceEnvKind.EMULATOR_CPU.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 12))
-        add(RecordCategory(DeviceEnvKind.EMULATOR_BATTERY.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 13))
-        // V35 momo 增强:系统属性/进程文件检测干预(干预类,默认关)
-        add(RecordCategory(DeviceEnvKind.SYSTEM_PROPERTIES.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 14))
-        add(RecordCategory(DeviceEnvKind.PROC_STATUS.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 15))
-        add(RecordCategory(DeviceEnvKind.PROC_MOUNT_INFO.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 16))
-        add(RecordCategory(DeviceEnvKind.PROC_CGROUP.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 17))
-        add(RecordCategory(DeviceEnvKind.PROC_NET.name, RecordType.DEVICE_ENV, false, NoiseTier.SIGNAL, 18))
-        add(RecordCategory(DeviceEnvKind.DETECT_ROOT.name, RecordType.DEVICE_ENV, false, NoiseTier.NOISE_HIGH, 19))
-        add(RecordCategory(DeviceEnvKind.DETECT_EMULATOR.name, RecordType.DEVICE_ENV, false, NoiseTier.NOISE_HIGH, 20))
-        // V33 UI 交互监听类别;默认态与 HookSwitch.DEFAULT 对齐:
-        // DIALOG_SHOW/DIALOG_KEYWORD/ACTIVITY_START 高信号默认开,
-        // WIDGET_TEXT/ACTIVITY_RESUME 高频噪声默认关)
-        add(RecordCategory(UiInteractionKind.DIALOG_SHOW.name, RecordType.UI_INTERACTION, true, NoiseTier.SIGNAL, 0))
-        add(RecordCategory(UiInteractionKind.DIALOG_KEYWORD.name, RecordType.UI_INTERACTION, true, NoiseTier.SIGNAL, 1))
-        add(RecordCategory(UiInteractionKind.WIDGET_TEXT.name, RecordType.UI_INTERACTION, false, NoiseTier.NOISE_HIGH, 2))
-        add(RecordCategory(UiInteractionKind.ACTIVITY_START.name, RecordType.UI_INTERACTION, true, NoiseTier.SIGNAL, 3))
-        add(RecordCategory(UiInteractionKind.ACTIVITY_RESUME.name, RecordType.UI_INTERACTION, false, NoiseTier.NOISE, 4))
+        add(RecordCategory(WebViewKind.PAGE_LOAD.name, RecordType.WEBVIEW, L, true, NoiseTier.SIGNAL, 0))
+        add(RecordCategory(WebViewKind.EVALUATE_JS.name, RecordType.WEBVIEW, L, true, NoiseTier.SIGNAL, 1))
+        add(RecordCategory(WebViewKind.JS_BRIDGE.name, RecordType.WEBVIEW, L, true, NoiseTier.SIGNAL, 2))
+        add(RecordCategory(WebViewKind.DEBUG.name, RecordType.WEBVIEW, L, true, NoiseTier.SIGNAL, 3))
+        add(RecordCategory(WebViewKind.JS_CRYPTO.name, RecordType.WEBVIEW, L, false, NoiseTier.NOISE_HIGH, 4))
+        // 网络环境类别(V30;V37 D-0:SSL/代理/VPN 为功能域干预类,默认关(安全优先);
+        // REQUEST 为监听域观测类,默认开——与 HookSwitch.DEFAULT 对齐)
+        add(RecordCategory(NetworkKind.SSL_CONTEXT.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 0))
+        add(RecordCategory(NetworkKind.SSL_TRUST_MANAGER.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 1))
+        add(RecordCategory(NetworkKind.SSL_OKHTTP_PINNER.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 2))
+        add(RecordCategory(NetworkKind.SSL_OKHTTP_VERIFIER.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 3))
+        add(RecordCategory(NetworkKind.SSL_WEBVIEW.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 4))
+        add(RecordCategory(NetworkKind.SSL_NETWORK_CONFIG.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 5))
+        add(RecordCategory(NetworkKind.PROXY_SYSTEM_PROP.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 6))
+        add(RecordCategory(NetworkKind.PROXY_CONNECTIVITY.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 7))
+        add(RecordCategory(NetworkKind.PROXY_SETTINGS.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 8))
+        add(RecordCategory(NetworkKind.PROXY_OKHTTP.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 9))
+        add(RecordCategory(NetworkKind.VPN_CAPABILITIES.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 10))
+        add(RecordCategory(NetworkKind.VPN_INTERFACE.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 11))
+        add(RecordCategory(NetworkKind.VPN_NETWORK_INFO.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 12))
+        add(RecordCategory(NetworkKind.VPN_LINK_PROPERTIES.name, RecordType.NETWORK, F, false, NoiseTier.SIGNAL, 13))
+        add(RecordCategory(NetworkKind.REQUEST.name, RecordType.NETWORK, L, true, NoiseTier.SIGNAL, 14))
+        // 设备环境类别(V31;V37 D-0:Root/Xposed/模拟器/proc 19 项为功能域干预类,默认关;
+        // DETECT_* 为监听域观测类,默认关(噪声大)——与 HookSwitch.DEFAULT 对齐)
+        add(RecordCategory(DeviceEnvKind.ROOT_FILE.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 0))
+        add(RecordCategory(DeviceEnvKind.ROOT_EXEC.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 1))
+        add(RecordCategory(DeviceEnvKind.ROOT_PACKAGE_MANAGER.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 2))
+        add(RecordCategory(DeviceEnvKind.ROOT_PROPERTY.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 3))
+        add(RecordCategory(DeviceEnvKind.XPOSED_CLASS.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 4))
+        add(RecordCategory(DeviceEnvKind.XPOSED_STACK.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 5))
+        add(RecordCategory(DeviceEnvKind.XPOSED_MAPS.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 6))
+        add(RecordCategory(DeviceEnvKind.EMULATOR_BUILD.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 7))
+        add(RecordCategory(DeviceEnvKind.EMULATOR_FILE.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 8))
+        add(RecordCategory(DeviceEnvKind.EMULATOR_SENSOR.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 9))
+        add(RecordCategory(DeviceEnvKind.EMULATOR_NETWORK.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 10))
+        add(RecordCategory(DeviceEnvKind.EMULATOR_TELEPHONY.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 11))
+        add(RecordCategory(DeviceEnvKind.EMULATOR_CPU.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 12))
+        add(RecordCategory(DeviceEnvKind.EMULATOR_BATTERY.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 13))
+        // V35 momo 增强:系统属性/进程文件检测干预(功能域,默认关)
+        add(RecordCategory(DeviceEnvKind.SYSTEM_PROPERTIES.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 14))
+        add(RecordCategory(DeviceEnvKind.PROC_STATUS.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 15))
+        add(RecordCategory(DeviceEnvKind.PROC_MOUNT_INFO.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 16))
+        add(RecordCategory(DeviceEnvKind.PROC_CGROUP.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 17))
+        add(RecordCategory(DeviceEnvKind.PROC_NET.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 18))
+        add(RecordCategory(DeviceEnvKind.DETECT_ROOT.name, RecordType.DEVICE_ENV, L, false, NoiseTier.NOISE_HIGH, 19))
+        add(RecordCategory(DeviceEnvKind.DETECT_EMULATOR.name, RecordType.DEVICE_ENV, L, false, NoiseTier.NOISE_HIGH, 20))
+        // V33 UI 交互类别(V37 D-0:DIALOG_KEYWORD 为功能域拦截,其余为监听域观测;
+        // 默认态与 HookSwitch.DEFAULT 对齐)
+        add(RecordCategory(UiInteractionKind.DIALOG_SHOW.name, RecordType.UI_INTERACTION, L, true, NoiseTier.SIGNAL, 0))
+        add(RecordCategory(UiInteractionKind.DIALOG_KEYWORD.name, RecordType.UI_INTERACTION, F, true, NoiseTier.SIGNAL, 1))
+        add(RecordCategory(UiInteractionKind.WIDGET_TEXT.name, RecordType.UI_INTERACTION, L, false, NoiseTier.NOISE_HIGH, 2))
+        add(RecordCategory(UiInteractionKind.ACTIVITY_START.name, RecordType.UI_INTERACTION, L, true, NoiseTier.SIGNAL, 3))
+        add(RecordCategory(UiInteractionKind.ACTIVITY_RESUME.name, RecordType.UI_INTERACTION, L, false, NoiseTier.NOISE, 4))
         // V33 系统信息监听类别;默认态与 HookSwitch.DEFAULT 对齐:
         // APP_INFO/SIGNATURE 高信号默认开,LOGCAT 高频噪声默认关)
-        add(RecordCategory(SystemKind.LOGCAT.name, RecordType.SYSTEM, false, NoiseTier.NOISE_HIGH, 0))
-        add(RecordCategory(SystemKind.APP_INFO.name, RecordType.SYSTEM, true, NoiseTier.SIGNAL, 1))
-        add(RecordCategory(SystemKind.SIGNATURE.name, RecordType.SYSTEM, true, NoiseTier.SIGNAL, 2))
-        // V33 进程控制类别;全部默认关(干预型 hook,安全优先)
-        add(RecordCategory(ProcessKind.EXIT_INTERCEPT.name, RecordType.PROCESS_CONTROL, false, NoiseTier.SIGNAL, 0))
-        add(RecordCategory(ProcessKind.CRASH_PREVENT.name, RecordType.PROCESS_CONTROL, false, NoiseTier.SIGNAL, 1))
-        add(RecordCategory(ProcessKind.SCREEN_RECORD.name, RecordType.PROCESS_CONTROL, false, NoiseTier.NOISE, 2))
+        add(RecordCategory(SystemKind.LOGCAT.name, RecordType.SYSTEM, L, false, NoiseTier.NOISE_HIGH, 0))
+        add(RecordCategory(SystemKind.APP_INFO.name, RecordType.SYSTEM, L, true, NoiseTier.SIGNAL, 1))
+        add(RecordCategory(SystemKind.SIGNATURE.name, RecordType.SYSTEM, L, true, NoiseTier.SIGNAL, 2))
+        // V33 进程控制类别(V37 D-0:全部功能域干预,默认关(安全优先))
+        add(RecordCategory(ProcessKind.EXIT_INTERCEPT.name, RecordType.PROCESS_CONTROL, F, false, NoiseTier.SIGNAL, 0))
+        add(RecordCategory(ProcessKind.CRASH_PREVENT.name, RecordType.PROCESS_CONTROL, F, false, NoiseTier.SIGNAL, 1))
+        add(RecordCategory(ProcessKind.SCREEN_RECORD.name, RecordType.PROCESS_CONTROL, F, false, NoiseTier.NOISE, 2))
     }
 
     /** 全部类别(按 type 分组、组内按 order;稳定输出)。 */
     fun all(): List<RecordCategory> =
         entries.sortedWith(compareBy({ it.type.ordinal }, { it.order }))
+
+    /** 指定能力域的类别(V37 双域拆分:功能页/监听页行集合唯一驱动源)。 */
+    fun forDomain(domain: CapabilityDomain): List<RecordCategory> =
+        entries.filter { it.domain == domain }
+
+    /** 类别是否功能域(主动干预);未知类别按监听域处理(漂移安全)。 */
+    fun isFeature(type: RecordType, id: String): Boolean =
+        byId(type, id)?.domain == CapabilityDomain.FEATURE
 
     /** 指定类型的类别(按 order 升序)。 */
     fun forType(type: RecordType): List<RecordCategory> =

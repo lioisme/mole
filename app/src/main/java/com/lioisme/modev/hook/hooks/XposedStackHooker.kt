@@ -21,7 +21,7 @@ class XposedStackHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().xposedStack) return
+                if (!featureOn(DeviceEnvKind.XPOSED_STACK)) return
                 if (IN_HOOK.get() == true) return
                 IN_HOOK.set(true)
                 try {
@@ -50,7 +50,7 @@ class XposedStackHooker(
         }.getOrNull() ?: return
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().xposedStack) return
+                if (!featureOn(DeviceEnvKind.XPOSED_STACK)) return
                 if (IN_HOOK.get() == true) return
                 IN_HOOK.set(true)
                 try {

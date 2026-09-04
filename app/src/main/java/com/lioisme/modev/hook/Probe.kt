@@ -28,6 +28,8 @@ class ProbeContext(
     val engine: HookEngine,
     /** 捕获配置快照(每次调用现读,变更即生效)。 */
     val config: () -> HookSwitch,
+    /** 配置变更订阅器(V37 T0.2):安装期一次性动作的延迟评估通道;测试可省略(空订阅)。 */
+    val configWatcher: ConfigWatcher = ConfigWatcher(),
     /** 上下文追踪器(同一算法操作链路的关联)。 */
     val tracker: CryptoContextTracker,
     /** 记录出口(有界队列 + 写前日志)。 */

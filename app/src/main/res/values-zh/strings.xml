@@ -503,16 +503,15 @@
     <string name="op_net_vpn_routes">获取路由表</string>
     <string name="op_net_request_start">请求发起</string>
     <string name="op_net_request_end">响应接收</string>
-    <string name="listen_settings_network">网络环境</string>
-    <string name="network_records_title">网络</string>
+    <string name="network_records_title">网络环境记录</string>
     <string name="filter_type_network">网络</string>
-    <string name="network_monitor_master">网络环境</string>
+    <string name="network_monitor_master">网络干预</string>
     <string name="network_records_search">搜索网络记录</string>
 
     <!-- V31 设备环境 -->
     <string name="filter_type_device_env">设备环境</string>
     <string name="device_records_title">设备环境记录</string>
-    <string name="device_env_master">设备环境监听</string>
+    <string name="device_env_master">设备环境伪装</string>
     <string name="kind_device_env_ROOT_FILE">Root 文件检测</string>
     <string name="kind_device_env_ROOT_EXEC">Root 命令执行</string>
     <string name="kind_device_env_ROOT_PACKAGE_MANAGER">Root 包查询</string>
@@ -611,7 +610,7 @@
     <!-- V33 UI 交互 -->
     <string name="filter_type_ui_interaction">UI交互</string>
     <string name="ui_interaction_records_title">UI交互记录</string>
-    <string name="listen_row_master_ui">UI交互监听</string>
+    <string name="listen_row_master_ui">UI 交互</string>
     <string name="kind_ui_DIALOG_SHOW">弹窗展示</string>
     <string name="kind_ui_DIALOG_KEYWORD">弹窗关键词</string>
     <string name="kind_ui_WIDGET_TEXT">控件文本</string>
@@ -638,7 +637,7 @@
     <!-- V33 进程控制 -->
     <string name="filter_type_process_control">进程控制</string>
     <string name="process_control_records_title">进程控制记录</string>
-    <string name="listen_row_master_process">进程控制监听</string>
+    <string name="listen_row_master_process">进程守护</string>
     <string name="kind_process_EXIT_INTERCEPT">退出拦截</string>
     <string name="kind_process_CRASH_PREVENT">崩溃预防</string>
     <string name="kind_process_SCREEN_RECORD">录屏解除</string>
@@ -649,4 +648,100 @@
     <string name="ui_interaction_records_search">搜索UI交互记录…</string>
     <string name="system_records_search">搜索系统信息记录…</string>
     <string name="process_control_records_search">搜索进程控制记录…</string>
+
+    <!-- V37 双域拆分:监控入口分区 -->
+    <string name="monitor_section_listen">监听</string>
+    <string name="monitor_section_feature">功能</string>
+    <string name="monitor_domain_listen">监听记录</string>
+    <string name="monitor_domain_feature">功能干预</string>
+    <!-- V37 双域拆分:每应用功能设置 -->
+    <string name="feature_settings_entry">功能设置</string>
+    <string name="feature_settings_hint">功能会主动改变应用行为,开启后立即生效。</string>
+    <string name="feature_masters_section">功能总开关</string>
+    <string name="feature_group_dialog_intercept">弹窗关键词拦截</string>
+    <string name="feature_group_process_guard">进程守护</string>
+    <string name="feature_group_ssl_bypass">SSL 校验绕过</string>
+    <string name="feature_group_proxy_vpn_hide">代理与 VPN 隐藏</string>
+    <string name="feature_group_root_xposed_hide">Root 与 Xposed 隐藏</string>
+    <string name="feature_group_device_spoof">模拟器与设备伪装</string>
+    <string name="feature_profile_row">伪装画像</string>
+    <string name="feature_profile_row_hint">设备伪装钩子使用的设备标识值组</string>
+    <string name="feature_profile_sheet_title">选择伪装画像</string>
+    <string name="feature_profile_follow_global">跟随全局</string>
+    <string name="feature_profile_auto">自动(按模拟器特征族)</string>
+    <string name="feature_profile_pixel7pro">Pixel 7 Pro</string>
+    <string name="feature_profile_xiaomi13">小米 13</string>
+    <string name="feature_keyword_follow_global">跟随全局关键词库</string>
+    <string name="feature_keyword_follow_global_hint">开启时,全局启用的关键词对本应用全部生效</string>
+    <string name="feature_keyword_library_empty">关键词库为空</string>
+    <string name="feature_keyword_open_library">打开关键词库</string>
+    <string name="feature_keyword_subset_title">启用的关键词</string>
+    <string name="danger_reset_feature_msg">清除 %1$s 的全部功能自定义并恢复默认?</string>
+    <!-- V37 双域拆分:监听页环境观测分区 -->
+    <string name="listen_section_env_observe">环境观测</string>
+    <!-- V37 T3.5:全局关键词库 -->
+    <string name="keywords_title">弹窗拦截关键词</string>
+    <string name="keywords_add_action">添加关键词</string>
+    <string name="keywords_add_title">添加关键词</string>
+    <string name="keywords_edit_title">编辑关键词</string>
+    <string name="keywords_text_label">关键词文本</string>
+    <string name="keywords_mode_label">匹配模式</string>
+    <string name="keyword_mode_contains">包含</string>
+    <string name="keyword_mode_regex">正则</string>
+    <string name="keyword_mode_equals">全等</string>
+    <string name="keywords_empty_title">暂无关键词</string>
+    <string name="keywords_empty_hint">添加关键词后,已作用域应用中命中的弹窗将被拦截。</string>
+    <string name="keywords_delete_action">删除</string>
+    <string name="keywords_delete_confirm_msg">删除关键词「%1$s」?已作用域应用将立即不再拦截该词。</string>
+    <!-- V37 T3.5:伪装画像 -->
+    <string name="profiles_title">伪装画像</string>
+    <string name="profiles_hint">内置档位覆盖常见设备标识;字段覆写在所选档位之上生效。</string>
+    <string name="profiles_global_section">画像档位</string>
+    <string name="profiles_overrides_section">字段覆写</string>
+    <string name="profiles_overrides_empty">暂无字段覆写</string>
+    <string name="profiles_override_add">添加覆写</string>
+    <string name="profiles_override_delete">删除覆写</string>
+    <string name="profiles_override_delete_confirm">删除覆写「%1$s」?</string>
+    <string name="profiles_override_key_label">键(如 build.MODEL、ro.hardware、wifi.ssid)</string>
+    <string name="profiles_override_value_label">值</string>
+    <string name="profiles_override_key_hint">前缀:build. / ro. / telephony. / wifi. / cpu.</string>
+    <!-- V37 T3.5:检测黑名单 -->
+    <string name="blacklist_title">检测黑名单</string>
+    <string name="blacklist_hint">追加项与内置基线取并集生效;内置条目不可删除。</string>
+    <string name="blacklist_root_packages">Root 包名</string>
+    <string name="blacklist_xposed_prefixes">Xposed 类名前缀</string>
+    <string name="blacklist_frida_ports">Frida 端口</string>
+    <string name="blacklist_mask_keywords">掩码关键词</string>
+    <string name="blacklist_section_empty">暂无追加项</string>
+    <string name="blacklist_add_action">添加</string>
+    <string name="blacklist_value_label">值</string>
+    <!-- V37 T3.5:设置页功能域入口 -->
+    <string name="settings_interception_section">拦截与伪装</string>
+    <string name="settings_keywords_entry">关键词库</string>
+    <string name="settings_keywords_entry_hint">全局弹窗拦截关键词</string>
+    <string name="settings_profiles_entry">伪装画像</string>
+    <string name="settings_profiles_entry_hint">设备标识档位与字段覆写</string>
+    <string name="settings_blacklist_entry">检测黑名单</string>
+    <string name="settings_blacklist_entry_hint">额外隐藏的包名、前缀与端口</string>
+
+    <!-- V37 T3.6:数据管理补齐后 5 类记录 -->
+    <string name="settings_records_network">网络环境记录</string>
+    <string name="settings_records_device_env">设备环境记录</string>
+    <string name="settings_records_ui_interaction">UI 交互记录</string>
+    <string name="settings_records_system">系统信息记录</string>
+    <string name="settings_records_process_control">进程控制记录</string>
+    <string name="settings_clear_network_records">清空网络环境记录</string>
+    <string name="settings_clear_device_env_records">清空设备环境记录</string>
+    <string name="settings_clear_ui_interaction_records">清空 UI 交互记录</string>
+    <string name="settings_clear_system_records">清空系统信息记录</string>
+    <string name="settings_clear_process_control_records">清空进程控制记录</string>
+    <string name="danger_clear_network_msg">确定永久删除全部网络环境记录?此操作不可撤销。</string>
+    <string name="danger_clear_device_env_msg">确定永久删除全部设备环境记录?此操作不可撤销。</string>
+    <string name="danger_clear_ui_interaction_msg">确定永久删除全部 UI 交互记录?此操作不可撤销。</string>
+    <string name="danger_clear_system_msg">确定永久删除全部系统信息记录?此操作不可撤销。</string>
+    <string name="danger_clear_process_control_msg">确定永久删除全部进程控制记录?此操作不可撤销。</string>
+
+    <!-- V37 T3.2:记录列表 Appbar 清空动作 -->
+    <string name="records_clear_action">清空本类</string>
+    <string name="danger_clear_page_records_msg">确定永久删除本应用该类型全部记录?此操作不可撤销。</string>
 </resources>

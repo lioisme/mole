@@ -80,7 +80,7 @@ class ProcCgroupHooker(
                     trackedReaders.remove(reader)
                     return
                 }
-                if (!config().procCgroup) return
+                if (!featureOn(DeviceEnvKind.PROC_CGROUP)) return
                 val line = invocation.result as? String ?: return
                 if (isMagiskCgroupLine(line)) {
                     invocation.setResult(null)
@@ -97,14 +97,22 @@ class ProcCgroupHooker(
         })
     }
 
+    /** 生效掩码词表(V37 T2.4):内置基线 ∪ 用户追加关键词(extraMaskKeywords)。 */
+    private fun maskKeywords(): List<String> =
+        if (config().feature.extraMaskKeywords.isEmpty()) {
+            MAGISK_CGROUP_KEYWORDS
+        } else {
+            MAGISK_CGROUP_KEYWORDS + config().feature.extraMaskKeywords.map { it.lowercase() }
+        }
+
     private fun isMagiskCgroupLine(line: String): Boolean {
         val lower = line.lowercase()
-        return MAGISK_CGROUP_KEYWORDS.any { lower.contains(it) }
+        return maskKeywords().any { lower.contains(it) }
     }
 
     private fun extractCgroupKeyword(line: String): String? {
         val lower = line.lowercase()
-        return MAGISK_CGROUP_KEYWORDS.firstOrNull { lower.contains(it) }
+        return maskKeywords().firstOrNull { lower.contains(it) }
     }
 
     private fun isProcCgroupPath(path: String): Boolean {

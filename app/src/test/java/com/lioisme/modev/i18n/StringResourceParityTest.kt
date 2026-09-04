@@ -37,6 +37,8 @@ class StringResourceParityTest {
         "filter_type_prefs",
         "kind_base64",
         "kind_mac",
+        // V37:机型品牌名双语同形(专有名词,非漏翻)
+        "feature_profile_pixel7pro",
         "op_prefs_get_string",
         "op_prefs_get_int",
         "op_prefs_get_long",

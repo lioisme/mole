@@ -49,10 +49,20 @@ object ModevRoutes {
     const val PROCESS_CONTROL_RECORDS = "records/process_control/{packageName}"
     /** 每应用监听设置页(V24 二态偏差)。 */
     const val APP_LISTEN_SETTINGS = "apps/{packageName}/listen-settings"
+    /** 每应用功能设置页(V37 双域拆分:干预开关 + 关键词启用 + 画像选择)。 */
+    const val APP_FEATURE_SETTINGS = "apps/{packageName}/feature-settings"
+    /** 全局关键词库管理页(V37 T3.5)。 */
+    const val KEYWORD_LIBRARY = "settings/keywords"
+    /** 全局伪装画像管理页(V37 T3.5)。 */
+    const val SPOOF_PROFILES = "settings/profiles"
+    /** 全局检测黑名单追加页(V37 T3.5)。 */
+    const val FEATURE_BLACKLIST = "settings/blacklist"
 
     fun appMonitor(packageName: String): String = "apps/${enc(packageName)}/monitor"
 
     fun appListenSettings(packageName: String): String = "apps/${enc(packageName)}/listen-settings"
+
+    fun appFeatureSettings(packageName: String): String = "apps/${enc(packageName)}/feature-settings"
 
     fun algorithmRecords(packageName: String): String = "records/algorithm/${enc(packageName)}"
 

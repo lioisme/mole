@@ -31,4 +31,11 @@ object ConfigKeys {
 
     /** 服务监听端口键(V29):宿主本地 SharedPreferences 专用,默认1510。 */
     const val SERVER_PORT = "server_port"
+
+    /**
+     * 全局功能配置键(V37 T3.5):宿主本地 SharedPreferences 专用,
+     * 存 [FeatureConfig] JSON(伪装画像选择 + 黑名单追加项);
+     * init 时并入 switch_global 种子,注入侧直读兜底可见。
+     */
+    const val GLOBAL_FEATURE = "feature_global"
 }

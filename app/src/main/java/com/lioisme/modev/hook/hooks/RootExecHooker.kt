@@ -31,7 +31,7 @@ class RootExecHooker(
         if (methodStringArray != null) {
             engine.hook(methodStringArray, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().rootExec) return
+                    if (!featureOn(DeviceEnvKind.ROOT_EXEC)) return
                     val command = invocation.getArg(0) as? Array<*> ?: return
                     val firstArg = command.firstOrNull()?.toString() ?: return
                     val cmdName = firstArg.substringAfterLast('/').substringAfterLast('\\')
@@ -75,7 +75,7 @@ class RootExecHooker(
         if (methodStringArrayStringArray != null) {
             engine.hook(methodStringArrayStringArray, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().rootExec) return
+                    if (!featureOn(DeviceEnvKind.ROOT_EXEC)) return
                     val command = invocation.getArg(0) as? Array<*> ?: return
                     val firstArg = command.firstOrNull()?.toString() ?: return
                     val cmdName = firstArg.substringAfterLast('/').substringAfterLast('\\')
@@ -98,7 +98,7 @@ class RootExecHooker(
         if (methodWithDir != null) {
             engine.hook(methodWithDir, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().rootExec) return
+                    if (!featureOn(DeviceEnvKind.ROOT_EXEC)) return
                     val command = invocation.getArg(0) as? Array<*> ?: return
                     val firstArg = command.firstOrNull()?.toString() ?: return
                     val cmdName = firstArg.substringAfterLast('/').substringAfterLast('\\')
@@ -157,7 +157,7 @@ class RootExecHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().rootExec) return
+                if (!featureOn(DeviceEnvKind.ROOT_EXEC)) return
                 val builder = invocation.thisObject as? ProcessBuilder ?: return
                 val command = runCatching { builder.command() }.getOrNull() ?: return
                 val firstArg = command.firstOrNull() ?: return

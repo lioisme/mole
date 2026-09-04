@@ -94,7 +94,8 @@ class MonitorEntryHeaderTest {
         rule.onNodeWithText(str(R.string.database_records_title)).assertIsDisplayed()
         rule.onAllNodesWithContentDescription(str(R.string.cd_back)).assertCountEquals(1)
 
-        // 操作卡(V23):启动按钮惰性解析异步出现 → 有界轮询;危险行仅断言存在不触发。
+        // V37 T3.2:启动/清空 = Appbar actions(图标;testTag 锚定);
+        // 启动按钮惰性解析异步出现 → 有界轮询;清空仅断言存在不触发确认。
         val launchDeadline = System.currentTimeMillis() + 10_000
         var hasLaunch = false
         while (System.currentTimeMillis() < launchDeadline) {
@@ -105,11 +106,9 @@ class MonitorEntryHeaderTest {
             }
             Thread.sleep(100)
         }
-        assertTrue("操作卡应渲染一键启动按钮", hasLaunch)
+        assertTrue("Appbar 应渲染一键启动动作", hasLaunch)
         rule.onAllNodesWithTag("app-launch").assertCountEquals(1)
-        rule.onNodeWithText(str(R.string.detail_clear_records))
-            .performScrollTo()
-            .assertIsDisplayed()
+        rule.onAllNodesWithTag("app-clear-records").assertCountEquals(1)
 
         pressBack()
         rule.waitForIdle()

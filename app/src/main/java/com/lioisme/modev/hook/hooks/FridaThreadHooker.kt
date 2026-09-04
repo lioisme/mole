@@ -33,7 +33,7 @@ class FridaThreadHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().procStatus) return
+                if (!featureOn(DeviceEnvKind.PROC_STATUS)) return
                 if (inHook.get() == true) return
                 inHook.set(true)
                 try {

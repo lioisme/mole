@@ -2,6 +2,7 @@ package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.DeviceEnvOperation
+import com.lioisme.modev.core.model.SpoofProfiles
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
@@ -22,8 +23,15 @@ class EmulatorBuildHooker(
     context: ProbeContext,
 ) : DeviceEnvBaseHooker(context) {
 
+    /** 静态字段改写幂等标记(V37 T0.2:全生命周期仅执行一次;internal 供门控回归测试)。 */
+    internal val fieldsMasked = java.util.concurrent.atomic.AtomicBoolean(false)
+
     override fun install() {
-        hookBuildStaticFields()
+        // V37 T0.2 FeatureGate 红线:Build 静态字段改写受 deviceEnvEnabled(EMULATOR_BUILD)
+        // 门控;安装期开关未开时经 ConfigWatcher 在配置变更后一次性补执行,
+        // 开关全关则永不篡改(修复「注入即改字段」旁路)。
+        applyBuildFieldMasking()
+        configWatcher.register { applyBuildFieldMasking() }
         hookBuildGetters("FINGERPRINT", DeviceEnvOperation.BUILD_FINGERPRINT)
         hookBuildGetters("MODEL", DeviceEnvOperation.BUILD_MODEL)
         hookBuildGetters("PRODUCT", DeviceEnvOperation.BUILD_PRODUCT)
@@ -38,6 +46,14 @@ class EmulatorBuildHooker(
         hookBuildGetters("SERIAL", DeviceEnvOperation.BUILD_SERIAL)
         hookBuildGetters("TYPE", DeviceEnvOperation.BUILD_TYPE)
         hookBuildFieldAccess()
+    }
+
+    /** 幂等补写入口:开关开启前零副作用,开启后一次性改写(internal 供门控回归测试)。 */
+    internal fun applyBuildFieldMasking() {
+        if (fieldsMasked.get()) return
+        if (!featureOn(DeviceEnvKind.EMULATOR_BUILD)) return
+        if (!fieldsMasked.compareAndSet(false, true)) return
+        hookBuildStaticFields()
     }
 
     /**
@@ -88,7 +104,7 @@ class EmulatorBuildHooker(
         val getter = runCatching { clazz.getMethod("get$fieldName") }.getOrNull() ?: return
         engine.hook(getter, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().deviceEnvEnabled(DeviceEnvKind.EMULATOR_BUILD)) return
+                if (!featureOn(DeviceEnvKind.EMULATOR_BUILD)) return
                 val value = invocation.result as? String ?: return
                 if (isEmulatorIndicator(value)) {
                     val fake = getRealisticValue(fieldName, value)
@@ -111,17 +127,28 @@ class EmulatorBuildHooker(
         return EMULATOR_KEYWORDS.any { lower.contains(it) }
     }
 
+    /**
+     * 伪造值解析(V37 T2.3 画像化):
+     * - 档位 = [SpoofProfiles.AUTO]:按模拟器特征族路由内置组(generic 系 → Pixel 组,
+     *   vbox/nox 系 → 小米组),保持 V34 既有行为;
+     * - 显式档位:统一取所选画像的 buildFields(含用户覆写)。
+     */
     internal fun getRealisticValue(field: String, original: String): String {
+        val feature = config().feature
+        if (feature.spoofProfileId != SpoofProfiles.AUTO) {
+            val profile = SpoofProfiles.resolve(feature.spoofProfileId, feature.spoofOverrides)
+            return profile.buildFields[field] ?: original
+        }
         val lower = original.lowercase()
         return when {
             // 通用模拟器值 → Google Pixel 7 Pro 组
             lower.contains("generic") || lower.contains("sdk") ||
                 lower.contains("emulator") || lower.contains("goldfish") ||
-                lower.contains("ranchu") -> PIXEL_7_PRO_MAP[field] ?: original
+                lower.contains("ranchu") -> SpoofProfiles.PIXEL_7_PRO_BUILD[field] ?: original
             // 其他含模拟器特征的值 → 小米 13 组(一致配置)
             lower.contains("vbox") || lower.contains("genymotion") ||
                 lower.contains("nox") || lower.contains("bluestacks") ||
-                lower.contains("ldnews") -> XIAOMI_13_MAP[field] ?: original
+                lower.contains("ldnews") -> SpoofProfiles.XIAOMI_13_BUILD[field] ?: original
             // 未知或已匹配真实设备值 → 不干预(保持原值一致性)
             else -> original
         }
@@ -142,7 +169,7 @@ class EmulatorBuildHooker(
         if (getField != null) {
             engine.hook(getField, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().emulatorBuild) return
+                    if (!featureOn(DeviceEnvKind.EMULATOR_BUILD)) return
                     val name = invocation.getArg(0) as? String ?: return
                     if (name !in INTERCEPTED_FIELD_NAMES) return
                     val declaringClass = invocation.thisObject as? Class<*> ?: return
@@ -166,7 +193,7 @@ class EmulatorBuildHooker(
         if (getDeclaredField != null) {
             engine.hook(getDeclaredField, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().emulatorBuild) return
+                    if (!featureOn(DeviceEnvKind.EMULATOR_BUILD)) return
                     val name = invocation.getArg(0) as? String ?: return
                     if (name !in INTERCEPTED_FIELD_NAMES) return
                     val declaringClass = invocation.thisObject as? Class<*> ?: return
@@ -196,38 +223,6 @@ class EmulatorBuildHooker(
         private val INTERCEPTED_FIELD_NAMES = setOf(
             "TAGS", "TYPE", "FINGERPRINT", "MODEL", "PRODUCT", "MANUFACTURER",
             "DEVICE", "BOARD", "HARDWARE", "BRAND", "HOST", "USER", "DISPLAY", "SERIAL",
-        )
-
-        private val PIXEL_7_PRO_MAP = mapOf(
-            "FINGERPRINT" to "google/raven/raven:14/UP1A.231105.001/10754064:userdebug/dev-keys",
-            "MODEL" to "Pixel 7 Pro",
-            "PRODUCT" to "raven",
-            "MANUFACTURER" to "Google",
-            "DEVICE" to "raven",
-            "BOARD" to "raven",
-            "HARDWARE" to "raven",
-            "BRAND" to "google",
-            "HOST" to "abfarm-release-rbe-64-00069",
-            "USER" to "android-build",
-            "DISPLAY" to "UP1A.231105.001",
-            "SERIAL" to "unknown",
-            "TYPE" to "userdebug",
-        )
-
-        private val XIAOMI_13_MAP = mapOf(
-            "FINGERPRINT" to "Xiaomi/13/13:14/UP1A.231105.001/V816.0.23.0.UNACNXM:user/release-keys",
-            "MODEL" to "2211133C",
-            "PRODUCT" to "fuxi",
-            "MANUFACTURER" to "Xiaomi",
-            "DEVICE" to "fuxi",
-            "BOARD" to "taro",
-            "HARDWARE" to "qcom",
-            "BRAND" to "Xiaomi",
-            "HOST" to "xiaomi.eu",
-            "USER" to "builder",
-            "DISPLAY" to "V816.0.23.0.UNACNXM",
-            "SERIAL" to "unknown",
-            "TYPE" to "user",
         )
     }
 }

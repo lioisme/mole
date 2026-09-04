@@ -15,44 +15,12 @@ object EffectiveSwitch {
 
     private const val TAG = "EffectiveSwitch"
 
-    /** 干预型 kind 名集合(V34 审计增强,供安全日志)。 */
-    private val INTERVENTION_KINDS = setOf(
-        NetworkKind.SSL_CONTEXT.name,
-        NetworkKind.SSL_TRUST_MANAGER.name,
-        NetworkKind.SSL_OKHTTP_PINNER.name,
-        NetworkKind.SSL_OKHTTP_VERIFIER.name,
-        NetworkKind.SSL_WEBVIEW.name,
-        NetworkKind.SSL_NETWORK_CONFIG.name,
-        NetworkKind.PROXY_SYSTEM_PROP.name,
-        NetworkKind.PROXY_CONNECTIVITY.name,
-        NetworkKind.PROXY_SETTINGS.name,
-        NetworkKind.PROXY_OKHTTP.name,
-        NetworkKind.VPN_CAPABILITIES.name,
-        NetworkKind.VPN_INTERFACE.name,
-        NetworkKind.VPN_NETWORK_INFO.name,
-        NetworkKind.VPN_LINK_PROPERTIES.name,
-        DeviceEnvKind.ROOT_FILE.name,
-        DeviceEnvKind.ROOT_EXEC.name,
-        DeviceEnvKind.ROOT_PACKAGE_MANAGER.name,
-        DeviceEnvKind.ROOT_PROPERTY.name,
-        DeviceEnvKind.XPOSED_CLASS.name,
-        DeviceEnvKind.XPOSED_STACK.name,
-        DeviceEnvKind.XPOSED_MAPS.name,
-        DeviceEnvKind.EMULATOR_BUILD.name,
-        DeviceEnvKind.EMULATOR_FILE.name,
-        DeviceEnvKind.EMULATOR_NETWORK.name,
-        DeviceEnvKind.EMULATOR_TELEPHONY.name,
-        DeviceEnvKind.EMULATOR_CPU.name,
-        DeviceEnvKind.EMULATOR_BATTERY.name,
-        DeviceEnvKind.SYSTEM_PROPERTIES.name,
-        DeviceEnvKind.PROC_STATUS.name,
-        DeviceEnvKind.PROC_MOUNT_INFO.name,
-        DeviceEnvKind.PROC_CGROUP.name,
-        DeviceEnvKind.PROC_NET.name,
-        ProcessKind.EXIT_INTERCEPT.name,
-        ProcessKind.CRASH_PREVENT.name,
-        ProcessKind.SCREEN_RECORD.name,
-    )
+    /**
+     * 干预型 kind 名集合(V37 T0.4:由 [CategoryTaxonomy] 功能域标注派生,
+     * 单一事实源,消灭手工清单漂移;供安全审计日志)。
+     */
+    private val INTERVENTION_KINDS: Set<String> =
+        CategoryTaxonomy.forDomain(CapabilityDomain.FEATURE).map { it.id }.toSet()
 
     /**
      * @param default  默认配置(未定制项的取值来源)。
@@ -89,8 +57,28 @@ object EffectiveSwitch {
         override.ignorePathPrefixes?.takeIf { it.isNotEmpty() }?.let {
             result = result.copy(ignorePathPrefixes = it)
         }
+        // V37 T1.2:功能域数据偏差 → feature 段(整表替换语义;keywordIds 由宿主端
+        // 解析为 dialogKeywords 后下发,注入侧零感知)
         override.dialogKeywords?.takeIf { it.isNotEmpty() }?.let {
-            result = result.copy(dialogKeywords = it)
+            result = result.copy(feature = result.feature.copy(dialogKeywords = it))
+        }
+        override.spoofProfileId?.let {
+            result = result.copy(feature = result.feature.copy(spoofProfileId = it))
+        }
+        override.spoofOverrides?.takeIf { it.isNotEmpty() }?.let {
+            result = result.copy(feature = result.feature.copy(spoofOverrides = it))
+        }
+        override.extraRootPackages?.takeIf { it.isNotEmpty() }?.let {
+            result = result.copy(feature = result.feature.copy(extraRootPackages = it))
+        }
+        override.extraXposedPrefixes?.takeIf { it.isNotEmpty() }?.let {
+            result = result.copy(feature = result.feature.copy(extraXposedPrefixes = it))
+        }
+        override.extraFridaPorts?.takeIf { it.isNotEmpty() }?.let {
+            result = result.copy(feature = result.feature.copy(extraFridaPorts = it))
+        }
+        override.extraMaskKeywords?.takeIf { it.isNotEmpty() }?.let {
+            result = result.copy(feature = result.feature.copy(extraMaskKeywords = it))
         }
         // V34 审计增强:干预型开关启用时输出安全警告日志
         logInterventionActivation(result, default)

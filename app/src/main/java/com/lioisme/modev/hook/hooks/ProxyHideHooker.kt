@@ -2,6 +2,7 @@ package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.NetworkKind
 import com.lioisme.modev.core.model.NetworkOperation
+import com.lioisme.modev.core.model.activeSpoofProfile
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
@@ -45,7 +46,7 @@ class ProxyHideHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().proxySystemProp) return
+                if (!featureOn(NetworkKind.PROXY_SYSTEM_PROP)) return
                 val key = invocation.getArg(0) as? String ?: return
                 if (key in proxyKeys) {
                     invocation.setResult(null)
@@ -72,7 +73,7 @@ class ProxyHideHooker(
         if (getDefaultProxy != null) {
             engine.hook(getDefaultProxy, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().proxyConnectivity) return
+                    if (!featureOn(NetworkKind.PROXY_CONNECTIVITY)) return
                     invocation.setResult(null)
                     emit(
                         kind = NetworkKind.PROXY_CONNECTIVITY,
@@ -87,7 +88,7 @@ class ProxyHideHooker(
         if (getHttpProxy != null) {
             engine.hook(getHttpProxy, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().proxyConnectivity) return
+                    if (!featureOn(NetworkKind.PROXY_CONNECTIVITY)) return
                     invocation.setResult(null)
                     emit(
                         kind = NetworkKind.PROXY_CONNECTIVITY,
@@ -117,7 +118,7 @@ class ProxyHideHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().proxySettings) return
+                if (!featureOn(NetworkKind.PROXY_SETTINGS)) return
                 val key = invocation.getArg(1) as? String ?: return
                 if (key in proxyKeys) {
                     invocation.setResult(null)
@@ -144,7 +145,7 @@ class ProxyHideHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
-                if (!config().proxyOkhttp) return
+                if (!featureOn(NetworkKind.PROXY_OKHTTP)) return
                 val thisClass = invocation.thisObject?.javaClass?.name ?: return
                 if (thisClass.contains("ProxySelector") || thisClass.contains("Default")) {
                     invocation.setResult(emptyList<java.net.Proxy>())
@@ -169,11 +170,11 @@ class ProxyHideHooker(
         if (getSSID != null) {
             engine.hook(getSSID, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().proxySystemProp) return
+                    if (!featureOn(NetworkKind.PROXY_SYSTEM_PROP)) return
                     val current = invocation.result as? String ?: return
                     // 仅替换模拟器/空值特征,保留真实设备值
                     if (current == "<unknown ssid>" || current == "null" || current.isEmpty()) {
-                        invocation.setResult("\"$FAKE_SSID\"")
+                        invocation.setResult("\"${config().activeSpoofProfile().fakeSsid}\"")
                         emit(
                             kind = NetworkKind.PROXY_SYSTEM_PROP,
                             operation = NetworkOperation.PROP_GET,
@@ -189,10 +190,10 @@ class ProxyHideHooker(
         if (getBSSID != null) {
             engine.hook(getBSSID, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().proxySystemProp) return
+                    if (!featureOn(NetworkKind.PROXY_SYSTEM_PROP)) return
                     val current = invocation.result as? String ?: return
                     if (current == "02:00:00:00:00:00" || current.isEmpty()) {
-                        invocation.setResult(FAKE_BSSID)
+                        invocation.setResult(config().activeSpoofProfile().fakeBssid)
                         emit(
                             kind = NetworkKind.PROXY_SYSTEM_PROP,
                             operation = NetworkOperation.PROP_GET,
@@ -208,7 +209,7 @@ class ProxyHideHooker(
         if (getNetworkId != null) {
             engine.hook(getNetworkId, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().proxySystemProp) return
+                    if (!featureOn(NetworkKind.PROXY_SYSTEM_PROP)) return
                     val current = invocation.result as? Int ?: return
                     if (current == -1) {
                         invocation.setResult(1)
@@ -221,10 +222,5 @@ class ProxyHideHooker(
                 }
             })
         }
-    }
-
-    companion object {
-        private const val FAKE_SSID = "MyNetwork"
-        private const val FAKE_BSSID = "01:02:03:04:05:06"
     }
 }

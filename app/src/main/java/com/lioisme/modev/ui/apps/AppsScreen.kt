@@ -134,6 +134,7 @@ fun AppsScreen(
     val openSettings: () -> Unit = { onOpenSettings() }
 
     Scaffold(
+        containerColor = MaterialTheme.colorScheme.surface,
         topBar = {
             CenterAlignedTopAppBar(
                 title = {
@@ -350,7 +351,9 @@ private fun ScopeFilterMenu(
                 Icons.Default.FilterList,
                 contentDescription = res.getString(R.string.cd_filter),
                 tint =
-                    if (!showSystem || !showModules) {
+                    // V37 T4.5:激活指示 = 任一筛选偏好偏离默认(置顶开/系统应用开/模块关);
+                    // 旧口径漏计 pinScoped 且把 showModules 默认关误判为激活(恒亮 bug)。
+                    if (!pinScoped || !showSystem || showModules) {
                         MaterialTheme.colorScheme.primary
                     } else {
                         MaterialTheme.colorScheme.onSurfaceVariant

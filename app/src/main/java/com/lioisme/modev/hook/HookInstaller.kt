@@ -79,11 +79,15 @@ class HookInstaller(
         ConfigChannel(
             packageName = packageName,
             processName = processName,
-            onConfig = { /* 配置变更即生效(钩子经 config() 实时读取) */ },
+            // V37 T0.2:配置变更转发订阅器(安装期一次性动作的延迟评估通道)
+            onConfig = { switch -> configWatcher.notify(switch) },
             onAck = { seq -> sink.onAck(seq) },
             tokenProvider = { remotePrefsProvider?.invoke()?.getString(RemotePrefsBridge.TOKEN_KEY, null) },
         )
     }
+
+    /** 配置变更订阅器(V37 T0.2):Build 静态字段改写等安装期动作经此延迟补执行。 */
+    private val configWatcher = ConfigWatcher()
 
     private val sink: RecordSink by lazy {
         // M5-3/M5-4: spool 为引擎级能力(两种变体一律启用),按进程名分目录防多进程互扰;
@@ -183,6 +187,7 @@ class HookInstaller(
         val context = ProbeContext(
             engine = HookEngine(platform),
             config = { channel.currentConfig },
+            configWatcher = configWatcher,
             tracker = CryptoContextTracker,
             sink = sink,
             packageName = packageName,

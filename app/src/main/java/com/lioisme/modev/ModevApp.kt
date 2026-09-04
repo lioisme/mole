@@ -9,15 +9,11 @@ import androidx.core.content.ContextCompat
 import com.google.gson.Gson
 import com.lioisme.modev.data.db.ModevDatabase
 import com.lioisme.modev.data.repo.AppCatalogRepository
+import com.lioisme.modev.data.repo.KeywordLibraryRepository
 import com.lioisme.modev.data.repo.LogRepository
 import com.lioisme.modev.data.repo.MirroredConfigWriter
 import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.data.server.ConfigServer
-import com.lioisme.modev.domain.capability.CapabilityRegistry
-import com.lioisme.modev.domain.capability.AlgorithmListenCapability
-import com.lioisme.modev.domain.capability.BehaviorListenCapability
-import com.lioisme.modev.domain.capability.DatabaseListenCapability
-import com.lioisme.modev.domain.capability.PrefsListenCapability
 import com.lioisme.modev.domain.scope.ScopeGateway
 import com.lioisme.modev.domain.scope.ScopeRepository
 import com.lioisme.modev.domain.scope.ScopeService
@@ -33,6 +29,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -92,6 +89,17 @@ class AppContainer(private val context: Context) {
         ).also { server.effectiveResolver = { pkg -> it.effectiveSwitch(pkg) } }
     }
 
+    /** 全局弹窗拦截关键词库(V37 T2.1/T2.2):装配进设置仓库并监听变更重推。 */
+    val keywordLibrary: KeywordLibraryRepository by lazy {
+        KeywordLibraryRepository(database.keywordLibraryDao(), appScope).also { library ->
+            settings.attachKeywordLibrary(library)
+            appScope.launch {
+                // 首帧空快照不触发重推;库条目任一变化 → 全部在线会话按包重解析
+                library.entries.drop(1).collect { settings.repushAllConnected() }
+            }
+        }
+    }
+
     val logs: LogRepository by lazy {
         LogRepository(
             dao = dao,
@@ -113,19 +121,6 @@ class AppContainer(private val context: Context) {
         ScopeRepository(scopeGateway)
     }
 
-    /**
-     * 监听能力注册表(V10 能力化架构):设置页「功能」区与能力设置路由的驱动源。
-     * 新增能力 = 实现 [Capability] + 在此注册,不改动导航/设置/通道主链路。
-     */
-    val capabilityRegistry: CapabilityRegistry by lazy {
-        CapabilityRegistry().apply {
-            register(AlgorithmListenCapability(settings.globalSwitch, appScope))
-            register(DatabaseListenCapability(settings.globalSwitch, appScope))
-            register(BehaviorListenCapability(settings.globalSwitch, appScope))
-            register(PrefsListenCapability(settings.globalSwitch, appScope))
-        }
-    }
-
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             catalog.refresh()
@@ -135,8 +130,8 @@ class AppContainer(private val context: Context) {
     init {
         // 进程启动即接线记录回调(并启动服务器),避免 UI 未访问日志页时记录被丢弃
         logs.start()
-        // 进程启动即初始化设置仓库:effectiveResolver(握手后立即按包推送有效配置)与
-        // capabilityRegistry 依赖 settings 惰性实例,若仅等 UI 打开设置页才初始化,
+        // 进程启动即初始化设置仓库:effectiveResolver(握手后立即按包推送有效配置)
+        // 依赖 settings 惰性实例,若仅等 UI 打开设置页才初始化,
         // 注入进程握手的配置推送将永远缺席(客户端 60s 读超时 → 无限重连)。
         settings
         // M3-2: 框架服务就绪后生成并持久化握手令牌,ConfigServer 启用认证

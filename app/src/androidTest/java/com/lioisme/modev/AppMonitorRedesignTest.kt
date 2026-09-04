@@ -148,13 +148,11 @@ class AppMonitorRedesignTest {
     }
 
     @Test
-    fun clearRecords_livesInActionsSection_withDangerConfirm() {
+    fun clearRecords_livesInAppbarActions_withDangerConfirm() {
         openMonitorEntry()
 
-        // 操作卡内的清空行(屏外行先滚动再点击;危险确认对话框可取消,非破坏路径)。
-        rule.onNodeWithText(str(R.string.detail_clear_records))
-            .performScrollTo()
-            .performClick()
+        // V37 T3.2:清空 = Appbar 图标动作(危险确认对话框可取消,非破坏路径)。
+        rule.onNodeWithTag("app-clear-records").performClick()
         rule.waitForIdle()
         rule.onNodeWithText(str(R.string.danger_title)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.cancel)).performClick()

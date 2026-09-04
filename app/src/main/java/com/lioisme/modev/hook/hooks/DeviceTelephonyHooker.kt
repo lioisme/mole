@@ -2,6 +2,7 @@ package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.DeviceEnvOperation
+import com.lioisme.modev.core.model.activeSpoofProfile
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
@@ -144,29 +145,34 @@ class DeviceTelephonyHooker(
 
     /**
      * 基于种子生成确定性假值:同包名+同种子 → 同假值。
+     * V37 T2.3:前缀取自生效伪装画像(内置档位 + 用户覆写),同包恒定。
      */
     private fun generateImei(seed: String): String {
+        val profile = config().activeSpoofProfile()
         val hash = (packageName + seed).hashCode()
-        val digits = kotlin.math.abs(hash).toString().take(14)
+        val digits = (profile.imeiPrefix + kotlin.math.abs(hash).toString()).take(14)
         return digits + luhnChecksum(digits)
     }
 
     private fun generateImsi(): String {
+        val profile = config().activeSpoofProfile()
         val hash = (packageName + "imsi").hashCode()
-        val part = kotlin.math.abs(hash).toString().take(14)
-        return "46000${part}"
+        val part = kotlin.math.abs(hash).toString().take(15 - profile.imsiPrefix.length)
+        return "${profile.imsiPrefix}$part"
     }
 
     private fun generateIccid(): String {
+        val profile = config().activeSpoofProfile()
         val hash = (packageName + "iccid").hashCode()
-        val part = kotlin.math.abs(hash).toString().take(18)
-        return "89860${part}"
+        val part = kotlin.math.abs(hash).toString().take(20 - profile.iccidPrefix.length)
+        return "${profile.iccidPrefix}$part"
     }
 
     private fun generatePhoneNumber(): String {
+        val profile = config().activeSpoofProfile()
         val hash = (packageName + "phone").hashCode()
-        val part = kotlin.math.abs(hash).toString().take(8)
-        return "138${part}"
+        val part = kotlin.math.abs(hash).toString().take(11 - profile.phonePrefix.length)
+        return "${profile.phonePrefix}$part"
     }
 
     private fun luhnChecksum(num: String): Int {

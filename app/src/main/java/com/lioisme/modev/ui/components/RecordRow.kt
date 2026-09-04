@@ -1,5 +1,7 @@
 package com.lioisme.modev.ui.components
 
+import com.lioisme.modev.ui.theme.Tokens
+
 import android.content.Context
 import android.text.format.DateFormat
 import androidx.annotation.StringRes
@@ -136,7 +138,7 @@ fun RecordRow(
                         },
                     )
                     .defaultMinSize(minHeight = MIN_ROW_HEIGHT)
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(SPACING.dp),
         ) {
@@ -243,7 +245,7 @@ private fun LeadingBadge(
             Modifier
                 .size(BADGE_SIZE.dp)
                 .clip(RoundedCornerShape(10.dp))
-                .background(tint.copy(alpha = BADGE_CONTAINER_ALPHA)),
+                .background(tint.copy(alpha = Tokens.badgeContainerAlpha)),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -261,7 +263,7 @@ private fun MicroBadge(badge: RowBadge) {
     Surface(
         shape = RoundedCornerShape(6.dp),
         color =
-            badge.accent?.copy(alpha = BADGE_CONTAINER_ALPHA)
+            badge.accent?.copy(alpha = Tokens.badgeContainerAlpha)
                 ?: MaterialTheme.colorScheme.surfaceVariant,
     ) {
         Text(
@@ -583,7 +585,6 @@ private val MIN_ROW_HEIGHT: Dp = 68.dp
 private const val BADGE_SIZE = 36
 
 /** 徽章容器/微徽章淡底透明度。 */
-private const val BADGE_CONTAINER_ALPHA = 0.13f
 
 /** 行内元素间距。 */
 private const val SPACING = 12
@@ -1079,8 +1080,6 @@ fun processOperationLabelRes(op: ProcessOperation): Int = when (op) {
     ProcessOperation.KILL_PROCESS -> R.string.op_process_kill_process
     ProcessOperation.RUNTIME_EXIT -> R.string.op_process_system_exit
     ProcessOperation.UNCAUGHT_EXCEPTION -> R.string.op_process_catch
-    ProcessOperation.RUNTIME_EXCEPTION -> R.string.op_process_catch
-    ProcessOperation.SCREEN_CAPTURE_INTENT -> R.string.op_process_block
     ProcessOperation.FLAG_SECURE -> R.string.op_process_block
     ProcessOperation.ADD_FLAGS -> R.string.op_process_block
     ProcessOperation.SURFACE_LOCK -> R.string.op_process_block

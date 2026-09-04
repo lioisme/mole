@@ -36,7 +36,7 @@ class VpnHideHooker(
         if (hasTransport != null) {
             engine.hook(hasTransport, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().vpnCapabilities) return
+                    if (!featureOn(NetworkKind.VPN_CAPABILITIES)) return
                     val transport = invocation.getArg(0) as? Int ?: return
                     if (transport == 4) {
                         invocation.setResult(false)
@@ -50,7 +50,7 @@ class VpnHideHooker(
         if (getCapabilities != null) {
             engine.hook(getCapabilities, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().vpnCapabilities) return
+                    if (!featureOn(NetworkKind.VPN_CAPABILITIES)) return
                     val result = invocation.result as? IntArray ?: return
                     if (18 !in result) {
                         invocation.setResult(result + 18)
@@ -64,7 +64,7 @@ class VpnHideHooker(
         if (getTransportInfo != null) {
             engine.hook(getTransportInfo, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().vpnCapabilities) return
+                    if (!featureOn(NetworkKind.VPN_CAPABILITIES)) return
                     val result = invocation.result ?: return
                     if (result.javaClass.name.contains("VpnTransportInfo")) {
                         invocation.setResult(null)
@@ -82,7 +82,7 @@ class VpnHideHooker(
         if (isVirtual != null) {
             engine.hook(isVirtual, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().vpnInterface) return
+                    if (!featureOn(NetworkKind.VPN_INTERFACE)) return
                     val name = runCatching {
                         clazz.getMethod("getName").invoke(invocation.thisObject) as? String
                     }.getOrNull() ?: return
@@ -99,7 +99,7 @@ class VpnHideHooker(
         if (getName != null) {
             engine.hook(getName, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().vpnInterface) return
+                    if (!featureOn(NetworkKind.VPN_INTERFACE)) return
                     val original = invocation.result as? String ?: return
                     if (isVpnInterface(original)) {
                         invocation.setResult(getFakeName(original))
@@ -114,7 +114,7 @@ class VpnHideHooker(
         if (getByName != null) {
             engine.hook(getByName, object : MethodHook() {
                 override fun before(invocation: Invocation) {
-                    if (!config().vpnInterface) return
+                    if (!featureOn(NetworkKind.VPN_INTERFACE)) return
                     val name = invocation.getArg(0) as? String ?: return
                     if (isVpnInterface(name)) {
                         // 不干预返回值(return = 保留原始结果),仅记录检测事件
@@ -129,7 +129,7 @@ class VpnHideHooker(
         if (getNetworkInterfaces != null) {
             engine.hook(getNetworkInterfaces, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().vpnInterface) return
+                    if (!featureOn(NetworkKind.VPN_INTERFACE)) return
                     val result = invocation.result as? java.util.Enumeration<*> ?: return
                     val filtered = java.util.Vector<Any>()
                     while (result.hasMoreElements()) {
@@ -155,7 +155,7 @@ class VpnHideHooker(
         if (getType != null) {
             engine.hook(getType, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().vpnNetworkInfo) return
+                    if (!featureOn(NetworkKind.VPN_NETWORK_INFO)) return
                     val result = invocation.result as? Int ?: return
                     if (result == 7) {
                         invocation.setResult(1)
@@ -169,7 +169,7 @@ class VpnHideHooker(
         if (getTypeName != null) {
             engine.hook(getTypeName, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().vpnNetworkInfo) return
+                    if (!featureOn(NetworkKind.VPN_NETWORK_INFO)) return
                     val result = invocation.result as? String ?: return
                     if (result.equals("VPN", ignoreCase = true)) {
                         invocation.setResult("WIFI")
@@ -187,7 +187,7 @@ class VpnHideHooker(
         if (getInterfaceName != null) {
             engine.hook(getInterfaceName, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().vpnLinkProperties) return
+                    if (!featureOn(NetworkKind.VPN_LINK_PROPERTIES)) return
                     val result = invocation.result as? String ?: return
                     if (isVpnInterface(result)) {
                         invocation.setResult(null)
@@ -202,7 +202,7 @@ class VpnHideHooker(
         if (getRoutes != null) {
             engine.hook(getRoutes, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!config().vpnLinkProperties) return
+                    if (!featureOn(NetworkKind.VPN_LINK_PROPERTIES)) return
                     val result = invocation.result as? List<*> ?: return
                     val filtered = result.filter { route ->
                         val iface = runCatching {
@@ -229,7 +229,7 @@ class VpnHideHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().vpnInterface) return
+                if (!featureOn(NetworkKind.VPN_INTERFACE)) return
                 val name = runCatching {
                     clazz.getMethod("getName").invoke(invocation.thisObject) as? String
                 }.getOrNull() ?: return

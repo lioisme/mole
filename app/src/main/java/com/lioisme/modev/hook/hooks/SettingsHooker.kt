@@ -43,7 +43,7 @@ class SettingsHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().rootProperty) return
+                if (!featureOn(DeviceEnvKind.ROOT_PROPERTY)) return
                 if (inHook.get() == true) return
                 inHook.set(true)
                 try {
@@ -76,7 +76,7 @@ class SettingsHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().rootProperty) return
+                if (!featureOn(DeviceEnvKind.ROOT_PROPERTY)) return
                 if (inHook.get() == true) return
                 inHook.set(true)
                 try {
@@ -109,7 +109,7 @@ class SettingsHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().rootProperty) return
+                if (!featureOn(DeviceEnvKind.ROOT_PROPERTY)) return
                 if (inHook.get() == true) return
                 inHook.set(true)
                 try {
@@ -142,7 +142,7 @@ class SettingsHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!config().rootProperty) return
+                if (!featureOn(DeviceEnvKind.ROOT_PROPERTY)) return
                 if (inHook.get() == true) return
                 inHook.set(true)
                 try {

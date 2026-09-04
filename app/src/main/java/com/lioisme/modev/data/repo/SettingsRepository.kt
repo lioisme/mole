@@ -7,6 +7,7 @@ import com.lioisme.modev.core.codec.WireProtocol
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.ConfigKeys
 import com.lioisme.modev.core.model.EffectiveSwitch
+import com.lioisme.modev.core.model.FeatureConfig
 import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.data.server.ConfigServer
 import kotlinx.coroutines.CoroutineScope
@@ -16,6 +17,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -202,15 +204,54 @@ class SettingsRepository(
     fun overrideFor(packageName: String): AppListenOverride =
         _overrides.value[packageName] ?: AppListenOverride.DEFAULT
 
-    /** 该包的有效配置快照(默认配置 ⊕ 偏差,纯解析)。 */
+    /** 该包的有效配置快照(默认配置 ⊕ 偏差,纯解析;V37 T2.2 叠加关键词库解析)。 */
     fun effectiveSwitch(packageName: String): HookSwitch =
-        EffectiveSwitch.resolve(_globalSwitch.value, _overrides.value[packageName])
+        withKeywordRules(
+            EffectiveSwitch.resolve(_globalSwitch.value, _overrides.value[packageName]),
+            _overrides.value[packageName],
+        )
 
-    /** 该包的有效配置流:默认配置或偏差任一变化即重发射(distinct 由数据类 equals 保证)。 */
-    fun effectiveSwitchFlow(packageName: String): Flow<HookSwitch> =
-        combine(globalSwitch, overrides) { global, map ->
-            EffectiveSwitch.resolve(global, map[packageName])
+    /** 该包的有效配置流:默认配置、偏差或关键词库任一变化即重发射(distinct 由数据类 equals 保证)。 */
+    fun effectiveSwitchFlow(packageName: String): Flow<HookSwitch> {
+        val library = keywordLibrary
+        val global = globalSwitch
+        val overrideFlow = combine(global, overrides) { g, map -> g to map[packageName] }
+        return if (library == null) {
+            overrideFlow.map { (g, ovr) -> withKeywordRules(EffectiveSwitch.resolve(g, ovr), ovr) }
+        } else {
+            combine(global, overrides, library.entries) { g, map, _ ->
+                val ovr = map[packageName]
+                withKeywordRules(EffectiveSwitch.resolve(g, ovr), ovr)
+            }
         }
+    }
+
+    // ---- V37 T2.2 关键词库接线 ----
+
+    private var keywordLibrary: KeywordLibraryRepository? = null
+
+    /** 装配关键词库(容器初始化期一次;null = 未装配,规则解析恒空)。 */
+    fun attachKeywordLibrary(library: KeywordLibraryRepository) {
+        keywordLibrary = library
+    }
+
+    /** 关键词库变更后向全部在线会话重推各自有效配置(库为全局资产,影响所有作用域包)。 */
+    fun repushAllConnected() {
+        scope.launch { server.pushToAllConnected() }
+    }
+
+    /**
+     * 有效配置叠加关键词规则(V37 T2.2):
+     * keywordIds=null 跟随全局启用集;非 null 取其子集;库未装配时恒空规则
+     * (旧扁平词表经 activeKeywordRules 降级兜底,兼容语义不变)。
+     */
+    private fun withKeywordRules(switch: HookSwitch, override: AppListenOverride?): HookSwitch {
+        val library = keywordLibrary ?: return switch
+        val followGlobal = override?.keywordFollowGlobal ?: true
+        val ids = if (followGlobal) null else override?.keywordIds ?: emptyList()
+        val rules = library.resolveRules(ids)
+        return switch.copy(feature = switch.feature.copy(dialogKeywordRules = rules))
+    }
 
     /**
      * 写入单应用自定义偏差:双写持久化 + 内存热更 + 向该包会话定向推送有效配置。
@@ -241,14 +282,41 @@ class SettingsRepository(
         scope.launch { server.pushToPackage(packageName) }
     }
 
+    // ---- V37 T3.5 全局功能配置(画像 / 黑名单追加;词表走关键词库) ----
+
+    private val _globalFeature = MutableStateFlow(FeatureConfig())
+
+    /** 全局功能配置(伪装画像选择 + 黑名单追加项;所有作用域包的 feature 默认值)。 */
+    val globalFeature: StateFlow<FeatureConfig> = _globalFeature
+
+    /**
+     * 写入全局功能配置:本地持久化 → 重播 switch_global 种子(注入侧直读兜底可见)
+     * → 全部在线会话重推各自有效配置。
+     */
+    suspend fun setGlobalFeature(config: FeatureConfig) {
+        withContext(Dispatchers.IO) {
+            localPrefs.edit { putString(ConfigKeys.GLOBAL_FEATURE, gson.toJson(config)) }
+        }
+        _globalFeature.value = config
+        val seed = HookSwitch.DEFAULT.copy(feature = config)
+        withContext(Dispatchers.IO) { writer.set(seed) }
+        _globalSwitch.value = seed
+        server.pushToAllConnected()
+    }
+
     init {
         // 迁移旧按包配置 → 全局键(仅一次;无旧键则回落默认并落盘,保证远程侧有值)
         writer.migrateLegacy()
-        // V25 D2:默认配置收敛为内置推荐值 —— 无条件重置 switch_global,
-        // 清除 V24 及更早「全局设置页」遗留的用户自定义值(此后无 UI 写入路径,
-        // 注入侧兜底读到恒为内置默认,陈旧安装自愈)。
-        writer.set(HookSwitch.DEFAULT)
-        _globalSwitch.value = HookSwitch.DEFAULT
+        // V37 T3.5:恢复全局功能配置(画像/黑名单;默认空 = 内置行为不变)
+        _globalFeature.value = localPrefs.getString(ConfigKeys.GLOBAL_FEATURE, null)
+            ?.let { runCatching { gson.fromJson(it, FeatureConfig::class.java) }.getOrNull() }
+            ?: FeatureConfig()
+        // V25 D2:默认配置收敛为内置推荐值 ⊕ 全局功能配置 —— 无条件重置 switch_global,
+        // 清除 V24 及更早「全局设置页」遗留的用户自定义值(画像/黑名单经
+        // setGlobalFeature 唯一写路径进入种子,注入侧兜底直读可见)。
+        val seed = HookSwitch.DEFAULT.copy(feature = _globalFeature.value)
+        writer.set(seed)
+        _globalSwitch.value = seed
         // 预载已存在的单应用覆盖(本地权威;非法 JSON 容错为 DEFAULT 并被过滤)
         _overrides.value = writer.localKeysWithPrefix(ConfigKeys.OVERRIDE_PREFIX)
             .associate { key ->
