@@ -56,6 +56,8 @@ object TestCases {
         "enhance-procfile" to listOf("E-PRC-01", "E-PRC-02", "E-PRC-03", "E-PRC-04", "E-PRC-05"),
         // ---- 联动 ----
         "linkage" to listOf("C-GATE-01", "C-THR-01", "C-MULTI-01"),
+        // ---- 冷启动冒烟(D-17 防回归:caller-classloader 帧语义完整性) ----
+        "smoke" to listOf("L-SMOKE-01"),
     )
 
     val ALL: List<String> = DOMAINS.values.flatten()

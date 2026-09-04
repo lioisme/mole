@@ -25,37 +25,10 @@ class XposedClassHooker(
     override fun install() {
         hookLoadClass()
         hookFindClass()
-        hookForName()
-    }
-
-    /**
-     * D-12b:ART 的 Class.forName 走原生解析可绕过 Java 层 loadClass 钩子,
-     * 检测框架首选 forName → 必须直接钩 java.lang.Class 静态方法(记录探测尝试;
-     * 类本不存在时自然 CNFE,存在时由 loadClass/findClass 钩子拦截)。
-     */
-    private fun hookForName() {
-        val clazz = runCatching { Class.forName("java.lang.Class") }.getOrNull() ?: return
-        val overloads = listOf<Array<Class<*>>>(
-            arrayOf(String::class.java),
-            arrayOf(String::class.java, Boolean::class.javaPrimitiveType!!, ClassLoader::class.java),
-        )
-        for (types in overloads) {
-            val method = runCatching { clazz.getMethod("forName", *types) }.getOrNull() ?: continue
-            engine.hook(method, object : MethodHook() {
-                override fun before(invocation: Invocation) {
-                    if (!config().xposedClass) return
-                    val name = invocation.getArg(0) as? String ?: return
-                    if (!isXposedClassName(name)) return
-                    emit(
-                        kind = DeviceEnvKind.XPOSED_CLASS,
-                        operation = DeviceEnvOperation.CLASS_FOR_NAME,
-                        originalValue = name,
-                        targetClass = name,
-                        interventionAction = ACTION_DETECTED,
-                    )
-                }
-            })
-        }
+        // D-17 回滚 D-12b:禁止钩取 Class.forName(String) —— 其语义依赖
+        // Reflection.getCallerClass(),LSPlant 桥帧替换调用方 → 应用侧单参
+        // forName 加载自身类全部 CNFE(androidx.startup/okhttp 启动即崩)。
+        // forName 探测面为已知覆盖缺口(Vector 原生解析绕过 Java 钩),接受。
     }
 
     private fun hookLoadClass() {
@@ -129,7 +102,6 @@ class XposedClassHooker(
 
     companion object {
         private const val ACTION_BLOCKED = "BLOCKED"
-        private const val ACTION_DETECTED = "DETECTED"
 
         private val XPOSED_PREFIXES = listOf(
             "de.robv.android.xposed.",

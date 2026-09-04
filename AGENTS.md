@@ -373,3 +373,13 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,算法监听(加解密/签名
 - **集成测试环境(LDPlayer x64)**:靶程序 `:testtarget`(debuggable,run-as 零 su 查询);
   adb 独立端口 5038;`cached_apps_freezer` 禁用;VM 死亡 WaitDevice 冷重启自愈。掩蔽型
   device_env kind 在预干净模拟器「无脏可掩即零记录」属正确行为,矩阵标 SKIP。
+- **禁止钩取依赖调用方栈帧语义的方法(V36 D-17 崩溃教训,硬约束)**:`Class.forName(String)`/
+  `Class.forName(String,boolean,Class)` 等以 `Reflection.getCallerClass()` 取调用方 classloader
+  的方法**一律不得钩取**——LSPlant 桥接帧(`HookBridge.invokeOriginalMethod`)替换真实调用方后,
+  应用侧单参 `forName` 加载自身类全部以错误 loader 解析 → CNFE → 启动即崩(androidx.startup/okhttp
+  首当其冲),且钩子无条件安装、**开关关闭也崩**。Xposed 类探测记录面仅靠 `ClassLoader.loadClass`/
+  `BaseDexClassLoader.findClass`(实例方法,无 caller-frame 依赖,安全)。新增任何钩子前必须评估:
+  ①是否依赖调用方帧;②是否在热路径无条件安装;③功能开关关闭时是否仍产生拦截开销。
+- **冷启动冒烟门禁(V36)**:注入侧任何钩子变更后,必须跑 `scripts/test-integration/23-run-smoke.ps1`
+  (全功能 ON 下逐个作用域 App 冷启动 + L-SMOKE-01 帧语义断言 + 驻留 ANR 检查)全绿方可交付;
+  真机/稳定模拟器为最终聚合验收环境。

@@ -387,6 +387,18 @@
 | D-15 | P2 | 测试环境 | LDPlayer VM 重负载反复死亡 | 6c/6g 超主机余量 + su/app_process/toast 风暴 + adb 双 server 互杀 | 持久配置降 4c/4g;查询/轮询全切 run-as 零 su 通道;adb 端口 5038 隔离;WaitDevice 冷重启自愈 | ✅ 环境固化 |
 | D-12b | P1 | Xposed 隐藏 | loadClass/findClass 钩子在 Vector 上不触发 Class.forName 路径 | ART `Class.forName` 走原生类型解析,绕过 Java 层 loadClass 虚方法 | XposedClassHooker 增补 `java.lang.Class.forName` 双签名钩子(记录 CLASS_FOR_NAME/DETECTED) | ✅ 已修(R9 前实证 XPOSED_CLASS=3) |
 | D-16 | P0 | WebView JS 桥 | JS_CRYPTO 恒零(注入脚本已跑、桥不可见) | `addJavascriptInterface` 在 WebView 构造器 **before** 阶段调用,provider 未就绪静默失败;JS 侧 `window.modevJsBridge` 永远 undefined | 桥注册移至构造器 **after**(hookCtorAfter) | ✅ 已修(实证 JS_CRYPTO=17) |
+| **D-17** | **P0 崩溃** | Xposed 隐藏 | **被作用域 App 启动即闪退**(apex/momo 等,ClassNotFoundException okhttp3.internal.platform.PlatformInitializer) | D-12b 钩取 `Class.forName(String)` 破坏其 `getCallerClass()` 语义 → LSPlant 桥帧替换真实调用方 → 应用侧单参 forName 加载自身类全用错 loader;且钩子无条件安装,**功能关也崩** | 回滚 hookForName;保留 loadClass/findClass 钩面;新增 L-SMOKE-01 + 23-run-smoke.ps1 冷启动门禁 | ✅ 已修+实证 |
+
+### D-17 修复验证(2026-09-04,全功能/全子功能 ON)
+
+| 门禁 | 结果 |
+|---|---|
+| 5 App 冷启动冒烟(testtarget/apex/momo/nativetest/demo.test) | ✅ 6/6 PASS(存活 + 无 FATAL + 无 ANR) |
+| L-SMOKE-01 forName caller-loader 帧语义 | ✅ forNameSingle=ok;forNameExplicit=ok;instantiate=ok |
+| 延长驻留(apex/momo 交互 swipe/back/home 后 pid 稳定) | ✅ 6/6 PASS(pid-stable + no-ANR + no-FATAL) |
+| XPOSED_CLASS 记录面(loadClass 路径,回滚后) | ✅ count=1 |
+| 旗舰录屏解限二态 | ✅ flagsHasSecure true→false + BLOCKED=1 |
+| Q 门禁 | ✅ 单测全绿 + BUILD SUCCESSFUL |
 
 ---
 

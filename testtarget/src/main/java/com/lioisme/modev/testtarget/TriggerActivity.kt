@@ -12,6 +12,7 @@ import com.lioisme.modev.testtarget.cases.DeviceEnvCases
 import com.lioisme.modev.testtarget.cases.NetworkCases
 import com.lioisme.modev.testtarget.cases.PrefsCases
 import com.lioisme.modev.testtarget.cases.ProcessCases
+import com.lioisme.modev.testtarget.cases.SmokeCases
 import com.lioisme.modev.testtarget.cases.SystemCases
 import com.lioisme.modev.testtarget.cases.UiCases
 
@@ -95,6 +96,7 @@ class TriggerActivity : Activity() {
                             "deviceenv", "enhance-root", "enhance-xposed", "enhance-emulator", "enhance-procfile" ->
                                 DeviceEnvCases.run(applicationContext, case)
                             "system" -> SystemCases.run(applicationContext, case)
+                            "smoke" -> SmokeCases.run(applicationContext, case)
                             "linkage" -> when (case) {
                                 "C-GATE-01" -> DbCases.run(applicationContext, "L-DB-11")
                                 "C-THR-01" -> BehaviorCases.run(applicationContext, "L-BHV-12")
