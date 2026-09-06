@@ -2,9 +2,9 @@ package com.lioisme.modev.data.repo
 
 import androidx.room.Room
 import com.lioisme.modev.core.model.RecordTypes
-import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
 import com.lioisme.modev.data.server.ConfigServer
+import com.lioisme.modev.domain.record.RecordDraft
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -41,7 +41,7 @@ class ScratchInsertTest {
         val hc = RecordFilter().hasConstraint
         if (hc) throw RuntimeException("HAS_CONSTRAINT_TRUE for empty RecordFilter")
         val id = repo.create(
-            CryptoRecordEntity(
+            RecordDraft(
                 packageName = "pkg.a",
                 kind = "CIPHER",
                 operation = "ENCRYPT",

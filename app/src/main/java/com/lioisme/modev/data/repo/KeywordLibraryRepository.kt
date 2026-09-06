@@ -32,10 +32,15 @@ class KeywordLibraryRepository(
     val entries: StateFlow<List<KeywordEntry>> = _entries.asStateFlow()
 
     init {
+        // 收集器容错收场(V38):Robolectric 等环境下仓库可能随宿主沙箱一起消亡
+        // (DB 关闭后 arch_disk_io 线程仍在),一次发射失败即终止收集而非向全局
+        // 异常通道泄漏(污染同 JVM 后续用例);生产进程级生命周期下无此路径。
         scope.launch {
-            dao.observeAll()
-                .map { list -> list.map { it.toEntry() } }
-                .collect { _entries.value = it }
+            runCatching {
+                dao.observeAll()
+                    .map { list -> list.map { it.toEntry() } }
+                    .collect { _entries.value = it }
+            }
         }
     }
 

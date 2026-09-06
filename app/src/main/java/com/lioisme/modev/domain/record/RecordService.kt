@@ -2,16 +2,14 @@ package com.lioisme.modev.domain.record
 
 import androidx.paging.PagingData
 import com.lioisme.modev.core.model.RecordType
-import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.mapping.RecordDetailModel
 import com.lioisme.modev.data.mapping.RowModel
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 记录读写服务(单一门面,V22):
- * 所有查询 / 增 / 删 / 改 / 统计经本接口暴露,DAO 不对外暴露。
- * 前端(ViewModel)与未来 MCP 均仅依赖本接口 + [RecordFilter] + [CategoryTaxonomy],
- * 禁止直触 [CryptoRecordDao] / [CryptoRecordEntity]。
+ * 记录读写服务(单一门面,V22):所有查询 / 增 / 删 / 改 / 统计经本接口暴露,DAO 不对外暴露。
+ * 前端(ViewModel)与 MCP(V38)均仅依赖本接口 + [RecordFilter] + [CategoryTaxonomy],
+ * 禁止直触 DAO / 实体(V38 D1:写入面经纯 Kotlin [RecordDraft],domain 零 data.db 依赖)。
  *
  * 设计约定:
  * - 读:流式分页([observe])供 UI;同步切片([queryPage])供 MCP / 导出(返回总量 + 当页);
@@ -37,11 +35,11 @@ interface RecordService {
     /** 相邻记录 id([newer]=true 取更新、false 取更旧),用于详情"上一条/下一条"。 */
     suspend fun neighbor(id: Long, newer: Boolean): Long?
 
-    /** 新增单条(供 MCP 导入 / 手动补录),返回自增 id。 */
-    suspend fun create(record: CryptoRecordEntity): Long
+    /** 新增单条(MCP 导入 / 手动补录),返回自增 id。 */
+    suspend fun create(record: RecordDraft): Long
 
-    /** 更新单条(按主键覆盖;MCP 编辑),成功返回 true。 */
-    suspend fun update(record: CryptoRecordEntity): Boolean
+    /** 更新单条(按主键整行覆盖;MCP 编辑),成功返回 true。 */
+    suspend fun update(id: Long, record: RecordDraft): Boolean
 
     /** 按 id 删除单条,成功返回 true。 */
     suspend fun delete(id: Long): Boolean
@@ -57,6 +55,9 @@ interface RecordService {
 
     /** 清空全部(数据管理,危险操作)。 */
     suspend fun clearAll()
+
+    /** 存储占用字节(主库 + wal + shm 三文件和;V38 上提为契约成员,数据管理/MCP 共用)。 */
+    suspend fun storageUsage(): Long
 
     /** 已出现记录的应用包名列表(筛选菜单 / 应用列表)。 */
     fun observePackages(): Flow<List<String>>

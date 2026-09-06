@@ -289,6 +289,54 @@ class SettingsRepository(
     /** 全局功能配置(伪装画像选择 + 黑名单追加项;所有作用域包的 feature 默认值)。 */
     val globalFeature: StateFlow<FeatureConfig> = _globalFeature
 
+    // ---- V38 MCP 服务配置(宿主本地;与 wire ConfigServer 完全独立) ----
+
+    private val _mcpEnabled = MutableStateFlow(true)
+
+    /** MCP 服务启用(V38):默认 true = 随宿主进程常驻(回环,免 Token)。 */
+    val mcpEnabled: StateFlow<Boolean> = _mcpEnabled
+
+    private val _mcpPort = MutableStateFlow(com.lioisme.modev.mcp.protocol.McpProtocol.DEFAULT_PORT)
+
+    /** MCP 监听端口(V38):默认 15110,与 wire 1510 区隔。 */
+    val mcpPort: StateFlow<Int> = _mcpPort
+
+    private val _mcpExternalAccess = MutableStateFlow(false)
+
+    /** MCP 外部访问(V38):false(默认)= 127.0.0.1 免 Token;true = 0.0.0.0 强制 Bearer。 */
+    val mcpExternalAccess: StateFlow<Boolean> = _mcpExternalAccess
+
+    /** MCP 回调:配置变更后由仓库驱动服务端重启(setter 装配,AppContainer 接线)。 */
+    var mcpRestarter: (() -> Unit)? = null
+
+    /** 写 MCP 启用开关:持久化 → 内存 → 异步 start/stop。 */
+    suspend fun setMcpEnabled(enabled: Boolean) {
+        withContext(Dispatchers.IO) {
+            localPrefs.edit { putBoolean(ConfigKeys.MCP_ENABLED, enabled) }
+        }
+        _mcpEnabled.value = enabled
+        mcpRestarter?.invoke()
+    }
+
+    /** 写 MCP 端口(1..65535):持久化 → 内存 → 异步重启改绑。 */
+    suspend fun setMcpPort(port: Int) {
+        val clamped = port.coerceIn(1, 65535)
+        withContext(Dispatchers.IO) {
+            localPrefs.edit { putInt(ConfigKeys.MCP_PORT, clamped) }
+        }
+        _mcpPort.value = clamped
+        mcpRestarter?.invoke()
+    }
+
+    /** 写 MCP 外部访问:持久化 → 内存 → 异步重启改绑(开启侧强制 Bearer 由服务端执行)。 */
+    suspend fun setMcpExternalAccess(enabled: Boolean) {
+        withContext(Dispatchers.IO) {
+            localPrefs.edit { putBoolean(ConfigKeys.MCP_EXTERNAL_ACCESS, enabled) }
+        }
+        _mcpExternalAccess.value = enabled
+        mcpRestarter?.invoke()
+    }
+
     /**
      * 写入全局功能配置:本地持久化 → 重播 switch_global 种子(注入侧直读兜底可见)
      * → 全部在线会话重推各自有效配置。
@@ -344,5 +392,21 @@ class SettingsRepository(
             server.port = storedPort
             scope.launch { server.restart() }
         }
+        // V38:恢复 MCP 服务偏好(进程重启后重放;enabled 默认 true,端口/外部访问默认零动作)
+        _mcpEnabled.value = localPrefs.getBoolean(ConfigKeys.MCP_ENABLED, true)
+        val storedMcpPort = localPrefs.getInt(ConfigKeys.MCP_PORT, com.lioisme.modev.mcp.protocol.McpProtocol.DEFAULT_PORT)
+        _mcpPort.value = storedMcpPort
+        val storedMcpExternal = localPrefs.getBoolean(ConfigKeys.MCP_EXTERNAL_ACCESS, false)
+        _mcpExternalAccess.value = storedMcpExternal
+    }
+
+    /** MCP Token 读取(自动生成惰性;AppContainer 装配期一次)。 */
+    fun mcpToken(): String {
+        var token = localPrefs.getString(ConfigKeys.MCP_TOKEN, null)
+        if (token.isNullOrBlank()) {
+            token = java.util.UUID.randomUUID().toString().replace("-", "")
+            localPrefs.edit { putString(ConfigKeys.MCP_TOKEN, token) }
+        }
+        return token
     }
 }

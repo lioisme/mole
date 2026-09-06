@@ -36,4 +36,10 @@ class ProbeContext(
     val sink: RecordSink,
     /** 主包名(记录归档键,分离进程归并后)。 */
     val packageName: String,
+    /**
+     * 目标 App classloader 惰性取用(V38):注入早于 Application 时为 null,每次调用重试。
+     * 模块注入类的 Class.forName 委派链不含 app dex → okhttp 等 app 类必须经此 loader
+     * 显式装载(installSslHooksFor 消费)。
+     */
+    val appClassLoader: () -> ClassLoader? = { null },
 )

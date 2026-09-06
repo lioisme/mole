@@ -9,12 +9,14 @@ $E = @{
     "crash-on"    = '{"processControlListen":true,"kinds":{"CRASH_PREVENT":true}}'
     "dlg-on"      = '{"uiListen":true,"kinds":{"DIALOG_KEYWORD":true},"dialogKeywords":["ModevKeywordHit"]}'
     "dlg-pass"    = '{"uiListen":true,"kinds":{"DIALOG_KEYWORD":true,"DIALOG_SHOW":true}}'
-    "ssl1"        = '{"networkListen":true,"kinds":{"SSL_CONTEXT":true}}'
-    "ssl2"        = '{"networkListen":true,"kinds":{"SSL_TRUST_MANAGER":true}}'
-    "ssl3"        = '{"networkListen":true,"kinds":{"SSL_OKHTTP_PINNER":true}}'
-    "ssl4"        = '{"networkListen":true,"kinds":{"SSL_OKHTTP_VERIFIER":true}}'
-    "ssl5"        = '{"networkListen":true,"kinds":{"SSL_WEBVIEW":true}}'
-    "ssl6"        = '{"networkListen":true,"kinds":{"SSL_NETWORK_CONFIG":true}}'
+    "ssl1"        = '{"networkListen":true,"cryptoListen":false,"kinds":{"SSL_CONTEXT":true}}'
+    "ssl2"        = '{"networkListen":true,"cryptoListen":false,"kinds":{"SSL_TRUST_MANAGER":true}}'
+    # V38:okhttp/networkconfig 校验链位于 trust 放行之后,单开 pin/verifier 档时
+    # trust 链先拒(V31 设计缺陷被 V36 起断言绑定失效掩盖),组合开档使命中可达。
+    "ssl3"        = '{"networkListen":true,"cryptoListen":false,"kinds":{"SSL_TRUST_MANAGER":true,"SSL_OKHTTP_PINNER":true}}'
+    "ssl4"        = '{"networkListen":true,"cryptoListen":false,"kinds":{"SSL_TRUST_MANAGER":true,"SSL_OKHTTP_VERIFIER":true}}'
+    "ssl5"        = '{"networkListen":true,"cryptoListen":false,"kinds":{"SSL_TRUST_MANAGER":true,"SSL_WEBVIEW":true}}'
+    "ssl6"        = '{"networkListen":true,"cryptoListen":false,"kinds":{"SSL_TRUST_MANAGER":true,"SSL_NETWORK_CONFIG":true}}'
     "proxy-on"    = '{"networkListen":true,"kinds":{"PROXY_SYSTEM_PROP":true,"PROXY_CONNECTIVITY":true,"PROXY_SETTINGS":true,"PROXY_OKHTTP":true}}'
     "vpn-on"      = '{"networkListen":true,"kinds":{"VPN_CAPABILITIES":true,"VPN_INTERFACE":true,"VPN_NETWORK_INFO":true,"VPN_LINK_PROPERTIES":true}}'
     "dns-on"      = '{"networkListen":true,"kinds":{"PROXY_CONNECTIVITY":true}}'
@@ -118,13 +120,13 @@ $SSL = @(
 foreach ($s in $SSL) {
     ApplyProfile "default"
     RunCase "enhance-ssl" $s[0] 8
-    $tt = GetTt $s[0]
-    Assert "$($s[0]) OFF handshake fails" ($tt -match "false|fail") "tt=$tt"
+    $tt = [string](GetTt $s[0])
+    Assert "$($s[0]) OFF handshake fails" ("$tt" -match "false|fail") "tt=$tt"
     ApplyProfile $s[1]
     ClearDb
     RunCase "enhance-ssl" $s[0] 8
-    $tt = GetTt $s[0]
-    Assert "$($s[0]) ON handshake ok" ($tt -match "true|200") "tt=$tt"
+    $tt = [string](GetTt $s[0])
+    Assert "$($s[0]) ON handshake ok" ("$tt" -match "true|200") "tt=$tt"
     WaitSpoolDrain | Out-Null
     $n = KindCount "network" $s[2]
     Assert "$($s[0]) ON record kind=$($s[2])" ($n -gt 0) "count=$n"

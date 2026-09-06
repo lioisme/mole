@@ -27,6 +27,8 @@ import androidx.compose.material.icons.filled.Devices
 import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.FilterAltOff
 import androidx.compose.material.icons.filled.Insights
+import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Hub
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Public
@@ -67,6 +69,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
+import com.lioisme.modev.domain.diagnostics.DiagnosticsReport
 import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.ui.apps.AppCountFormat
 import com.lioisme.modev.ui.components.ModevTopBar
@@ -102,6 +105,18 @@ fun DiagnosticsScreen(
     val externalAccess by viewModel.externalAccess.collectAsStateWithLifecycle()
     val listeningAddress by viewModel.listeningAddress.collectAsStateWithLifecycle()
     val port by viewModel.port.collectAsStateWithLifecycle()
+    // V38 MCP 服务分区状态
+    val mcpEnabled by viewModel.mcpEnabled.collectAsStateWithLifecycle()
+    val mcpPort by viewModel.mcpPort.collectAsStateWithLifecycle()
+    val mcpExternalAccess by viewModel.mcpExternalAccess.collectAsStateWithLifecycle()
+
+    // V38 MCP 端口设置弹层状态。
+    var mcpPortSheetOpen by rememberSaveable { mutableStateOf(false) }
+    var mcpPortInputValue by rememberSaveable { mutableStateOf(mcpPort.toString()) }
+    var mcpPortInputError by rememberSaveable { mutableStateOf(false) }
+
+    // V38 MCP Token 显隐(默认掩码,点击展示 + 可复制)。
+    var mcpTokenVisible by rememberSaveable { mutableStateOf(false) }
 
     // V15:统计数值按应用实际生效 locale 千分位分组(与 stringResource 解析同源)。
     // V16 R5:热切换下 LocalConfiguration 陈旧,一律经包装 Context 解析(effectiveLocale)。
@@ -128,42 +143,43 @@ fun DiagnosticsScreen(
     val displayAddress = listeningAddress
 
     // 剪贴板快照:与页面行同源(同资源标签 + 同格式化),统计无论折叠与否全量收录。
+    // V38 D2:装配逻辑下沉 DiagnosticsReport(纯函数),与 MCP diagnostics 工具双端同源。
     fun copyDiagnostics() {
-        val lines =
-            buildList {
-                fun line(label: String, value: String) = add("$label: $value")
-                when (val framework = frameworkState) {
-                    is ScopeState.Connecting -> {
-                        line(context.getString(R.string.settings_framework_service), context.getString(R.string.settings_connecting))
-                    }
-                    is ScopeState.Ready -> {
-                        line(context.getString(R.string.settings_framework), "${framework.frameworkName} ${framework.frameworkVersion}")
-                        line(context.getString(R.string.settings_scoped_count), context.getString(R.string.settings_scoped_count_value, framework.scope.size))
-                    }
-                    is ScopeState.Unavailable -> {
-                        line(context.getString(R.string.settings_framework_service), context.getString(R.string.settings_not_connected))
-                        if (framework.reason == ScopeState.UnavailableReason.SERVICE_ERROR) {
-                            add(
-                                framework.message?.let { context.getString(R.string.settings_framework_error, it) }
-                                    ?: context.getString(R.string.unknown_error),
-                            )
-                        }
-                    }
-                }
-                val scopeSuffix =
-                    context.getString(
-                        if (externalAccess) R.string.settings_port_scope_all else R.string.settings_port_scope_local,
-                    )
-                line(context.getString(R.string.settings_port), context.getString(R.string.settings_port_value, displayAddress, port) + " " + scopeSuffix)
-                line(context.getString(R.string.settings_online_targets), context.getString(R.string.settings_online_targets_value, connectedCount))
-                line(context.getString(R.string.stats_received), stat(pipelineStats.received))
-                line(context.getString(R.string.stats_dropped), stat(pipelineStats.dropped))
-                line(context.getString(R.string.stats_write_failures), stat(pipelineStats.writeFailures))
-                line(context.getString(R.string.stats_trimmed), stat(pipelineStats.trimmed))
-                line(context.getString(R.string.stats_rejected_hellos), stat(pipelineStats.channel.rejectedHellos))
-                line(context.getString(R.string.stats_dropped_records), stat(pipelineStats.channel.droppedRecords))
-                line(context.getString(R.string.stats_rejected_records), stat(pipelineStats.channel.rejectedRecords))
-            }
+        val labels = DiagnosticsReport.Labels(
+            frameworkService = context.getString(R.string.settings_framework_service),
+            framework = context.getString(R.string.settings_framework),
+            connecting = context.getString(R.string.settings_connecting),
+            notConnected = context.getString(R.string.settings_not_connected),
+            scopedCount = context.getString(R.string.settings_scoped_count),
+            scopedCountValue = context.getString(R.string.settings_scoped_count_value),
+            frameworkError = context.getString(R.string.settings_framework_error),
+            unknownError = context.getString(R.string.unknown_error),
+            port = context.getString(R.string.settings_port),
+            portValue = context.getString(R.string.settings_port_value),
+            portScopeAll = context.getString(R.string.settings_port_scope_all),
+            portScopeLocal = context.getString(R.string.settings_port_scope_local),
+            onlineTargets = context.getString(R.string.settings_online_targets),
+            onlineTargetsValue = context.getString(R.string.settings_online_targets_value),
+            statsReceived = context.getString(R.string.stats_received),
+            statsDropped = context.getString(R.string.stats_dropped),
+            statsWriteFailures = context.getString(R.string.stats_write_failures),
+            statsTrimmed = context.getString(R.string.stats_trimmed),
+            statsRejectedHellos = context.getString(R.string.stats_rejected_hellos),
+            statsDroppedRecords = context.getString(R.string.stats_dropped_records),
+            statsRejectedRecords = context.getString(R.string.stats_rejected_records),
+        )
+        val lines = DiagnosticsReport.build(
+            snapshot = DiagnosticsReport.Snapshot(
+                frameworkState = frameworkState,
+                displayAddress = displayAddress,
+                port = port,
+                externalAccess = externalAccess,
+                connectedCount = connectedCount,
+                pipelineStats = pipelineStats,
+            ),
+            labels = labels,
+            formatCount = ::stat,
+        )
         clipboard.setText(AnnotatedString(lines.joinToString("\n")))
         scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.diagnostics_copied)) }
     }
@@ -270,6 +286,46 @@ fun DiagnosticsScreen(
                 )
             }
             Spacer(Modifier.height(24.dp))
+            // V38 MCP 服务分区:启用开关 / 外部访问开关 / 端口行 / Token 行。
+            SettingsSection(stringResource(R.string.mcp_section)) {
+                SettingsToggleItem(
+                    icon = Icons.Default.Hub,
+                    title = stringResource(R.string.mcp_enabled),
+                    subtitle = stringResource(R.string.mcp_enabled_hint),
+                    checked = mcpEnabled,
+                    modifier = Modifier.testTag("diagnostics-mcp-enabled"),
+                    onCheckedChange = { viewModel.setMcpEnabled(it) },
+                )
+                SettingsToggleItem(
+                    icon = Icons.Default.Public,
+                    title = stringResource(R.string.mcp_external_access),
+                    subtitle = stringResource(R.string.mcp_external_access_hint),
+                    checked = mcpExternalAccess,
+                    modifier = Modifier.testTag("diagnostics-mcp-external"),
+                    onCheckedChange = { viewModel.setMcpExternalAccess(it) },
+                )
+                SettingsInfoItem(
+                    icon = Icons.Default.Dns,
+                    title = stringResource(R.string.mcp_port),
+                    value = mcpPort.toString(),
+                    onClick = { mcpPortSheetOpen = true },
+                )
+                SettingsInfoItem(
+                    icon = Icons.Default.Key,
+                    title = stringResource(R.string.mcp_token),
+                    value = if (mcpTokenVisible) viewModel.mcpToken else "••••••••",
+                    valueMaxLines = 1,
+                    onClick = {
+                        if (!mcpTokenVisible) {
+                            mcpTokenVisible = true
+                        } else {
+                            clipboard.setText(AnnotatedString(viewModel.mcpToken))
+                            scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.diagnostics_copied)) }
+                        }
+                    },
+                )
+            }
+            Spacer(Modifier.height(24.dp))
             // 管道统计分区(V21 T5:卡片化,与 Data 页分区视觉对齐;折叠头行
             // 即分区标题——标题唯一,不与 Section 重复;卡片 token 与
             // SettingsSection 同源 surfaceContainerLow)。
@@ -357,6 +413,83 @@ fun DiagnosticsScreen(
                 )
             }
             Spacer(Modifier.height(24.dp))
+        }
+    }
+
+    // V38 MCP 端口设置 BottomSheet(与 wire 端口 sheet 同构;输入即底部 sheet 契约)。
+    if (mcpPortSheetOpen) {
+        val sheetState = rememberModalBottomSheetState()
+        val sheetScope = rememberCoroutineScope()
+        fun closeMcpPortSheet(reset: Boolean) {
+            sheetScope.launch { sheetState.hide() }.invokeOnCompletion {
+                if (reset) {
+                    mcpPortInputValue = mcpPort.toString()
+                    mcpPortInputError = false
+                }
+                mcpPortSheetOpen = false
+            }
+        }
+        ModalBottomSheet(
+            onDismissRequest = { closeMcpPortSheet(reset = true) },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.testTag("mcp-port-setting-sheet"),
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .imePadding()
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = 24.dp),
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_port_edit),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+                Spacer(Modifier.height(16.dp))
+                OutlinedTextField(
+                    value = mcpPortInputValue,
+                    onValueChange = { newValue ->
+                        mcpPortInputValue = newValue.filter { it.isDigit() }
+                        mcpPortInputError = false
+                    },
+                    label = { Text(stringResource(R.string.mcp_port)) },
+                    isError = mcpPortInputError,
+                    supportingText = if (mcpPortInputError) {
+                        { Text(stringResource(R.string.settings_port_invalid)) }
+                    } else null,
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Spacer(Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                ) {
+                    TextButton(onClick = { closeMcpPortSheet(reset = true) }) {
+                        Text(stringResource(R.string.cancel))
+                    }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(
+                        onClick = {
+                            val parsed = mcpPortInputValue.toIntOrNull()
+                            if (parsed != null && parsed in 1..65535) {
+                                viewModel.setMcpPort(parsed)
+                                closeMcpPortSheet(reset = false)
+                            } else {
+                                mcpPortInputError = true
+                            }
+                        },
+                    ) {
+                        Text(stringResource(R.string.confirm))
+                    }
+                }
+            }
         }
     }
 

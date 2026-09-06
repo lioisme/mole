@@ -247,7 +247,10 @@ fun PerAppFeatureSettingsScreen(
             Spacer(Modifier.height(Dimens.sectionGapDense))
 
             FeatureGroups.ALL.forEach { group ->
-                SettingsSection(stringResource(featureGroupLabelRes(group))) {
+                SettingsSection(
+                    title = stringResource(featureGroupLabelRes(group)),
+                    modifier = Modifier.testTag("feature-group-header-${group.name}"),
+                ) {
                     FeatureGroups.kindIds(group).forEachIndexed { index, kindId ->
                         if (index > 0) HorizontalDivider16()
                         ToggleListItem(
@@ -466,7 +469,12 @@ private fun SpoofProfileSheet(
         sheetState = sheetState,
         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
     ) {
-        Column(Modifier.fillMaxWidth().padding(bottom = 24.dp)) {
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp),
+        ) {
             Text(
                 stringResource(R.string.feature_profile_sheet_title),
                 style = MaterialTheme.typography.titleLarge,

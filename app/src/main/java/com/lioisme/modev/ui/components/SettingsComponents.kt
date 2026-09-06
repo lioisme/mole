@@ -52,6 +52,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SettingsSection(
     title: String,
+    modifier: Modifier = Modifier,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Text(
@@ -59,7 +60,7 @@ fun SettingsSection(
         style = MaterialTheme.typography.titleSmall,
         color = MaterialTheme.colorScheme.primary,
         fontWeight = FontWeight.SemiBold,
-        modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+        modifier = modifier.padding(start = 4.dp, bottom = 8.dp),
     )
     Card(
         colors =

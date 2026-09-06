@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法/数据库/行为/偏好/WebView/系统信息 + 环境观测)+ 功能域(退出拦截/崩溃预防/解除录屏/弹窗关键词拦截/SSL 绕过/代理 VPN 隐藏/设备环境伪装)+ 宿主双进程日志。
-构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀;2026-08-26 V27 记录列表重构/行为监听一等公民增量沉淀;2026-08-26 V28 详情页纯 markdown 化/偏好监听一等公民增量沉淀;2026-09-04 V37 双域拆分/FeatureGate 红线/关键词库与画像契约增量沉淀)。
+构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀;2026-08-26 V27 记录列表重构/行为监听一等公民增量沉淀;2026-08-26 V28 详情页纯 markdown 化/偏好监听一等公民增量沉淀;2026-09-04 V37 双域拆分/FeatureGate 红线/关键词库与画像契约增量沉淀;2026-09-05 V38 MCP 服务/工具面 parity/注入侧 seq 续号修复增量沉淀)。
 
 ## 构建 / 测试(Windows,gradlew.bat)
 
@@ -50,6 +50,8 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 | 关键词库 Keyword Library | 全局弹窗拦截关键词资产(Room `keyword_library`,text 唯一 + matchMode + 全局启停);每应用默认跟随全局,可显式子集 | 仅 override 扁平词表、无库 |
 | 伪装画像 Spoof Profile | 设备/网络伪装值组(auto/pixel7pro/xiaomi13 内置档位 + 字段覆写);`SpoofProfiles` 为机型字面量唯一事实源 | 钩子内硬编码机型值 |
 | 检测黑名单追加项 extra* | Root 包名/Xposed 前缀/Frida 端口/掩码词的用户追加项(内置基线 ∪ 追加,只增不删) | 覆盖内置基线 |
+| MCP 服务 MCP Server | 进程内常驻 Streamable HTTP(spec 2025-06-18,端口 15110,单端点 POST /mcp);默认回环免 Token(adb forward 开箱即用);外部访问独立开关 = 0.0.0.0 + 强制 Bearer;与 wire ConfigServer 完全独立生命周期(独立端口/开关/restart,互不触碰,VERSION 恒 4 零感知) | 把 MCP 当 wire 通道扩展、恢复 resources/prompts 双通道 |
+| 工具面 Tool Surface 43 | MCP 对 Agent 的能力清单(记录 14/应用 6/监听 4/功能 4/资产 8/服务 4/作用域 3),与 UI 能力逐行对照、同上游继承;`McpToolParityTest` 冻结快照 + B1 边界源码扫描双门禁 | 「MCP 子集」「UI 专属阉割」(§5.3 明示排除除外) |
 
 ## 强约束(改了会挂测试/降级质量)
 
@@ -310,8 +312,25 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
      (pillContainerAlpha/badgeContainerAlpha/chevronAlpha/disabledContentAlpha/
      emptyIcon*/codeBorderAlpha);记录行内边距 16dp 统一(旧 14dp 已归一);
      设置类行开关统一 `ToggleListItem`(PerAppSettingRows 共享);
-     kind→标签映射唯一入口 `KindLabelRes.resolve`(监听/功能两页共用,
-     Prefs OPEN/CLEAR 碰撞前置规则不变)。
+      kind→标签映射唯一入口 `KindLabelRes.resolve`(监听/功能两页共用,
+      Prefs OPEN/CLEAR 碰撞前置规则不变)。
+26. **MCP 服务契约(V38,Agent 一等公民)**:`mcp.*` 包边界 = B1(禁 import
+      `ui.*`/`androidx.compose.*`/`data.db.*`/`hook.*`/`data.server.*`/`framework.*`,
+      `McpToolParityTest.mcp_layer_boundary_allowlist` 源码扫描)+ B2(允许
+      `domain.*`/`data.repo.*`/`core.*`,与 UI 同一上游 allowlist——「同一起游继承」
+      由测试锁定);**工具面 parity**:`McpToolParityTest.frozen_43_tool_names` 冻结
+      43 工具名快照,新增 UI 能力必须同步 MCP 工具(否则红),防「旁路上游」与
+      「功能阉割」双向漂移;协议 = spec 2025-06-18 Streamable HTTP 单端点 POST /mcp,
+      单请求单响应(batch→-32600),错误码分型(协议错误 -327xx/-326xx vs 业务错误
+      `result.isError`),会话头 `Mcp-Session-Id`(restart 整体失效);认证 = 回环免
+      Token、外部访问(0.0.0.0)强制 Bearer(宿主本地自动生成 UUID Token,诊断页
+      展示/复制,独立于 ConfigServer requireToken);`McpDtos` 必须用专用
+      `GsonBuilder().serializeNulls()`(SQL NULL 键否则静默丢失);记录大字段
+      1MiB 截断守卫(响应内 `truncated:true`);`records_clear_all`/`app_clear_records`
+      等危险工具 `confirm:true` 必填(缺失→-32602 协议错误);日志 `ModevMcp` 仅落
+      method+tool+耗时不落记录内容(PII 纪律);MCP 与 wire ConfigServer 完全独立
+      生命周期(独立端口 15110/开关/restart,互不触碰,VERSION 恒 4 零感知);
+      交付门禁 = `24-run-mcp.ps1`(42 子断言,§9.2 矩阵 22 项)。
 
 ## 已知工具链坑
 
@@ -375,6 +394,49 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 - lint NewerVersionAvailable 按声明依赖逐条计数:直依赖锁定旧版必 +1;
   仅传递使用的库不要显式声明(高亮引擎经 `dev.snipme:highlights` 直依赖并锁
   1.1.0,Kotlin 2.2.0 构建 metadata 安全;禁随上游盲升)。
+- **PowerShell 参数名/脚本变量禁用自动变量名 `$args`/`$pid`(V38 实锤,大小写不敏感
+  即冲突)**:`function F([object]$args)` 实参不绑定(自动变量遮蔽),`$pid = ...`
+  静默失败(只读)——集成脚本中表现为「arguments 恒空」「存活判定拿 shell 自身 PID
+  恒真 = 假 PASS」。一律改 `$toolArgs`/`$pidOut`;新写脚本函数先 `Get-Help` 心查
+  自动变量表(完整列表见 about_Automatic_Variables)。
+- **PS 5.1 `Invoke-WebRequest` 无 `-SkipHttpErrorCheck`**(PS 6+ 参数):参数绑定
+  失败 = 语句终止错误,响应变量为 null。非 2xx 断言一律 try/catch +
+  `$_.Exception.Response.GetResponseStream()` 读体。
+- **雷电 x64 镜像剪贴板静默丢弃写入**(V38 实锤):`ClipboardManager.setPrimaryClip`
+  前台执行后 `hasPrimaryClip` 仍 false(直写亦然)。剪贴板内容断言必须经
+  `clipboardFunctional()` 哨兵探测降级(Snackbar 证处理器执行),内容同源由
+  DiagnosticsReport JVM 单测 + MCP diagnostics 工具双端兜底;真机自动恢复全断言。
+- **connectedAndroidTest 测后 AGP 卸载宿主 APK → Vector modules 行删除 + enabled
+  复位**(V38 实锤):后续注入矩阵全 FAIL(记录零捕获)且无崩溃日志,极难归因。
+  恢复序列:重装 APK → 等 Vector 重注册 → `UPDATE modules SET enabled=1` +
+  scope 行(`11-vector-scope.ps1`)→ **重启 VM**(lspd 缓存模块表,不重启不生效)→
+  HookInstaller 日志验证。androidTest 抽样必须排在设备集成矩阵之后,或测后即恢复。
+- **注入早于 Application 时,任何构造期一次性求值的 Context 依赖初始化都会静默退化**
+  (V38 seq 续号 bug 根因):`RecordSink.seqCounter` 构造期 `restoreSeq()` 时
+  `ActivityThread.currentApplication()` 为 null → 每次重启 seq 从 1 重发 → 宿主
+  `(packageName,processName,seq)` 唯一索引 REPLACE 静默覆盖上一代记录(跨重启数据
+  丢失,矩阵表现为「记录凭空消失」)。规约:Context 依赖初始化一律惰性到首次使用
+  且路径可见才定档;spoolProvider 同款懒重试。回归 `RecordSinkTest`
+  「file becomes visible after construction」。
+- **现代路径 after-setResult 曾被拦截器丢弃(V38 修复,功能域全局影响)**:
+  `LibxposedPlatform.intercept` 恒 `return result` → after 钩子里的 setResult
+  (maps 掩蔽/栈过滤/传感器伪装/VPN·DNS 隐藏/SSL 结果替换)全部空操作。
+  after 短路值必须优先返回。新增结果改写型 Hooker 后必须以对应二态断言验证
+  (裸挂钩不触发 = 假修复)。
+- **Android 14 握手验证只经 Platform 包私有桥(V38 dexdump 实锤)**:
+  `Platform.checkServerTrusted(X509TrustManager,X509Certificate[],String,
+  AbstractConscryptSocket|ConscryptEngine)` 是 static 包私有(access 0x0008 无
+  PUBLIC 位),`getMethod` 不可见必须 `getDeclaredMethod+setAccessible`;参数类型
+  为 hide 类需运行时反射解析。TrustManagerImpl 公开重载不在 native 握手路径上。
+- **app dex 类必须经 app classloader 显式装载(V38 三重实锤)**:①ART 同 loader
+  内类引用解析走 native fast path,`ClassLoader.loadClass` 监视器看不到(okhttp
+  全系类);②模块注入类的 forName 委派链不含 app dex;③模块与 app 各带一份
+  kotlin-stdlib,`Function0` 等双份 Class 按 `==` 比较 → getDeclaredMethod 必败。
+  统一解法:`ProbeContext.appClassLoader` + `Class.forName(name,false,appLoader)`
+  (initialize=false 零副作用),以 SSLContext.init/握手回调为补装触发点。
+- **Vector 2.2 同一方法的第二个 hook 不执行**(V38 观察):两个 hooker 各自对
+  `ClassLoader.loadClass` 注册钩子时,仅先注册者生效——需要类加载观察的 hooker
+  共享单一监视器或改用显式预载,禁止各自重复注册同一方法。
 
 ## 测试金字塔(新增行为必须有测试)
 

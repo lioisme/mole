@@ -191,6 +191,8 @@ class HookInstaller(
             tracker = CryptoContextTracker,
             sink = sink,
             packageName = packageName,
+            // V38:app dex 类(okhttp 等)显式装载用(注入早于 Application 时惰性重试)
+            appClassLoader = { applicationContext()?.classLoader },
         )
         for (probe in probes) {
             try {

@@ -417,6 +417,14 @@
     <string name="settings_online_targets_value">%1$,d</string>
     <string name="settings_port_edit">Port setting</string>
     <string name="settings_port_invalid">Port must be 1–65535</string>
+    <!-- V38 MCP service -->
+    <string name="mcp_section">MCP server (Agent)</string>
+    <string name="mcp_enabled">MCP server</string>
+    <string name="mcp_enabled_hint">Model Context Protocol endpoint for agents; serves 127.0.0.1:15110 by default (adb forward tcp:15110 tcp:15110).</string>
+    <string name="mcp_external_access">MCP external access</string>
+    <string name="mcp_external_access_hint">Bind 0.0.0.0 and require the bearer token below. Devices on the same network can connect.</string>
+    <string name="mcp_port">MCP port</string>
+    <string name="mcp_token">Access token</string>
     <string name="settings_clear_all_records">Clear all records</string>
     <string name="settings_total_records">Total records</string>
     <string name="settings_total_records_value">%1$,d</string>

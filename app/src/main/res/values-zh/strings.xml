@@ -410,6 +410,14 @@
     <string name="settings_online_targets_value">%1$,d 个</string>
     <string name="settings_port_edit">端口设置</string>
     <string name="settings_port_invalid">端口需为 1–65535</string>
+    <!-- V38 MCP 服务 -->
+    <string name="mcp_section">MCP 服务(Agent)</string>
+    <string name="mcp_enabled">MCP 服务</string>
+    <string name="mcp_enabled_hint">面向 Agent 的 Model Context Protocol 端点;默认随宿主常驻 127.0.0.1:15110(adb forward tcp:15110 tcp:15110)。</string>
+    <string name="mcp_external_access">MCP 外部访问</string>
+    <string name="mcp_external_access_hint">绑定 0.0.0.0 并强制使用下方访问令牌;同一网络的设备可连接。</string>
+    <string name="mcp_port">MCP 端口</string>
+    <string name="mcp_token">访问令牌</string>
     <string name="settings_clear_all_records">清空全部记录</string>
     <string name="settings_total_records">总记录数</string>
     <string name="settings_total_records_value">%1$,d 条</string>

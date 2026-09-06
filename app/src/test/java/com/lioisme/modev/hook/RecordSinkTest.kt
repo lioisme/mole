@@ -97,6 +97,32 @@ class RecordSinkTest {
         awaitSeqFile(seqFile, 301L)
     }
 
+    /**
+     * V38 回归(注入早于 Application):构造期 seq 文件路径不可见(provider 暂返 null),
+     * 首次发号时文件已可见 → 必须续号而非从 1 重发(旧实现构造期一次性求值,
+     * 宿主唯一索引 REPLACE 会静默覆盖上一代记录)。
+     */
+    @Test
+    fun `seq restores when file becomes visible after construction`() {
+        val seqFile = File(dir, "late.dat")
+        seqFile.writeText("41")
+        var visible = false
+        val seen = java.util.concurrent.ConcurrentLinkedQueue<Long>()
+        val sink = RecordSink(
+            jsonOf = { rec -> seen.add(rec.seq); "{}" },
+            sendJson = { true },
+            isConnected = { false },
+            spoolProvider = { null },
+            seqFileProvider = { if (visible) seqFile else null },
+        )
+        sink.start()
+        visible = true
+        sink.emit(record("late"))
+        val deadline = System.currentTimeMillis() + 5_000
+        while (seen.isEmpty() && System.currentTimeMillis() < deadline) Thread.sleep(50)
+        assertEquals(listOf(42L), seen.toList())
+    }
+
     @Test
     fun `missing seq file starts at zero`() {
         val seqFile = File(dir, "absent.dat")

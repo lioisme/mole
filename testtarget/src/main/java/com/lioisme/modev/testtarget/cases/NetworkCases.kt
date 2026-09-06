@@ -85,8 +85,11 @@ object NetworkCases {
                 Tt.result(case, "handshake" to ok.toString())
             }
             "E-SSL-02" -> {
+                // V38:默认 hostname verifier 对 localhost 不匹配 ip.p12 证书 SAN(V31
+                // 时代用例缺陷;trust bypass 后仍被 hostname 验证拦下),改用与证书
+                // 匹配的 127.0.0.1(服务器同一台)。
                 val port = NetTargets.tlsIpPort(ctx)
-                val ok = runCatching { httpsGet("https://localhost:$port/s2") }.isSuccess
+                val ok = runCatching { httpsGet("https://127.0.0.1:$port/s2") }.isSuccess
                 Tt.result(case, "handshake" to ok.toString())
             }
             "E-SSL-03" -> {
@@ -99,19 +102,22 @@ object NetworkCases {
                     )
                     .certificatePinner(
                         CertificatePinner.Builder()
-                            .add("localhost:$port", "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
+                            // okhttp 4.x pattern 不允许携带端口(V38 实锤 IllegalArgumentException);
+                            // 用与证书信任链匹配的 127.0.0.1 + 故意错误 pin,触发 CertificatePinner.check
+                            // (V31 时代 localhost/无端口 + 正确信任链组合下 hostname 先失败,pin 路径不可达)。
+                            .add("127.0.0.1", "sha256/AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=")
                             .build(),
                     )
                     .build()
                 val r = runCatching {
-                    client.newCall(Request.Builder().url("https://localhost:$port/s3").build()).execute()
+                    client.newCall(Request.Builder().url("https://127.0.0.1:$port/s3").build()).execute()
                         .use { it.code }
                 }
                 Tt.result(case, "code" to (r.getOrNull()?.toString() ?: "fail"), "err" to (r.exceptionOrNull()?.javaClass?.simpleName ?: "none"))
             }
             "E-SSL-04" -> {
-                val port = NetTargets.tlsNoHostPort(ctx)
-                val tm = trustManagerFor(ctx, "testserver_nohost.p12")
+                val port = NetTargets.tlsIpPort(ctx)
+                val tm = trustManagerFor(ctx, "testserver_ip.p12")
                 val client = OkHttpClient.Builder()
                     .sslSocketFactory(
                         SSLContext.getInstance("TLS").apply { init(null, arrayOf(tm), null) }.socketFactory,

@@ -37,15 +37,15 @@ $modevProc = & $ADB -s $DEVICE shell "ps -A | grep com.lioisme.modev" 2>$null
 $targetProc = & $ADB -s $DEVICE shell "ps -A | grep $Package" 2>$null
 
 if ($modevProc) {
-    $pid = ($modevProc -split '\s+')[1]
-    Write-Host "  [OK] Modev 进程运行中 (PID: $pid)" -ForegroundColor Green
+    $procId = (($modevProc -split '\s+')[1])
+    Write-Host "  [OK] Modev 进程运行中 (PID: $procId)" -ForegroundColor Green
 } else {
     Write-Host "  [ERROR] Modev 进程未运行" -ForegroundColor Red
 }
 
 if ($targetProc) {
-    $pid = ($targetProc -split '\s+')[1]
-    Write-Host "  [OK] 目标应用进程运行中 (PID: $pid)" -ForegroundColor Green
+    $procId = (($targetProc -split '\s+')[1])
+    Write-Host "  [OK] 目标应用进程运行中 (PID: $procId)" -ForegroundColor Green
 } else {
     Write-Host "  [WARN] 目标应用进程未运行" -ForegroundColor Yellow
 }

@@ -121,6 +121,61 @@ class AppContainer(private val context: Context) {
         ScopeRepository(scopeGateway)
     }
 
+    /**
+     * MCP 服务器(V38):Agent 一等公民能力面,43 工具,与 wire ConfigServer 独立生命周期。
+     * 自引用快照 lambda 在请求期才解析(server_status 消费),装配期无递归。
+     */
+    val mcp: com.lioisme.modev.mcp.McpServer by lazy {
+        val registry = com.lioisme.modev.mcp.tools.McpToolRegistry(
+            com.lioisme.modev.mcp.tools.McpTools.create(
+                context = context,
+                logs = logs,
+                settings = settings,
+                keywords = keywordLibrary,
+                catalog = catalog,
+                scopeRepository = scopeRepository,
+                connectionMonitor = server,
+                mcpSnapshot = {
+                    com.lioisme.modev.mcp.tools.McpJson.obj(
+                        "enabled" to com.google.gson.JsonPrimitive(settings.mcpEnabled.value),
+                        "port" to com.google.gson.JsonPrimitive(mcp.port),
+                        "boundAddress" to com.google.gson.JsonPrimitive(
+                            if (mcp.isRunning) {
+                                if (mcp.externalAccess) "0.0.0.0" else "127.0.0.1"
+                            } else null,
+                        ),
+                        "externalAccess" to com.google.gson.JsonPrimitive(mcp.externalAccess),
+                        "sessionCount" to com.google.gson.JsonPrimitive(mcp.sessionCount()),
+                    )
+                },
+            ),
+        )
+        val built = com.lioisme.modev.mcp.McpServer(
+            port = settings.mcpPort.value,
+            externalAccess = settings.mcpExternalAccess.value,
+            token = settings.mcpToken(),
+            serverInfo = com.lioisme.modev.mcp.tools.McpJson.obj(
+                "name" to com.google.gson.JsonPrimitive(com.lioisme.modev.mcp.tools.McpTools.SERVER_NAME),
+                "version" to com.google.gson.JsonPrimitive(
+                    runCatching { context.packageManager.getPackageInfo(context.packageName, 0).versionName }.getOrNull() ?: "0",
+                ),
+            ),
+            instructions = com.lioisme.modev.mcp.tools.McpTools.SERVER_INSTRUCTIONS,
+            registry = registry,
+        )
+        // 配置变更 → 重启(enabled=false 时停机)
+        settings.mcpRestarter = {
+            if (settings.mcpEnabled.value) {
+                built.port = settings.mcpPort.value
+                built.externalAccess = settings.mcpExternalAccess.value
+                built.restart()
+            } else {
+                built.stop()
+            }
+        }
+        built
+    }
+
     private val packageReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             catalog.refresh()
@@ -134,6 +189,10 @@ class AppContainer(private val context: Context) {
         // 依赖 settings 惰性实例,若仅等 UI 打开设置页才初始化,
         // 注入进程握手的配置推送将永远缺席(客户端 60s 读超时 → 无限重连)。
         settings
+        // V38:MCP 服务随进程常驻(默认启用回环;设置变更经 mcpRestarter 重启)
+        if (settings.mcpEnabled.value) {
+            appScope.launch { mcp.start() }
+        }
         // M3-2: 框架服务就绪后生成并持久化握手令牌,ConfigServer 启用认证
         // serviceFlow 公开为 Any?(见 FrameworkBridge),转型发生在非空分支内,
         // legacy 变体(运行时缺 service 库)空值路径零类解析,自然降级不启用认证。

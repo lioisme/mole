@@ -113,8 +113,8 @@ class PerAppFeatureSettingsTest {
     fun featurePage_rendersGroups_andProcessGuardTogglePersists() {
         openFeatureSettings()
 
-        // 功能卡分区存在。
-        rule.onNodeWithText(str(R.string.feature_group_process_guard))
+        // 功能卡分区存在(组标题与 master 行同文案「进程守护」,锚定必须走 testTag)。
+        rule.onNodeWithTag("feature-group-header-PROCESS_GUARD")
             .performScrollTo().assertIsDisplayed()
         // 退出拦截默认关(功能域默认全关)。
         rule.onNodeWithTag("feature-row-EXIT_INTERCEPT")

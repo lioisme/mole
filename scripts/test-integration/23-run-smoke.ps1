@@ -29,13 +29,13 @@ function ColdStart([string]$pkg, [int]$settleSec = 14) {
     AdbShell "logcat -c -b crash" | Out-Null
     AdbShell "am start -S -n $comp" | Out-Null
     Start-Sleep -Seconds $settleSec
-    $pid = AdbShell "pidof $pkg"
-    $alive = $pid -match "\d"
+    $pidOut = AdbShell "pidof $pkg"
+    $alive = $pidOut -match "\d"
     $fatal = AdbShell "logcat -d -b crash"
     $crashed = $fatal -match [regex]::Escape($pkg) -or $fatal -match "FATAL EXCEPTION"
     $anr = (AdbShell "logcat -d -t 200") -match "ANR in $pkg"
     $ok = $alive -and (-not $crashed) -and (-not $anr)
-    $detail = if ($crashed) { "FATAL in crash buffer" } elseif ($anr) { "ANR" } elseif (-not $alive) { "process dead" } else { "pid=$($pid.Trim())" }
+    $detail = if ($crashed) { "FATAL in crash buffer" } elseif ($anr) { "ANR" } elseif (-not $alive) { "process dead" } else { "pid=$((("$pidOut" -replace '\s',' ')).Trim())" }
     Assert "smoke/$pkg all-features-ON cold start" $ok $detail
 }
 

@@ -32,7 +32,20 @@ class RecordSink(
 
     private val queue = LinkedBlockingQueue<MonitoredRecord>(CAPACITY)
     private val dropped = AtomicLong()
-    private val seqCounter = AtomicLong(restoreSeq())
+
+    /**
+     * seq 计数器。V38 修复:构造期求值 restoreSeq 在「注入早于 Application」场景下
+     * applicationContext() 恒 null → 文件不可见 → 每次进程重启 seq 从 1 重发,
+     * 宿主 (packageName, processName, seq) 唯一索引 + REPLACE 静默覆盖上一代记录
+     * (数据丢失)。改为首次发号时惰性续号:文件路径就绪前每次发号重试,
+     * 已发号后不再回溯(极早期无 spool 记录直发路径,窗口可忽略)。
+     */
+    private val seqCounter = AtomicLong(0L)
+
+    private val seqRestoreLock = Any()
+
+    @Volatile
+    private var seqRestored = false
 
     @Volatile
     private var spool: RecordSpool? = null
@@ -52,6 +65,23 @@ class RecordSink(
 
     val droppedCount: Long get() = dropped.get()
 
+    /** 发号入口:首次调用完成跨重启续号(见 [seqCounter] 注释的 V38 修复说明)。 */
+    private fun nextSeq(): Long {
+        if (!seqRestored) {
+            synchronized(seqRestoreLock) {
+                if (!seqRestored) {
+                    if (seqCounter.get() > 0L) {
+                        seqRestored = true
+                    } else if (currentSeqFile() != null) {
+                        seqCounter.set(restoreSeq())
+                        seqRestored = true
+                    }
+                }
+            }
+        }
+        return seqCounter.incrementAndGet()
+    }
+
     fun start() {
         if (running) return
         running = true
@@ -63,7 +93,7 @@ class RecordSink(
 
     fun emit(record: MonitoredRecord) {
         if (!running) return
-        val seq = seqCounter.incrementAndGet()
+        val seq = nextSeq()
         // M14: 仅写入内存检查点(Hook 线程零 I/O);落盘由工作线程周期执行
         seqCheckpoint = seq
         if (!queue.offer(record.withSeq(seq))) {
@@ -86,7 +116,7 @@ class RecordSink(
      */
     fun emitUrgent(record: MonitoredRecord) {
         if (!running) return
-        val seq = seqCounter.incrementAndGet()
+        val seq = nextSeq()
         seqCheckpoint = seq
         val r = record.withSeq(seq)
         try {

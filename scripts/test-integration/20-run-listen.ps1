@@ -11,6 +11,10 @@ $P = @{
     "wv-all"     = '{"webviewListen":true,"logStack":false,"kinds":{"PAGE_LOAD":true,"EVALUATE_JS":true,"JS_BRIDGE":true,"DEBUG":true,"JS_CRYPTO":true}}'
     "net-obs"    = '{"networkListen":true,"logStack":false}'
     "dev-all"    = '{"deviceEnvListen":true,"logStack":false,"kinds":{"ROOT_FILE":true,"ROOT_EXEC":true,"ROOT_PACKAGE_MANAGER":true,"ROOT_PROPERTY":true,"XPOSED_CLASS":true,"XPOSED_STACK":true,"XPOSED_MAPS":true,"EMULATOR_BUILD":true,"EMULATOR_FILE":true,"EMULATOR_SENSOR":true,"EMULATOR_NETWORK":true,"EMULATOR_TELEPHONY":true,"EMULATOR_CPU":true,"EMULATOR_BATTERY":true,"SYSTEM_PROPERTIES":true,"PROC_STATUS":true,"PROC_MOUNT_INFO":true,"PROC_CGROUP":true,"PROC_NET":true,"DETECT_ROOT":true,"DETECT_EMULATOR":true}}'
+    # 检测监控独立轮(V38):DetectionMonitorHooker 对已启用的干预型 Hooker 让位
+    # (避免双重 hook 开销),故 dev-all 下 DETECT_* 结构性零产出;监控面有效性
+    # 必须在干预型全关、仅 DETECT_* 开的档案下验证。
+    "detect-obs" = '{"deviceEnvListen":true,"logStack":false,"kinds":{"DETECT_ROOT":true,"DETECT_EMULATOR":true}}'
     "ui-all"     = '{"uiListen":true,"logStack":false,"kinds":{"DIALOG_SHOW":true,"DIALOG_KEYWORD":true,"WIDGET_TEXT":true,"ACTIVITY_START":true,"ACTIVITY_RESUME":true},"dialogKeywords":["ModevKeywordHit"]}'
     "sys-all"    = '{"systemListen":true,"logStack":false,"kinds":{"LOGCAT":true,"APP_INFO":true,"SIGNATURE":true}}'
     "proc-on"    = '{"processControlListen":true,"logStack":false,"kinds":{"SCREEN_RECORD":true}}'
@@ -65,20 +69,25 @@ $DOMAINS = [ordered]@{
         @("L-DEV-21","deviceenv",6))
         kinds=@("ROOT_FILE","ROOT_EXEC","XPOSED_CLASS","XPOSED_STACK","XPOSED_MAPS",
                 "EMULATOR_FILE","EMULATOR_NETWORK","EMULATOR_TELEPHONY",
-                "SYSTEM_PROPERTIES","PROC_MOUNT_INFO","PROC_NET",
-                "DETECT_ROOT","DETECT_EMULATOR")
+                "SYSTEM_PROPERTIES","PROC_MOUNT_INFO","PROC_NET")
         # 掩蔽型 kind:LDPlayer/Magisk 环境预干净(无 su 包可见/test-keys/qemu 传感器名/
         # magisk cgroup 行/TracerPid≠0),「无脏可掩 → 无记录」即正确行为;干预有效性由 E-* 二态验证
+        # DETECT_ROOT/DETECT_EMULATOR 在 dev-all 下让位于干预型 Hooker(结构性零),
+        # 由独立 detect 域验证。
         conditional=@("ROOT_PACKAGE_MANAGER","ROOT_PROPERTY","EMULATOR_BUILD","EMULATOR_SENSOR",
                 "EMULATOR_CPU","EMULATOR_BATTERY","PROC_STATUS","PROC_CGROUP") }
+    "detect"    = @{ profile="detect-obs"; neg="dev-off";       rt="device_env"; cases=@(
+        @("L-DEV-20","deviceenv",5), @("L-DEV-21","deviceenv",6))
+        kinds=@("DETECT_ROOT","DETECT_EMULATOR") }
     "ui"        = @{ profile="ui-all";     neg="ui-off";        rt="ui";        cases=@(
         @("L-UI-01","ui",6), @("L-UI-02","ui",6), @("L-UI-03","ui",5), @("L-UI-04","ui",6), @("L-UI-05","ui",5))
         kinds=@("DIALOG_SHOW","DIALOG_KEYWORD","WIDGET_TEXT","ACTIVITY_START","ACTIVITY_RESUME") }
     "system"    = @{ profile="sys-all";    neg="sys-off";       rt="system";    cases=@(
         @("L-SYS-01","system",5), @("L-SYS-02","system",5), @("L-SYS-03","system",5))
         kinds=@("LOGCAT","APP_INFO","SIGNATURE") }
-    "process"   = @{ profile="proc-on";    neg="proc-off";      rt="process";   cases=@(
-        @("L-PRC-01","enhance-secure",6))
+    "process"   = @{ profile="proc-on";    neg="proc-off";      rt="process";
+        # 单元素嵌套数组必须用逗号算子防扁平化(V38 实锤:@(@(x,y,z)) 解包为 3 标量)
+        cases=@(, @("L-PRC-01","enhance-secure",6))
         kinds=@("SCREEN_RECORD") }
 }
 

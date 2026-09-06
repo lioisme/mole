@@ -29,8 +29,12 @@ class LibxposedPlatform(private val xposed: XposedInterface) : Platform {
                         overrides != null -> chain.proceed(overrides)
                         else -> chain.proceed()
                     }
-                    hook.after(ModernInvocation(chain, result))
-                    result
+                    val afterInvocation = ModernInvocation(chain, result)
+                    hook.after(afterInvocation)
+                    // V38 修复:after 回调的 setResult 曾被丢弃(拦截器恒返回原
+                    // result)→ 现代路径所有「结果改写型」干预(maps 掩蔽/传感器
+                    // 伪装/VPN·DNS 隐藏/SSL 结果替换)静默失效。after 短路值优先。
+                    if (afterInvocation.shortCircuited) afterInvocation.shortCircuitResult else result
                 }
             true
         } catch (t: Throwable) {

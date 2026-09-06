@@ -25,6 +25,9 @@ abstract class NetworkBaseHooker(
     protected val sink: RecordSink = context.sink
     protected val packageName = context.packageName
 
+    /** 装配上下文(V38:app dex 类显式装载 appClassLoader 消费点)。 */
+    protected val contextRef = context
+
     /** 目标进程名(/proc/self/cmdline)。 */
     protected val processName: String by lazy {
         runCatching { File("/proc/self/cmdline").readBytes() }

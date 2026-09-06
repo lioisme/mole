@@ -26,6 +26,9 @@ abstract class BaseHooker(
     protected val sink = context.sink
     protected val packageName = context.packageName
 
+    /** 装配上下文(V38:app dex 类显式装载 appClassLoader 消费点)。 */
+    protected val contextRef = context
+
     /** 目标进程名:注入侧位于目标进程内,/proc/self/cmdline 即目标进程名。 */
     protected val processName: String by lazy {
         runCatching { File("/proc/self/cmdline").readBytes() }

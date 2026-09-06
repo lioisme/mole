@@ -122,6 +122,9 @@ function ResetState([string]$profileJson) {
     EnsureHost
     RunCase "list" "REGISTRY" 4
     WaitSpoolDrain | Out-Null
+    # spool 排空 ≠ 入库完成:TCP 在途记录经宿主异步批写,清库前留落库窗口,
+    # 否则上一轮在途行落在 ClearDb 之后,污染下一轮 NEG 零断言(V38 实锤)。
+    Start-Sleep -Seconds 3
     ClearDb
 }
 
@@ -253,7 +256,9 @@ function TargetAlive {
 }
 
 # 等待注入侧 spool 排空(run-as 零 su 轮询;洪泛后查询前调用,防「未回放」假阴性)
+# V38:宿主进程无前台服务可被后台回收 → 排空前置 EnsureHost(回收后靶端 ≤30s 重连回放)
 function WaitSpoolDrain([int]$timeoutSec = 90) {
+    EnsureHost
     $sp = "files/modev_spool/$script:TARGET_PKG/spool.dat"
     $deadline = (Get-Date).AddSeconds($timeoutSec)
     $prev = -1; $stable = 0

@@ -21,6 +21,8 @@ aboutLibraries = "12.2.4"
 # 锁定 0.38.1:kotlin-stdlib 2.2.21 与项目 Kotlin 2.2.20 同 minor;
 # 0.39+ 部分版本 / 0.44(latest) 依赖 stdlib 2.3+/2.4,超出编译器 metadata 可读上限,禁升
 markdownRenderer = "0.38.1"
+# V38:MCP Streamable HTTP 传输引擎(2.3.1 = 最终版,零传递依赖;仅作 HTTP 解析,不用其静态文件能力)
+nanohttpd = "2.3.1"
 junit = "4.13.2"
 robolectric = "4.14.1"
 coroutinesTest = "1.10.2"
@@ -47,6 +49,7 @@ androidx-room-paging = { group = "androidx.room", name = "room-paging", version.
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+nanohttpd = { group = "org.nanohttpd", name = "nanohttpd", version.ref = "nanohttpd" }
 libxposed-api = { group = "io.github.libxposed", name = "api", version.ref = "libxposed" }
 libxposed-service = { group = "io.github.libxposed", name = "service", version.ref = "libxposedService" }
 xposed-api = { group = "de.robv.android.xposed", name = "api", version.ref = "xposedApi" }

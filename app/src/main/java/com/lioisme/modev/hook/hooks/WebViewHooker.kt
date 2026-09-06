@@ -183,6 +183,10 @@ class WebViewHooker(
     }
 
     private fun emitGeneric(view: WebView, op: WebViewOperation) {
+        // V38 修复:loadData/loadDataWithBaseURL 路径曾绕过 kind 闸门,
+        // webviewListen=false 或 PAGE_LOAD 关时仍产出记录(NEG 零断言实锤);
+        // 与其余 emit* 路径同构补闸。
+        if (!enabled(WebViewKind.PAGE_LOAD)) return
         emit(view, WebViewKind.PAGE_LOAD, op)
     }
 

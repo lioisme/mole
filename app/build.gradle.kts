@@ -166,6 +166,8 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     implementation(libs.gson)
+    // V38:MCP 服务 HTTP 传输引擎(见 toml 注释;Agent 面向能力,与 ConfigServer wire 协议完全独立)
+    implementation(libs.nanohttpd)
 
     compileOnly(libs.libxposed.api)
     // 框架通信服务(现代入口宿主进程使用;legacy 变体仅编译期引用,运行时缺失→框架桥自然降级)

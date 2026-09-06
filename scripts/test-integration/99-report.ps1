@@ -1,19 +1,20 @@
-﻿# 99-report.ps1 — 汇总三轮结果 → docs/test-reports/round-N.md
+﻿# 99-report.ps1 — 汇总各轮结果 → docs/test-reports/round-N.md
 $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\tt-lib.ps1"
 
-$roundDir = Join-Path $script:TMP ""
-$files = @{
-    "监听矩阵 L" = Join-Path $script:TMP "listen-round.json"
-    "增强矩阵 E" = Join-Path $script:TMP "enhance-round.json"
-    "联动矩阵 C" = Join-Path $script:TMP "linkage-round.json"
+$files = [ordered]@{
+    "监听矩阵 L"   = Join-Path $script:TMP "listen-round.json"
+    "增强矩阵 E"   = Join-Path $script:TMP "enhance-round.json"
+    "联动矩阵 C"   = Join-Path $script:TMP "linkage-round.json"
+    "冷启动冒烟 S" = Join-Path $script:TMP "smoke-round.json"
+    "MCP 矩阵 M"   = Join-Path $script:TMP "mcp-round.json"
 }
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
 $reports = Resolve-Path "$PSScriptRoot\..\..\docs\test-reports" -ErrorAction SilentlyContinue
 if (-not $reports) { New-Item -ItemType Directory -Force -Path "docs\test-reports" | Out-Null; $reports = "docs\test-reports" }
 $out = Join-Path $PWD "docs\test-reports\round-$stamp.md"
 
-$lines = @("# Modev V35 全功能验收报告 — $stamp", "")
+$lines = @("# Modev 全功能验收报告 — $stamp", "")
 $totP = 0; $totF = 0; $totS = 0
 foreach ($k in $files.Keys) {
     $f = $files[$k]

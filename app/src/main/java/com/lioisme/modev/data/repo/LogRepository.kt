@@ -38,6 +38,7 @@ import com.lioisme.modev.data.mapping.RowModel
 import com.lioisme.modev.data.mapping.toEntity
 import com.lioisme.modev.data.mapping.toRecordDetailOrNull
 import com.lioisme.modev.data.mapping.toRowModelOrNull
+import com.lioisme.modev.domain.record.RecordDraft
 import com.lioisme.modev.domain.record.RecordFilter
 import com.lioisme.modev.domain.record.RecordPage
 import com.lioisme.modev.domain.record.RecordService
@@ -391,13 +392,15 @@ class LogRepository(
         }
     }
 
-    /** 新增单条(供 MCP 导入 / 手动补录),返回自增 id。 */
-    override suspend fun create(record: CryptoRecordEntity): Long = dao.insertReturningId(record)
+    /** 新增单条(MCP 导入 / 手动补录),Draft→实体映射后落库,返回自增 id。 */
+    override suspend fun create(record: RecordDraft): Long = dao.insertReturningId(record.toEntity())
 
-    /** 更新单条(按主键覆盖,MCP 编辑),成功返回 true。 */
-    override suspend fun update(record: CryptoRecordEntity): Boolean {
-        dao.upsert(record)
-        return true
+    /** 更新单条(按主键整行覆盖,MCP 编辑),id 不存在时 upsert 以 0 插入视为失败。 */
+    override suspend fun update(id: Long, record: RecordDraft): Boolean {
+        val entity = record.toEntity().copy(id = id)
+        dao.upsert(entity)
+        // upsert 无返回值:回读主键确认目标行存在(不存在则以新 id 插入,删除语义下判失败)
+        return dao.observeById(id).first() != null
     }
 
     /** 按 id 删除单条。 */
@@ -436,7 +439,7 @@ class LogRepository(
      * 数据管理页/诊断消费(UI 禁止直触 [com.lioisme.modev.data.db.ModevDatabase])。
      * 未装配 databaseFile 时返回 0。
      */
-    suspend fun storageUsage(): Long {
+    override suspend fun storageUsage(): Long {
         val provider = databaseFile ?: return 0L
         return withContext(Dispatchers.IO) {
             val main = provider()

@@ -38,4 +38,16 @@ object ConfigKeys {
      * init 时并入 switch_global 种子,注入侧直读兜底可见。
      */
     const val GLOBAL_FEATURE = "feature_global"
+
+    /** MCP 服务启用键(V38):宿主本地专用,默认 true(回环常驻,与 ConfigServer 先例一致)。 */
+    const val MCP_ENABLED = "mcp_enabled"
+
+    /** MCP 服务端口键(V38):宿主本地专用,默认 15110。 */
+    const val MCP_PORT = "mcp_port"
+
+    /** MCP 外部访问键(V38):宿主本地专用;true = 0.0.0.0 且强制 Bearer Token。 */
+    const val MCP_EXTERNAL_ACCESS = "mcp_external_access"
+
+    /** MCP Bearer Token 键(V38):宿主本地自动生成,诊断页展示/复制;不镜像注入侧。 */
+    const val MCP_TOKEN = "mcp_token"
 }
