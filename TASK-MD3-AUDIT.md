@@ -1,5 +1,10 @@
 # TASK-MD3-AUDIT: MD3 组件库全量审计与整改
 
+> ⚠️ **本文档已被 TASK-V40-AUDIT.md 取代(2026-09-07)**:其"无手搓自研控件"结论
+> 漏计 R 类 12 处(StatusPill/LeadingBadge/MicroBadge/TimelineHeader/色板/计数胶囊等);
+> V40 按 R 类全替换 + Coil 化完成整改,现行契约以 `TASK-V40-AUDIT.md` 与 AGENTS.md 为准。
+> 以下为历史记录,仅存档。
+
 > 审计日期: 2026-08-28
 > 审计范围: 全部 17 个屏幕、23+ 自定义组件、9 个 BottomSheet、4 个 Dialog
 > 总评: 94/100 — 已高度符合 MD3 标准

@@ -1,0 +1,298 @@
+package com.lioisme.modev.ui.components
+
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.lioisme.modev.R
+import kotlinx.coroutines.launch
+
+/**
+ * 统一底部弹层脚手架(V39 R7):全 App ModalBottomSheet 唯一出口,
+ * 收编此前散落的输入 sheet / 单选 sheet / 端口 sheet / 详情 sheet 手写复制。
+ *
+ * 契约(AGENTS 强约束 #4,V21 T2 双内边距缺陷防线):
+ * - 显式 `containerColor = surfaceContainerHigh`;
+ * - 内容 Column **仅** `.imePadding()`,禁叠 `navigationBarsPadding`(M3 已内部消费);
+ * - **hide 动画完成后才回调关闭**(收口闪黑;此前 Language/Appearance/Color/
+ *   DiagnosticsDetail 四处直连偏差经本组件统一修复);
+ * - 标题恒 titleLarge SemiBold @horizontal 24;内容区自管水平 padding
+ *   (与既有各 sheet 逐像素对齐);
+ * - 带键盘输入的弹层一律走本系(居中 AlertDialog 仅危险确认/关于类)。
+ */
+class ModevSheetScope internal constructor(
+    private val hideThen: ((() -> Unit)?) -> Unit,
+) {
+    /** 播完退场动画后执行 [action](选择/提交/关闭统一收口)。 */
+    fun dismissWith(action: () -> Unit = {}) = hideThen(action)
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ModevSheet(
+    title: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    content: @Composable ColumnScope.(ModevSheetScope) -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState()
+    val scope = rememberCoroutineScope()
+
+    fun hideThen(action: (() -> Unit)?) {
+        scope.launch { sheetState.hide() }.invokeOnCompletion { action?.invoke() }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = { hideThen(onDismiss) },
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+        modifier = modifier,
+    ) {
+        Column(Modifier.fillMaxWidth().imePadding()) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
+            )
+            content(ModevSheetScope(::hideThen))
+        }
+    }
+}
+
+/** sheet 内容通用水平内边距(与标题 24dp 对齐)。 */
+val SheetContentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 24.dp)
+
+/**
+ * 输入型底部 sheet(标题 + 单行/多行输入 + 校验 + 取消/确认):
+ * [validate] 返回 false 时置错误态(supportingText = [errorText]),不关闭;
+ * 确认经 hide 动画后回调 [onSubmit](携带原样输入文本,数值解析由调用方负责)。
+ */
+@Composable
+fun ModevInputSheet(
+    title: String,
+    initialValue: String,
+    onSubmit: (String) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    label: String? = null,
+    hint: String? = null,
+    errorText: String = "",
+    keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+    digitOnly: Boolean = false,
+    maxLength: Int? = null,
+    minLines: Int = 1,
+    inputTestTag: String? = null,
+    confirmTestTag: String? = null,
+    validate: (String) -> Boolean = { it.isNotBlank() },
+) {
+    var text by remember { mutableStateOf(initialValue) }
+    var error by remember { mutableStateOf(false) }
+    ModevSheet(
+        title = title,
+        onDismiss = onDismiss,
+        modifier = modifier,
+    ) { sheet ->
+        Column(Modifier.fillMaxWidth().padding(SheetContentPadding)) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { input ->
+                    val filtered = if (digitOnly) input.filter { it.isDigit() } else input
+                    text = if (maxLength != null) filtered.take(maxLength) else filtered
+                    error = false
+                },
+                label = label?.let { { Text(it) } },
+                isError = error,
+                supportingText =
+                    when {
+                        error && errorText.isNotEmpty() -> {
+                            { Text(errorText) }
+                        }
+                        hint != null -> {
+                            { Text(hint) }
+                        }
+                        else -> null
+                    },
+                singleLine = minLines == 1,
+                minLines = minLines,
+                keyboardOptions = keyboardOptions,
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .let { base -> inputTestTag?.let { base.testTag(it) } ?: base },
+            )
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.cancel))
+                }
+                Spacer(Modifier.width(8.dp))
+                TextButton(
+                    onClick = {
+                        if (validate(text)) {
+                            sheet.dismissWith { onSubmit(text) }
+                        } else {
+                            error = true
+                        }
+                    },
+                    modifier = confirmTestTag?.let { Modifier.testTag(it) } ?: Modifier,
+                ) {
+                    Text(stringResource(R.string.confirm))
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 端口编辑底部 sheet(wire/MCP 共用,V39 合并此前两份逐行重复实现):
+ * 数字输入 + 1..65535 校验,确认经 hide 动画后回调 [onConfirm]。
+ */
+@Composable
+fun ModevPortSheet(
+    label: String,
+    currentPort: Int,
+    onConfirm: (Int) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ModevInputSheet(
+        title = stringResource(R.string.settings_port_edit),
+        initialValue = currentPort.toString(),
+        label = label,
+        errorText = stringResource(R.string.settings_port_invalid),
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        digitOnly = true,
+        validate = { it.toIntOrNull() in 1..65535 },
+        onSubmit = { it.toIntOrNull()?.let(onConfirm) },
+        onDismiss = onDismiss,
+        modifier = modifier,
+    )
+}
+
+/** 单选 sheet 选项:值 + 已解析标签(UI 侧经 stringResource 产出,组件零资源感知)。 */
+data class ChoiceOption<T>(val value: T, val label: String, val testTag: String? = null)
+
+/**
+ * 单选列表底部 sheet(画像等选择型弹层共用;V19 T6 矩阵 M10 同款
+ * ListItem + leading RadioButton 形态):选中即经 hide 动画回调 [onSelect]。
+ */
+@Composable
+fun <T> ModevChoiceSheet(
+    title: String,
+    options: List<ChoiceOption<T>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    ModevSheet(
+        title = title,
+        onDismiss = onDismiss,
+        modifier = modifier,
+    ) { sheet ->
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp),
+        ) {
+            options.forEach { option ->
+                ListItem(
+                    colors = ListItemDefaults.colors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                    ),
+                    headlineContent = {
+                        Text(
+                            option.label,
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurface,
+                        )
+                    },
+                    leadingContent = {
+                        RadioButton(
+                            selected = option.value == selected,
+                            onClick = { sheet.dismissWith { onSelect(option.value) } },
+                        )
+                    },
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 8.dp)
+                            .let { base ->
+                                option.testTag?.let { base.testTag(it) } ?: base
+                            }
+                            .clickable { sheet.dismissWith { onSelect(option.value) } },
+                )
+            }
+        }
+    }
+}
+
+/**
+ * sheet 底部取消/确认按钮行(自定义内容 sheet 复用:键值编辑 / 关键词编辑等
+ * 多控件形态无法收敛为 [ModevInputSheet] 单输入,内容经 [ModevSheet] 承载,
+ * 动作行统一走本组件;[onConfirm] 由调用方经 ModevSheetScope.dismissWith 收口)。
+ */
+@Composable
+fun ModevSheetButtonRow(
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+    confirmEnabled: Boolean = true,
+    confirmTestTag: String? = null,
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.End,
+    ) {
+        TextButton(onClick = onCancel) {
+            Text(stringResource(R.string.cancel))
+        }
+        Spacer(Modifier.width(8.dp))
+        TextButton(
+            onClick = onConfirm,
+            enabled = confirmEnabled,
+            modifier = confirmTestTag?.let { Modifier.testTag(it) } ?: Modifier,
+        ) {
+            Text(stringResource(R.string.confirm))
+        }
+    }
+}

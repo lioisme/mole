@@ -2,6 +2,7 @@ package com.lioisme.modev.mcp
 
 import android.util.Log
 import com.google.gson.JsonObject
+import com.lioisme.modev.domain.server.ConnectionMonitor
 import com.lioisme.modev.mcp.protocol.JsonRpc
 import com.lioisme.modev.mcp.protocol.McpProtocol
 import com.lioisme.modev.mcp.protocol.McpSessionManager
@@ -10,16 +11,21 @@ import java.util.concurrent.atomic.AtomicBoolean
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /**
- * MCP 服务器(V38):进程内常驻 Streamable HTTP,与注入侧 wire [com.lioisme.modev.data.server.ConfigServer]
- * 完全独立生命周期(独立端口/开关/restart,互不触碰)。
+ * MCP 服务器(V38;V39 令牌化):进程内常驻 Streamable HTTP,与注入侧 wire
+ * [com.lioisme.modev.data.server.ConfigServer] 完全独立生命周期(独立端口/开关/restart,互不触碰)。
  *
  * - 生命周期:`@Volatile epoch` 守卫(镜像 ConfigServer 既有模式),restart = close+start,
  *   旧代 HTTP 引擎 stop 后新代不受污染;
- * - 认证:回环免 Token(adb forward 开箱即用);externalAccess 时强制 Bearer;
+ * - 认证(V39;V40 D-4 解耦):令牌认证独立开关,**启用后全接口强制**(含回环 adb forward);
+ *   校验集 = 多令牌 Bearer 集合,变更原地生效(不重启、不踢会话);
+ *   外部访问与认证相互独立——是否鉴权**仅**由 tokenAuthEnabled 决定
+ *   (外部 0.0.0.0 无认证监听 = 用户显式选择,UI 文案承载风险提示);
  * - 协议分发:initialize 建会话 → Mcp-Session-Id 头;notifications → 202;
  *   DELETE 关会话;GET 405(无服务端主动流,batching 已移除 → 数组 -32600)。
  *
@@ -28,7 +34,8 @@ import kotlinx.coroutines.runBlocking
 class McpServer(
     @Volatile var port: Int = McpProtocol.DEFAULT_PORT,
     @Volatile var externalAccess: Boolean = false,
-    @Volatile var token: String? = null,
+    @Volatile var tokenAuthEnabled: Boolean = false,
+    @Volatile var requiredTokens: Set<String> = emptySet(),
     private val serverInfo: JsonObject,
     private val instructions: String,
     private val registry: McpToolRegistry,
@@ -43,6 +50,14 @@ class McpServer(
 
     private val sessions = McpSessionManager()
 
+    /** 绑定地址观测点("127.0.0.1"/"0.0.0.0";未绑定 = null),服务页与 server_status 消费。 */
+    private val _boundAddress = MutableStateFlow<String?>(null)
+    val boundAddress: StateFlow<String?> = _boundAddress
+
+    /** 最近一次绑定失败原因(null = 无错误);服务页错误态展示消费。 */
+    private val _bindError = MutableStateFlow<String?>(null)
+    val bindError: StateFlow<String?> = _bindError
+
     val isRunning: Boolean get() = running.get()
 
     /** 实际监听端口(port=0 由内核分配时;未启动 = -1,测试消费)。 */
@@ -53,7 +68,8 @@ class McpServer(
             if (running.get()) return
             epoch += 1
             val myEpoch = epoch
-            val bind = if (externalAccess) "0.0.0.0" else "127.0.0.1"
+            val bind =
+                if (externalAccess) ConnectionMonitor.BIND_ALL_INTERFACES else ConnectionMonitor.BIND_LOOPBACK
             try {
                 val e = McpHttpEngine(bind, port) { method, uri, headers, body ->
                     handleHttp(method, uri, headers, body)
@@ -63,11 +79,15 @@ class McpServer(
                 e.start(SOCKET_READ_TIMEOUT_SECONDS * 1000, true)
                 engine = e
                 running.set(true)
+                _boundAddress.value = bind
+                _bindError.value = null
                 Log.i(TAG, "mcp server started $bind:$port epoch=$myEpoch")
             } catch (t: Throwable) {
                 Log.w(TAG, "mcp server bind failed $bind:$port: ${t.message}")
                 // 绑定失败不置 running:端口被占等场景退避重试由上层(设置写入/restart)驱动
                 running.set(false)
+                _boundAddress.value = null
+                _bindError.value = t.message ?: t.javaClass.simpleName
             }
         }
     }
@@ -77,6 +97,7 @@ class McpServer(
             if (!running.get()) return
             epoch += 1
             running.set(false)
+            _boundAddress.value = null
             sessions.closeAll()
             runCatching { engine?.stop() }
             engine = null
@@ -100,10 +121,12 @@ class McpServer(
         if (uri != McpProtocol.ENDPOINT_PATH) {
             return HttpResult(404, JsonRpc.errorResponse(null, JsonRpc.INVALID_REQUEST, "Not found"))
         }
-        // 认证:externalAccess 强制 Bearer(回环免 Token)
-        if (externalAccess) {
+        // 认证(V39;V40 D-4 解耦):仅令牌认证开关决定是否强制 Bearer(启用后全接口,含回环);
+        // 外部访问与认证互相独立,无服务端强制耦合。
+        if (tokenAuthEnabled) {
             val auth = headers.entries.firstOrNull { it.key.equals("authorization", ignoreCase = true) }?.value
-            if (auth != "Bearer $token") {
+            val bearer = auth?.removePrefix("Bearer ")?.trim()
+            if (bearer.isNullOrEmpty() || bearer !in requiredTokens) {
                 return HttpResult(401, JsonRpc.errorResponse(null, JsonRpc.INVALID_REQUEST, "Unauthorized"))
             }
         }

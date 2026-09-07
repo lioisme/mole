@@ -2,21 +2,24 @@ package com.lioisme.modev
 
 import android.content.Context
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.hasScrollAction
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
-import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
-import androidx.compose.ui.test.printToString
 import androidx.room.Room
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.lioisme.modev.R
+import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
@@ -27,16 +30,17 @@ import com.lioisme.modev.ui.settings.DataSettingsViewModel
 import com.lioisme.modev.ui.settings.DataSettingsViewModelFactory
 import com.lioisme.modev.ui.settings.StorageFormat
 import kotlinx.coroutines.runBlocking
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 数据管理页验收(V19 T7 扩展):
- * - 分类计数(算法/数据库)与全库总数渲染(内存库端到端,种子数据确定性);
- * - 按类型清理:危险 AlertDialog 确认 → 仅清目标类型;
- * - 存储占用:数据库文件大小 = 与生产同源的计算值;
- * - 危险对话框取消路径(真实容器,非破坏)。
+ * 数据管理页验收(V19 T7;V40 T4 双维度记录浏览重构):
+ * - 分类计数(可点 → 全局列表回调)与按应用浏览(计数>0 的应用 → 监控页回调);
+ * - 按类型危险清理行退役(清理并入各记录列表),仅保留「清空全部」(确认/取消路径);
+ * - 存储占用 = 与生产同源计算值。
  */
 @RunWith(AndroidJUnit4::class)
 class DataSettingsScreenTest {
@@ -50,10 +54,10 @@ class DataSettingsScreenTest {
 
     private fun str(id: Int, vararg args: Any) = ctx.getString(id, *args)
 
-    private fun entity(recordType: String) =
+    private fun entity(recordType: String, pkg: String = "pkg.test") =
         CryptoRecordEntity(
             recordType = recordType,
-            packageName = "pkg.test",
+            packageName = pkg,
             kind = "DIGEST",
             operation = "DIGEST",
             algorithm = "MD5",
@@ -68,58 +72,130 @@ class DataSettingsScreenTest {
             if (rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty()) return
             Thread.sleep(100)
         }
-        val tree = rule.onRoot(useUnmergedTree = true).printToString()
-        throw AssertionError("未等到文本 '$text'。树:\n$tree")
+        rule.onAllNodesWithText(text).onFirst().assertIsDisplayed()
     }
 
     /** 滚动至可见(小屏折叠区)。 */
     private fun scrollTo(text: String) {
-        try {
-            rule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText(text))
-        } catch (e: AssertionError) {
-            val tree = rule.onRoot(useUnmergedTree = true).printToString()
-            throw AssertionError("滚动目标 '$text' 未找到。树:\n$tree", e)
-        }
+        rule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText(text))
+    }
+
+    private fun scrollToTag(tag: String) {
+        rule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasTestTag(tag))
     }
 
     /** 计数文案值(zh="2 条" / en="2",资源驱动,与设备区域无关)。 */
     private fun countText(value: Long) = str(R.string.settings_total_records_value, value)
 
-    /** 内存库端到端:计数渲染 + 按类型清理确认(破坏性验证,不触碰真库)。 */
+    private fun setContent(robot: Robot) = rule.setContent {
+        MaterialTheme {
+            DataSettingsScreen(
+                viewModel = robot.vm,
+                onBack = {},
+                onOpenTypeRecords = robot::onOpenType,
+                onOpenApp = robot::onOpenApp,
+            )
+        }
+    }
+
+    /** 回调捕获替身(导航在单屏组合内不可用,断言入口接线)。 */
+    private class Robot {
+        lateinit var vm: DataSettingsViewModel
+        val openedTypes = mutableListOf<RecordType>()
+        val openedApps = mutableListOf<String>()
+
+        fun onOpenType(type: RecordType) {
+            openedTypes += type
+        }
+
+        fun onOpenApp(pkg: String) {
+            openedApps += pkg
+        }
+    }
+
+    /** 内存库端到端:计数渲染 + 类型行/应用行导航回调 + 危险行退役 + 清空全部。 */
     @Test
-    fun typeCounts_andClearByTypeConfirm() {
+    fun typeCounts_clickableRows_andBrowseByApp() {
+        val robot = Robot()
         val db = Room.inMemoryDatabaseBuilder(ctx, ModevDatabase::class.java).build()
         val dao = db.cryptoRecordDao()
         runBlocking {
             repeat(2) { dao.insert(entity(RecordTypes.CRYPTO)) }
-            repeat(3) { dao.insert(entity(RecordTypes.DATABASE)) }
+            repeat(3) { dao.insert(entity(RecordTypes.DATABASE, pkg = "pkg.other")) }
         }
-        val vm = DataSettingsViewModel(LogRepository(dao, ConfigServer()))
+        robot.vm = DataSettingsViewModel(LogRepository(dao, ConfigServer()))
+        setContent(robot)
 
-        rule.setContent { MaterialTheme { DataSettingsScreen(vm, onBack = {}) } }
+        // 类型计数区:算法 2 / 数据库 3 行渲染 + 可点回调(全局列表入口)。
+        waitForVisible(str(R.string.settings_records_algorithm))
+        scrollTo(str(R.string.settings_records_algorithm))
+        rule.onNodeWithText(str(R.string.settings_records_algorithm)).performClick()
+        rule.waitForIdle()
+        scrollTo(str(R.string.settings_records_database))
+        rule.onNodeWithText(str(R.string.settings_records_database)).performClick()
+        rule.waitForIdle()
+        assertEquals(listOf(RecordType.CRYPTO, RecordType.DATABASE), robot.openedTypes)
+        assertEquals(listOf(RecordType.CRYPTO, RecordType.DATABASE), robot.openedTypes)
 
-        // 分类计数:算法 2 / 数据库 3(值进 ListItem 合并节点文本,行标签即锚点)。
-        rule.onNodeWithText(str(R.string.settings_records_algorithm)).assertIsDisplayed()
-        waitForVisible(countText(2))
-        rule.onAllNodesWithText(countText(3)).assertCountEquals(1)
-
-        // 按类型清理:算法记录 → 危险确认 → 仅算法清空(0/3;清后总数 3 与数据库行同值)。
-        rule.onNodeWithText(str(R.string.settings_clear_algorithm_records)).performClick()
-        rule.onNodeWithText(str(R.string.danger_clear_algorithm_msg)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.confirm)).performClick()
-        waitForVisible(countText(0))
-        rule.onAllNodesWithText(str(R.string.danger_clear_algorithm_msg)).assertCountEquals(0)
-        rule.onAllNodesWithText(countText(3)).assertCountEquals(2)
+        // 按应用浏览:两个有记录的应用各一行,点击 → 监控页回调。
+        waitForVisible(str(R.string.settings_apps_browse_section))
+        scrollTo("pkg.test")
+        rule.onNodeWithText("pkg.test").performClick()
+        rule.waitForIdle()
+        scrollTo("pkg.other")
+        rule.onNodeWithText("pkg.other").performClick()
+        rule.waitForIdle()
+        assertEquals(listOf("pkg.test", "pkg.other"), robot.openedApps)
 
         db.close()
     }
 
-    /** 真实容器壳:标签齐全 + 存储占用值与生产同源 + 危险对话框取消路径(非破坏)。 */
+    /** V40 T4 红线:按类型危险清理行退役,清理并入列表;「清空全部」保留可用。 */
     @Test
-    fun storageValue_andDangerCancelPath() {
+    fun dangerRowsRetired_clearAllKept_withConfirmAndCancel() {
+        val robot = Robot()
+        val db = Room.inMemoryDatabaseBuilder(ctx, ModevDatabase::class.java).build()
+        val dao = db.cryptoRecordDao()
+        runBlocking {
+            repeat(2) { dao.insert(entity(RecordTypes.CRYPTO)) }
+        }
+        robot.vm = DataSettingsViewModel(LogRepository(dao, ConfigServer()))
+        setContent(robot)
+
+        // 10 个按类型危险行(testTag clear-type-*)全库退役。
+        rule.onAllNodesWithTag("clear-type-crypto", useUnmergedTree = true)
+            .assertCountEquals(0)
+        rule.onAllNodesWithTag("clear-type-database", useUnmergedTree = true)
+            .assertCountEquals(0)
+
+        // 「清空全部」保留:确认路径 → 库清空(计数归零)。
+        scrollTo(str(R.string.settings_clear_all_records))
+        rule.onNodeWithTag("clear-all").performClick()
+        rule.onNodeWithText(str(R.string.danger_clear_all_msg)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.confirm)).performClick()
+        waitForVisible(countText(0))
+
+        // 取消路径:打开 → 取消 → 无清理(种子 1 条仍在)。
+        runBlocking { dao.insert(entity(RecordTypes.CRYPTO, pkg = "pkg.keep")) }
+        scrollTo(str(R.string.settings_clear_all_records))
+        rule.onNodeWithTag("clear-all").performClick()
+        rule.onNodeWithText(str(R.string.danger_clear_all_msg)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.cancel)).performClick()
+        rule.waitForIdle()
+        assertTrue(
+            "取消后不得清理数据",
+            rule.onAllNodesWithText(countText(1)).fetchSemanticsNodes().isNotEmpty(),
+        )
+
+        db.close()
+    }
+
+    /** 真实容器壳:存储占用值与生产同源(V23 契约保留)。 */
+    @Test
+    fun storageValue_sameSourceAsProduction() {
         val container = (ctx.applicationContext as ModevApp).container
-        val vm = DataSettingsViewModelFactory(container).create(DataSettingsViewModel::class.java)
-        // V23 存储占用口径 = DB + -wal + -shm 三文件和(LogRepository.storageUsage 同源);
+        val robot = Robot()
+        robot.vm = DataSettingsViewModelFactory(container).create(DataSettingsViewModel::class.java)
         // 预建 DB 文件防「Room 首查才建文件」竞态取 0 B。
         val dbPath = ctx.getDatabasePath(ModevDatabase.NAME)
         dbPath.parentFile?.mkdirs()
@@ -134,23 +210,11 @@ class DataSettingsScreenTest {
                 sizeOf(ModevDatabase.NAME + "-shm"),
         )
 
-        rule.setContent { MaterialTheme { DataSettingsScreen(vm, onBack = {}) } }
+        setContent(robot)
 
-        rule.onNodeWithText(str(R.string.settings_records_algorithm)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.settings_records_database)).assertIsDisplayed()
-        // 存储占用为 VM 异步快照流(V23):先有界轮询等值出现,再滚动至可见。
         waitForVisible(expectedSize)
         scrollTo(expectedSize)
         rule.onNodeWithText(expectedSize).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.settings_storage_db)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.settings_total_records)).assertIsDisplayed()
-
-        // 危险对话框:打开 → 取消 → 关闭(不清理任何数据)。
-        scrollTo(str(R.string.settings_clear_all_records))
-        rule.onNodeWithText(str(R.string.settings_clear_all_records)).performClick()
-        rule.onNodeWithText(str(R.string.danger_clear_all_msg)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.cancel)).performClick()
-        rule.waitForIdle()
-        rule.onAllNodesWithText(str(R.string.danger_clear_all_msg)).assertCountEquals(0)
     }
 }

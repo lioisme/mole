@@ -3,17 +3,15 @@ package com.lioisme.modev
 import android.content.Context
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.test.assertIsDisplayed
-import androidx.compose.ui.test.assertIsOff
-import androidx.compose.ui.test.assertIsOn
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -24,18 +22,16 @@ import com.lioisme.modev.ui.settings.DiagnosticsViewModel
 import com.lioisme.modev.ui.settings.DiagnosticsViewModelFactory
 import kotlinx.coroutines.runBlocking
 import org.junit.After
-import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 服务与诊断页验收(V19 T8;V26 外部访问开关 + 端口行参数化;V38 MCP 分区增量):
- * - 四分区渲染(框架与作用域 / 通信服务 / MCP 服务 / 管道统计)+ 框架态行(按 VM 实际态);
- * - 端口行 = 端口号(V30 起收敛;监听地址与作用域后缀经剪贴板报告承载);
- * - 外部访问开关默认停用;切换即改状态并驱动服务端改绑(@After 复位停用);
- * - 「复制诊断信息」剪贴板快照与页面行同源(参数驱动),Snackbar 反馈。
+ * 诊断页验收(V19 T8;V26 详情弹层;V39 服务/诊断拆分:服务配置断言迁 ServicesScreenTest):
+ * - 三分区渲染(框架与作用域 / 通信服务[在线目标] / 管道统计)+ 框架态行(按 VM 实际态);
+ * - 「复制诊断信息」剪贴板快照与页面行同源(参数驱动),Snackbar 反馈;
+ * - V39:快照新增 MCP 两行(服务态 + 令牌认证态)。
  */
 @RunWith(AndroidJUnit4::class)
 class DiagnosticsScreenTest {
@@ -68,38 +64,67 @@ class DiagnosticsScreenTest {
         rule.waitForIdle()
     }
 
-    /** 端口行期望值(V30 契约:行值 = 端口号)。 */
-    private fun portRowValue(): String = vm.port.value.toString()
-
     private fun scrollTo(text: String) {
         rule.onAllNodes(hasScrollAction()).onFirst().performScrollToNode(hasText(text))
     }
 
     @Test
-    fun threeSections_andServiceRows() {
+    fun diagnosticsSections_andRuntimeRows() {
         setContent()
 
-        // 四分区:框架与作用域 / 通信服务 / MCP 服务 / 管道统计(统计折叠区滚动可达)。
+        // V39 拆分:诊断页 = 框架与作用域 / 通信服务(在线目标)/ 管道统计;
+        // 服务配置(外部访问/端口/MCP 开关/令牌)不再渲染。
         rule.onNodeWithText(str(R.string.settings_framework_section)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.settings_server_section)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.mcp_section)).assertIsDisplayed()
+        assertTrue(
+            "MCP 分区已迁服务页,诊断页不得渲染",
+            rule.onAllNodesWithText(str(R.string.mcp_section)).fetchSemanticsNodes().isEmpty(),
+        )
+        assertTrue(
+            "外部访问开关已迁服务页,诊断页不得渲染",
+            rule.onAllNodesWithTag("services-wire-external").fetchSemanticsNodes().isEmpty(),
+        )
         scrollTo(str(R.string.settings_stats_section))
         rule.onNodeWithText(str(R.string.settings_stats_section)).assertIsDisplayed()
 
-        // 框架态行 + 通信服务行(端口号 / 在线目标;存在性断言,分区滚动后不要求同屏)。
+        // 框架态行 + 在线目标行(存在性断言,分区滚动后不要求同屏)。
         assertTrue(
             "框架行缺失",
             rule.onAllNodesWithText(frameworkValue(vm)).fetchSemanticsNodes().isNotEmpty(),
-        )
-        assertTrue(
-            "端口行缺失",
-            rule.onAllNodesWithText(portRowValue()).fetchSemanticsNodes().isNotEmpty(),
         )
         assertTrue(
             "在线目标行缺失",
             rule.onAllNodesWithText(str(R.string.settings_online_targets_value, vm.connectedCount.value))
                 .fetchSemanticsNodes().isNotEmpty(),
         )
+    }
+
+    /**
+     * V40 T1:管道统计恒展开——零交互即可见全部 7 行统计,
+     * 折叠机制(StatsToggleRow/AnimatedVisibility)已退役,不存在展开态前置。
+     */
+    @Test
+    fun pipelineStats_alwaysExpanded_noInteraction() {
+        setContent()
+
+        val statLabels =
+            listOf(
+                R.string.stats_received,
+                R.string.stats_dropped,
+                R.string.stats_write_failures,
+                R.string.stats_trimmed,
+                R.string.stats_rejected_hellos,
+                R.string.stats_dropped_records,
+                R.string.stats_rejected_records,
+            )
+        scrollTo(str(R.string.stats_received))
+        rule.onNodeWithText(str(R.string.settings_stats_section)).assertIsDisplayed()
+        statLabels.forEach { label ->
+            assertTrue(
+                "统计行缺失(恒展开契约):${ctx.getString(label)}",
+                rule.onAllNodesWithText(str(label)).fetchSemanticsNodes().isNotEmpty(),
+            )
+        }
     }
 
     /**
@@ -167,33 +192,6 @@ class DiagnosticsScreenTest {
         assertTrue("端口行缺失:\n$text", text.contains(expectedPort))
         assertTrue("统计标签缺失:\n$text", text.contains(str(R.string.stats_received)))
         assertTrue("框架行缺失:\n$text", text.contains(frameworkValue(vm)))
-    }
-
-    @Test
-    fun externalAccessSwitch_defaultOff_toggleOnRebindsAllInterfaces() {
-        setContent()
-
-        // 默认停用:开关 Off(V38 起页面有两个「外部访问」语义行,锚定走 testTag)。
-        rule.onNodeWithTag("diagnostics-bind-all").performScrollTo().assertIsOff()
-
-        // 开启 → 状态翻转 + 服务端改绑全接口(@After 复位)。
-        rule.onNodeWithTag("diagnostics-bind-all").performClick()
-        val deadline = System.currentTimeMillis() + 10_000
-        while (System.currentTimeMillis() < deadline && !vm.externalAccess.value) {
-            Thread.sleep(100)
-            rule.waitForIdle()
-        }
-        assertEquals(true, vm.externalAccess.value)
-        rule.onNodeWithTag("diagnostics-bind-all").assertIsOn()
-
-        // 等待服务端完成改绑(VM 地址观测点轮询)。
-        var rebound = false
-        while (System.currentTimeMillis() < deadline && !rebound) {
-            rule.waitForIdle()
-            rebound = vm.listeningAddress.value == ConnectionMonitor.BIND_ALL_INTERFACES
-            if (!rebound) Thread.sleep(100)
-        }
-        assertEquals(ConnectionMonitor.BIND_ALL_INTERFACES, vm.listeningAddress.value)
     }
 
     /** 复位外部访问偏好(跨用例污染防线;服务端回绑回环)。 */

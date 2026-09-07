@@ -25,7 +25,12 @@ object ModevRoutes {
     const val RECORD_DETAIL = "record/{recordId}"
     const val SETTINGS = "settings"
     const val DATA_SETTINGS = "settings/data"
+    /** 服务页(V39 拆分:wire/MCP 服务配置唯一入口,自「服务与诊断」分离)。 */
+    const val SERVICES_SETTINGS = "settings/services"
+    /** 诊断页(V39 拆分:框架/作用域/运行时统计/复制快照)。 */
     const val DIAGNOSTICS_SETTINGS = "settings/diagnostics"
+    /** MCP 访问令牌管理页(V39:多令牌列表 + 认证开关)。 */
+    const val MCP_TOKENS = "settings/mcp-tokens"
     const val ABOUT = "settings/about"
     const val LICENSES = "settings/licenses"
     const val LICENSE_DETAIL = "settings/licenses/{index}"
@@ -47,6 +52,11 @@ object ModevRoutes {
     const val SYSTEM_RECORDS = "records/system/{packageName}"
     /** 每应用进程控制监听记录列表(V33 一等公民)。 */
     const val PROCESS_CONTROL_RECORDS = "records/process_control/{packageName}"
+    /**
+     * 按类型全局记录列表(V40 T4 双维度浏览:类型 × 全部应用;
+     * 数据管理页类型计数行入口,`records/type/{recordType}`)。
+     */
+    const val GLOBAL_TYPE_RECORDS = "records/type/{recordType}"
     /** 每应用监听设置页(V24 二态偏差)。 */
     const val APP_LISTEN_SETTINGS = "apps/{packageName}/listen-settings"
     /** 每应用功能设置页(V37 双域拆分:干预开关 + 关键词启用 + 画像选择)。 */
@@ -83,6 +93,9 @@ object ModevRoutes {
     fun systemRecords(packageName: String): String = "records/system/${enc(packageName)}"
 
     fun processControlRecords(packageName: String): String = "records/process_control/${enc(packageName)}"
+
+    /** 按类型全局记录列表(wire 值作路径参数;非法值由目的地侧回落弹栈)。 */
+    fun globalTypeRecords(recordType: String): String = "records/type/${enc(recordType)}"
 
     fun licenseDetail(index: Int): String = "settings/licenses/${index}"
 

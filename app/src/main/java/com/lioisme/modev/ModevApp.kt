@@ -139,12 +139,10 @@ class AppContainer(private val context: Context) {
                     com.lioisme.modev.mcp.tools.McpJson.obj(
                         "enabled" to com.google.gson.JsonPrimitive(settings.mcpEnabled.value),
                         "port" to com.google.gson.JsonPrimitive(mcp.port),
-                        "boundAddress" to com.google.gson.JsonPrimitive(
-                            if (mcp.isRunning) {
-                                if (mcp.externalAccess) "0.0.0.0" else "127.0.0.1"
-                            } else null,
-                        ),
+                        "boundAddress" to com.google.gson.JsonPrimitive(mcp.boundAddress.value),
                         "externalAccess" to com.google.gson.JsonPrimitive(mcp.externalAccess),
+                        "tokenAuth" to com.google.gson.JsonPrimitive(mcp.tokenAuthEnabled),
+                        "tokenCount" to com.google.gson.JsonPrimitive(settings.mcpTokens.value.size),
                         "sessionCount" to com.google.gson.JsonPrimitive(mcp.sessionCount()),
                     )
                 },
@@ -153,7 +151,8 @@ class AppContainer(private val context: Context) {
         val built = com.lioisme.modev.mcp.McpServer(
             port = settings.mcpPort.value,
             externalAccess = settings.mcpExternalAccess.value,
-            token = settings.mcpToken(),
+            tokenAuthEnabled = settings.mcpTokenAuth.value,
+            requiredTokens = settings.mcpTokens.value.map { it.value }.toSet(),
             serverInfo = com.lioisme.modev.mcp.tools.McpJson.obj(
                 "name" to com.google.gson.JsonPrimitive(com.lioisme.modev.mcp.tools.McpTools.SERVER_NAME),
                 "version" to com.google.gson.JsonPrimitive(
@@ -168,11 +167,15 @@ class AppContainer(private val context: Context) {
             if (settings.mcpEnabled.value) {
                 built.port = settings.mcpPort.value
                 built.externalAccess = settings.mcpExternalAccess.value
+                built.tokenAuthEnabled = settings.mcpTokenAuth.value
+                built.requiredTokens = settings.mcpTokens.value.map { it.value }.toSet()
                 built.restart()
             } else {
                 built.stop()
             }
         }
+        // V39:令牌集合变更原地更新校验集(不重启 socket、不踢已连会话)
+        settings.mcpTokenSetUpdater = { tokens -> built.requiredTokens = tokens }
         built
     }
 

@@ -15,6 +15,7 @@ import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.performScrollToIndex
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
@@ -42,7 +43,7 @@ import org.junit.runner.RunWith
  * 二级设置页:算法监听/数据库监听/数据管理/服务与诊断,往返可达)、
  * R2(应用列表/记录列表 AppBar 内仅一个 SearchBar)、
  * R3(SearchBar 内仅一个筛选按钮,无返回/清除)、
- * V7 变更:应用行无运行按钮(根页 app-launch=0)、详情页顶栏更多菜单承载导出,
+ * V7 变更:Appbar 启动入口仅监听页(根页 app-launch=0;V40 T3 行内运行按钮退役)、详情页顶栏更多菜单承载导出,
  * V10 变更:捕获设置全局化(入口移至设置页,记录页筛选菜单仅算法/数据库类别)、
  * V20 变更:危险操作(移出作用域/清空该应用记录)迁至监听入口页头部更多菜单,
  * 记录列表 = 单应用过滤(无查看记录混合页)。
@@ -75,6 +76,38 @@ class FourScreensNavTest {
         rule.waitForIdle()
     }
 
+    /**
+     * 点击入口页记录列表入口并以「列表页标志」校验导航落地(V40 T4 健壮性):
+     * 列表页 = cd_back 与 cd_filter 同现(入口页恒无筛选按钮);雷电高负载下
+     * uiautomator 点击偶发不生效(V39 设备报告记录),未落地则有界重试 2 次。
+     * 入口文本先滚动至可见(入口页条目多,视口下方行未断言可见性)。
+     */
+    private fun clickEntryUntilOnList(entryText: String) {
+        repeat(3) { attempt ->
+            try {
+                rule.onAllNodes(hasText(entryText)).onFirst().performScrollTo()
+            } catch (_: AssertionError) {
+                // 已在视口内(performScrollTo 对已可见节点在部分版本抛错)——忽略。
+            }
+            rule.onNodeWithText(entryText).performClick()
+            if (awaitPage(back = 1, filter = 1)) return
+            if (attempt == 2) return
+        }
+    }
+
+    /** 有界轮询等待页面态(cd_back/cd_filter 计数)达成(V40 T4 导航健壮性锚点)。 */
+    private fun awaitPage(back: Int, filter: Int): Boolean {
+        val deadline = System.currentTimeMillis() + 2_000
+        while (System.currentTimeMillis() < deadline) {
+            rule.waitForIdle()
+            val backCount = rule.onAllNodesWithContentDescription(str(R.string.cd_back)).fetchSemanticsNodes().size
+            val filterCount = rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).fetchSemanticsNodes().size
+            if (backCount == back && filterCount == filter) return true
+            Thread.sleep(100)
+        }
+        return false
+    }
+
     @Test
     fun rootHasOnlyFilterButton_andFilterMenuNavigatesToSettings_andBack() {
         rule.waitForIdle()
@@ -83,8 +116,10 @@ class FourScreensNavTest {
         rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(1)
         rule.onAllNodesWithContentDescription(str(R.string.cd_settings)).assertCountEquals(1)
         rule.onAllNodesWithContentDescription(str(R.string.cd_back)).assertCountEquals(0)
-        // V7/V20:根页应用行无运行按钮(启动入口仅保留于应用监听入口页头部)。
+        // V40 T3:Appbar 启动入口(app-launch)仅保留于应用监听入口页,根页恒 0;
+        // 行内运行按钮已退役(app-row-run 恒 0,由 appRow_hasNoRunButton 验收)。
         rule.onAllNodesWithTag("app-launch").assertCountEquals(0)
+        rule.onAllNodesWithTag("app-row-run").assertCountEquals(0)
         // V24 G2:records/all 退役,根页不得再有全部记录入口(contentDescription)。
         rule.onAllNodesWithContentDescription(str(R.string.monitor_records_caption)).assertCountEquals(0)
 
@@ -159,6 +194,21 @@ class FourScreensNavTest {
         pressBack()
         rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(1)
         rule.onAllNodesWithContentDescription(str(R.string.cd_settings)).assertCountEquals(1)
+    }
+
+    /**
+     * V40 T3:应用行运行按钮退役——启动唯一入口 = 每应用监控页 Appbar
+     * (testTag `app-launch`,恒最右)。行内 `app-row-run` 恒不存在,
+     * 且启动入口惰性解析机制随按钮退役(行 trailing 仅作用域 Checkbox)。
+     */
+    @Test
+    fun appRow_hasNoRunButton() {
+        rule.waitForIdle()
+        assumeTrue(rule.onAllNodesWithTag("app-row").fetchSemanticsNodes().isNotEmpty())
+        // 向下滚动加载更多行后再断言(覆盖惰性回收场景)。
+        rule.onAllNodes(hasScrollAction()).onFirst().performScrollToIndex(15)
+        rule.waitForIdle()
+        rule.onAllNodesWithTag("app-row-run").assertCountEquals(0)
     }
 
     @Test
@@ -260,29 +310,32 @@ class FourScreensNavTest {
             .performScrollToNode(hasText(str(R.string.diagnostics_settings_title)))
         rule.onNodeWithText(str(R.string.diagnostics_settings_title)).assertIsDisplayed()
 
-        // 返回设置页 → 数据管理页:总记录行 + 清空全部日志(危险块),不触发。
-        // 数据管理入口在小屏折叠区,先滚动至可见再点击。
+        // 返回设置页 → 数据管理页:类型计数区(V40 计数行可点)+ 总记录行 +
+        // 清空全部日志(危险块),不触发。数据管理入口在小屏折叠区,先滚动至可见再点击。
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.data_settings_title)))
         rule.onNodeWithText(str(R.string.data_settings_title)).performClick()
         rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.settings_total_records)).assertIsDisplayed()
-        // V27 数据管理新增「清理行为记录」行,清空全部行可能被推出视口:滚动至可见再断言。
+        // V40 T4:总记录行位于浏览区之下,先滚动至可见再断言(修复滚动敏感假失败)。
+        rule.onNodeWithText(str(R.string.settings_total_records))
+            .performScrollTo()
+            .assertIsDisplayed()
+        // 清空全部行可能被推出视口:滚动至可见再断言(V40 起为数据页唯一危险行)。
         rule.onNodeWithText(str(R.string.settings_clear_all_records))
             .performScrollTo()
             .assertIsDisplayed()
         pressBack()
 
-        // 返回设置页 → 服务与诊断页:入口在底部折叠区,滚动后进入(端口行 + 管线统计折叠头)。
+        // 返回设置页 → 诊断页(V39 拆分:诊断入口 = settings/diagnostics;
+        // 端口配置迁服务页,此处断言诊断页恒展开的管道统计分区)。
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(str(R.string.diagnostics_settings_title)))
         rule.onNodeWithText(str(R.string.diagnostics_settings_title)).performClick()
         rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.settings_port)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.settings_stats_section)).assertIsDisplayed()
         pressBack()
 
-        // 返回根页:唯一筛选按钮、无运行按钮。
+        // 返回根页:Appbar 唯一筛选按钮、零 actions(V40 T3 启动入口仅监控页 Appbar)。
         pressBack()
         rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(1)
         rule.onAllNodesWithTag("app-launch").assertCountEquals(0)
@@ -296,33 +349,43 @@ class FourScreensNavTest {
         // 雷电等首行应用常无记录,轮询查找带记录行的应用(与 appRowOpens 查找
         // 启动按钮同款:逐行进入入口页 → 先算法列表,无记录再数据库列表;
         // 均无则返回下一行,找不到跳过)。
+        // V40 T4 健壮性:每步导航后校验页面态(入口页 = cd_back 1 + cd_filter 0),
+        // 未落地有界重试——雷电高负载下 uiautomator 点击偶发不生效(V39 报告记录)。
         var openedRecord = false
         var swipes = 0
         while (!openedRecord && swipes < 10) {
             var i = 0
             while (i < rule.onAllNodesWithTag("app-row").fetchSemanticsNodes().size) {
-                rule.onAllNodesWithTag("app-row")[i].performClick()
-                rule.waitForIdle()
-                // V18/V20:单击应用先进监听入口页,经「算法记录」到算法列表。
-                rule.onNodeWithText(str(R.string.algorithm_records_title)).performClick()
-                rule.waitForIdle()
+                // 进入入口页:未落地重新点击同一行(最多 3 次)。
+                var entered = false
+                repeat(3) {
+                    if (entered) return@repeat
+                    rule.onAllNodesWithTag("app-row")[i].performClick()
+                    entered = awaitPage(back = 1, filter = 0)
+                }
+                if (!entered) {
+                    i++
+                    continue
+                }
+                // 经「算法记录」到算法列表。
+                clickEntryUntilOnList(str(R.string.algorithm_records_title))
                 if (rule.onAllNodesWithTag("record-row").fetchSemanticsNodes().isNotEmpty()) {
                     openedRecord = true
                     break
                 }
-                // 算法列表无记录 → 返回入口页,试数据库列表。
+                // 算法列表无记录 → 返回入口页,试数据库列表;回退落根页则换下一行。
                 pressBack()
-                rule.waitForIdle()
-                rule.onNodeWithText(str(R.string.database_records_title)).performClick()
-                rule.waitForIdle()
+                if (!awaitPage(back = 1, filter = 0)) {
+                    i++
+                    continue
+                }
+                clickEntryUntilOnList(str(R.string.database_records_title))
                 if (rule.onAllNodesWithTag("record-row").fetchSemanticsNodes().isNotEmpty()) {
                     openedRecord = true
                     break
                 }
                 pressBack()
-                rule.waitForIdle()
-                pressBack()
-                rule.waitForIdle()
+                awaitPage(back = 1, filter = 0)
                 i++
             }
             if (!openedRecord && swipes < 9) {
@@ -350,11 +413,15 @@ class FourScreensNavTest {
         // 返回记录列表页:AppBar 仅 SearchBar + 筛选按钮。
         rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(1)
         pressBack()
-        // 返回入口页(V20):两记录入口仍在。
-        rule.onNodeWithText(str(R.string.algorithm_records_title)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.database_records_title)).assertIsDisplayed()
+        // 返回入口页(V20):两记录入口仍在(入口页条目多,先滚动至可见再断言)。
+        rule.onNodeWithText(str(R.string.algorithm_records_title))
+            .performScrollTo()
+            .assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.database_records_title))
+            .performScrollTo()
+            .assertIsDisplayed()
         pressBack()
-        // 返回根页:唯一筛选按钮、无运行按钮。
+        // 返回根页:Appbar 唯一筛选按钮、零 actions(V40 T3 启动入口仅监控页 Appbar)。
         rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(1)
         rule.onAllNodesWithTag("app-launch").assertCountEquals(0)
     }

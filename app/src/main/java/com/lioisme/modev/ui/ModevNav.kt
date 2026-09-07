@@ -3,8 +3,11 @@ package com.lioisme.modev.ui
 import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
@@ -14,6 +17,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.navArgument
+import com.lioisme.modev.R
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.ui.apps.AppMonitorScreen
 import com.lioisme.modev.ui.apps.AppMonitorViewModelFactory
@@ -23,6 +27,7 @@ import com.lioisme.modev.ui.apps.PerAppFeatureSettingsScreen
 import com.lioisme.modev.ui.apps.PerAppFeatureSettingsViewModelFactory
 import com.lioisme.modev.ui.apps.PerAppListenSettingsScreen
 import com.lioisme.modev.ui.apps.PerAppListenSettingsViewModelFactory
+import com.lioisme.modev.ui.common.DoubleBackExit
 import com.lioisme.modev.ui.detail.RecordDetailScreen
 import com.lioisme.modev.ui.detail.RecordDetailViewModelFactory
 import com.lioisme.modev.ui.navigation.ModevRoutes
@@ -33,6 +38,7 @@ import com.lioisme.modev.ui.navigation.popGuarded
 import com.lioisme.modev.ui.navigation.popWhenReady
 import com.lioisme.modev.ui.navigation.slideComposable
 import com.lioisme.modev.ui.records.AlgorithmRecordsScreen
+import com.lioisme.modev.ui.records.GlobalTypeRecordsScreen
 import com.lioisme.modev.ui.records.BehaviorRecordsScreen
 import com.lioisme.modev.ui.records.DatabaseRecordsScreen
 import com.lioisme.modev.ui.records.PrefsRecordsScreen
@@ -50,6 +56,10 @@ import com.lioisme.modev.ui.settings.DiagnosticsScreen
 import com.lioisme.modev.ui.settings.DiagnosticsViewModelFactory
 import com.lioisme.modev.ui.settings.LicenseDetailScreen
 import com.lioisme.modev.ui.settings.LicensesScreen
+import com.lioisme.modev.ui.settings.McpTokensScreen
+import com.lioisme.modev.ui.settings.McpTokensViewModelFactory
+import com.lioisme.modev.ui.settings.ServicesScreen
+import com.lioisme.modev.ui.settings.ServicesViewModelFactory
 import com.lioisme.modev.ui.settings.SettingsScreen
 import com.lioisme.modev.ui.settings.SettingsViewModelFactory
 import com.lioisme.modev.ui.settings.features.FeatureBlacklistScreen
@@ -58,6 +68,7 @@ import com.lioisme.modev.ui.settings.features.KeywordLibraryScreen
 import com.lioisme.modev.ui.settings.features.KeywordLibraryViewModelFactory
 import com.lioisme.modev.ui.settings.features.SpoofProfileScreen
 import com.lioisme.modev.ui.settings.features.SpoofProfileViewModelFactory
+import kotlinx.coroutines.launch
 
 /**
  * 单栈导航宿主(2026-08-16 V4,五界面收敛;2026-08-17 V10 设置分级;V18 应用监听入口;
@@ -86,6 +97,12 @@ fun ModevNavHost(navController: NavHostController) {
         }
     }
 
+    // V39 R8:根页双击返回退出——首次提示「再按一次退出程序」(Snackbar),窗口内再按 finish。
+    // Snackbar 宿主上提至导航层,与 AppsScreen 消息流共用同一 SnackbarHost。
+    val rootSnackbarHostState = remember { SnackbarHostState() }
+    val rootScope = rememberCoroutineScope()
+    val doubleBackExit = remember { DoubleBackExit() }
+
     // 导航队列常驻执行:随组合销毁自动取消;保证任何快速输入最终在转场边界上按序执行。
     LaunchedEffect(navController) {
         navController.drainNavigationQueue()
@@ -107,10 +124,16 @@ fun ModevNavHost(navController: NavHostController) {
             transitions = NavTransitions.QUARTER,
         ) {
             // 根页面兜底:导航忙碌(转场/队列)时返回键入队弹栈,杜绝「排队窗口内误退出」;
-            // 空闲时返回 false → finish(退出 App)。
+            // 空闲时首次返回提示「再按一次退出程序」,窗口内再按才 finish(V39 R8)。
             BackHandler(enabled = true) {
                 if (!navController.popGuarded()) {
-                    (context as? Activity)?.finish()
+                    if (doubleBackExit.press()) {
+                        (context as? Activity)?.finish()
+                    } else {
+                        rootScope.launch {
+                            rootSnackbarHostState.showSnackbar(context.getString(R.string.exit_press_back_again))
+                        }
+                    }
                 }
             }
             AppsScreen(
@@ -121,6 +144,7 @@ fun ModevNavHost(navController: NavHostController) {
                 onOpenSettings = {
                     navController.navigateGuarded(ModevRoutes.SETTINGS)
                 },
+                snackbarHostState = rootSnackbarHostState,
             )
         }
         slideComposable(
@@ -468,6 +492,9 @@ fun ModevNavHost(navController: NavHostController) {
                     onOpenDataSettings = {
                         navController.navigateGuarded(ModevRoutes.DATA_SETTINGS)
                     },
+                    onOpenServices = {
+                        navController.navigateGuarded(ModevRoutes.SERVICES_SETTINGS)
+                    },
                     onOpenDiagnostics = {
                         navController.navigateGuarded(ModevRoutes.DIAGNOSTICS_SETTINGS)
                     },
@@ -550,6 +577,56 @@ fun ModevNavHost(navController: NavHostController) {
             BackGuarded(navController) {
                 DataSettingsScreen(
                     viewModel = viewModel(factory = DataSettingsViewModelFactory(app.container)),
+                    onBack = { navController.popGuarded() },
+                    onOpenTypeRecords = { type ->
+                        navController.navigateGuarded(ModevRoutes.globalTypeRecords(type.wire))
+                    },
+                    onOpenApp = { pkg ->
+                        navController.navigateGuarded(ModevRoutes.appMonitor(pkg))
+                    },
+                )
+            }
+        }
+        // V40 T4:按类型全局记录列表(类型 × 全部应用;数据管理页类型计数行入口)。
+        slideComposable(
+            route = ModevRoutes.GLOBAL_TYPE_RECORDS,
+            arguments = listOf(navArgument("recordType") { type = NavType.StringType }),
+        ) { entry ->
+            val type = ModevRoutes.dec(entry.arguments?.getString("recordType"))
+                ?.let { wire -> RecordType.entries.firstOrNull { it.wire == wire } }
+            if (type == null) {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
+            BackGuarded(navController) {
+                GlobalTypeRecordsScreen(
+                    viewModel = viewModel(
+                        key = "records-global-${type.wire}",
+                        factory = RecordsViewModelFactory(type, null, app.container),
+                    ),
+                    type = type,
+                    onBack = { navController.popGuarded() },
+                    onOpenRecord = { id ->
+                        navController.navigateGuarded(ModevRoutes.recordDetail(id))
+                    },
+                )
+            }
+        }
+        slideComposable(route = ModevRoutes.SERVICES_SETTINGS) {
+            BackGuarded(navController) {
+                ServicesScreen(
+                    viewModel = viewModel(factory = ServicesViewModelFactory(app.container)),
+                    onBack = { navController.popGuarded() },
+                    onOpenTokens = {
+                        navController.navigateGuarded(ModevRoutes.MCP_TOKENS)
+                    },
+                )
+            }
+        }
+        slideComposable(route = ModevRoutes.MCP_TOKENS) {
+            BackGuarded(navController) {
+                McpTokensScreen(
+                    viewModel = viewModel(factory = McpTokensViewModelFactory(app.container)),
                     onBack = { navController.popGuarded() },
                 )
             }

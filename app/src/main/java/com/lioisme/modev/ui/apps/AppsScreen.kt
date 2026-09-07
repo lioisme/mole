@@ -1,11 +1,13 @@
 ﻿package com.lioisme.modev.ui.apps
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,9 +20,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FilterList
+
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.Android
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.Badge
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -50,23 +54,28 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import com.lioisme.modev.i18n.LocaleManager
 import com.lioisme.modev.ui.common.connectionStatus
 import com.lioisme.modev.ui.common.rememberEffectiveLocale
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
 import com.lioisme.modev.ui.components.AppIcon
-import com.lioisme.modev.ui.components.CollapsedSearchInput
-import com.lioisme.modev.ui.components.EmptyState
 import com.lioisme.modev.ui.components.SearchInputField
-import com.lioisme.modev.ui.components.StatusDot
+import com.lioisme.modev.ui.theme.Tokens
+import com.lioisme.modev.ui.theme.statusColor
 import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.components.rememberSearchController
 /// 搜索收起动画完成后的导航目标(先收后导,单一事实源)。
@@ -96,9 +105,10 @@ fun AppsScreen(
     viewModel: AppsViewModel,
     onOpen: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    // V39 R8:根页 Snackbar 宿主上提至导航层(双击返回退出提示与消息流共用同一宿主)。
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
     val focusManager = LocalFocusManager.current
 
@@ -141,15 +151,21 @@ fun AppsScreen(
                     SearchBar(
                         state = search.searchBarState,
                         inputField = {
-CollapsedSearchInput(
+                            // V40 T5.1:折叠态 = 标准 MD3 InputField(CollapsedSearchInput
+                            // 退役);焦点驱动展开经 onInputActiveChange 守卫。
+                            SearchInputField(
                                 query = search.queryText,
-                                // 根页无返回语义,返回按钮隐藏(二级页才有);
-                                // 左上角 = 设置按钮(V18,与右下角筛选按钮对称)。
+                                onQueryChange = { search.queryText = it },
+                                active = search.searchActive,
+                                onActiveChange = search::onInputActiveChange,
+                                onSearch = {
+                                    search.collapse()
+                                    focusManager.clearFocus()
+                                },
+                                // 根页无返回语义;左上角 = 设置按钮(V18,与右侧筛选按钮对称)。
                                 onBack = null,
-                                onClear = { search.queryText = "" },
-                                onTapToExpand = { search.searchActive = true },
                                 placeholder = stringResource(R.string.apps_search),
-                                leadingContent = {
+                                leadingSlot = {
                                     TipIconButton(
                                         tooltip = stringResource(R.string.cd_settings),
                                         onClick = openSettings,
@@ -206,15 +222,48 @@ Column(Modifier.fillMaxSize()) {
                         }
                     }
                 } else if (state.rows.isEmpty()) {
-                    EmptyState(
-                        icon = Icons.Outlined.Android,
-                        message =
-                            if (search.queryText.isNotBlank()) {
-                                stringResource(R.string.apps_empty_no_match)
-                            } else {
-                                stringResource(R.string.apps_empty_no_apps)
-                            },
-                    )
+                    // V40 T5.4:空态内联(EmptyState 组件退役)——MD3 原语组合。
+                    val emptyMessage =
+                        if (search.queryText.isNotBlank()) {
+                            stringResource(R.string.apps_empty_no_match)
+                        } else {
+                            stringResource(R.string.apps_empty_no_apps)
+                        }
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .wrapContentSize(Alignment.Center)
+                                .semantics { stateDescription = emptyMessage },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                        .copy(alpha = Tokens.emptyIconContainerAlpha),
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Outlined.Android,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    .copy(alpha = Tokens.emptyIconAlpha),
+                                modifier = Modifier.size(28.dp),
+                            )
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            emptyMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 32.dp),
+                        )
+                    }
                 } else {
                     LazyColumn(
                         contentPadding = PaddingValues(bottom = 16.dp),
@@ -289,10 +338,43 @@ items(state.rows, key = { it.packageName }) { row ->
                 focusManager.clearFocus()
             }
             if (state.rows.isEmpty()) {
-                EmptyState(
-                    icon = Icons.Outlined.Android,
-                    message = dlgRes.getString(R.string.apps_empty_no_match),
-                )
+                // V40 T5.4:空态内联(EmptyState 组件退役);Dialog 窗口经 dlgRes 解析。
+                val emptyMessage = dlgRes.getString(R.string.apps_empty_no_match)
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .wrapContentSize(Alignment.Center)
+                            .semantics { stateDescription = emptyMessage },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                                    .copy(alpha = Tokens.emptyIconContainerAlpha),
+                            ),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            Icons.Outlined.Android,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                .copy(alpha = Tokens.emptyIconAlpha),
+                            modifier = Modifier.size(28.dp),
+                        )
+                    }
+                    Spacer(Modifier.height(16.dp))
+                    Text(
+                        emptyMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp),
+                    )
+                }
             } else {
                 LazyColumn(
                     contentPadding = PaddingValues(bottom = 16.dp),
@@ -391,11 +473,12 @@ private fun ScopeFilterMenu(
 
 /**
  * 应用行(2026-08-15 UI 重构 Phase 5,对齐 LIDE ProjectList 行规范;2026-08-17 V7;
- * 2026-08-18 V14 R4 状态角标化;V19 T6 矩阵 M6:M3 [ListItem] 承载):
+ * 2026-08-18 V14 R4 状态角标化;V19 T6 矩阵 M6:M3 [ListItem] 承载;
+ * V40 T3:行内运行按钮退役——列表行仅承载作用域 Checkbox,启动唯一入口 =
+ * 每应用监控页 Appbar 且恒最右):
  * leading AppIcon 40dp + headline 名称 bodyLarge Medium + 记录数 secondaryContainer
  * 徽标 + supporting 包名 bodySmall + 状态角标(已作用域时:运行中=绿色圆点/
- * 未运行=灰色圆点,完整语义进 contentDescription 与长按 tooltip),
- * trailing Checkbox(作用域勾选,V7 起置于右侧,无运行按钮);
+ * 未运行=灰色圆点,完整语义进 contentDescription 与长按 tooltip);
  * 行间 outlineVariant 分隔线,列表外侧,行内不分割。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -420,17 +503,17 @@ private fun AppRowItem(
                     modifier = Modifier.weight(1f, fill = false),
                 )
                 // 仅计数徽标存在时保留间距(V13:无空缺字段不留空白)。
+                // V40 T5.2:计数徽标 = 标准 M3 Badge(手搓 Surface 胶囊退役)。
                 if (row.recordCount > 0) {
                     Spacer(Modifier.width(6.dp))
-                    Surface(
-                        shape = CircleShape,
-                        color = MaterialTheme.colorScheme.secondaryContainer,
+                    Badge(
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
                     ) {
                         Text(
                             countText(row.recordCount),
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
                             style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
                         )
                     }
                 }
@@ -449,9 +532,17 @@ private fun AppRowItem(
                 if (row.scoped) {
                     Spacer(Modifier.width(6.dp))
                     val status = connectionStatus(row.connected)
-                    StatusDot(
-                        kind = status.kind,
-                        label = stringResource(status.labelRes),
+                    val statusLabel = stringResource(status.labelRes)
+                    // V40 T5.2:状态点 = 标准 M3 Badge(自研 StatusDot 退役);
+                    // 完整语义经 contentDescription(无障碍与几何断言同源)。
+                    Badge(
+                        containerColor = statusColor(status.kind),
+                        modifier =
+                            Modifier
+                                .testTag("app-row-status")
+                                .semantics {
+                                    contentDescription = statusLabel
+                                },
                     )
                 }
             }

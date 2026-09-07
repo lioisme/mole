@@ -14,30 +14,24 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.RestartAlt
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -57,7 +51,10 @@ import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.SpoofProfiles
 import com.lioisme.modev.data.repo.KeywordLibraryRepository
 import com.lioisme.modev.data.repo.SettingsRepository
+import com.lioisme.modev.ui.components.ChoiceOption
 import com.lioisme.modev.ui.components.HorizontalDivider16
+import com.lioisme.modev.ui.components.ModevChoiceSheet
+import com.lioisme.modev.ui.components.ModevConfirmDialog
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
@@ -349,25 +346,14 @@ fun PerAppFeatureSettingsScreen(
     }
 
     if (confirmReset) {
-        AlertDialog(
-            onDismissRequest = { confirmReset = false },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            icon = { Icon(Icons.Filled.RestartAlt, null) },
-            title = { Text(stringResource(R.string.danger_title)) },
-            text = { Text(stringResource(R.string.danger_reset_feature_msg, viewModel.packageName)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.reset()
-                    confirmReset = false
-                }) {
-                    Text(stringResource(R.string.confirm))
-                }
+        ModevConfirmDialog(
+            title = stringResource(R.string.danger_title),
+            message = stringResource(R.string.danger_reset_feature_msg, viewModel.packageName),
+            onConfirm = {
+                viewModel.reset()
+                confirmReset = false
             },
-            dismissButton = {
-                TextButton(onClick = { confirmReset = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { confirmReset = false },
         )
     }
 
@@ -443,68 +429,42 @@ private fun KeywordSubsetSection(
     }
 }
 
-/** 画像选择底部 sheet(跟随全局 + 内置档位单选;契约 4)。 */
-@OptIn(ExperimentalMaterial3Api::class)
+/** 画像选择底部 sheet(跟随全局 + 内置档位单选;契约 4;V39 收编统一 [ModevChoiceSheet])。 */
 @Composable
 private fun SpoofProfileSheet(
     selectedId: String?,
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
     val res = rememberLocaleAwareResources()
-
-    fun choose(id: String?) {
-        scope.launch { sheetState.hide() }.invokeOnCompletion {
+    val options = buildList {
+        add(
+            ChoiceOption<String?>(
+                value = null,
+                label = res.getString(R.string.feature_profile_follow_global),
+                testTag = "feature-profile-option-follow-global",
+            ),
+        )
+        addAll(
+            SpoofProfiles.BUILTINS.map {
+                ChoiceOption<String?>(
+                    value = it.id,
+                    label = res.getString(spoofProfileLabelRes(it.id)),
+                    testTag = "feature-profile-option-${it.id}",
+                )
+            },
+        )
+    }
+    ModevChoiceSheet(
+        title = stringResource(R.string.feature_profile_sheet_title),
+        options = options,
+        selected = selectedId,
+        onSelect = { id ->
             onSelect(id)
             onDismiss()
-        }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = {
-            scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
         },
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = 24.dp),
-        ) {
-            Text(
-                stringResource(R.string.feature_profile_sheet_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
-            )
-            val options = buildList {
-                add(null as String?)
-                addAll(SpoofProfiles.BUILTINS.map { it.id })
-            }
-            options.forEach { id ->
-                ListItem(
-                    colors = ListItemDefaults.colors(
-                        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    ),
-                    headlineContent = { Text(res.getString(spoofProfileLabelRes(id))) },
-                    leadingContent = {
-                        RadioButton(
-                            selected = (selectedId ?: GLOBAL_FOLLOW_ID) == (id ?: GLOBAL_FOLLOW_ID),
-                            onClick = { choose(id) },
-                        )
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .testTag("feature-profile-option-${id ?: "follow-global"}")
-                        .clickable { choose(id) },
-                )
-            }
-        }
-    }
+        onDismiss = onDismiss,
+    )
 }
 
 private const val GLOBAL_FOLLOW_ID = "__follow_global__"

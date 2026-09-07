@@ -48,7 +48,8 @@ class ServerTools(
     private fun serverStatus() = schemaTool(
         name = "server_status",
         description = "Server overview: wire ConfigServer (port/bound address/external access/connected " +
-            "packages), MCP server self state (port/bound/sessions) and framework scope state.",
+            "packages), MCP server self state (port/bound/token auth/token count/sessions) and framework " +
+            "scope state. Token values are never exposed.",
         schema = emptySchema(),
     ) { _ ->
         McpJson.obj(
@@ -80,7 +81,7 @@ class ServerTools(
 
     private fun serverSetPort() = schemaTool(
         name = "server_set_port",
-        description = "Change wire ConfigServer listen port (1..65535; default 1510). Restart rebinds; " +
+        description = "Change wire ConfigServer listen port (1..65535; default 1511). Restart rebinds; " +
             "connected sessions recover via reconnect loop.",
         schema = { required(listOf("port")); int("port", "New wire port 1..65535") },
     ) { args ->
@@ -99,6 +100,7 @@ class ServerTools(
         schema = emptySchema(),
     ) { _ ->
         val stats = pipelineStats()
+        val mcp = mcpSnapshot()
         val snapshot = DiagnosticsReport.Snapshot(
             frameworkState = scopeRepository.state.value,
             displayAddress = connectionMonitor.boundAddress.value ?: ConnectionMonitor.BIND_LOOPBACK,
@@ -106,6 +108,10 @@ class ServerTools(
             externalAccess = settings.serverExternalAccess.value,
             connectedCount = connectionMonitor.connectedPackagesFlow.value.size,
             pipelineStats = stats,
+            mcpEnabled = mcp.get("enabled")?.asBoolean ?: false,
+            mcpPort = mcp.get("port")?.asInt ?: 0,
+            mcpBoundAddress = mcp.get("boundAddress")?.takeIf { it.isJsonNull.not() }?.asString,
+            mcpTokenAuth = mcp.get("tokenAuth")?.asBoolean ?: false,
         )
         val labels = DiagnosticsReport.Labels(
             frameworkService = "Framework service",
@@ -122,6 +128,11 @@ class ServerTools(
             portScopeLocal = "(local only)",
             onlineTargets = "Online targets",
             onlineTargetsValue = "%1\$d",
+            mcpServer = "MCP server",
+            mcpDisabled = "Disabled",
+            mcpTokenAuth = "MCP token auth",
+            stateOn = "On",
+            stateOff = "Off",
             statsReceived = "Received",
             statsDropped = "Dropped",
             statsWriteFailures = "Write failures",

@@ -37,9 +37,9 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Badge
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -51,7 +51,6 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -67,6 +66,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
@@ -92,9 +92,9 @@ import com.lioisme.modev.ui.common.rememberEffectiveLocale
 import com.lioisme.modev.ui.common.scopeStatus
 import com.lioisme.modev.ui.components.AppIcon
 import com.lioisme.modev.ui.components.HorizontalDivider16
+import com.lioisme.modev.ui.components.ModevConfirmDialog
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsSection
-import com.lioisme.modev.ui.components.StatusDot
 import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.theme.Dimens
 import com.lioisme.modev.ui.theme.behaviorKindColor
@@ -174,17 +174,18 @@ fun AppMonitorScreen(
                 title = label,
                 onBack = onBack,
                 actions = {
-                    // V37 T3.2:启动/清空上移 Appbar(仅存在启动入口时展示,防闪烁契约保留)
+                    // V37 T3.2:启动/清空上移 Appbar(V40 T3:启动恒最右,清空居左;
+                    // 仅存在启动入口时展示启动,防闪烁契约保留)
+                    TooltipAction(
+                        tooltip = stringResource(R.string.detail_clear_records),
+                        testTag = "app-clear-records",
+                    ) { pendingDanger = DangerAction.CLEAR_LOGS }
                     if (launchable == true) {
                         TooltipAction(
                             tooltip = stringResource(R.string.apps_launch),
                             testTag = "app-launch",
                         ) { onLaunch(viewModel.packageName) }
                     }
-                    TooltipAction(
-                        tooltip = stringResource(R.string.detail_clear_records),
-                        testTag = "app-clear-records",
-                    ) { pendingDanger = DangerAction.CLEAR_LOGS }
                 },
             )
         },
@@ -337,38 +338,23 @@ fun AppMonitorScreen(
     }
 
     pendingDanger?.let { danger ->
-        AlertDialog(
-            onDismissRequest = { pendingDanger = null },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            icon = { Icon(Icons.Filled.GppBad, null) },
-            title = { Text(stringResource(R.string.danger_title)) },
-            text = {
-                Text(
-                    stringResource(
-                        when (danger) {
-                            DangerAction.REMOVE_SCOPE -> R.string.danger_remove_scope_msg
-                            DangerAction.CLEAR_LOGS -> R.string.danger_clear_logs_msg
-                        },
-                        viewModel.packageName,
-                    )
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    when (danger) {
-                        DangerAction.REMOVE_SCOPE -> viewModel.removeScope()
-                        DangerAction.CLEAR_LOGS -> viewModel.clearLogs()
-                    }
-                    pendingDanger = null
-                }) {
-                    Text(stringResource(R.string.confirm))
+        ModevConfirmDialog(
+            title = stringResource(R.string.danger_title),
+            message = stringResource(
+                when (danger) {
+                    DangerAction.REMOVE_SCOPE -> R.string.danger_remove_scope_msg
+                    DangerAction.CLEAR_LOGS -> R.string.danger_clear_logs_msg
+                },
+                viewModel.packageName,
+            ),
+            onConfirm = {
+                when (danger) {
+                    DangerAction.REMOVE_SCOPE -> viewModel.removeScope()
+                    DangerAction.CLEAR_LOGS -> viewModel.clearLogs()
                 }
+                pendingDanger = null
             },
-            dismissButton = {
-                TextButton(onClick = { pendingDanger = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { pendingDanger = null },
         )
     }
 }
@@ -456,7 +442,8 @@ private fun HeroCard(
 }
 
 /**
- * 状态胶囊:圆点 + 文案的 tonal pill(StatusColorTokens AA 语义色)。
+ * 状态胶囊(V40 T5.2):圆点 = 标准 M3 [Badge](自研 StatusDot 退役)+
+ * 文案的 tonal Surface(StatusColorTokens AA 语义色);语义经 contentDescription。
  */
 @Composable
 private fun StatusPill(semantic: StatusSemantic) {
@@ -468,7 +455,10 @@ private fun StatusPill(semantic: StatusSemantic) {
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            StatusDot(kind = semantic.kind, label = label)
+            Badge(
+                containerColor = color,
+                modifier = Modifier.semantics { contentDescription = label },
+            )
             Text(
                 label,
                 style = MaterialTheme.typography.labelSmall,

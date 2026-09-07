@@ -1,11 +1,13 @@
 ﻿# tt-mcp-lib.ps1 — V38 MCP 集成测试客户端库(在 tt-lib.ps1 之后加载)
 # 依赖:tt-lib.ps1 已提供 $script:ADB/$script:DEVICE/WaitDevice/EnsureHost/Assert 等。
-# 端口:15110(MCP 默认;adb forward 到宿主回环)。
+# 端口:1510(V39:MCP 默认;adb forward 到宿主回环;wire 迁 1511)。
+# 令牌(V39):$script:MCP_TOKEN 非空时随请求附带 Bearer 头(令牌认证启用后必需)。
 
-$script:MCP_PORT = 15110
+$script:MCP_PORT = 1510
 $script:MCP_URL = "http://127.0.0.1:$($script:MCP_PORT)/mcp"
 $script:MCP_SESSION = $null
 $script:MCP_ID = 0
+$script:MCP_TOKEN = $null
 
 # 建立端口转发(幂等;先删除旧的避免端口占用累积)
 function McpForward {
@@ -37,6 +39,7 @@ function McpRpc([string]$method, [object]$params, [string]$sessionId = $script:M
 function McpSend([string]$json, [string]$sessionId) {
     $headers = @{ "Content-Type" = "application/json" }
     if ($sessionId) { $headers["Mcp-Session-Id"] = $sessionId }
+    if ($script:MCP_TOKEN) { $headers["Authorization"] = "Bearer $($script:MCP_TOKEN)" }
     try {
         $resp = Invoke-WebRequest -Uri $script:MCP_URL -Method Post -Body $json -Headers $headers -UseBasicParsing -TimeoutSec 45
         $status = [int]$resp.StatusCode

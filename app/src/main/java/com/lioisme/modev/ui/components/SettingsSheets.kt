@@ -1,112 +1,40 @@
 package com.lioisme.modev.ui.components
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.annotation.StringRes
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.unit.dp
 import com.lioisme.modev.R
-import kotlinx.coroutines.launch
 
 /**
- * 监听设置输入弹层集(V21 T2 契约;V25 自 ui/settings 迁入 components,消费方 = 每应用监听设置页):
- * - 输入型弹层一律 [ModalBottomSheet],显式 `containerColor =
- *   surfaceContainerHigh`(M3 弹层容器 token,消 R2 色差);
- * - 内容 Column **仅** `.imePadding()`(M3 已内部消费导航栏 insets,
- *   叠加 `navigationBarsPadding` 会撑出底部色带 —— V17 双内边距缺陷修复);
- * - 确认/取消走 hide 动画后回调(既有 V15 规范)。
+ * 监听设置输入弹层集(V21 T2 契约;V25 自 ui/settings 迁入 components,消费方 = 每应用监听设置页;
+ * V39 R7 收编:全部收敛为 [ModevInputSheet] 薄封装,ModalBottomSheet 外壳/hide 动画收口/
+ * imePadding/容器色契约由脚手架单点保证,本文件仅表达标题/提示/校验/解析语义)。
  */
-@OptIn(ExperimentalMaterial3Api::class)
+
+/** 单字节字段上限(≤0 = ∞ 由调用方解释;空输入回落 0,与既有行为一致)。 */
 @Composable
 internal fun MaxBytesSheet(
     initial: Int,
     onConfirm: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var text by remember { mutableStateOf(if (initial <= 0) "0" else initial.toString()) }
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
-
-    fun confirm() {
-        val value = text.toIntOrNull() ?: 0
-        scope.launch { sheetState.hide() }.invokeOnCompletion { onConfirm(value) }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = {
-            scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-        },
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .imePadding()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 24.dp),
-        ) {
-            Text(
-                stringResource(R.string.capture_max_bytes_dialog_title),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(16.dp))
-            OutlinedTextField(
-                value = text,
-                onValueChange = { input ->
-                    if (input.all { it.isDigit() } && input.length <= 9) text = input
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                supportingText = { Text(stringResource(R.string.capture_max_bytes_hint)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(20.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(onClick = {
-                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                }) {
-                    Text(stringResource(R.string.cancel))
-                }
-                Spacer(Modifier.width(8.dp))
-                TextButton(onClick = { confirm() }) {
-                    Text(stringResource(R.string.confirm))
-                }
-            }
-        }
-    }
+    ModevInputSheet(
+        title = stringResource(R.string.capture_max_bytes_dialog_title),
+        initialValue = if (initial <= 0) "0" else initial.toString(),
+        hint = stringResource(R.string.capture_max_bytes_hint),
+        keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+        digitOnly = true,
+        maxLength = 9,
+        validate = { true },
+        onSubmit = { onConfirm(it.toIntOrNull() ?: 0) },
+        onDismiss = onDismiss,
+    )
 }
 
 /** 忽略栈前缀编辑(底部 sheet,每行一个,去空行去重)。 */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun IgnoreStackSheet(
     initial: List<String>,
@@ -124,7 +52,6 @@ internal fun IgnoreStackSheet(
  * 忽略路径前缀编辑(V27 行为降噪;底部 sheet,每行一个,去空行去重):
  * 与 [IgnoreStackSheet] 同构,语义对象为主体路径而非调用栈。
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun IgnorePathSheet(
     initial: List<String>,
@@ -138,137 +65,52 @@ internal fun IgnorePathSheet(
     onDismiss = onDismiss,
 )
 
-/** 前缀清单编辑共用实现(ModalBottomSheet 规范见文件头 KDoc)。 */
-@OptIn(ExperimentalMaterial3Api::class)
+/** 前缀清单编辑共用实现(多行输入,每行一个前缀)。 */
 @Composable
 private fun PrefixListSheet(
-    titleRes: Int,
-    hintRes: Int,
+    @StringRes titleRes: Int,
+    @StringRes hintRes: Int,
     initial: List<String>,
     onConfirm: (List<String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var text by remember { mutableStateOf(initial.joinToString("\n")) }
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
-
-    fun confirm() {
-        val prefixes = text.lines().map { it.trim() }.filter { it.isNotEmpty() }.distinct()
-        scope.launch { sheetState.hide() }.invokeOnCompletion { onConfirm(prefixes) }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = {
-            scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+    ModevInputSheet(
+        title = stringResource(titleRes),
+        initialValue = initial.joinToString("\n"),
+        hint = stringResource(hintRes),
+        minLines = 4,
+        validate = { true },
+        onSubmit = { text ->
+            onConfirm(text.lines().map { it.trim() }.filter { it.isNotEmpty() }.distinct())
         },
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .imePadding()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 24.dp),
-        ) {
-            Text(
-                stringResource(titleRes),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(16.dp))
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                minLines = 4,
-                supportingText = { Text(stringResource(hintRes)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(20.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(onClick = {
-                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                }) {
-                    Text(stringResource(R.string.cancel))
-                }
-                Spacer(Modifier.width(8.dp))
-                TextButton(onClick = { confirm() }) {
-                    Text(stringResource(R.string.confirm))
-                }
-            }
-        }
-    }
+        onDismiss = onDismiss,
+    )
 }
 
 /** 整数值编辑底部 sheet(数据库监听结果闸门行数/字符上限共用)。 */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun IntLimitSheet(
-    titleRes: Int,
-    hintRes: Int,
+    @StringRes titleRes: Int,
+    @StringRes hintRes: Int,
     initial: Int,
     onConfirm: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var text by remember { mutableStateOf(initial.toString()) }
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
+    ModevInputSheet(
+        title = stringResource(titleRes),
+        initialValue = initial.toString(),
+        hint = stringResource(hintRes),
+        keyboardOptions = KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Number),
+        digitOnly = true,
+        maxLength = 9,
+        validate = { true },
+        onSubmit = { onConfirm(it.toIntOrNull() ?: 0) },
+        onDismiss = onDismiss,
+    )
+}
 
-    fun confirm() {
-        val value = text.toIntOrNull() ?: 0
-        scope.launch { sheetState.hide() }.invokeOnCompletion { onConfirm(value) }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = {
-            scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-        },
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .imePadding()
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = 24.dp),
-        ) {
-            Text(
-                stringResource(titleRes),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(16.dp))
-            OutlinedTextField(
-                value = text,
-                onValueChange = { input ->
-                    if (input.all { it.isDigit() } && input.length <= 9) text = input
-                },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                supportingText = { Text(stringResource(hintRes)) },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Spacer(Modifier.height(20.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                TextButton(onClick = {
-                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                }) {
-                    Text(stringResource(R.string.cancel))
-                }
-                Spacer(Modifier.width(8.dp))
-                TextButton(onClick = { confirm() }) {
-                    Text(stringResource(R.string.confirm))
-                }
-            }
-        }
-    }
+/** 脚手架内文本提示(自定义内容 sheet 复用)。 */
+@Composable
+internal fun SheetHintText(text: String) {
+    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

@@ -29,7 +29,7 @@ object ConfigKeys {
      */
     const val SERVER_EXTERNAL_ACCESS = "server_external_access"
 
-    /** 服务监听端口键(V29):宿主本地 SharedPreferences 专用,默认1510。 */
+    /** 服务监听端口键(V29):宿主本地 SharedPreferences 专用,默认 1511(V39:1510 让位 MCP)。 */
     const val SERVER_PORT = "server_port"
 
     /**
@@ -42,12 +42,21 @@ object ConfigKeys {
     /** MCP 服务启用键(V38):宿主本地专用,默认 true(回环常驻,与 ConfigServer 先例一致)。 */
     const val MCP_ENABLED = "mcp_enabled"
 
-    /** MCP 服务端口键(V38):宿主本地专用,默认 15110。 */
+    /** MCP 服务端口键(V38):宿主本地专用,默认 1510(V39)。 */
     const val MCP_PORT = "mcp_port"
 
-    /** MCP 外部访问键(V38):宿主本地专用;true = 0.0.0.0 且强制 Bearer Token。 */
+    /** MCP 外部访问键(V38):宿主本地专用;true = 0.0.0.0(V39:强制伴随令牌认证)。 */
     const val MCP_EXTERNAL_ACCESS = "mcp_external_access"
 
-    /** MCP Bearer Token 键(V38):宿主本地自动生成,诊断页展示/复制;不镜像注入侧。 */
+    /** MCP 令牌认证开关键(V39):宿主本地专用;默认 false = 停用(全接口免 Token)。 */
+    const val MCP_TOKEN_AUTH = "mcp_token_auth"
+
+    /**
+     * MCP 多令牌列表键(V39):宿主本地专用,存 `List<McpTokenEntry>` JSON;
+     * 不镜像注入侧。取代 V38 单键 [MCP_TOKEN](升级时惰性导入为「默认令牌」)。
+     */
+    const val MCP_TOKENS = "mcp_tokens"
+
+    /** MCP Bearer Token 单键(V38 遗留,V39 起仅迁移读取,不再写入)。 */
     const val MCP_TOKEN = "mcp_token"
 }

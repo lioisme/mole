@@ -167,6 +167,7 @@ dependencies {
 
     implementation(libs.gson)
     // V38:MCP 服务 HTTP 传输引擎(见 toml 注释;Agent 面向能力,与 ConfigServer wire 协议完全独立)
+    implementation(libs.coil.compose)
     implementation(libs.nanohttpd)
 
     compileOnly(libs.libxposed.api)

@@ -1,86 +1,104 @@
 package com.lioisme.modev.ui.components
 
-import android.content.pm.PackageManager
-import android.graphics.Bitmap
-import android.graphics.Canvas
+import android.content.Context
 import android.graphics.drawable.Drawable
-import android.util.LruCache
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import coil.Coil
+import coil.ImageLoader
+import coil.compose.AsyncImage
+import coil.decode.DataSource
+import coil.fetch.DrawableResult
+import coil.fetch.Fetcher
+import coil.key.Keyer
+import coil.request.ImageRequest
+import coil.request.Options
 
 /**
- * 应用图标缓存:滚动列表避免反复 PackageManager binder 调用与重复位图转换。
- */
-object AppIconCache {
-    private val cache = LruCache<String, ImageBitmap>(128)
-
-    fun get(pm: PackageManager, packageName: String, sizePx: Int): ImageBitmap? =
-        cache.get(packageName) ?: runCatching {
-            pm.getApplicationIcon(packageName).toBitmap(sizePx)
-        }.getOrNull()?.also { cache.put(packageName, it) }
-
-    private fun Drawable.toBitmap(sizePx: Int): ImageBitmap {
-        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        setBounds(0, 0, sizePx, sizePx)
-        draw(canvas)
-        return bitmap.asImageBitmap()
-    }
-}
-
-/**
- * 应用图标:后台加载 + 缓存;加载中/失败时显示占位首字母块。
+ * 应用图标(V40 T5.4 Coil 化,手搓 LruCache/drawable→Bitmap 转换退役):
+ * [AsyncImage] + PackageManager Fetcher——Coil 内存缓存(MemoryCache)承担
+ * 去重(滚动列表零重复 binder 调用);首字母占位块垫底,加载成功后被图标覆盖
+ * (包不存在/加载失败 = 占位即终态,语义与 V13 形态一致)。
+ * 彩色启动图标由 [AsyncImage] 直绘 Drawable 保证(不经单色 Icon 管线,
+ * 无 LocalContentColor 蒙层问题——V13 已知坑)。
  */
 @Composable
 fun AppIcon(packageName: String, size: Dp, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    val sizePx = with(density) { size.roundToPx() }
-    val icon by produceState<ImageBitmap?>(initialValue = null, packageName) {
-        value = withContext(Dispatchers.IO) {
-            AppIconCache.get(context.packageManager, packageName, sizePx)
-        }
-    }
-    val bitmap = icon
-    if (bitmap != null) {
-        Icon(
-            bitmap = bitmap,
+    val loader = remember(context) { appIconLoader(context) }
+    val sizePx = with(density) { size.roundToPx() } * 2
+    Box(modifier = modifier.size(size)) {
+        PlaceholderIconUnderlay(packageName, size)
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(PackageIcon(packageName))
+                .size(sizePx, sizePx)
+                .build(),
             contentDescription = null,
-            // 彩色启动图标必须 Color.Unspecified,否则 LocalContentColor 默认值
-            // (深色主题≈白)会对位图叠加单色蒙层,导致图标全白不可读。
-            tint = Color.Unspecified,
-            modifier = modifier.size(size),
+            imageLoader = loader,
+            modifier = Modifier.size(size),
         )
-    } else {
-        Box(
-            modifier = modifier
-                .size(size)
-                .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                packageName.firstOrNull()?.uppercase() ?: "?",
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
-                style = MaterialTheme.typography.titleMedium,
-            )
-        }
     }
 }
+
+/** 占位首字母块(垫底层;图标加载成功后被 AsyncImage 覆盖)。 */
+@Composable
+private fun PlaceholderIconUnderlay(packageName: String, size: Dp) {
+    Box(
+        modifier = Modifier
+            .size(size)
+            .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            packageName.firstOrNull()?.uppercase() ?: "?",
+            color = MaterialTheme.colorScheme.onPrimaryContainer,
+            style = MaterialTheme.typography.titleMedium,
+        )
+    }
+}
+
+/** PackageManager 图标键(Coil [Keyer] 缓存键 = 包名)。 */
+internal data class PackageIcon(val packageName: String)
+
+/** 缓存键:PackageIcon → "icon:{pkg}"(跨 size 复用同一解码源)。 */
+internal object PackageIconKeyer : Keyer<PackageIcon> {
+    override fun key(data: PackageIcon, options: Options): String = "icon:${data.packageName}"
+}
+
+/**
+ * Coil Fetcher:PackageIcon → PackageManager Drawable(主进程内零拷贝,
+ * drawable 尺寸交 Coil 缩放;包不存在抛 NameNotFound → AsyncImage 空态)。
+ */
+internal object PackageIconFetcherFactory : Fetcher.Factory<PackageIcon> {
+    override fun create(data: PackageIcon, options: Options, imageLoader: ImageLoader): Fetcher =
+        object : Fetcher {
+            override suspend fun fetch(): DrawableResult {
+                val drawable: Drawable =
+                    options.context.packageManager.getApplicationIcon(data.packageName)
+                return DrawableResult(drawable, isSampled = false, dataSource = DataSource.DISK)
+            }
+        }
+}
+
+/** 共享加载器(进程级单例,装配 Keyer/Fetcher + 默认内存缓存)。 */
+internal fun appIconLoader(context: Context): ImageLoader =
+    ImageLoader.Builder(context)
+        .components {
+            add(PackageIconKeyer)
+            add(PackageIconFetcherFactory)
+        }
+        .build()
+        .also { Coil.setImageLoader(it) }

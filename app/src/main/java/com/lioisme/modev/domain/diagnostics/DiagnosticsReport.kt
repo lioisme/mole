@@ -2,6 +2,7 @@ package com.lioisme.modev.domain.diagnostics
 
 import com.lioisme.modev.data.repo.PipelineStats
 import com.lioisme.modev.domain.scope.ScopeState
+import com.lioisme.modev.domain.server.ConnectionMonitor
 
 /**
  * 诊断报告装配(V38 D2 解耦):原困在 `DiagnosticsScreen.copyDiagnostics` 的
@@ -30,6 +31,11 @@ object DiagnosticsReport {
         val portScopeLocal: String,
         val onlineTargets: String,
         val onlineTargetsValue: String,
+        val mcpServer: String,
+        val mcpDisabled: String,
+        val mcpTokenAuth: String,
+        val stateOn: String,
+        val stateOff: String,
         val statsReceived: String,
         val statsDropped: String,
         val statsWriteFailures: String,
@@ -47,11 +53,16 @@ object DiagnosticsReport {
         val externalAccess: Boolean,
         val connectedCount: Int,
         val pipelineStats: PipelineStats,
+        /** V39: MCP 服务态(启用/端口/绑定地址/令牌认证;令牌值恒不进快照)。 */
+        val mcpEnabled: Boolean,
+        val mcpPort: Int,
+        val mcpBoundAddress: String?,
+        val mcpTokenAuth: Boolean,
     )
 
     /**
      * 装配诊断文本(行序 = 诊断页行序):
-     * 框架态 → (服务错误行) → 端口行(带作用域后缀) → 在线目标 → 管道统计 7 行。
+     * 框架态 → (服务错误行) → 端口行(带作用域后缀) → 在线目标 → MCP 两行 → 管道统计 7 行。
      */
     fun build(snapshot: Snapshot, labels: Labels, formatCount: (Long) -> String): List<String> {
         val lines = mutableListOf<String>()
@@ -76,6 +87,16 @@ object DiagnosticsReport {
         val scopeSuffix = if (snapshot.externalAccess) labels.portScopeAll else labels.portScopeLocal
         line(labels.port, labels.portValue.format(snapshot.displayAddress, snapshot.port) + " " + scopeSuffix)
         line(labels.onlineTargets, labels.onlineTargetsValue.format(snapshot.connectedCount))
+        // V39: MCP 服务态(未绑定回落端口字面量;停用显式 Disabled)。
+        line(
+            labels.mcpServer,
+            if (snapshot.mcpEnabled) {
+                labels.portValue.format(snapshot.mcpBoundAddress ?: ConnectionMonitor.BIND_LOOPBACK, snapshot.mcpPort)
+            } else {
+                labels.mcpDisabled
+            },
+        )
+        line(labels.mcpTokenAuth, if (snapshot.mcpTokenAuth) labels.stateOn else labels.stateOff)
         val stats = snapshot.pipelineStats
         line(labels.statsReceived, formatCount(stats.received))
         line(labels.statsDropped, formatCount(stats.dropped))

@@ -77,8 +77,9 @@ $null = McpInitialize
 $okPing = McpRpc "ping" @{}
 Assert "M-PROTO-05c" ($okPing.status -eq 200) "re-init recover"
 
-# 回环免 Token(M-PROTO-06):整个矩阵即在该模式下运行,能走到这里即已证明
-Assert "M-PROTO-06" ($okPing.status -eq 200) "loopback no-token accepted"
+# 回环免 Token(V39 语义:令牌认证默认停用 → 回环无 Token 直通;启用后全接口强制由
+# McpServerLifecycleTest 令牌矩阵覆盖,设备侧不驱动 UI 开关)
+Assert "M-PROTO-06" ($okPing.status -eq 200) "loopback no-token accepted (token auth off by default)"
 
 # ---- 记录组(种子:RunCase 真实触发) ----
 # 环境防线(V38):宿主进程无前台服务,LDPlayer 后台可回收;ResetState 统一
@@ -216,9 +217,9 @@ $null = McpTool "spoof_global_set" @{ profileId = "auto" }
 
 # ---- 服务组 ----
 $ss = McpTool "server_status" @{}
-Assert "M-SRV-01a" ($ss.wire.port -ge 1 -and $ss.mcp.port -eq 15110 -and $ss.mcp.enabled -eq $true) "server_status wire+mcp"
-$netstat = SuShell "netstat -tln | grep 15110"
-Assert "M-SRV-01b" ("$netstat" -match "127\.0\.0\.1:15110") "netstat mcp 15110 bound"
+Assert "M-SRV-01a" ($ss.wire.port -ge 1 -and $ss.mcp.port -eq 1510 -and $ss.mcp.enabled -eq $true -and $ss.mcp.tokenAuth -eq $false) "server_status wire+mcp (V39: mcp 1510, token auth off)"
+$netstat = SuShell "netstat -tln | grep 1510"
+Assert "M-SRV-01b" ("$netstat" -match "127\.0\.0\.1:1510") "netstat mcp 1510 bound"
 
 $diag = McpTool "diagnostics" @{}
 Assert "M-SRV-02" ($null -ne $diag.stats -and $diag.report.Count -ge 10) "diagnostics stats+report"

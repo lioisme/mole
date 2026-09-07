@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ContentCut
@@ -17,16 +16,13 @@ import androidx.compose.material.icons.filled.FormatListNumbered
 import androidx.compose.material.icons.filled.RestartAlt
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,7 +33,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -65,6 +60,7 @@ import com.lioisme.modev.ui.components.IntLimitSheet
 import com.lioisme.modev.ui.components.IgnorePathSheet
 import com.lioisme.modev.ui.components.IgnoreStackSheet
 import com.lioisme.modev.ui.components.MaxBytesSheet
+import com.lioisme.modev.ui.components.ModevConfirmDialog
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
@@ -251,42 +247,42 @@ fun PerAppListenSettingsScreen(
             )
 
             SettingsSection(stringResource(R.string.section_monitor_kinds)) {
-                ListenRow(
+                ToggleListItem(
                     label = stringResource(R.string.algorithm_monitor_master),
                     checked = effective.cryptoListen,
                     onCheckedChange = { viewModel.setMaster(isCrypto = true, value = it) },
                     testTag = "listen-row-master-crypto",
                 )
                 HorizontalDivider16()
-                ListenRow(
+                ToggleListItem(
                     label = stringResource(R.string.database_monitor_master),
                     checked = effective.dbListen,
                     onCheckedChange = { viewModel.setMaster(isCrypto = false, value = it) },
                     testTag = "listen-row-master-db",
                 )
                 HorizontalDivider16()
-                ListenRow(
+                ToggleListItem(
                     label = res.getString(R.string.behavior_monitor_master),
                     checked = effective.behaviorListen,
                     onCheckedChange = { viewModel.setBehaviorMaster(it) },
                     testTag = "listen-row-master-behavior",
                 )
                 HorizontalDivider16()
-                ListenRow(
+                ToggleListItem(
                     label = res.getString(R.string.prefs_monitor_master),
                     checked = effective.prefsListen,
                     onCheckedChange = { viewModel.setPrefsMaster(it) },
                     testTag = "listen-row-master-prefs",
                 )
                 HorizontalDivider16()
-                ListenRow(
+                ToggleListItem(
                     label = res.getString(R.string.webview_monitor_master),
                     checked = effective.webviewListen,
                     onCheckedChange = { viewModel.setWebviewMaster(it) },
                     testTag = "listen-row-master-webview",
                 )
                 HorizontalDivider16()
-                ListenRow(
+                ToggleListItem(
                     label = res.getString(R.string.listen_row_master_system),
                     checked = effective.systemListen,
                     onCheckedChange = { viewModel.setSystemMaster(it) },
@@ -299,7 +295,7 @@ fun PerAppListenSettingsScreen(
             SettingsSection(stringResource(R.string.filter_type_crypto)) {
                 CategoryTaxonomy.forType(RecordType.CRYPTO).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
-                    ListenRow(
+                    ToggleListItem(
                         label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
@@ -313,7 +309,7 @@ fun PerAppListenSettingsScreen(
             SettingsSection(stringResource(R.string.filter_type_database)) {
                 CategoryTaxonomy.forType(RecordType.DATABASE).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
-                    ListenRow(
+                    ToggleListItem(
                         label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
@@ -327,7 +323,7 @@ fun PerAppListenSettingsScreen(
             SettingsSection(stringResource(R.string.filter_type_behavior)) {
                 CategoryTaxonomy.forType(RecordType.BEHAVIOR).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
-                    ListenRow(
+                    ToggleListItem(
                         label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
@@ -335,7 +331,7 @@ fun PerAppListenSettingsScreen(
                     )
                 }
                 HorizontalDivider16()
-                ListenRow(
+                ToggleListItem(
                     label = res.getString(R.string.switch_file_content_capture),
                     checked = effective.fileContentCapture,
                     onCheckedChange = { viewModel.setFileContentCapture(it) },
@@ -358,7 +354,7 @@ fun PerAppListenSettingsScreen(
             SettingsSection(stringResource(R.string.filter_type_prefs)) {
                 CategoryTaxonomy.forType(RecordType.PREFS).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
-                    ListenRow(
+                    ToggleListItem(
                         label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
@@ -372,7 +368,7 @@ fun PerAppListenSettingsScreen(
             SettingsSection(stringResource(R.string.filter_type_webview)) {
                 CategoryTaxonomy.forType(RecordType.WEBVIEW).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
-                    ListenRow(
+                    ToggleListItem(
                         label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
@@ -391,7 +387,7 @@ fun PerAppListenSettingsScreen(
                     .filter { it.domain == com.lioisme.modev.core.model.CapabilityDomain.LISTEN }
                 envObserveKinds.forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
-                    ListenRow(
+                    ToggleListItem(
                         label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
@@ -405,7 +401,7 @@ fun PerAppListenSettingsScreen(
             SettingsSection(stringResource(R.string.filter_type_system)) {
                 CategoryTaxonomy.forType(RecordType.SYSTEM).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
-                    ListenRow(
+                    ToggleListItem(
                         label = res.getString(KindLabelRes.resolve(category.id)),
                         checked = EffectiveSwitch.readKind(effective, category.id) == true,
                         onCheckedChange = { viewModel.setKind(category.id, it) },
@@ -417,7 +413,7 @@ fun PerAppListenSettingsScreen(
 
             // V25 记录选项:堆栈开关(行内 Switch)+ 单字段字节上限 / 忽略栈前缀(sheet 编辑)。
             SettingsSection(stringResource(R.string.section_record_options)) {
-                ListenRow(
+                ToggleListItem(
                     label = res.getString(R.string.switch_log_stack),
                     checked = effective.logStack,
                     onCheckedChange = { viewModel.setLogStack(it) },
@@ -504,27 +500,14 @@ fun PerAppListenSettingsScreen(
     }
 
     if (confirmReset) {
-        AlertDialog(
-            onDismissRequest = { confirmReset = false },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            icon = { Icon(Icons.Filled.RestartAlt, null) },
-            title = { Text(stringResource(R.string.danger_title)) },
-            text = {
-                Text(stringResource(R.string.danger_reset_listen_msg, viewModel.packageName))
+        ModevConfirmDialog(
+            title = stringResource(R.string.danger_title),
+            message = stringResource(R.string.danger_reset_listen_msg, viewModel.packageName),
+            onConfirm = {
+                viewModel.reset()
+                confirmReset = false
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.reset()
-                    confirmReset = false
-                }) {
-                    Text(stringResource(R.string.confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmReset = false }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { confirmReset = false },
         )
     }
 
@@ -587,52 +570,4 @@ fun PerAppListenSettingsScreen(
 /** 上限值显示惯例:≤0 = 不限(∞),否则十进制数值。 */
 private fun limitValue(value: Int): String = if (value <= 0) "∞" else value.toString()
 
-/**
- * 监听行:label(+可选 supporting 副文)+ 尾部 M3 Switch;整行 toggleable(role=Switch)
- * 单击切换,内层 Switch onCheckedChange=null 并 clearAndSetSemantics 去重(契约 13 同款语义)。
- */
-@Composable
-private fun ListenRow(
-    label: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    testTag: String,
-    supporting: String? = null,
-) {
-    ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        headlineContent = {
-            Text(
-                label,
-                style = MaterialTheme.typography.bodyLarge,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        supportingContent =
-            if (supporting.isNullOrBlank()) {
-                null
-            } else {
-                {
-                    Text(
-                        supporting,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            },
-        trailingContent = {
-            Switch(
-                checked = checked,
-                onCheckedChange = null,
-                modifier = Modifier.clearAndSetSemantics {},
-            )
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag(testTag)
-            .toggleable(value = checked, role = Role.Switch, onValueChange = onCheckedChange),
-    )
-}
 

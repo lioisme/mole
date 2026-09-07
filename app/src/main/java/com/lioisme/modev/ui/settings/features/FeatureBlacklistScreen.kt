@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -23,22 +22,16 @@ import androidx.compose.material3.InputChip
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -46,9 +39,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
+import com.lioisme.modev.ui.components.ModevInputSheet
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsSection
-import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
 import kotlinx.coroutines.launch
 
@@ -228,73 +221,29 @@ fun FeatureBlacklistScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** 黑名单追加项输入 sheet(V39 收编:统一 [ModevInputSheet] 脚手架,hide 动画收口)。 */
 @Composable
 private fun BlacklistAddSheet(
     kind: BlacklistKind,
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit,
 ) {
-    var text by remember { mutableStateOf("") }
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
     val res = rememberLocaleAwareResources()
     val numeric = kind == BlacklistKind.FRIDA_PORTS
-
-    fun confirm() {
-        val trimmed = text.trim()
-        if (trimmed.isEmpty()) return
-        if (numeric && trimmed.toIntOrNull() !in 1..65535) return
-        scope.launch { sheetState.hide() }.invokeOnCompletion { onConfirm(trimmed) }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = {
-            scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
+    ModevInputSheet(
+        title = res.getString(blacklistKindLabelRes(kind)),
+        initialValue = "",
+        label = stringResource(R.string.blacklist_value_label),
+        errorText = if (numeric) stringResource(R.string.settings_port_invalid) else "",
+        inputTestTag = "blacklist-input",
+        confirmTestTag = "blacklist-confirm",
+        validate = { text ->
+            val trimmed = text.trim()
+            trimmed.isNotEmpty() && (!numeric || trimmed.toIntOrNull() in 1..65535)
         },
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .imePadding()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 24.dp),
-        ) {
-            Text(
-                res.getString(blacklistKindLabelRes(kind)),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(16.dp))
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                label = { Text(stringResource(R.string.blacklist_value_label)) },
-                singleLine = true,
-                isError = numeric && text.isNotBlank() && text.trim().toIntOrNull() !in 1..65535,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .testTag("blacklist-input"),
-            )
-            Spacer(Modifier.height(20.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = {
-                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                }) {
-                    Text(stringResource(R.string.cancel))
-                }
-                Spacer(Modifier.width(8.dp))
-                TextButton(
-                    onClick = { confirm() },
-                    modifier = Modifier.testTag("blacklist-confirm"),
-                ) {
-                    Text(stringResource(R.string.confirm))
-                }
-            }
-        }
-    }
+        onSubmit = { onConfirm(it.trim()) },
+        onDismiss = onDismiss,
+    )
 }
 
 internal fun blacklistKindLabelRes(kind: BlacklistKind): Int = when (kind) {

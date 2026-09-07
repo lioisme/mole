@@ -66,6 +66,27 @@ class McpToolParityTest {
         assertTrue("tools missing from source declarations: $missing", missing.isEmpty())
     }
 
+    /**
+     * V39 §5.3 明示排除:令牌管理(McpTokensScreen:认证开关 / 多令牌创建撤销)
+     * **不**暴露为 MCP 工具——引导悖论(启用认证后需令牌才能调用造令牌工具,
+     * 回环自锁风险)+ PII 纪律(令牌值属宿主本地秘密,Agent 面零可见)。
+     * 本快照恒 43;若未来新增 UI 能力须同步工具面或在此登记排除理由。
+     */
+    @Test
+    fun token_management_is_documented_exclusion() {
+        val tokenTools = mcpSources()
+            .flatMap { it.readLines() }
+            .mapNotNull { line ->
+                Regex("""name\s*=\s*"([a-z_]*token[a-z_]*)"""").find(line)?.groupValues?.get(1)
+            }
+            .toSet()
+        assertTrue(
+            "token management must stay out of the MCP tool surface (bootstrap paradox + PII); " +
+                "unexpected token tools: $tokenTools",
+            tokenTools.isEmpty(),
+        )
+    }
+
     @Test
     fun mcp_layer_boundary_allowlist() {
         val forbidden = listOf(

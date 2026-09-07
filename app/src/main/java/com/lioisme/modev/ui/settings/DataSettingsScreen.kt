@@ -1,14 +1,20 @@
 package com.lioisme.modev.ui.settings
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
@@ -23,7 +29,6 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material.icons.outlined.FolderOpen
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -31,35 +36,40 @@ import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.RecordType
+import com.lioisme.modev.ui.components.AppIcon
+import com.lioisme.modev.ui.components.ModevConfirmDialog
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsInfoItem
 import com.lioisme.modev.ui.components.SettingsSection
+import com.lioisme.modev.ui.records.recordTypeCountLabelRes
 import com.lioisme.modev.ui.theme.Dimens
 import com.lioisme.modev.ui.theme.Tokens
 
-/** 待确认的清理目标(按类型 / 全部,危险 AlertDialog 确认;V37 T3.6 全 10 类型)。 */
-private sealed interface ClearTarget {
-    data class ByType(val type: RecordType) : ClearTarget
-    data object All : ClearTarget
-}
-
 /**
- * 数据管理页(V10 设置分级;V19 T7 扩展;V37 T3.6 枚举驱动全 10 记录类型):
- * 记录分类计数 + 存储占用 + 按类型清理 / 清空全部(危险操作,确认后无回收站)。
+ * 数据管理页(V10 设置分级;V19 T7 扩展;V37 T3.6 枚举驱动全 10 记录类型;
+ * V40 T4 双维度记录浏览):三区 = 类型计数(每行可点 → 按类型全局列表)+
+ * 按应用浏览(有记录的应用 → 每应用监控页)+ 存储占用与「清空全部」。
+ * V40 变更:按类型危险清理行退役——清理并入各记录列表(搜索条动作槽,
+ * 单应用/全局语境各有确认文案),本页仅保留「清空全部」兜底。
  * 新增 RecordType 零改动(RecordType.entries 驱动)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -67,12 +77,16 @@ private sealed interface ClearTarget {
 fun DataSettingsScreen(
     viewModel: DataSettingsViewModel,
     onBack: () -> Unit,
+    onOpenTypeRecords: (RecordType) -> Unit,
+    onOpenApp: (String) -> Unit,
 ) {
     val totalRecords by viewModel.totalRecords.collectAsStateWithLifecycle()
     val typeCounts by viewModel.typeCounts.collectAsStateWithLifecycle()
+    val packageCounts by viewModel.packageCounts.collectAsStateWithLifecycle()
+    val packageLabels by viewModel.packageLabels.collectAsStateWithLifecycle()
     // 存储占用:仓库唯一出口(V23 R4,DB+wal+shm;清理动作后 VM 自动重取)
     val storageBytes by viewModel.storageBytes.collectAsStateWithLifecycle()
-    var pendingClear by remember { mutableStateOf<ClearTarget?>(null) }
+    var pendingClearAll by remember { mutableStateOf(false) }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
@@ -91,6 +105,7 @@ fun DataSettingsScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             Spacer(Modifier.height(8.dp))
+            // 类型计数 → 按类型全局列表(V40 T4:行可点,testTag 携带 wire 值)。
             SettingsSection(stringResource(R.string.settings_type_counts_section)) {
                 RecordType.entries.forEach { type ->
                     SettingsInfoItem(
@@ -100,7 +115,68 @@ fun DataSettingsScreen(
                             R.string.settings_total_records_value,
                             typeCounts[type.wire] ?: 0L,
                         ),
+                        modifier = Modifier.testTag("data-type-${type.wire}"),
+                        onClick = { onOpenTypeRecords(type) },
                     )
+                }
+            }
+            Spacer(Modifier.height(Dimens.pageBottom))
+            // 按应用浏览(V40 T4 第二维度入口):有记录的应用 → 每应用监控页。
+            SettingsSection(stringResource(R.string.settings_apps_browse_section)) {
+                val packages =
+                    packageCounts.filterValues { it > 0 }.keys
+                        .sortedWith(
+                            compareBy<String> { it }
+                                .thenByDescending { packageCounts[it] ?: 0L },
+                        )
+                if (packages.isEmpty()) {
+                    // V40 T5.4:空态内联(EmptyState 组件退役)——MD3 原语组合。
+                    val emptyMessage = stringResource(R.string.apps_browse_empty)
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 24.dp)
+                                .wrapContentSize(Alignment.Center)
+                                .semantics { stateDescription = emptyMessage },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(
+                            Modifier
+                                .size(56.dp)
+                                .clip(CircleShape)
+                                .background(
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                        .copy(alpha = Tokens.emptyIconContainerAlpha),
+                                ),
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(
+                                Icons.Default.PhoneAndroid,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                    .copy(alpha = Tokens.emptyIconAlpha),
+                                modifier = Modifier.size(28.dp),
+                            )
+                        }
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            emptyMessage,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(horizontal = 32.dp),
+                        )
+                    }
+                } else {
+                    packages.forEach { pkg ->
+                        AppBrowseRow(
+                            label = packageLabels[pkg] ?: pkg,
+                            packageName = pkg,
+                            count = packageCounts.getValue(pkg),
+                            onClick = { onOpenApp(pkg) },
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(Dimens.pageBottom))
@@ -112,22 +188,16 @@ fun DataSettingsScreen(
                 )
             }
             Spacer(Modifier.height(Dimens.pageBottom))
+            // V40 T4:按类型清理退役(并入各记录列表),仅保留「清空全部」。
             SettingsSection(stringResource(R.string.settings_data_section)) {
                 SettingsInfoItem(
                     icon = Icons.Default.Storage,
                     title = stringResource(R.string.settings_total_records),
                     value = stringResource(R.string.settings_total_records_value, totalRecords),
                 )
-                RecordType.entries.forEach { type ->
-                    DangerRow(
-                        text = stringResource(recordTypeClearLabelRes(type)),
-                        onClick = { pendingClear = ClearTarget.ByType(type) },
-                        testTag = "clear-type-${type.wire}",
-                    )
-                }
                 DangerRow(
                     text = stringResource(R.string.settings_clear_all_records),
-                    onClick = { pendingClear = ClearTarget.All },
+                    onClick = { pendingClearAll = true },
                     testTag = "clear-all",
                 )
             }
@@ -135,40 +205,68 @@ fun DataSettingsScreen(
         }
     }
 
-    pendingClear?.let { target ->
-        AlertDialog(
-            onDismissRequest = { pendingClear = null },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            icon = { Icon(Icons.Default.Delete, null) },
-            title = { Text(stringResource(R.string.danger_title)) },
-            text = {
-                Text(
-                    stringResource(
-                        when (target) {
-                            is ClearTarget.ByType -> recordTypeClearMsgRes(target.type)
-                            ClearTarget.All -> R.string.danger_clear_all_msg
-                        },
-                    ),
-                )
+    if (pendingClearAll) {
+        ModevConfirmDialog(
+            title = stringResource(R.string.danger_title),
+            message = stringResource(R.string.danger_clear_all_msg),
+            onConfirm = {
+                viewModel.clearAll()
+                pendingClearAll = false
             },
-            confirmButton = {
-                TextButton(onClick = {
-                    when (target) {
-                        is ClearTarget.ByType -> viewModel.clearByType(target.type)
-                        ClearTarget.All -> viewModel.clearAll()
-                    }
-                    pendingClear = null
-                }) {
-                    Text(stringResource(R.string.confirm))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { pendingClear = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { pendingClearAll = false },
         )
     }
+}
+
+/**
+ * 按应用浏览行(V40 T4):AppIcon + 应用名(headline,目录未收录回落包名)+
+ * 包名 + 记录数(supporting)+ chevron;计数资源格式串驱动(#2 契约)。
+ */
+@Composable
+private fun AppBrowseRow(
+    label: String,
+    packageName: String,
+    count: Long,
+    onClick: () -> Unit,
+) {
+    ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        headlineContent = {
+            Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+        },
+        supportingContent = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    packageName,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                Spacer(Modifier.width(6.dp))
+                Text(
+                    // #2 契约:资源格式串 %1$,d 自带千分位,直接消费 Long 原始值。
+                    stringResource(R.string.settings_total_records_value, count),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        leadingContent = { AppIcon(packageName = packageName, size = 40.dp) },
+        trailingContent = {
+            Icon(
+                Icons.Default.ChevronRight,
+                null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = Tokens.chevronAlpha),
+                modifier = Modifier.size(20.dp),
+            )
+        },
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .testTag("data-app-$packageName")
+                .clickable(onClick = onClick),
+    )
 }
 
 /** 记录类型图标(与监控入口页同语义色系)。 */
@@ -183,48 +281,6 @@ private fun recordTypeIcon(type: RecordType): ImageVector = when (type) {
     RecordType.UI_INTERACTION -> Icons.Default.Warning
     RecordType.SYSTEM -> Icons.Default.PhoneAndroid
     RecordType.PROCESS_CONTROL -> Icons.Default.GppBad
-}
-
-/** 计数行标题(V37 T3.6:全 10 类型;既有 5 键保留,新增 5 键同构命名)。 */
-private fun recordTypeCountLabelRes(type: RecordType): Int = when (type) {
-    RecordType.CRYPTO -> R.string.settings_records_algorithm
-    RecordType.DATABASE -> R.string.settings_records_database
-    RecordType.BEHAVIOR -> R.string.settings_records_behavior
-    RecordType.PREFS -> R.string.settings_records_prefs
-    RecordType.WEBVIEW -> R.string.settings_records_webview
-    RecordType.NETWORK -> R.string.settings_records_network
-    RecordType.DEVICE_ENV -> R.string.settings_records_device_env
-    RecordType.UI_INTERACTION -> R.string.settings_records_ui_interaction
-    RecordType.SYSTEM -> R.string.settings_records_system
-    RecordType.PROCESS_CONTROL -> R.string.settings_records_process_control
-}
-
-/** 清理行标题。 */
-private fun recordTypeClearLabelRes(type: RecordType): Int = when (type) {
-    RecordType.CRYPTO -> R.string.settings_clear_algorithm_records
-    RecordType.DATABASE -> R.string.settings_clear_database_records
-    RecordType.BEHAVIOR -> R.string.settings_clear_behavior_records
-    RecordType.PREFS -> R.string.settings_clear_prefs_records
-    RecordType.WEBVIEW -> R.string.settings_clear_webview_records
-    RecordType.NETWORK -> R.string.settings_clear_network_records
-    RecordType.DEVICE_ENV -> R.string.settings_clear_device_env_records
-    RecordType.UI_INTERACTION -> R.string.settings_clear_ui_interaction_records
-    RecordType.SYSTEM -> R.string.settings_clear_system_records
-    RecordType.PROCESS_CONTROL -> R.string.settings_clear_process_control_records
-}
-
-/** 清理确认文案。 */
-private fun recordTypeClearMsgRes(type: RecordType): Int = when (type) {
-    RecordType.CRYPTO -> R.string.danger_clear_algorithm_msg
-    RecordType.DATABASE -> R.string.danger_clear_database_msg
-    RecordType.BEHAVIOR -> R.string.danger_clear_behavior_msg
-    RecordType.PREFS -> R.string.danger_clear_prefs_msg
-    RecordType.WEBVIEW -> R.string.danger_clear_webview_msg
-    RecordType.NETWORK -> R.string.danger_clear_network_msg
-    RecordType.DEVICE_ENV -> R.string.danger_clear_device_env_msg
-    RecordType.UI_INTERACTION -> R.string.danger_clear_ui_interaction_msg
-    RecordType.SYSTEM -> R.string.danger_clear_system_msg
-    RecordType.PROCESS_CONTROL -> R.string.danger_clear_process_control_msg
 }
 
 /**

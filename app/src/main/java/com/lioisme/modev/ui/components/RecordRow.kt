@@ -12,13 +12,14 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -88,63 +89,112 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 记录行(V27 M1-T3 重构,取代 V13 三级文本流):
- * 单一脚手架 [RecordListCard] 承载各族记录(Crypto/Sql,后续 Behavior),信息架构四级:
- * - leading 类别徽章(36dp 圆角方,类别色@13% 底 + 类别色图标 20dp,CIPHER 按方向换锁形);
+ * 记录行(V27 M1-T3 重构;V40 T4 行内上下文标签;V40 T5.3 ListItem 化):
+ * 标准 M3 [ListItem] 承载(RecordListCard 手搭 Row 脚手架退役),信息架构四级:
+ * - leading 类别图标(36dp 圆角方 tonal 底,类别色@13% + 类别色图标 20dp,CIPHER 按方向换锁形);
  * - headline 算法名 / SQL 首行(bodyLarge Medium mono,超长尾省略);
- * - 元行 labelMedium:类别词元(类别色)+ 操作名(+库名/行数后缀);
- * - 预览行 bodySmall mono(最有价值数据段 / SQL 预览);
- * - 尾栏:方向微徽章(labelSmall 紧凑胶囊,替代 V19 AssistChip);
- * - 行容器 surfaceContainerLow 圆角 16dp,最小高 68dp;
- * - 单击进详情、长按复制摘要([CryptoRecord.copySummary],回调由宿主接线)。
+ * - supporting 元行 labelMedium:类别词元(类别色)+ 操作名(+库名/行数后缀)
+ *   ([contextLabel] 非空时前缀「应用名 · 」——按类型全局列表的来源语境)
+ *   + 预览行 bodySmall mono(最有价值数据段 / SQL 预览);
+ * - trailing:秒级时间 + 方向微徽章(labelSmall 紧凑胶囊);
+ * - 行容器 surfaceContainerLow(列表页卡片间距由 [RecordTimelineList] padding 承担);
+ * - 单击进详情、长按复制摘要(回调由宿主接线)。
+ * `record-row` testTag、[RowPresentation] 单一数据出口、单击/长按/时间契约均不变。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun RecordRow(
     record: RowModel,
     modifier: Modifier = Modifier,
+    /** 来源语境标签(应用名;null = 单应用列表不渲染,降噪)。 */
+    contextLabel: String? = null,
     onClick: () -> Unit,
     onLongClick: () -> Unit = {},
 ) {
     val haptics = LocalHapticFeedback.current
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = MaterialTheme.shapes.large,
-        color = MaterialTheme.colorScheme.surfaceContainerLow,
-    ) {
-        val presentation =
-            when (record) {
-                is CryptoRow -> cryptoPresentation(record)
-                is SqlRow -> sqlPresentation(record)
-                is BehaviorRow -> behaviorPresentation(record)
-                is PrefsRow -> prefsPresentation(record)
-                is WebViewRow -> webviewPresentation(record)
-                is NetworkRow -> networkPresentation(record)
-                is DeviceEnvRow -> deviceEnvPresentation(record)
-                is UiInteractionRow -> uiInteractionPresentation(record)
-                is SystemRow -> systemPresentation(record)
-                is ProcessRow -> processPresentation(record)
-            }
-        Row(
-            modifier =
-                Modifier
-                    .semantics { role = Role.Button }
-                    .clip(MaterialTheme.shapes.large)
-                    .combinedClickable(
-                        onClick = onClick,
-                        onLongClick = {
-                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                            onLongClick()
-                        },
-                    )
-                    .defaultMinSize(minHeight = MIN_ROW_HEIGHT)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(SPACING.dp),
-        ) {
-            RecordListCard(presentation = presentation)
+    val presentation =
+        when (record) {
+            is CryptoRow -> cryptoPresentation(record)
+            is SqlRow -> sqlPresentation(record)
+            is BehaviorRow -> behaviorPresentation(record)
+            is PrefsRow -> prefsPresentation(record)
+            is WebViewRow -> webviewPresentation(record)
+            is NetworkRow -> networkPresentation(record)
+            is DeviceEnvRow -> deviceEnvPresentation(record)
+            is UiInteractionRow -> uiInteractionPresentation(record)
+            is SystemRow -> systemPresentation(record)
+            is ProcessRow -> processPresentation(record)
         }
-    }
+    ListItem(
+        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .defaultMinSize(minHeight = MIN_ROW_HEIGHT)
+                .semantics { role = Role.Button }
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        onLongClick()
+                    },
+                ),
+        leadingContent = {
+            LeadingIcon(icon = presentation.icon, tint = presentation.accent)
+        },
+        headlineContent = {
+            Text(
+                text = presentation.headline,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.Medium,
+                fontFamily = FontFamily.Monospace,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        },
+        supportingContent = {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                val meta =
+                    if (contextLabel != null) {
+                        buildAnnotatedString {
+                            append(contextLabel)
+                            append(SEPARATOR)
+                            append(presentation.meta)
+                        }
+                    } else {
+                        presentation.meta
+                    }
+                Text(
+                    text = meta,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                presentation.preview?.takeIf { it.isNotEmpty() }?.let { preview ->
+                    Text(
+                        text = preview,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = FontFamily.Monospace,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+        },
+        trailingContent = {
+            // 尾栏恒渲染(时间必在;徽章可选)——V20「时间恒在行内右栏」契约。
+            Column(
+                horizontalAlignment = Alignment.End,
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                TimeText(timestamp = presentation.timestamp)
+                presentation.badges.forEach { badge -> MicroBadge(badge) }
+            }
+        },
+    )
 }
 
 /** 统一行展示规格(presentation 单一数据出口,三族同构)。 */
@@ -165,50 +215,26 @@ private data class RowBadge(
     val accent: Color? = null,
 )
 
-/** 统一行卡片骨架(RowScope 内调用,weight 承载主体列)。 */
+/**
+ * leading 类别图标(V40 T5.3 内联,原 LeadingBadge 私有件):
+ * 36dp 圆角方 tonal 底(accent@13%)+ accent 图标 20dp。
+ */
 @Composable
-private fun RowScope.RecordListCard(presentation: RowPresentation) {
-    LeadingBadge(icon = presentation.icon, tint = presentation.accent)
-    Column(
-        modifier = Modifier.weight(1f),
-        verticalArrangement = Arrangement.spacedBy(2.dp),
+private fun LeadingIcon(icon: ImageVector, tint: Color) {
+    Box(
+        modifier =
+            Modifier
+                .size(BADGE_SIZE.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(tint.copy(alpha = Tokens.badgeContainerAlpha)),
+        contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = presentation.headline,
-            style = MaterialTheme.typography.bodyLarge,
-            fontWeight = FontWeight.Medium,
-            fontFamily = FontFamily.Monospace,
-            color = MaterialTheme.colorScheme.onSurface,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = tint,
+            modifier = Modifier.size(20.dp),
         )
-        Text(
-            text = presentation.meta,
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        presentation.preview?.let { preview ->
-            if (preview.isNotEmpty()) {
-                Text(
-                    text = preview,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-        }
-    }
-    // 尾栏恒渲染(时间必在;徽章可选)——V20「时间恒在行内右栏」契约。
-    Column(
-        horizontalAlignment = Alignment.End,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        TimeText(timestamp = presentation.timestamp)
-        presentation.badges.forEach { badge -> MicroBadge(badge) }
     }
 }
 
@@ -232,29 +258,6 @@ private fun TimeText(timestamp: Long) {
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
-}
-
-/** leading 类别徽章(36dp 圆角方,accent@13% 容器 + accent 图标;纯装饰语义)。 */
-@Composable
-private fun LeadingBadge(
-    icon: ImageVector,
-    tint: Color,
-) {
-    Box(
-        modifier =
-            Modifier
-                .size(BADGE_SIZE.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(tint.copy(alpha = Tokens.badgeContainerAlpha)),
-        contentAlignment = Alignment.Center,
-    ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            tint = tint,
-            modifier = Modifier.size(20.dp),
-        )
-    }
 }
 
 /** 尾栏微徽章(方向/状态;紧凑胶囊)。 */
@@ -588,6 +591,9 @@ private const val BADGE_SIZE = 36
 
 /** 行内元素间距。 */
 private const val SPACING = 12
+
+/** 元行来源语境与应用内原词元的分隔(V40 T4)。 */
+private const val SEPARATOR = " · "
 
 // ---------------------------------------------------------------------------
 // WebView 标签资源(V29 一等公民)

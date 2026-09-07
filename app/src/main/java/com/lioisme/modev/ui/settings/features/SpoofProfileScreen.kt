@@ -1,45 +1,34 @@
 package com.lioisme.modev.ui.settings.features
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -51,7 +40,11 @@ import com.lioisme.modev.core.model.FeatureConfig
 import com.lioisme.modev.core.model.SpoofProfiles
 import com.lioisme.modev.ui.apps.spoofProfileLabelRes
 import com.lioisme.modev.ui.components.HorizontalDivider16
+import com.lioisme.modev.ui.components.ModevConfirmDialog
+import com.lioisme.modev.ui.components.ModevSheet
+import com.lioisme.modev.ui.components.ModevSheetButtonRow
 import com.lioisme.modev.ui.components.ModevTopBar
+import com.lioisme.modev.ui.components.SheetContentPadding
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
@@ -252,31 +245,19 @@ fun SpoofProfileScreen(
     }
 
     pendingDeleteKey?.let { key ->
-        AlertDialog(
-            onDismissRequest = { pendingDeleteKey = null },
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-            icon = { Icon(Icons.Filled.Delete, null) },
-            title = { Text(stringResource(R.string.danger_title)) },
-            text = { Text(stringResource(R.string.profiles_override_delete_confirm, key)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.removeOverride(key)
-                    pendingDeleteKey = null
-                }) {
-                    Text(stringResource(R.string.confirm))
-                }
+        ModevConfirmDialog(
+            title = stringResource(R.string.danger_title),
+            message = stringResource(R.string.profiles_override_delete_confirm, key),
+            onConfirm = {
+                viewModel.removeOverride(key)
+                pendingDeleteKey = null
             },
-            dismissButton = {
-                TextButton(onClick = { pendingDeleteKey = null }) {
-                    Text(stringResource(R.string.cancel))
-                }
-            },
+            onDismiss = { pendingDeleteKey = null },
         )
     }
 }
 
-/** 覆写条目编辑 sheet(键 + 值;契约 4)。 */
-@OptIn(ExperimentalMaterial3Api::class)
+/** 覆写条目编辑 sheet(键 + 值;契约 4;V39 收编统一 [ModevSheet] 脚手架)。 */
 @Composable
 private fun OverrideEditSheet(
     existingKeys: Set<String>,
@@ -285,36 +266,12 @@ private fun OverrideEditSheet(
 ) {
     var key by remember { mutableStateOf("") }
     var value by remember { mutableStateOf("") }
-    val sheetState = rememberModalBottomSheetState()
-    val scope = rememberCoroutineScope()
-    val res = rememberLocaleAwareResources()
 
-    fun confirm() {
-        val trimmed = key.trim()
-        if (trimmed.isEmpty()) return
-        scope.launch { sheetState.hide() }.invokeOnCompletion { onConfirm(trimmed, value.trim()) }
-    }
-
-    ModalBottomSheet(
-        onDismissRequest = {
-            scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-        },
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .imePadding()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 24.dp),
-        ) {
-            Text(
-                stringResource(R.string.profiles_override_add),
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.SemiBold,
-            )
-            Spacer(Modifier.height(4.dp))
+    ModevSheet(
+        title = stringResource(R.string.profiles_override_add),
+        onDismiss = onDismiss,
+    ) { sheet ->
+        Column(Modifier.fillMaxWidth().padding(SheetContentPadding)) {
             Text(
                 stringResource(R.string.profiles_override_key_hint),
                 style = MaterialTheme.typography.bodySmall,
@@ -342,20 +299,16 @@ private fun OverrideEditSheet(
                     .testTag("profile-override-value"),
             )
             Spacer(Modifier.height(20.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                TextButton(onClick = {
-                    scope.launch { sheetState.hide() }.invokeOnCompletion { onDismiss() }
-                }) {
-                    Text(stringResource(R.string.cancel))
-                }
-                Spacer(Modifier.width(8.dp))
-                TextButton(
-                    onClick = { confirm() },
-                    modifier = Modifier.testTag("profile-override-confirm"),
-                ) {
-                    Text(stringResource(R.string.confirm))
-                }
-            }
+            ModevSheetButtonRow(
+                onConfirm = {
+                    val trimmed = key.trim()
+                    if (trimmed.isNotEmpty()) {
+                        sheet.dismissWith { onConfirm(trimmed, value.trim()) }
+                    }
+                },
+                onCancel = onDismiss,
+                confirmTestTag = "profile-override-confirm",
+            )
         }
     }
 }

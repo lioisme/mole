@@ -19,6 +19,7 @@ import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
 import androidx.compose.ui.test.printToLog
@@ -155,9 +156,14 @@ class MonitorListScreensTest {
         assertTrue("等待「显示 Xposed 模块」生效后被测包行应出现", rowFound)
         rule.onNodeWithText(ownPackage).performClick()
         rule.waitForIdle()
-        // V20:入口页两记录入口(单应用列表)。
-        rule.onNodeWithText(str(R.string.algorithm_records_title)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.database_records_title)).assertIsDisplayed()
+        // V20:入口页两记录入口(单应用列表)。V40 T4 健壮性:入口行位于
+        // Hero/统计区之下,先滚动至可见再断言(修复 V39 报告记录的预存假失败)。
+        rule.onNodeWithText(str(R.string.algorithm_records_title))
+            .performScrollTo()
+            .assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.database_records_title))
+            .performScrollTo()
+            .assertIsDisplayed()
     }
 
     private fun openList(entryLabel: String) {
@@ -189,10 +195,15 @@ class MonitorListScreensTest {
         rule.onAllNodes(hasText(text, substring = substring)).assertCountEquals(0)
     }
 
-    /** 行级断言:含某文本的记录行(列表渲染两份时按节点计数)。 */
+    /**
+     * 行级断言:含某文本的记录行(列表渲染两份时按节点计数)。
+     * V40 T5.3:RecordRow 改 M3 ListItem 后内容槽合并为单一语义节点,
+     * 行内文本不再是后代 → testTag 节点自身 Text 匹配(AGENTS #13 同源口径)。
+     */
     private fun rowCount(text: String, substring: Boolean = false) =
-        rule.onAllNodes(hasTestTag("record-row") and hasAnyDescendant(hasText(text, substring = substring)))
-            .fetchSemanticsNodes().size
+        rule.onAllNodes(
+            hasTestTag("record-row") and hasText(text, substring = substring),
+        ).fetchSemanticsNodes().size
 
     /** 超时诊断:打印当前语义树(全部 root 窗口,含 Dialog)。 */
     private fun dumpTree() {
@@ -276,7 +287,10 @@ class MonitorListScreensTest {
         // 搜索词过滤(展开搜索视图输入 → SQL 侧过滤)。
         rule.onNodeWithText(str(R.string.algorithm_records_search)).performClick()
         rule.waitForIdle()
-        rule.onNode(hasSetTextAction()).performTextInput("AES")
+        // V40 T5.1:折叠条(标准 InputField)+ 展开视图双输入域并存 → 取 Dialog 窗口内者。
+        rule.onNode(
+            hasSetTextAction() and hasAnyAncestor(isDialog()),
+        ).performTextInput("AES")
         rule.waitForIdle()
         waitForHidden("SHA-256")
         // 收起搜索视图(Dialog 内返回键;物理返回键在该测试环境不达 Dialog 窗口)。

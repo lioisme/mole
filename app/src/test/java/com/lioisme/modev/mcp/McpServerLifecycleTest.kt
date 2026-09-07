@@ -55,7 +55,8 @@ class McpServerLifecycleTest {
         server = McpServer(
             port = 0, // 内核分配空闲端口
             externalAccess = false,
-            token = "test-token",
+            tokenAuthEnabled = false,
+            requiredTokens = setOf("test-token"),
             serverInfo = JsonObject().apply {
                 addProperty("name", "modev")
                 addProperty("version", "test")
@@ -240,9 +241,26 @@ class McpServerLifecycleTest {
     }
 
     @Test
-    fun external_access_requires_bearer_token() {
+    fun external_access_without_auth_serves_unauthenticated() {
+        // V40 D-4 解耦:外部访问开启而令牌认证停用 = 用户显式选择的无认证监听,
+        // 服务端不再强制 Bearer(0.0.0.0 无认证可直连)。
         server.stop()
         server.externalAccess = true
+        server.port = 0
+        server.start()
+        val p = server.actualPort()
+        assertTrue(p > 0)
+        val init = """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}"""
+        val (ok, headers, _) = postOn(p, init, auth = null)
+        assertEquals("无认证头部必须直通(认证仅由 tokenAuthEnabled 决定)", 200, ok)
+        assertNotNull(headers["Mcp-Session-Id"]?.firstOrNull())
+    }
+
+    @Test
+    fun external_access_with_auth_requires_bearer_token() {
+        server.stop()
+        server.externalAccess = true
+        server.tokenAuthEnabled = true
         server.port = 0
         server.start()
         val p = server.actualPort()
@@ -253,6 +271,56 @@ class McpServerLifecycleTest {
         val (ok, headers, _) = postOn(p, init, auth = "Bearer test-token")
         assertEquals(200, ok)
         assertNotNull(headers["Mcp-Session-Id"]?.firstOrNull())
+    }
+
+    // ---- V39 令牌矩阵 ----
+
+    private val initBody = """{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18"}}"""
+
+    @Test
+    fun token_auth_off_accepts_loopback_without_header() {
+        // 默认停用:回环无 Authorization 直通(setUp 即 tokenAuthEnabled=false)
+        val (code, _, _) = post(initBody)
+        assertEquals(200, code)
+    }
+
+    @Test
+    fun token_auth_enforced_on_loopback_when_enabled() {
+        server.tokenAuthEnabled = true
+        val (noHeader, _, _) = post(initBody)
+        assertEquals("回环同样强制(V39 全接口语义)", 401, noHeader)
+        val (wrong, _, _) = post(initBody, auth = "Bearer nope")
+        assertEquals(401, wrong)
+        val (ok, headers, _) = post(initBody, auth = "Bearer test-token")
+        assertEquals(200, ok)
+        assertNotNull(headers["Mcp-Session-Id"]?.firstOrNull())
+    }
+
+    @Test
+    fun multiple_tokens_all_accepted_and_revoked_rejected() {
+        server.tokenAuthEnabled = true
+        server.requiredTokens = setOf("token-a", "token-b")
+        assertEquals(200, post(initBody, auth = "Bearer token-a").first)
+        assertEquals(200, post(initBody, auth = "Bearer token-b").first)
+        // 撤销即时生效(原地更新校验集,不重启不踢会话)
+        server.requiredTokens = setOf("token-b")
+        assertEquals(401, post(initBody, auth = "Bearer token-a").first)
+        assertEquals(200, post(initBody, auth = "Bearer token-b").first)
+    }
+
+    @Test
+    fun empty_token_set_denies_all_when_auth_enabled() {
+        server.tokenAuthEnabled = true
+        server.requiredTokens = emptySet()
+        assertEquals(401, post(initBody, auth = "Bearer anything").first)
+        assertEquals(401, post(initBody).first)
+    }
+
+    @Test
+    fun bound_address_tracks_bind_state() {
+        assertEquals("127.0.0.1", server.boundAddress.value)
+        server.stop()
+        assertEquals(null, server.boundAddress.value)
     }
 
     private fun postOn(port: Int, body: String, auth: String?): Triple<Int, Map<String, List<String>>, String> {

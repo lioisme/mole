@@ -178,12 +178,13 @@ class SettingsRepository(
 
     private val _serverPort = MutableStateFlow(WireProtocol.PORT)
 
-    /** 服务监听端口(V29):默认1510,可自定义。 */
+    /** 服务监听端口(V29):默认 1511(V39:1510 让位 MCP),可自定义。 */
     val serverPort: StateFlow<Int> = _serverPort
 
     /**
      * 写入监听端口并即时生效:本地持久化 → 服务端改绑新端口([ConfigServer.restart],
-     * 已连接会话由注入侧重连循环恢复;当前 hook 侧使用同一默认常量,非1510时需后续同步)。
+     * 已连接会话由注入侧重连循环恢复;hook 侧与宿主同 APK 共享 [WireProtocol.PORT] 常量,
+     * 非默认端口时注入侧以磁盘兜底/握手重连自适应)。
      */
     suspend fun setServerPort(port: Int) {
         val clamped = port.coerceIn(1, 65535)
@@ -289,25 +290,38 @@ class SettingsRepository(
     /** 全局功能配置(伪装画像选择 + 黑名单追加项;所有作用域包的 feature 默认值)。 */
     val globalFeature: StateFlow<FeatureConfig> = _globalFeature
 
-    // ---- V38 MCP 服务配置(宿主本地;与 wire ConfigServer 完全独立) ----
+    // ---- V38 MCP 服务配置(V39 令牌化;宿主本地;与 wire ConfigServer 完全独立) ----
 
     private val _mcpEnabled = MutableStateFlow(true)
 
-    /** MCP 服务启用(V38):默认 true = 随宿主进程常驻(回环,免 Token)。 */
+    /** MCP 服务启用(V38):默认 true = 随宿主进程常驻(V39:默认回环 127.0.0.1:1510,令牌认证默认停用)。 */
     val mcpEnabled: StateFlow<Boolean> = _mcpEnabled
 
     private val _mcpPort = MutableStateFlow(com.lioisme.modev.mcp.protocol.McpProtocol.DEFAULT_PORT)
 
-    /** MCP 监听端口(V38):默认 15110,与 wire 1510 区隔。 */
+    /** MCP 监听端口(V39):默认 1510,与 wire 1511 区隔。 */
     val mcpPort: StateFlow<Int> = _mcpPort
 
     private val _mcpExternalAccess = MutableStateFlow(false)
 
-    /** MCP 外部访问(V38):false(默认)= 127.0.0.1 免 Token;true = 0.0.0.0 强制 Bearer。 */
+    /** MCP 外部访问(V38;V40 D-4 起与令牌认证互相独立):false(默认)= 127.0.0.1;true = 0.0.0.0。 */
     val mcpExternalAccess: StateFlow<Boolean> = _mcpExternalAccess
 
-    /** MCP 回调:配置变更后由仓库驱动服务端重启(setter 装配,AppContainer 接线)。 */
+    private val _mcpTokenAuth = MutableStateFlow(false)
+
+    /** MCP 令牌认证(V39):默认停用;启用后**全接口**(含回环 adb forward)必须携带 Bearer 令牌。 */
+    val mcpTokenAuth: StateFlow<Boolean> = _mcpTokenAuth
+
+    private val _mcpTokens = MutableStateFlow<List<com.lioisme.modev.core.model.McpTokenEntry>>(emptyList())
+
+    /** MCP 令牌列表(V39):多令牌;创建/撤销即时生效(原地更新校验集,不重启 socket、不踢会话)。 */
+    val mcpTokens: StateFlow<List<com.lioisme.modev.core.model.McpTokenEntry>> = _mcpTokens
+
+    /** MCP 回调:端口/绑定/启停变更后由仓库驱动服务端重启(setter 装配,AppContainer 接线)。 */
     var mcpRestarter: (() -> Unit)? = null
+
+    /** MCP 回调:令牌集合变更后原地推送服务端校验集(无需重启,避免踢掉已连会话)。 */
+    var mcpTokenSetUpdater: ((Set<String>) -> Unit)? = null
 
     /** 写 MCP 启用开关:持久化 → 内存 → 异步 start/stop。 */
     suspend fun setMcpEnabled(enabled: Boolean) {
@@ -328,13 +342,56 @@ class SettingsRepository(
         mcpRestarter?.invoke()
     }
 
-    /** 写 MCP 外部访问:持久化 → 内存 → 异步重启改绑(开启侧强制 Bearer 由服务端执行)。 */
+    /**
+     * 写 MCP 外部访问(V40 D-4 解耦):true = 改绑 0.0.0.0,与令牌认证**相互独立**——
+     * 是否要求 Bearer 完全由令牌认证开关决定;false = 仅改绑回环。
+     */
     suspend fun setMcpExternalAccess(enabled: Boolean) {
         withContext(Dispatchers.IO) {
             localPrefs.edit { putBoolean(ConfigKeys.MCP_EXTERNAL_ACCESS, enabled) }
         }
         _mcpExternalAccess.value = enabled
         mcpRestarter?.invoke()
+    }
+
+    /**
+     * 写 MCP 令牌认证(V40 D-4 解耦):true = 启用后全接口强制 Bearer(列表为空即时派生一枚,
+     * 避免「启用即锁死」);false = 停用认证。与外部访问无级联——外部 0.0.0.0 监听
+     * 是否可无认证访问由用户显式选择(UI 文案承载风险提示)。
+     */
+    suspend fun setMcpTokenAuth(enabled: Boolean) {
+        if (enabled && _mcpTokens.value.isEmpty()) {
+            persistMcpTokens(_mcpTokens.value + com.lioisme.modev.core.model.McpTokenEntry.create(label = ""))
+        }
+        persistMcpTokenAuth(enabled)
+        mcpRestarter?.invoke()
+    }
+
+    /** 新增令牌(label 可空 = 未命名,UI 回落资源文案):持久化 → 原地更新校验集;返回新条目。 */
+    suspend fun addMcpToken(label: String): com.lioisme.modev.core.model.McpTokenEntry {
+        val entry = com.lioisme.modev.core.model.McpTokenEntry.create(label.trim())
+        persistMcpTokens(_mcpTokens.value + entry)
+        return entry
+    }
+
+    /** 撤销令牌:持久化 → 原地更新校验集;撤销最后一枚不自动停用认证(空集合 = 全拒,UI 提示)。 */
+    suspend fun revokeMcpToken(id: String) {
+        persistMcpTokens(_mcpTokens.value.filterNot { it.id == id })
+    }
+
+    private suspend fun persistMcpTokenAuth(enabled: Boolean) {
+        withContext(Dispatchers.IO) {
+            localPrefs.edit { putBoolean(ConfigKeys.MCP_TOKEN_AUTH, enabled) }
+        }
+        _mcpTokenAuth.value = enabled
+    }
+
+    private suspend fun persistMcpTokens(tokens: List<com.lioisme.modev.core.model.McpTokenEntry>) {
+        withContext(Dispatchers.IO) {
+            localPrefs.edit { putString(ConfigKeys.MCP_TOKENS, gson.toJson(tokens)) }
+        }
+        _mcpTokens.value = tokens
+        mcpTokenSetUpdater?.invoke(tokens.map { it.value }.toSet())
     }
 
     /**
@@ -385,28 +442,39 @@ class SettingsRepository(
             // 服务端可能已在容器惰性初始化时以回环启动,restart 立即改绑全接口
             scope.launch { server.restart() }
         }
-        // V29:恢复服务监听端口偏好(进程重启后重放;默认1510零动作)
+        // V29:恢复服务监听端口偏好(进程重启后重放;默认 1511 零动作)
         val storedPort = localPrefs.getInt(ConfigKeys.SERVER_PORT, WireProtocol.PORT)
         if (storedPort != WireProtocol.PORT) {
             _serverPort.value = storedPort
             server.port = storedPort
             scope.launch { server.restart() }
         }
-        // V38:恢复 MCP 服务偏好(进程重启后重放;enabled 默认 true,端口/外部访问默认零动作)
+        // V38→V39:恢复 MCP 服务偏好(进程重启后重放;enabled 默认 true,端口/外部访问默认零动作)
         _mcpEnabled.value = localPrefs.getBoolean(ConfigKeys.MCP_ENABLED, true)
-        val storedMcpPort = localPrefs.getInt(ConfigKeys.MCP_PORT, com.lioisme.modev.mcp.protocol.McpProtocol.DEFAULT_PORT)
-        _mcpPort.value = storedMcpPort
+        _mcpPort.value = localPrefs.getInt(ConfigKeys.MCP_PORT, com.lioisme.modev.mcp.protocol.McpProtocol.DEFAULT_PORT)
         val storedMcpExternal = localPrefs.getBoolean(ConfigKeys.MCP_EXTERNAL_ACCESS, false)
         _mcpExternalAccess.value = storedMcpExternal
-    }
-
-    /** MCP Token 读取(自动生成惰性;AppContainer 装配期一次)。 */
-    fun mcpToken(): String {
-        var token = localPrefs.getString(ConfigKeys.MCP_TOKEN, null)
-        if (token.isNullOrBlank()) {
-            token = java.util.UUID.randomUUID().toString().replace("-", "")
-            localPrefs.edit { putString(ConfigKeys.MCP_TOKEN, token) }
+        // V39 令牌迁移:旧单键 mcp_token 导入为未命名条目(一次性,导入后删旧键);
+        // 令牌认证直读偏好(V40 D-4 解耦;V39 升级用户曾级联写入过显式 prefs 值,保持不变)。
+        var tokens = localPrefs.getString(ConfigKeys.MCP_TOKENS, null)
+            ?.let { runCatching { gson.fromJson(it, Array<com.lioisme.modev.core.model.McpTokenEntry>::class.java).toList() }.getOrNull() }
+            ?: emptyList()
+        val legacyToken = localPrefs.getString(ConfigKeys.MCP_TOKEN, null)
+        if (!legacyToken.isNullOrBlank() && tokens.none { it.value == legacyToken }) {
+            tokens = tokens + com.lioisme.modev.core.model.McpTokenEntry(
+                id = java.util.UUID.randomUUID().toString().replace("-", ""),
+                label = "",
+                value = legacyToken,
+                createdAt = 0L,
+            )
+            localPrefs.edit {
+                putString(ConfigKeys.MCP_TOKENS, gson.toJson(tokens))
+                remove(ConfigKeys.MCP_TOKEN)
+            }
         }
-        return token
+        _mcpTokens.value = tokens
+        // V40 D-4 解耦:令牌认证直读偏好,不再按外部访问重推导(升级用户若曾依赖
+        // V39 级联语义,升级后保持 prefs 中的显式值;V39 未级联写入过 prefs 时默认停用)。
+        _mcpTokenAuth.value = localPrefs.getBoolean(ConfigKeys.MCP_TOKEN_AUTH, false)
     }
 }
