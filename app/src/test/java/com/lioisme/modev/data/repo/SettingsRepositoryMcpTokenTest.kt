@@ -94,8 +94,8 @@ class SettingsRepositoryMcpTokenTest {
     @Test
     fun `external access independent of token auth`() {
         val r = repo()
-        runBlocking { r.setMcpExternalAccess(true) }
-        assertTrue(r.mcpExternalAccess.value)
+        runBlocking { r.setExternalAccess(true) }
+        assertTrue(r.serverExternalAccess.value)
         assertFalse("外部访问与令牌认证互相独立,不得级联启用认证", r.mcpTokenAuth.value)
         assertTrue("不得自动派生令牌", r.mcpTokens.value.isEmpty())
     }
@@ -103,11 +103,11 @@ class SettingsRepositoryMcpTokenTest {
     @Test
     fun `disabling auth keeps external access on`() {
         val r = repo()
-        runBlocking { r.setMcpExternalAccess(true) }
+        runBlocking { r.setExternalAccess(true) }
         runBlocking { r.setMcpTokenAuth(true) }
         runBlocking { r.setMcpTokenAuth(false) }
         assertFalse(r.mcpTokenAuth.value)
-        assertTrue("关认证不得级联关闭外部访问", r.mcpExternalAccess.value)
+        assertTrue("关认证不得级联关闭外部访问", r.serverExternalAccess.value)
     }
 
     @Test
@@ -139,18 +139,19 @@ class SettingsRepositoryMcpTokenTest {
 
     @Test
     fun `external access and auth states replay from prefs`() {
+        // V41 统一键:统一键置位 + 令牌认证直读(双键分裂已退役)。
         prefs.edit()
-            .putBoolean(ConfigKeys.MCP_EXTERNAL_ACCESS, true)
+            .putBoolean(ConfigKeys.SERVER_EXTERNAL_ACCESS, true)
             .putBoolean(ConfigKeys.MCP_TOKEN_AUTH, true)
             .commit()
         val r = repo()
-        assertTrue(r.mcpExternalAccess.value)
+        assertTrue(r.serverExternalAccess.value)
         assertTrue(r.mcpTokenAuth.value)
 
         // V40 D-4:外部访问开而认证关 = 合法组合,重启后原样重放。
         prefs.edit().putBoolean(ConfigKeys.MCP_TOKEN_AUTH, false).commit()
         val r2 = repo()
-        assertTrue(r2.mcpExternalAccess.value)
+        assertTrue(r2.serverExternalAccess.value)
         assertFalse("认证不得按外部访问重推导", r2.mcpTokenAuth.value)
     }
 

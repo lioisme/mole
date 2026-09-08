@@ -581,9 +581,7 @@ fun ModevNavHost(navController: NavHostController) {
                     onOpenTypeRecords = { type ->
                         navController.navigateGuarded(ModevRoutes.globalTypeRecords(type.wire))
                     },
-                    onOpenApp = { pkg ->
-                        navController.navigateGuarded(ModevRoutes.appMonitor(pkg))
-                    },
+                    // V41 T5:按应用浏览退役——onOpenApp 接线拆除,应用维度唯一入口 = 主列表。
                 )
             }
         }

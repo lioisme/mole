@@ -2,8 +2,8 @@ package com.lioisme.modev
 
 import android.content.Context
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertCountEquals
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.hasText
@@ -37,8 +37,10 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 数据管理页验收(V19 T7;V40 T4 双维度记录浏览重构):
- * - 分类计数(可点 → 全局列表回调)与按应用浏览(计数>0 的应用 → 监控页回调);
+ * 数据管理页验收(V19 T7;V40 T4 双维度;V41 T5 收敛):
+ * - 分类计数(可点 → 全局列表回调);
+ * - 「按应用浏览」已退役(V41)——`data-app-*` 行与入口回调不复存在,
+ *   应用维度唯一入口 = 主界面应用列表;
  * - 按类型危险清理行退役(清理并入各记录列表),仅保留「清空全部」(确认/取消路径);
  * - 存储占用 = 与生产同源计算值。
  */
@@ -93,7 +95,6 @@ class DataSettingsScreenTest {
                 viewModel = robot.vm,
                 onBack = {},
                 onOpenTypeRecords = robot::onOpenType,
-                onOpenApp = robot::onOpenApp,
             )
         }
     }
@@ -102,20 +103,15 @@ class DataSettingsScreenTest {
     private class Robot {
         lateinit var vm: DataSettingsViewModel
         val openedTypes = mutableListOf<RecordType>()
-        val openedApps = mutableListOf<String>()
 
         fun onOpenType(type: RecordType) {
             openedTypes += type
         }
-
-        fun onOpenApp(pkg: String) {
-            openedApps += pkg
-        }
     }
 
-    /** 内存库端到端:计数渲染 + 类型行/应用行导航回调 + 危险行退役 + 清空全部。 */
+    /** 类型计数可点回调 + 按应用浏览退役红线(V41 T5)。 */
     @Test
-    fun typeCounts_clickableRows_andBrowseByApp() {
+    fun typeCounts_clickableRows_andAppBrowseRetired() {
         val robot = Robot()
         val db = Room.inMemoryDatabaseBuilder(ctx, ModevDatabase::class.java).build()
         val dao = db.cryptoRecordDao()
@@ -135,17 +131,15 @@ class DataSettingsScreenTest {
         rule.onNodeWithText(str(R.string.settings_records_database)).performClick()
         rule.waitForIdle()
         assertEquals(listOf(RecordType.CRYPTO, RecordType.DATABASE), robot.openedTypes)
-        assertEquals(listOf(RecordType.CRYPTO, RecordType.DATABASE), robot.openedTypes)
 
-        // 按应用浏览:两个有记录的应用各一行,点击 → 监控页回调。
-        waitForVisible(str(R.string.settings_apps_browse_section))
-        scrollTo("pkg.test")
-        rule.onNodeWithText("pkg.test").performClick()
-        rule.waitForIdle()
-        scrollTo("pkg.other")
-        rule.onNodeWithText("pkg.other").performClick()
-        rule.waitForIdle()
-        assertEquals(listOf("pkg.test", "pkg.other"), robot.openedApps)
+        // V41 T5 红线:按应用浏览区退役——分区文案/应用行全库不复存在。
+        scrollTo(str(R.string.settings_records_database))
+        rule.onAllNodesWithTag("data-app-pkg.test", useUnmergedTree = true).assertCountEquals(0)
+        rule.onAllNodesWithTag("data-app-pkg.other", useUnmergedTree = true).assertCountEquals(0)
+        assertTrue(
+            "按应用浏览应用行不得复活",
+            rule.onAllNodesWithText("pkg.test").fetchSemanticsNodes().isEmpty(),
+        )
 
         db.close()
     }

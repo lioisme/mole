@@ -74,9 +74,10 @@ class LanguageHotSwitchTest {
             rule.waitForIdle()
 
             // 零重建:Activity 未被销毁,设置页仍在前台且文本即时切换。
+            // V41 T6:语言行并入「General」分区(旧「Language & Region」分区标题退役)。
             assertEquals(0, destroyed)
             rule.onNodeWithText("Settings").assertIsDisplayed()
-            rule.onNodeWithText("Language & Region").assertIsDisplayed()
+            rule.onNodeWithText("General").assertIsDisplayed()
 
             // 导航栈保留:返回仍落应用列表(筛选按钮唯一)。切换后 UI 已是英文,
             // 测试侧 str() 经未包装的 Application 上下文仍解析中文——此处须用
@@ -103,5 +104,76 @@ class LanguageHotSwitchTest {
         LocaleManager.setLanguage(ctx, LocaleManager.TAG_EN)
         rule.waitForIdle()
         rule.onNodeWithContentDescription("Back").assertIsDisplayed()
+    }
+
+    @Test
+    fun jaKo_hotSwitch_rendersNativeTexts_zeroRecreation() {
+        // V42 T5:ja/ko 新增语言热切换(资源解析驱动断言,不硬编码日韩字面量;
+        // 零重建契约同 R1——生命周期计数法沿用)。
+        val app = ctx.applicationContext as Application
+        var destroyed = 0
+        val callback =
+            object : Application.ActivityLifecycleCallbacks {
+                override fun onActivityCreated(activity: Activity, savedInstanceState: Bundle?) = Unit
+                override fun onActivityStarted(activity: Activity) = Unit
+                override fun onActivityResumed(activity: Activity) = Unit
+                override fun onActivityPaused(activity: Activity) = Unit
+                override fun onActivityStopped(activity: Activity) = Unit
+                override fun onActivitySaveInstanceState(activity: Activity, outState: Bundle) = Unit
+                override fun onActivityDestroyed(activity: Activity) {
+                    destroyed++
+                }
+            }
+        app.registerActivityLifecycleCallbacks(callback)
+        try {
+            // ja 切换:设置页标题即时渲染日文。
+            LocaleManager.setLanguage(ctx, LocaleManager.TAG_JA)
+            rule.waitForIdle()
+            assertEquals(0, destroyed)
+            rule.onNodeWithText(LocaleManager.wrap(ctx).getString(R.string.settings_title)).assertIsDisplayed()
+
+            // ja → ko 直切:全站文本即时更替(多语言链路无中间回退)。
+            LocaleManager.setLanguage(ctx, LocaleManager.TAG_KO)
+            rule.waitForIdle()
+            assertEquals(0, destroyed)
+            rule.onNodeWithText(LocaleManager.wrap(ctx).getString(R.string.settings_title)).assertIsDisplayed()
+
+            // 语言选择面板出现 ja/ko 自名选项(选择器完备性)。
+            rule.onNodeWithText(str(R.string.language)).performClick()
+            rule.waitForIdle()
+            rule.onNodeWithText("日本語").assertIsDisplayed()
+            rule.onNodeWithText("한국어").assertIsDisplayed()
+            // 关闭面板(点选当前语言外的取消路径:直接按返回)。
+            InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
+            rule.waitForIdle()
+        } finally {
+            app.unregisterActivityLifecycleCallbacks(callback)
+        }
+    }
+
+    @Test
+    fun jaKo_uiSelection_appliesAndUpdatesTitle() {
+        // V42 T5 补强:经语言面板 **UI 点选** 日本語/한국어(非编程直设)——
+        // 选择行 → 热切换生效 → 标题即时更替 → localeFlow 单源同步。
+        rule.waitForIdle()
+        rule.onNodeWithContentDescription(str(R.string.cd_settings)).performClick()
+        rule.waitForIdle()
+
+        // 语言行(当前跟随系统,行标签为设备默认语言;经未包装上下文解析)。
+        rule.onNodeWithText(str(R.string.language)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("日本語").performClick()
+        rule.waitForIdle()
+        // 切换后设置页标签即时日文化(经包装上下文解析 ja 文案)。
+        assertEquals(LocaleManager.TAG_JA, LocaleManager.currentLanguageTag)
+        rule.onNodeWithText(LocaleManager.wrap(ctx).getString(R.string.settings_title)).assertIsDisplayed()
+
+        // 再次打开面板(行标签已是 ja)→ 点选 한국어。
+        rule.onNodeWithText(LocaleManager.wrap(ctx).getString(R.string.language)).performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText("한국어").performClick()
+        rule.waitForIdle()
+        assertEquals(LocaleManager.TAG_KO, LocaleManager.currentLanguageTag)
+        rule.onNodeWithText(LocaleManager.wrap(ctx).getString(R.string.settings_title)).assertIsDisplayed()
     }
 }

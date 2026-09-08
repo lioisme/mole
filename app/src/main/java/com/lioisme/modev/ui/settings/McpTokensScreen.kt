@@ -149,7 +149,11 @@ fun McpTokensScreen(
                 SettingsToggleItem(
                     icon = Icons.Default.Key,
                     title = stringResource(R.string.mcp_token_auth),
-                    subtitle = stringResource(R.string.mcp_token_auth_hint),
+                    subtitle = if (tokenAuth) {
+                        TOKEN_AUTH_BEARER_SUBTITLE
+                    } else {
+                        stringResource(R.string.mcp_token_auth_off_hint)
+                    },
                     checked = tokenAuth,
                     modifier = Modifier.testTag("token-auth-toggle"),
                     onCheckedChange = viewModel::setTokenAuth,
@@ -230,11 +234,13 @@ fun McpTokensScreen(
  * 认证状态行(V40 T6):语义色圆点(M3 Badge)+ 一句话状态——
  * 开 = 「已启用 · N 枚令牌」;开且零令牌 = 空集全拒警示(error 色,可从 UI
  * 直接理解撤销最后一枚不停用语义);关 = 「已停用 · 请求无需令牌」。
+ * 资源形态(V41 T1):三个状态键均为自含文案(「On ·/已启用 ·」前缀由各语言
+ * 资源字面承载)——`tokens_status_active` 仅含单个 `%d` 占位符,**传参必须
+ * 单参 tokenCount**;传参与占位符错配会在组合期抛 IllegalFormatConversionException
+ * (V41 V1.1 闪退根因,三态回归由 McpTokensScreenStateTest 锁定)。
  */
 @Composable
-private fun AuthStatusLine(authEnabled: Boolean, tokenCount: Int) {
-    val on = stringResource(R.string.mcp_state_on)
-    val off = stringResource(R.string.mcp_state_off)
+internal fun AuthStatusLine(authEnabled: Boolean, tokenCount: Int) {
     val dotColor =
         if (authEnabled) {
             MaterialTheme.colorScheme.primary
@@ -254,12 +260,12 @@ private fun AuthStatusLine(authEnabled: Boolean, tokenCount: Int) {
             text =
                 if (authEnabled) {
                     if (tokenCount == 0) {
-                        stringResource(R.string.tokens_status_deny_all, on)
+                        stringResource(R.string.tokens_status_deny_all)
                     } else {
-                        stringResource(R.string.tokens_status_active, on, tokenCount)
+                        stringResource(R.string.tokens_status_active, tokenCount)
                     }
                 } else {
-                    stringResource(R.string.tokens_status_off, off)
+                    stringResource(R.string.tokens_status_off)
                 },
             style = MaterialTheme.typography.bodySmall,
             color =

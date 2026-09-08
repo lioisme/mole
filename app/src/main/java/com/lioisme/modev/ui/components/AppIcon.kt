@@ -9,15 +9,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.Dp
 import coil.Coil
 import coil.ImageLoader
 import coil.compose.AsyncImage
+import coil.compose.AsyncImagePainter
 import coil.decode.DataSource
 import coil.fetch.DrawableResult
 import coil.fetch.Fetcher
@@ -26,39 +31,55 @@ import coil.request.ImageRequest
 import coil.request.Options
 
 /**
- * 应用图标(V40 T5.4 Coil 化,手搓 LruCache/drawable→Bitmap 转换退役):
- * [AsyncImage] + PackageManager Fetcher——Coil 内存缓存(MemoryCache)承担
- * 去重(滚动列表零重复 binder 调用);首字母占位块垫底,加载成功后被图标覆盖
- * (包不存在/加载失败 = 占位即终态,语义与 V13 形态一致)。
+ * 应用图标(V40 T5.4 Coil 化,手搓 LruCache/drawable→Bitmap 转换退役;
+ * V42 T2 底图状态驱动):[AsyncImage] + PackageManager Fetcher——Coil 内存
+ * 缓存(MemoryCache)承担去重(滚动列表零重复 binder 调用)。
+ * 占位首字母块 = **加载中/失败态限定**(AsyncImage onState 驱动,Success 即
+ * 移除)——不规则/透明图标加载完成后不再透出底层色块(V42 R2 主诉);
+ * 包不存在/加载失败 = 占位即终态,语义与 V13 形态一致。
  * 彩色启动图标由 [AsyncImage] 直绘 Drawable 保证(不经单色 Icon 管线,
- * 无 LocalContentColor 蒙层问题——V13 已知坑)。
+ * 无 LocalContentColor 蒙层问题——V13 已知坑),**恒原样绘制不裁切**
+ * (尊重不规则图标原生形态)。
+ *
+ * @param loader 测试注入点(默认 null = 进程级共享加载器,生产零感知)。
  */
 @Composable
-fun AppIcon(packageName: String, size: Dp, modifier: Modifier = Modifier) {
+fun AppIcon(
+    packageName: String,
+    size: Dp,
+    modifier: Modifier = Modifier,
+    loader: ImageLoader? = null,
+) {
     val context = LocalContext.current
     val density = LocalDensity.current
-    val loader = remember(context) { appIconLoader(context) }
+    val effectiveLoader = loader ?: remember(context) { appIconLoader(context) }
     val sizePx = with(density) { size.roundToPx() } * 2
+    // 占位可见性按包名重置(Lazy 列表行复用切换包名时回到加载态)。
+    var showPlaceholder by remember(packageName) { mutableStateOf(true) }
     Box(modifier = modifier.size(size)) {
-        PlaceholderIconUnderlay(packageName, size)
+        if (showPlaceholder) {
+            PlaceholderIconUnderlay(packageName, size)
+        }
         AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(PackageIcon(packageName))
                 .size(sizePx, sizePx)
                 .build(),
             contentDescription = null,
-            imageLoader = loader,
+            imageLoader = effectiveLoader,
+            onState = { state -> showPlaceholder = state !is AsyncImagePainter.State.Success },
             modifier = Modifier.size(size),
         )
     }
 }
 
-/** 占位首字母块(垫底层;图标加载成功后被 AsyncImage 覆盖)。 */
+/** 占位首字母块(垫底层;仅加载中/失败组合,加载成功即随 [AppIcon] 状态移除)。 */
 @Composable
 private fun PlaceholderIconUnderlay(packageName: String, size: Dp) {
     Box(
         modifier = Modifier
             .size(size)
+            .testTag("app-icon-placeholder")
             .background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
         contentAlignment = Alignment.Center,
     ) {

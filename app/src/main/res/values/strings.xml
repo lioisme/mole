@@ -389,9 +389,11 @@
     <string name="capture_ignore_path_dialog_hint">One prefix per line, e.g. /data/local/tmp/</string>
     <!-- Settings -->
     <string name="settings_title">Settings</string>
-    <string name="settings_display_section">Display</string>
-    <string name="settings_language_section">Language &amp; Region</string>
-    <string name="settings_features_section">Capabilities</string>
+    <!-- V41 根页 IA 重排:分区按归属归类(通用/数据/服务/功能域/关于) -->
+    <string name="settings_section_general">General</string>
+    <string name="settings_section_data">Data</string>
+    <string name="settings_section_services">Services &amp; diagnostics</string>
+    <string name="settings_section_feature_domain">Feature domain</string>
     <string name="settings_data_section">Data</string>
     <string name="settings_framework_section">Framework &amp; scope</string>
     <string name="settings_server_section">Service</string>
@@ -411,27 +413,35 @@
     <string name="settings_port_value">%1$s:%2$d</string>
     <string name="settings_port_scope_local">(local only)</string>
     <string name="settings_port_scope_all">(all interfaces)</string>
+    <string name="services_common_section">Common</string>
+    <!-- V41:外部访问 = 统一开关(wire + MCP 双服务);副标题为动态绑定地址,无静态 hint -->
     <string name="settings_external_access">External access</string>
-    <string name="settings_external_access_hint">Listens on 0.0.0.0 for LAN access.</string>
     <string name="settings_online_targets">Running target processes</string>
     <string name="settings_online_targets_value">%1$,d</string>
     <string name="settings_port_edit">Port setting</string>
     <string name="settings_port_invalid">Port must be 1–65535</string>
+    <!-- V42 T3 port validation -->
+    <string name="settings_port_privileged">Ports below 1024 need system privileges</string>
+    <string name="settings_port_in_use">Port is already in use</string>
+    <string name="settings_port_conflict">Conflicts with the %1$s port</string>
+    <string name="settings_port_checking">Checking…</string>
+    <!-- V42 T3 wire bind error (mirrors mcp_bind_error) -->
+    <string name="wire_bind_error_title">Wire binding</string>
+    <string name="wire_bind_error">Bind failed: %1$s</string>
     <!-- V38 MCP service -->
     <string name="mcp_section">MCP server (Agent)</string>
     <string name="mcp_enabled">MCP server</string>
-    <string name="mcp_enabled_hint">Agent endpoint, loopback by default.</string>
-    <string name="mcp_external_access">MCP external access</string>
-    <string name="mcp_external_access_hint">Binds 0.0.0.0; unauthenticated without token auth.</string>
+    <!-- V41:开态副标题为技术字面量 POST /mcp(非资源);静态 hint 退役 -->
     <string name="mcp_port">MCP port</string>
     <!-- V39 MCP token management -->
     <string name="mcp_token_auth">Token authentication</string>
-    <string name="mcp_token_auth_hint">All requests, even loopback, need a token.</string>
+    <string name="mcp_token_auth_off_hint">No token needed</string>
     <string name="mcp_tokens_entry">Access tokens</string>
     <plurals name="mcp_tokens_count">
         <item quantity="one">%1$,d token</item>
         <item quantity="other">%1$,d tokens</item>
     </plurals>
+    <string name="mcp_bind_error_title">MCP binding</string>
     <string name="mcp_bind_error">Bind failed: %1$s</string>
     <string name="mcp_disabled">Disabled</string>
     <string name="mcp_state_on">On</string>
@@ -458,8 +468,7 @@
     <string name="settings_total_records">Total records</string>
     <string name="settings_total_records_value">%1$,d</string>
     <string name="settings_type_counts_section">Records by type</string>
-    <string name="settings_apps_browse_section">Records by app</string>
-    <string name="apps_browse_empty">No records yet.</string>
+    <!-- V41:「按应用浏览」退役——应用维度唯一入口 = 主界面应用列表 -->
     <string name="settings_records_algorithm">Algorithm records</string>
     <string name="settings_records_database">Database records</string>
     <string name="settings_records_behavior">Behavior records</string>
@@ -497,6 +506,9 @@
     <string name="system_default">System default</string>
     <string name="lang_en">English</string>
     <string name="lang_zh">中文</string>
+    <!-- V42 T5:语言自名(autonym),四 locale 同文 -->
+    <string name="lang_ja">日本語</string>
+    <string name="lang_ko">한국어</string>
     <string name="about">About</string>
     <string name="version">%1$s v%2$s</string>
     <string name="about_version">Version</string>
@@ -759,8 +771,7 @@
     <string name="blacklist_section_empty">No additions</string>
     <string name="blacklist_add_action">Add</string>
     <string name="blacklist_value_label">Value</string>
-    <!-- V37 T3.5: settings hub entries -->
-    <string name="settings_interception_section">Interception &amp; Spoofing</string>
+    <!-- V37 T3.5: settings hub entries;V41 分区标题改 settings_section_feature_domain -->
     <string name="settings_keywords_entry">Keyword Library</string>
     <string name="settings_keywords_entry_hint">Global dialog intercept keywords</string>
     <string name="settings_profiles_entry">Spoof Profiles</string>

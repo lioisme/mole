@@ -24,8 +24,10 @@ object ConfigKeys {
     fun overrideKey(packageName: String): String = OVERRIDE_PREFIX + packageName
 
     /**
-     * 服务监听外部访问键(V26):宿主本地 SharedPreferences 专用,
-     * 不入远程镜像(仅宿主进程消费,注入侧零感知)。
+     * 统一外部访问键(V41,取代 V26/V38 双键分裂):wire ConfigServer 与
+     * MCP McpServer **双服务消费**的唯一事实源——false(默认)= 127.0.0.1,
+     * true = 0.0.0.0。宿主本地 SharedPreferences 专用,不入远程镜像
+     * (仅宿主进程消费,注入侧零感知,wire VERSION 恒 4)。
      */
     const val SERVER_EXTERNAL_ACCESS = "server_external_access"
 
@@ -45,7 +47,10 @@ object ConfigKeys {
     /** MCP 服务端口键(V38):宿主本地专用,默认 1510(V39)。 */
     const val MCP_PORT = "mcp_port"
 
-    /** MCP 外部访问键(V38):宿主本地专用;true = 0.0.0.0(V39:强制伴随令牌认证)。 */
+    /**
+     * MCP 外部访问键(V38;**V41 起退役为迁移输入**):init 读到后 OR 合并进
+     * [SERVER_EXTERNAL_ACCESS] 并删除本键(幂等,合并后不再出现)。
+     */
     const val MCP_EXTERNAL_ACCESS = "mcp_external_access"
 
     /** MCP 令牌认证开关键(V39):宿主本地专用;默认 false = 停用(全接口免 Token)。 */

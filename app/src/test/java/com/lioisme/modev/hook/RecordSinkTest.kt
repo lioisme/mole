@@ -72,7 +72,7 @@ class RecordSinkTest {
      * 有界轮询等待 seq 检查点落盘为 [expected](异步工作线程写盘,固定 sleep 在
      * 并行 CI/重负载下会竞态;轮询直至断言成立或超时)。
      */
-    private fun awaitSeqFile(file: File, expected: Long, timeoutMs: Long = 10_000) {
+    private fun awaitSeqFile(file: File, expected: Long, timeoutMs: Long = 30_000) {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
             runCatching { file.readText().trim().toLong() }

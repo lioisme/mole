@@ -103,12 +103,12 @@ class SettingsComponentsTest {
             MaterialTheme {
                 SettingsInfoItem(
                     icon = Icons.Default.Settings,
-                    title = targetContext.getString(R.string.settings_display_section),
+                    title = targetContext.getString(R.string.settings_section_general),
                     value = "Info Value",
                 )
             }
         }
-        rule.onNodeWithText(targetContext.getString(R.string.settings_display_section)).assertIsDisplayed()
+        rule.onNodeWithText(targetContext.getString(R.string.settings_section_general)).assertIsDisplayed()
         rule.onNodeWithText("Info Value").assertIsDisplayed()
     }
 

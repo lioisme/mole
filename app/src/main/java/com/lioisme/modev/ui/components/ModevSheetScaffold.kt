@@ -31,6 +31,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
@@ -38,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.lioisme.modev.R
+import com.lioisme.modev.domain.server.PortValidator
 import kotlinx.coroutines.launch
 
 /**
@@ -182,8 +184,12 @@ fun ModevInputSheet(
 }
 
 /**
- * 端口编辑底部 sheet(wire/MCP 共用,V39 合并此前两份逐行重复实现):
- * 数字输入 + 1..65535 校验,确认经 hide 动画后回调 [onConfirm]。
+ * 端口编辑底部 sheet(wire/MCP 共用,V39 合并;V42 T3 可用性校验升级):
+ * 数字输入 + maxLength + 本地范围预拒 + **异步可用性校验**(D-3:确认 → busy →
+ * IO 校验(特权/冲突/占用,经 [validatePort])→ 通过 hide 动画后回调 [onConfirm] /
+ * 失败分型行内错误并保持 sheet 打开——硬阻止保存,不可带病写入)。
+ * [validatePort] 由调用方注入(PortValidator 组装:自身端口豁免/对端冲突/
+ * 探测地址随统一外部访问开关);范围校验在本地同步先行(省 IO)。
  */
 @Composable
 fun ModevPortSheet(
@@ -192,20 +198,92 @@ fun ModevPortSheet(
     onConfirm: (Int) -> Unit,
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier,
+    validatePort: (suspend (Int) -> PortValidator.PortCheck)? = null,
 ) {
-    ModevInputSheet(
+    var text by remember { mutableStateOf(currentPort.toString()) }
+    // 错误态持 PortCheck 分型(组合侧映射文案——stringResource 仅可组合上下文)。
+    var lastError by remember { mutableStateOf<PortValidator.PortCheck?>(null) }
+    var busy by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    @Composable
+    fun errorLabel(check: PortValidator.PortCheck): String = when (check) {
+        PortValidator.PortCheck.OutOfRange -> stringResource(R.string.settings_port_invalid)
+        PortValidator.PortCheck.Privileged -> stringResource(R.string.settings_port_privileged)
+        is PortValidator.PortCheck.Conflict -> stringResource(R.string.settings_port_conflict, check.otherLabel)
+        PortValidator.PortCheck.InUse -> stringResource(R.string.settings_port_in_use)
+        PortValidator.PortCheck.Available -> ""
+    }
+
+    ModevSheet(
         title = stringResource(R.string.settings_port_edit),
-        initialValue = currentPort.toString(),
-        label = label,
-        errorText = stringResource(R.string.settings_port_invalid),
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-        digitOnly = true,
-        validate = { it.toIntOrNull() in 1..65535 },
-        onSubmit = { it.toIntOrNull()?.let(onConfirm) },
         onDismiss = onDismiss,
         modifier = modifier,
-    )
+    ) { sheet ->
+        Column(Modifier.fillMaxWidth().padding(SheetContentPadding)) {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { input ->
+                    text = input.filter { it.isDigit() }.take(PORT_INPUT_MAX_LENGTH)
+                    lastError = null
+                },
+                label = label.takeIf { it.isNotEmpty() }?.let { { Text(it) } },
+                isError = lastError != null,
+                supportingText = lastError?.let { check -> { Text(errorLabel(check)) } },
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                modifier = Modifier.fillMaxWidth().testTag("port-input"),
+            )
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (busy) {
+                    Text(
+                        stringResource(R.string.settings_port_checking),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(end = 12.dp).testTag("port-checking"),
+                    )
+                }
+                TextButton(onClick = onDismiss, enabled = !busy) {
+                    Text(stringResource(R.string.cancel))
+                }
+                Spacer(Modifier.width(8.dp))
+                TextButton(
+                    onClick = {
+                        val candidate = text.toIntOrNull()
+                        if (candidate == null || candidate !in 1..65535) {
+                            // 范围本地同步预拒(零 IO)。
+                            lastError = PortValidator.PortCheck.OutOfRange
+                            return@TextButton
+                        }
+                        busy = true
+                        scope.launch {
+                            val check = validatePort?.invoke(candidate)
+                                ?: PortValidator.PortCheck.Available
+                            if (check == PortValidator.PortCheck.Available) {
+                                sheet.dismissWith { onConfirm(candidate) }
+                            } else {
+                                lastError = check
+                                busy = false
+                            }
+                        }
+                    },
+                    enabled = !busy,
+                    modifier = Modifier.testTag("port-confirm"),
+                ) {
+                    Text(stringResource(R.string.confirm))
+                }
+            }
+        }
+    }
 }
+
+/** 端口输入长度上限(65535 五位;ModevPortSheet 输入滤器消费)。 */
+private const val PORT_INPUT_MAX_LENGTH = 5
 
 /** 单选 sheet 选项:值 + 已解析标签(UI 侧经 stringResource 产出,组件零资源感知)。 */
 data class ChoiceOption<T>(val value: T, val label: String, val testTag: String? = null)

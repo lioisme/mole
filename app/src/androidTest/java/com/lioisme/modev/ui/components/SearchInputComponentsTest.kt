@@ -10,10 +10,12 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -121,8 +123,9 @@ class SearchInputComponentsTest {
     @Test
     fun tap_expandsViaFocusIntent() {
         // 行为探针(MD3 标准):折叠态单击/聚焦由 InputField 焦点回调驱动
-        // onExpandedChange(true)——这是 MD3 SearchBar 的标准交互(取代 D4 手搓
-        // 胶囊的「长按不展开」定制;长按选词同样聚焦展开 = 标准形态,契约已更新)。
+        // onExpandedChange(true)——这是 MD3 SearchBar 的标准交互。V42 T1 契约
+        // 修订:该标准仅对「文本区/输入域本体」成立;槽按钮按压引发的展开意图
+        // 被 SearchInputField 内部门禁抑制(见 longPress_* 三探针)。
         var expansions = 0
         setInput(
             mutableStateOf(""),
@@ -130,6 +133,101 @@ class SearchInputComponentsTest {
         )
         rule.onNodeWithText("Search…").performClick()
         rule.runOnIdle { assertTrue("单击/聚焦须驱动展开意图", expansions >= 1) }
+    }
+
+    // ---- V42 T1 槽长按门禁探针(先红后绿的契约反转锁定) ----
+
+    /** 槽长按探针共用:长按槽内按钮,断言展开意图按期望出现/不出现。 */
+    private fun longPressProbe(
+        leadingSlot: (@androidx.compose.runtime.Composable () -> Unit)? = null,
+        actionSlot: (@androidx.compose.runtime.Composable () -> Unit)? = null,
+        slotCd: String,
+        expectExpansion: Boolean,
+        desc: String,
+    ) {
+        var expansions = 0
+        val query = mutableStateOf("abc")
+        rule.setContent {
+            MaterialTheme {
+                SearchInputField(
+                    query = query.value,
+                    onQueryChange = { query.value = it },
+                    active = false,
+                    onActiveChange = { if (it) expansions++ },
+                    onSearch = {},
+                    onBack = null,
+                    placeholder = "Search…",
+                    actionSlot = actionSlot,
+                    filterSlot = filterSlot(),
+                    leadingSlot = leadingSlot,
+                )
+            }
+        }
+        // 长按至 tooltip 出现(等价真实用户长按手势),随后等待宽限窗耗尽——
+        // 焦点回调若在按压窗口内到达必须被门禁拦截。
+        rule.onNodeWithContentDescription(slotCd).performTouchInput { longClick() }
+        rule.waitForIdle()
+        rule.runOnIdle { Thread.sleep(SLOT_EXPAND_GRACE_MS + 150) }
+        rule.waitForIdle()
+        val expansionsAfterLongPress = expansions
+        rule.runOnIdle {
+            assertTrue(
+                "$desc 展开意图计数不符(实际 $expansionsAfterLongPress)",
+                (expansionsAfterLongPress > 0) == expectExpansion,
+            )
+        }
+    }
+
+    @Test
+    fun longPress_onActionSlot_doesNotExpand() {
+        var actionClicked = 0
+        longPressProbe(
+            actionSlot = {
+                TipIconButton(tooltip = "Clear type", onClick = { actionClicked++ }) {
+                    Icon(Icons.Default.Star, contentDescription = "action-slot")
+                }
+            },
+            slotCd = "action-slot",
+            expectExpansion = false,
+            desc = "动作槽长按",
+        )
+        rule.runOnIdle { assertTrue("动作槽点击必须保持生效", actionClicked == 1) }
+    }
+
+    @Test
+    fun longPress_onFilterSlot_doesNotExpand() {
+        longPressProbe(
+            slotCd = filterCd,
+            expectExpansion = false,
+            desc = "筛选槽长按",
+        )
+    }
+
+    @Test
+    fun longPress_onLeadingSlot_doesNotExpand() {
+        longPressProbe(
+            leadingSlot = {
+                TipIconButton(tooltip = "Settings", onClick = {}) {
+                    Icon(Icons.Default.Star, contentDescription = "settings-slot")
+                }
+            },
+            slotCd = "settings-slot",
+            expectExpansion = false,
+            desc = "前导槽长按",
+        )
+    }
+
+    @Test
+    fun tap_onQueryText_stillExpands_afterSlotGate() {
+        // 文本区标准行为回归锚:门禁上线后单击输入域仍展开(文本区长按选词
+        // 同走焦点路径,不受槽门禁影响)。
+        var expansions = 0
+        setInput(
+            mutableStateOf(""),
+            onActiveChange = { if (it) expansions++ },
+        )
+        rule.onNodeWithText("Search…").performClick()
+        rule.runOnIdle { assertTrue("文本区单击仍须展开", expansions >= 1) }
     }
 
     @Test

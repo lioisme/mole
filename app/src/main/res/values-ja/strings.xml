@@ -1,0 +1,794 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Japanese resources (V42 T5 full translation).
+     Generated from values/strings.xml via scripts/v42_generate.mjs — do not hand-edit order.
+     Baseline: en structure + zh semantics; technical identifiers (en==zh set) stay English.
+     ja/ko CLDR plural rules: "other" quantity only. -->
+<resources>
+    <string name="app_name">Modev</string>
+    <string name="app_description">作用域付き Xposed フックで対象アプリのアルゴリズムとデータベース操作を監視します。</string>
+
+    <!-- Common -->
+    <string name="cd_back">戻る</string>
+    <string name="cd_filter">フィルタ</string>
+    <string name="cd_settings">設定</string>
+    <string name="confirm">OK</string>
+    <string name="record_types_all">すべての記録</string>
+    <string name="online">実行中</string>
+    <string name="offline">未実行</string>
+    <string name="loading">読み込み中…</string>
+    <string name="retry">読み込みに失敗しました。タップで再試行</string>
+    <string name="unknown_error">不明なエラー</string>
+
+    <!-- Apps screen -->
+    <string name="apps_search">アプリ名・パッケージを検索…</string>
+    <string name="apps_system">システムアプリ</string>
+    <string name="apps_modules">Xposed モジュール</string>
+    <string name="apps_empty_no_match">一致するアプリがありません</string>
+    <string name="apps_empty_no_apps">アプリが見つかりません</string>
+    <string name="apps_launch">起動</string>
+    <string name="apps_scope_requested">%1$s のスコープ追加を要求しました。システム通知で確認してください(対象プロセス再起動後に適用)</string>
+    <string name="apps_scope_removed">%1$s をスコープから解除しました。対象プロセス再起動後に適用</string>
+    <string name="apps_scope_failed_not_ready">スコープを変更できません: フレームワーク未準備</string>
+    <string name="apps_scope_failed_service">スコープを変更できません: サービス未接続</string>
+    <string name="apps_scope_failed_rejected">スコープ要求が拒否されました</string>
+    <string name="apps_scope_failed_timeout">確認待ちがタイムアウトしました。確認後下へスワイプして更新してください</string>
+    <string name="apps_scope_failed_remove">%1$s のスコープ解除に失敗しました</string>
+    <string name="apps_records_cleared">%1$s の記録を消去しました</string>
+
+    <!-- App records -->
+    <string name="detail_listening">スコープ内</string>
+    <string name="detail_not_listening">スコープ外</string>
+    <string name="detail_clear_records">このアプリの記録を消去</string>
+    <string name="detail_framework_no_service">フレームワークサービス未接続</string>
+    <string name="detail_reading_scope">スコープを読み込み中…</string>
+    <string name="algorithm_records_title">アルゴリズム記録</string>
+    <string name="database_records_title">データベース記録</string>
+    <string name="algorithm_records_search">アルゴリズム記録を検索…</string>
+    <string name="database_records_search">データベース記録を検索…</string>
+    <string name="behavior_records_title">動作記録</string>
+    <string name="prefs_records_title">プリファレンス記録</string>
+    <string name="prefs_records_search">プリファレンス記録を検索</string>
+    <string name="behavior_records_search">動作記録を検索…</string>
+    <string name="webview_records_title">WebView 記録</string>
+    <string name="webview_records_search">WebView 記録を検索…</string>
+
+    <string name="monitor_records_caption">すべての記録</string>
+    <string name="filter_type_crypto">暗号</string>
+    <string name="filter_type_database">データベース</string>
+    <string name="filter_type_behavior">動作</string>
+    <string name="filter_type_prefs">SharedPreferences</string>
+    <string name="filter_type_webview">WebView</string>
+
+    <string name="detail_empty">記録はまだありません</string>
+    <string name="detail_empty_hint">フィルタを調整するか、機能設定でさらにカテゴリを有効にしてください</string>
+    <string name="records_count_subtitle">記録 %1$s 件</string>
+    <string name="record_copied_toast">記録の概要をコピーしました</string>
+    <string name="section_monitor_kinds">監視カテゴリ</string>
+    <string name="app_monitor_scope_row">このアプリを監視</string>
+    <string name="listen_settings_entry">機能設定</string>
+    <string name="listen_summary_default">デフォルト設定を使用</string>
+    <plurals name="listen_settings_custom_n">
+        <item quantity="other">%1$d 項目をカスタマイズ</item>
+    </plurals>
+    <string name="app_monitor_actions_section">操作</string>
+    <string name="listen_settings_hint">各スイッチはデフォルト設定から始まります。切り替えるとこのアプリの個別設定になり、即時適用されます。</string>
+    <string name="listen_reset_action">デフォルト設定に戻す</string>
+    <string name="danger_reset_listen_msg">%1$s のすべての機能設定をデフォルトに戻しますか?</string>
+    <string name="section_record_options">記録オプション</string>
+    <string name="algorithm_monitor_master">アルゴリズム監視を有効化</string>
+    <string name="database_monitor_master">データベース監視を有効化</string>
+    <string name="section_db_result_limits">結果上限</string>
+    <string name="switch_cipher">暗号(Cipher)</string>
+    <string name="switch_message_digest">メッセージダイジェスト(MessageDigest)</string>
+    <string name="switch_mac">MAC(HMAC)</string>
+    <string name="switch_signature">署名(Signature)</string>
+    <string name="switch_key_param">鍵パラメータ構築</string>
+    <string name="switch_key_generation">鍵生成</string>
+    <string name="switch_key_factory">鍵ファクトリ(KeyFactory)</string>
+    <string name="switch_key_store">キーストア(KeyStore)</string>
+    <string name="switch_key_agreement">鍵合意(KeyAgreement)</string>
+    <string name="switch_random">安全な乱数(SecureRandom)</string>
+    <string name="switch_base64">Base64 エンコード</string>
+    <string name="switch_webview">WebView JS 暗号</string>
+    <string name="switch_db_open">データベースオープン</string>
+    <string name="switch_db_query">データベースクエリ</string>
+    <string name="switch_db_dml">データベース変更</string>
+    <string name="switch_db_exec">SQL 実行</string>
+    <string name="switch_db_transaction">トランザクション</string>
+    <string name="db_max_result_rows">最大結果行数</string>
+    <string name="db_max_result_rows_hint">クエリ結果ごとに収集する行数(0 = 無制限)</string>
+    <string name="db_max_result_rows_dialog_title">最大結果行数</string>
+    <string name="db_max_result_chars">最大結果バイト数</string>
+    <string name="db_max_result_chars_hint">クエリ結果ごとに保存する文字数(0 = 無制限)</string>
+    <string name="db_max_result_chars_dialog_title">最大結果バイト数</string>
+    <string name="switch_log_stack">呼び出しスタックを記録</string>
+    <string name="capture_max_bytes">フィールドあたり最大バイト</string>
+    <string name="capture_max_bytes_hint">フィールドあたりのバイト数(0 = 無制限)</string>
+    <string name="capture_max_bytes_dialog_title">フィールドあたり最大バイト</string>
+    <string name="capture_ignore_stack">スタック接頭辞を除外</string>
+    <string name="capture_ignore_stack_hint">呼び出しスタックがいずれかの接頭辞に一致する記録をスキップ</string>
+    <string name="capture_ignore_stack_dialog_title">スタック接頭辞を除外</string>
+    <string name="capture_ignore_stack_dialog_hint">1 行に 1 クラス接頭辞。例: com.google.gson</string>
+
+    <!-- Danger confirmations -->
+    <string name="danger_title">操作の確認</string>
+    <string name="danger_remove_scope_msg">「%1$s」をスコープから解除しますか?対象プロセス再起動後に適用されます。</string>
+    <string name="danger_clear_logs_msg">「%1$s」のすべての記録を消去しますか?この操作は元に戻せません。</string>
+    <string name="danger_clear_all_msg">すべての記録を消去しますか?この操作は元に戻せません。</string>
+    <string name="cancel">キャンセル</string>
+
+    <!-- Record kind / operation labels -->
+    <string name="kind_message_digest">ダイジェスト</string>
+    <string name="kind_cipher">暗号</string>
+    <string name="kind_mac">HMAC</string>
+    <string name="kind_signature">署名</string>
+    <string name="kind_key_param">鍵パラメータ</string>
+    <string name="kind_key_generation">鍵生成</string>
+    <string name="kind_key_factory">鍵ファクトリ</string>
+    <string name="kind_key_store">キーストア</string>
+    <string name="kind_key_agreement">鍵合意</string>
+    <string name="kind_random">乱数</string>
+    <string name="kind_base64">Base64</string>
+    <string name="kind_webview">ウェブ</string>
+    <string name="op_get_instance">インスタンス取得</string>
+    <string name="op_init">初期化</string>
+    <string name="op_update">更新</string>
+    <string name="op_do_final">最終処理</string>
+    <string name="op_digest">ダイジェスト</string>
+    <string name="op_sign">署名</string>
+    <string name="op_verify">検証</string>
+    <string name="op_get_iv">IV 取得</string>
+    <string name="op_construct">生成</string>
+    <string name="op_generate">生成</string>
+    <string name="op_generate_private">秘密鍵生成</string>
+    <string name="op_generate_public">公開鍵生成</string>
+    <string name="op_generate_secret">共有鍵生成</string>
+    <string name="op_get_key">鍵取得</string>
+    <string name="op_set_key">鍵設定</string>
+    <string name="op_delete_key">鍵削除</string>
+    <string name="op_load">読み込み</string>
+    <string name="op_do_phase">フェーズ実行</string>
+    <string name="op_generate_seed">シード生成</string>
+    <string name="op_encode">エンコード</string>
+    <string name="op_decode">デコード</string>
+    <string name="op_encrypt">暗号化</string>
+    <string name="op_decrypt">復号</string>
+    <string name="dir_encrypt">暗号化</string>
+    <string name="dir_decrypt">復号</string>
+    <string name="dir_wrap">ラップ</string>
+    <string name="dir_unwrap">アンラップ</string>
+    <string name="dir_mode">モード %1$d</string>
+    <!-- Record row data snippet prefixes (2026-08-17 V8: 列表行收敛为单段关键数据) -->
+    <string name="record_data_key">key:</string>
+    <string name="record_data_alias">alias:</string>
+    <string name="record_data_out">out:</string>
+    <string name="record_data_in">in:</string>
+
+    <!-- Record detail -->
+    <string name="record_title">記録詳細</string>
+    <string name="record_not_found">記録が存在しないか、既に消去されています</string>
+    <string name="record_prev">前へ</string>
+    <string name="record_next">次へ</string>
+    <string name="record_more">その他</string>
+    <string name="record_export">JSON エクスポート</string>
+    <string name="export_ok">エクスポートしました</string>
+    <string name="export_too_large">記録が大きすぎてエクスポートできません(%1$d 文字)</string>
+    <string name="meta_kind">種別</string>
+    <string name="meta_operation">操作</string>
+    <string name="meta_url">URL</string>
+    <string name="meta_url_host">ホスト</string>
+    <string name="meta_method">メソッド</string>
+    <string name="meta_status_code">ステータス</string>
+    <string name="meta_proxy">プロキシ</string>
+    <string name="meta_vpn">仮想プライベートネットワーク</string>
+    <string name="meta_ssl_protocol">SSL プロトコル</string>
+    <string name="meta_cipher_suite">暗号スイート</string>
+    <string name="meta_proxy_port">プロキシポート</string>
+    <string name="meta_bridge">ブリッジ名</string>
+    <string name="meta_script_size">スクリプトサイズ</string>
+    <string name="meta_context">コンテキスト</string>
+    <string name="meta_direction">方向</string>
+    <string name="meta_provider">プロバイダ</string>
+    <string name="meta_key_exportable">エクスポート可否</string>
+    <string name="meta_process">プロセス</string>
+    <string name="meta_verify">検証結果</string>
+    <string name="verify_ok">✓ 合格</string>
+    <string name="verify_fail">✗ 失敗</string>
+
+    <!-- Record detail zones (V20: 数据关系可视化分区) -->
+    <string name="section_zone_data_flow">データフロー</string>
+    <string name="section_zone_key_material">鍵素材</string>
+    <string name="role_input_plaintext">入力(平文)</string>
+    <string name="role_output_ciphertext">出力(暗号文)</string>
+    <string name="role_input_ciphertext">入力(暗号文)</string>
+    <string name="role_output_plaintext">出力(平文)</string>
+    <string name="role_input_message">入力(メッセージ)</string>
+    <string name="role_output_digest">出力(ダイジェスト)</string>
+    <string name="role_output_mac">出力(MAC)</string>
+    <string name="role_output_signature">出力(署名)</string>
+    <string name="role_output_verify">出力(検証結果)</string>
+    <string name="role_input_data">入力(データ)</string>
+    <string name="role_output_data">出力(データ)</string>
+    <string name="role_output_base64">出力(Base64)</string>
+    <string name="role_input_base64">入力(Base64)</string>
+    <string name="role_output_key">出力(鍵)</string>
+    <string name="section_key">鍵</string>
+    <string name="section_key_alias">鍵エイリアス(ハードウェア鍵、エクスポート不可)</string>
+    <string name="section_iv">IV</string>
+    <string name="section_input">入力</string>
+    <string name="section_output">出力</string>
+    <string name="section_salt">Salt(ソルト)</string>
+    <string name="section_aad">AAD(追加認証データ)</string>
+    <string name="section_public_key">公開鍵</string>
+    <string name="section_params">パラメータ</string>
+    <string name="section_stack">呼び出しスタック</string>
+    <string name="section_req_headers">リクエストヘッダー</string>
+    <string name="section_resp_headers">レスポンスヘッダー</string>
+    <!-- V28 纯 markdown 详情:元数据节标题 / 时间戳行 / 偏好元数据行 -->
+    <string name="section_metadata">メタデータ</string>
+    <string name="meta_timestamp">時刻</string>
+    <string name="section_value">値</string>
+    <string name="meta_pref_file">設定ファイル</string>
+    <string name="meta_pref_key">キー</string>
+    <string name="bytes_count">%1$,d バイト</string>
+    <string name="bytes_truncated">(切り詰め済み)</string>
+    <string name="section_copy">コピー</string>
+    <string name="section_repr_text">テキスト</string>
+    <string name="section_repr_base64">Base64</string>
+    <string name="section_repr_hex">Hex</string>
+    <plurals name="params_omitted">
+        <item quantity="other">他 %1$d 個のパラメータを省略</item>
+    </plurals>
+    <string name="params_truncated">…(長い値は切り詰め)</string>
+    <plurals name="stack_more">
+        <item quantity="other">他 %1$d 個のスタックフレームを省略</item>
+    </plurals>
+    <!-- V26 markdown 详情:代码卡全屏出口 + 显示上限截断标记 + 元数据表头 -->
+    <string name="detail_fullscreen">全文を表示</string>
+    <string name="detail_exit_fullscreen">全画面を終了</string>
+    <plurals name="detail_truncated_marker">
+        <item quantity="other">全 %2$,d 文字のうち先頭 %1$,d 文字を表示。完全な内容はコピーまたは全文表示をご利用ください。</item>
+    </plurals>
+    <string name="meta_table_field">項目</string>
+    <string name="meta_table_value">値</string>
+    <string name="record_copy_done">%1$s をコピー:%2$d 文字</string>
+    <string name="record_copy_too_large">大きすぎてコピーできません(%1$d 文字)。長押しで選択するか、ブロックの hex をコピーしてください。</string>
+    <string name="export_failed">エクスポート失敗</string>
+
+    <!-- Database monitor (V17: SQLite 监听类别/操作/详情/开关) -->
+    <string name="kind_db_open">データベースオープン</string>
+    <string name="kind_db_query">クエリ</string>
+    <string name="kind_db_dml">データ変更</string>
+    <string name="kind_db_exec">SQL 実行</string>
+    <string name="kind_db_transaction">トランザクション</string>
+    <string name="op_db_open_database">データベースを開く</string>
+    <string name="op_db_close_database">データベースを閉じる</string>
+    <string name="op_db_open_helper">ヘルパーを開く</string>
+    <string name="op_db_close_helper">ヘルパーを閉じる</string>
+    <string name="op_db_query">プロジェクションクエリ</string>
+    <string name="op_db_raw_query">ロークエリ</string>
+    <string name="op_db_query_result">クエリ結果</string>
+    <string name="op_db_statement_query_long">スカラークエリ(Long)</string>
+    <string name="op_db_statement_query_string">スカラークエリ(String)</string>
+    <string name="op_db_insert">挿入</string>
+    <string name="op_db_replace">置換</string>
+    <string name="op_db_update">更新</string>
+    <string name="op_db_delete">削除</string>
+    <string name="op_db_exec_sql">SQL 実行</string>
+    <string name="op_db_statement_execute">ステートメント実行</string>
+    <string name="op_db_statement_execute_insert">挿入実行</string>
+    <string name="op_db_statement_execute_update_delete">更新/削除実行</string>
+    <string name="op_db_attach">DB アタッチ</string>
+    <string name="op_db_begin_transaction">トランザクション開始</string>
+    <string name="op_db_end_transaction">トランザクション終了</string>
+    <string name="op_db_set_transaction_successful">成功マーク</string>
+    <string name="record_data_db">DB:</string>
+    <string name="record_data_sql">SQL:</string>
+    <string name="record_data_rows">結果行:</string>
+    <string name="record_data_affected">影響:</string>
+    <plurals name="record_data_rows_short">
+        <item quantity="other">%1$d 行</item>
+    </plurals>
+    <plurals name="record_data_affected_short">
+        <item quantity="other">%1$d 件に影響</item>
+    </plurals>
+    <string name="meta_db_path">パス</string>
+    <string name="meta_thread">スレッド</string>
+    <string name="meta_rows">結果行数</string>
+    <string name="meta_affected">影響行数</string>
+    <string name="meta_row_id">行 ID</string>
+    <string name="section_sql">SQL 文</string>
+    <string name="section_db_path">データベースパス</string>
+    <string name="section_bind_args">バインド引数</string>
+    <string name="section_result_rows">結果行</string>
+    <string name="section_result_text">結果</string>
+    <plurals name="rows_more">
+        <item quantity="other">他 %1$d 行を省略</item>
+    </plurals>
+
+    <!-- Behavior monitor (V27: 文件/Assets/Shell 监听类别/操作/详情) -->
+    <string name="kind_behavior_file_read">ファイル読み取り</string>
+    <string name="kind_behavior_file_write">ファイル書き込み</string>
+    <string name="kind_behavior_file_delete">ファイル削除</string>
+    <string name="kind_behavior_file_rename">ファイル名変更</string>
+    <string name="kind_behavior_file_list">ディレクトリ一覧</string>
+    <string name="kind_behavior_asset_read">アセットアクセス</string>
+    <string name="kind_behavior_shell_exec">シェルコマンド</string>
+    <string name="op_behavior_open_read">読み取り用オープン</string>
+    <string name="op_behavior_read_all">一括読み取り</string>
+    <string name="op_behavior_open_write">書き込み用オープン</string>
+    <string name="op_behavior_write_all">書き込み</string>
+    <string name="op_behavior_mkdir">ディレクトリ作成</string>
+    <string name="op_behavior_mkdirs">多階層ディレクトリ作成</string>
+    <string name="op_behavior_delete">削除</string>
+    <string name="op_behavior_rename">名前変更/移動</string>
+    <string name="op_behavior_list">ディレクトリ一覧取得</string>
+    <string name="op_behavior_asset_open">アセットオープン</string>
+    <string name="op_behavior_asset_open_fd">アセット fd オープン</string>
+    <string name="op_behavior_asset_list">アセット一覧</string>
+    <string name="op_behavior_exec">コマンド実行</string>
+    <string name="meta_path">対象パス</string>
+    <string name="meta_dest_path">移動先パス</string>
+    <string name="meta_file_size">サイズ</string>
+    <string name="section_command">コマンド</string>
+    <string name="section_content">内容プレビュー</string>
+    <string name="section_script">スクリプト</string>
+    <string name="behavior_monitor_master">動作監視</string>
+    <string name="prefs_monitor_master">プリファレンス監視</string>
+    <string name="webview_monitor_master">WebView 監視</string>
+    <string name="kind_prefs_open">設定ファイルオープン</string>
+    <string name="kind_prefs_get">設定読み取り</string>
+    <string name="kind_prefs_put">設定書き込み</string>
+    <string name="kind_prefs_remove">設定キー削除</string>
+    <string name="kind_prefs_clear">設定全消去</string>
+    <!-- WebView kind labels (V29) -->
+    <string name="kind_wv_page_load">ページロード</string>
+    <string name="kind_wv_evaluate_js">JS 実行</string>
+    <string name="kind_wv_js_bridge">JS ブリッジ</string>
+    <string name="kind_wv_debug">デバッグスイッチ</string>
+    <string name="kind_wv_js_crypto">JS 暗号</string>
+    <!-- WebView operation labels (V29) -->
+    <string name="op_wv_load_url">URL ロード</string>
+    <string name="op_wv_load_data">データロード</string>
+    <string name="op_wv_evaluate_js">JS 実行</string>
+    <string name="op_wv_add_js_interface">JS ブリッジ登録</string>
+    <string name="op_wv_set_debugging">デバッグスイッチ設定</string>
+    <string name="op_wv_page_finished">ページロード完了</string>
+    <string name="op_wv_js_encrypt">JS 暗号化</string>
+    <string name="op_wv_js_decrypt">JS 復号</string>
+    <string name="op_wv_js_digest">JS ダイジェスト</string>
+    <string name="op_wv_js_sign">JS 署名</string>
+    <string name="op_wv_js_verify">JS 検証</string>
+    <string name="op_wv_js_import_key">JS 鍵インポート</string>
+    <string name="op_wv_js_generate_key">JS 鍵生成</string>
+    <string name="op_prefs_open">設定ファイルオープン</string>
+    <string name="op_prefs_get_string">getString</string>
+    <string name="op_prefs_get_int">getInt</string>
+    <string name="op_prefs_get_long">getLong</string>
+    <string name="op_prefs_get_float">getFloat</string>
+    <string name="op_prefs_get_boolean">getBoolean</string>
+    <string name="op_prefs_get_string_set">getStringSet</string>
+    <string name="op_prefs_get_all">getAll</string>
+    <string name="op_prefs_contains">contains</string>
+    <string name="op_prefs_put_string">putString</string>
+    <string name="op_prefs_put_int">putInt</string>
+    <string name="op_prefs_put_long">putLong</string>
+    <string name="op_prefs_put_float">putFloat</string>
+    <string name="op_prefs_put_boolean">putBoolean</string>
+    <string name="op_prefs_put_string_set">putStringSet</string>
+    <string name="op_prefs_remove">remove</string>
+    <string name="op_prefs_clear">clear</string>
+    <string name="switch_file_content_capture">ファイル内容キャプチャ</string>
+    <string name="switch_file_content_capture_hint">整読系 API のみ(Files.readAll*/write/copy、アセット open)。ストリーム系パスはハンドルに触れない</string>
+    <string name="capture_ignore_path">パス接頭辞を除外</string>
+    <string name="capture_ignore_path_hint">主体パスがいずれかの接頭辞で始まる動作記録をスキップ</string>
+    <string name="capture_ignore_path_dialog_title">パス接頭辞を除外</string>
+    <string name="capture_ignore_path_dialog_hint">1 行に 1 接頭辞。例: /data/local/tmp/</string>
+    <!-- Settings -->
+    <string name="settings_title">設定</string>
+    <!-- V41 根页 IA 重排:分区按归属归类(通用/数据/服务/功能域/关于) -->
+    <string name="settings_section_general">一般</string>
+    <string name="settings_section_data">データ</string>
+    <string name="settings_section_services">サービスと診断</string>
+    <string name="settings_section_feature_domain">機能ドメイン</string>
+    <string name="settings_data_section">データ</string>
+    <string name="settings_framework_section">フレームワークとスコープ</string>
+    <string name="settings_server_section">通信サービス</string>
+    <string name="settings_server_section_injection">通信サービス(注入側)</string>
+    <string name="settings_about_section">このアプリについて</string>
+    <string name="data_settings_title">データ管理</string>
+    <string name="services_settings_title">サービス</string>
+    <string name="diagnostics_settings_title">診断</string>
+    <string name="settings_framework_service">フレームワークサービス</string>
+    <string name="settings_connecting">接続中…</string>
+    <string name="settings_framework">フレームワーク</string>
+    <string name="settings_scoped_count">スコープ済みアプリ数</string>
+    <string name="settings_scoped_count_value">%1$,d 個</string>
+    <string name="settings_not_connected">未接続</string>
+    <string name="settings_framework_error">フレームワークサービス異常:%1$s</string>
+    <string name="settings_port">リッスンポート</string>
+    <string name="settings_port_value">%1$s:%2$d</string>
+    <string name="settings_port_scope_local">(ローカルのみ)</string>
+    <string name="settings_port_scope_all">(全インターフェース)</string>
+    <string name="services_common_section">一般</string>
+    <!-- V41:外部访问 = 统一开关(wire + MCP 双服务);副标题为动态绑定地址,无静态 hint -->
+    <string name="settings_external_access">外部アクセス</string>
+    <string name="settings_online_targets">実行中の対象プロセス</string>
+    <string name="settings_online_targets_value">%1$,d 個</string>
+    <string name="settings_port_edit">ポート設定</string>
+    <string name="settings_port_invalid">ポートは 1–65535 で指定してください</string>
+    <!-- V42 T3 port validation -->
+    <string name="settings_port_privileged">1024 未満のポートにはシステム権限が必要です</string>
+    <string name="settings_port_in_use">ポートは既に使用中です</string>
+    <string name="settings_port_conflict">%1$s 포트と 충돌합니다</string>
+    <string name="settings_port_checking">確認中…</string>
+    <!-- V42 T3 wire bind error (mirrors mcp_bind_error) -->
+    <string name="wire_bind_error_title">Wire バインディング</string>
+    <string name="wire_bind_error">バインド失敗:%1$s</string>
+    <!-- V38 MCP service -->
+    <string name="mcp_section">MCP サービス(Agent)</string>
+    <string name="mcp_enabled">MCP サービス</string>
+    <!-- V41:开态副标题为技术字面量 POST /mcp(非资源);静态 hint 退役 -->
+    <string name="mcp_port">MCP ポート</string>
+    <!-- V39 MCP token management -->
+    <string name="mcp_token_auth">トークン認証</string>
+    <string name="mcp_token_auth_off_hint">トークン不要</string>
+    <string name="mcp_tokens_entry">アクセストークン</string>
+    <plurals name="mcp_tokens_count">
+        <item quantity="other">%1$,d 個のトークン</item>
+    </plurals>
+    <string name="mcp_bind_error_title">MCP バインディング</string>
+    <string name="mcp_bind_error">バインド失敗:%1$s</string>
+    <string name="mcp_disabled">無効</string>
+    <string name="mcp_state_on">オン</string>
+    <string name="mcp_state_off">オフ</string>
+    <string name="mcp_tokens_title">アクセストークン</string>
+    <string name="tokens_add">トークンを作成</string>
+    <string name="tokens_add_label_hint">名前(任意)</string>
+    <string name="tokens_empty">トークンはまだありません。</string>
+    <string name="tokens_empty_auth_on">トークン認証が有効ですがトークンが存在せず、すべてのリクエストが拒否されます。</string>
+    <string name="tokens_status_active">オン · %1$,d 個のトークン</string>
+    <string name="tokens_status_deny_all">オン · トークンなし:全リクエスト拒否</string>
+    <string name="tokens_status_off">オフ · リクエストにトークン不要</string>
+    <string name="token_unnamed">トークン %1$s</string>
+    <string name="token_revoke">取り消し</string>
+    <string name="token_show">表示</string>
+    <string name="token_hide">非表示</string>
+    <string name="token_revoke_confirm_msg">このトークンを取り消しますか?使用中のクライアントは直ちに拒否されます。</string>
+    <string name="token_copied">トークンをコピーしました</string>
+    <string name="token_created">トークンを作成しました</string>
+    <string name="token_created_legacy">インポート</string>
+    <!-- V39 exit confirm -->
+    <string name="exit_press_back_again">もう一度戻るキーで終了</string>
+    <string name="settings_clear_all_records">すべての記録を消去</string>
+    <string name="settings_total_records">総記録数</string>
+    <string name="settings_total_records_value">%1$,d 件</string>
+    <string name="settings_type_counts_section">記録分類</string>
+    <!-- V41:「按应用浏览」退役——应用维度唯一入口 = 主界面应用列表 -->
+    <string name="settings_records_algorithm">アルゴリズム記録</string>
+    <string name="settings_records_database">データベース記録</string>
+    <string name="settings_records_behavior">動作記録</string>
+    <string name="settings_records_prefs">プリファレンス記録</string>
+    <string name="settings_records_webview">WebView 記録</string>
+    <string name="danger_clear_prefs_msg">すべての SharedPreferences 記録を消去しますか?この操作は元に戻せません。</string>
+    <string name="danger_clear_webview_msg">すべての WebView 記録を消去しますか?この操作は元に戻せません。</string>
+    <string name="settings_storage_section">ストレージ使用량</string>
+    <string name="settings_storage_db">データベースファイル</string>
+    <string name="danger_clear_algorithm_msg">すべてのアルゴリズム記録を消去しますか?この操作は元に戻せません。</string>
+    <string name="danger_clear_database_msg">すべてのデータベース記録を消去しますか?この操作は元に戻せません。</string>
+    <string name="danger_clear_behavior_msg">すべての動作記録を消去しますか?この操作は元に戻せません。</string>
+    <string name="settings_stats_section">パイプライン統計</string>
+    <string name="diagnostics_copy">診断情報をコピー</string>
+    <string name="diagnostics_copied">診断情報をコピーしました</string>
+    <string name="diagnostics_detail_copy">コピー</string>
+    <string name="stats_received">受信済み</string>
+    <string name="stats_dropped">廃棄(キュー満)</string>
+    <string name="stats_write_failures">書き込み失敗</string>
+    <string name="stats_trimmed">切り詰め(容量超過)</string>
+    <string name="stats_rejected_hellos">拒否(ハンドシェイク)</string>
+    <string name="stats_dropped_records">廃棄(不正形式)</string>
+    <string name="stats_rejected_records">拒否(パッケージ不一致)</string>
+    <string name="settings_pin_scoped">スコープ済みアプリを先頭に固定</string>
+    <string name="appearance">外観</string>
+    <string name="follow_system">システムに従う</string>
+    <string name="light_mode">ライト</string>
+    <string name="dark_mode">ダーク</string>
+    <string name="theme_color">테마 색</string>
+    <string name="follow_wallpaper">壁紙に従う</string>
+    <string name="custom_accent">カスタムアクセント</string>
+    <string name="system_wallpaper">システム壁紙に従う</string>
+    <string name="pick_accent">アクセント色を選択</string>
+    <string name="language">言語</string>
+    <string name="system_default">システム既定</string>
+    <string name="lang_en">English</string>
+    <string name="lang_zh">中文</string>
+    <!-- V42 T5:语言自名(autonym),四 locale 同文 -->
+    <string name="lang_ja">日本語</string>
+    <string name="lang_ko">한국어</string>
+    <string name="about">このアプリについて</string>
+    <string name="version">%1$s v%2$s</string>
+    <string name="about_version">バージョン</string>
+    <string name="licenses_title">オープンソースライセンス</string>
+    <string name="licenses_subtitle">%1$s が使用するサードパーティコンポーネント</string>
+    <string name="licenses_row_format">%1$s · %2$s</string>
+    <string name="clear_search">検索をクリア</string>
+    <!-- V30 Network environment monitoring -->
+    <!-- Network kind labels -->
+    <string name="kind_net_ssl_context">SSL コンテキスト</string>
+    <string name="kind_net_ssl_trust_manager">トラストマネージャ</string>
+    <string name="kind_net_ssl_okhttp_pinner">証明書ピン留め</string>
+    <string name="kind_net_ssl_okhttp_verifier">ホスト名検証</string>
+    <string name="kind_net_ssl_webview">WebView SSL 検証</string>
+    <string name="kind_net_ssl_network_config">ネットワークセキュリティ設定</string>
+    <string name="kind_net_proxy_system_prop">システムプロパティ</string>
+    <string name="kind_net_proxy_connectivity">接続マネージャ</string>
+    <string name="kind_net_proxy_settings">グローバル設定</string>
+    <string name="kind_net_proxy_okhttp">OkHttp プロキシ</string>
+    <string name="kind_net_vpn_capabilities">VPN 機能</string>
+    <string name="kind_net_vpn_interface">VPN インターフェース</string>
+    <string name="kind_net_vpn_network_info">VPN ネットワーク情報</string>
+    <string name="kind_net_vpn_link_properties">VPN リンクプロパティ</string>
+    <string name="kind_net_request">ネットワークリクエスト</string>
+    <!-- Network operation labels -->
+    <string name="op_net_ssl_init">SSL コンテキスト初期化</string>
+    <string name="op_net_ssl_check">サーバー証明書検証</string>
+    <string name="op_net_ssl_pin">証明書ピン確認</string>
+    <string name="op_net_ssl_verify">ホスト名検証</string>
+    <string name="op_net_ssl_webview_error">WebView SSL エラー</string>
+    <string name="op_net_ssl_config_check">ピン設定確認</string>
+    <string name="op_net_prop_get">システムプロパティ取得</string>
+    <string name="op_net_prop_default">既定プロキシ取得</string>
+    <string name="op_net_prop_link">HTTP プロキシ取得</string>
+    <string name="op_net_prop_global">グローバル設定読み取り</string>
+    <string name="op_net_prop_okhttp">OkHttp プロキシ選択</string>
+    <string name="op_net_vpn_has_transport">VPN トランスポート検出</string>
+    <string name="op_net_vpn_get_caps">ネットワーク機能取得</string>
+    <string name="op_net_vpn_transport_info">トランスポート情報取得</string>
+    <string name="op_net_vpn_is_virtual">仮想ネットワーク判定</string>
+    <string name="op_net_vpn_iface_name">インターフェース名取得</string>
+    <string name="op_net_vpn_iface_by_name">名前でインターフェース検索</string>
+    <string name="op_net_vpn_iface_enum">ネットワークインターフェース列挙</string>
+    <string name="op_net_vpn_type">ネットワークタイプ取得</string>
+    <string name="op_net_vpn_type_name">タイプ名取得</string>
+    <string name="op_net_vpn_iface_prop">インターフェース属性取得</string>
+    <string name="op_net_vpn_routes">ルートテーブル取得</string>
+    <string name="op_net_request_start">リクエスト開始</string>
+    <string name="op_net_request_end">レスポンス受信</string>
+    <!-- Network listen settings -->
+    <string name="network_records_title">ネットワーク記録</string>
+    <string name="filter_type_network">ネットワーク</string>
+    <string name="network_monitor_master">ネットワーク介入</string>
+    <string name="network_records_search">ネットワーク記録を検索</string>
+
+    <!-- V31 Device Environment -->
+    <string name="filter_type_device_env">デバイス環境</string>
+    <string name="device_records_title">デバイス環境記録</string>
+    <string name="device_env_master">デバイス環境偽装</string>
+    <string name="kind_device_env_ROOT_FILE">Root ファイル検出</string>
+    <string name="kind_device_env_ROOT_EXEC">Root コマンド実行</string>
+    <string name="kind_device_env_ROOT_PACKAGE_MANAGER">Root パッケージ照会</string>
+    <string name="kind_device_env_ROOT_PROPERTY">Root プロパティ検出</string>
+    <string name="kind_device_env_XPOSED_CLASS">Xposed クラス検出</string>
+    <string name="kind_device_env_XPOSED_STACK">Xposed スタック検出</string>
+    <string name="kind_device_env_XPOSED_MAPS">Xposed マップ走査</string>
+    <string name="kind_device_env_EMULATOR_BUILD">エミュレータ Build 偽装</string>
+    <string name="kind_device_env_EMULATOR_FILE">エミュレータファイル検出</string>
+    <string name="kind_device_env_EMULATOR_SENSOR">エミュレータセンサー偽装</string>
+    <string name="kind_device_env_EMULATOR_NETWORK">エミュレータネットワーク偽装</string>
+    <string name="kind_device_env_EMULATOR_TELEPHONY">エミュレータ電話偽装</string>
+    <string name="kind_device_env_EMULATOR_CPU">エミュレータ CPU 偽装</string>
+    <string name="kind_device_env_EMULATOR_BATTERY">エミュレータバッテリー偽装</string>
+    <string name="kind_device_env_SYSTEM_PROPERTIES">システムプロパティフック</string>
+    <string name="kind_device_env_PROC_STATUS">/proc/self/status フィルタ</string>
+    <string name="kind_device_env_PROC_MOUNT_INFO">/proc/self/mountinfo フィルタ</string>
+    <string name="kind_device_env_PROC_CGROUP">/proc/self/cgroup フィルタ</string>
+    <string name="kind_device_env_PROC_NET">/proc/net/tcp フィルタ</string>
+    <string name="kind_device_env_DETECT_ROOT">Root 検出の監視</string>
+    <string name="kind_device_env_DETECT_EMULATOR">エミュレータ検出の監視</string>
+    <string name="detail_device_env_masked">隠蔽済み</string>
+    <string name="detail_device_env_target_path">対象パス</string>
+    <string name="detail_device_env_target_class">対象クラス</string>
+    <string name="detail_device_env_target_property">対象プロパティ</string>
+    <string name="detail_device_env_detection_pattern">検出パターン</string>
+    <string name="detail_device_env_original_value">元の値</string>
+    <!-- V31 设备环境操作标签 -->
+    <string name="device_records_search">デバイス環境記録を検索</string>
+    <string name="op_device_env_file_exists">ファイル存在検出</string>
+    <string name="op_device_env_file_length">ファイルサイズ検出</string>
+    <string name="op_device_env_file_readable">ファイル可読検出</string>
+    <string name="op_device_env_exec_command">コマンド実行監視</string>
+    <string name="op_device_env_process_builder">プロセス構築監視</string>
+    <string name="op_device_env_get_installed_packages">インストール済みパッケージ照会</string>
+    <string name="op_device_env_get_installed_applications">インストール済みアプリ照会</string>
+    <string name="op_device_env_query_intent_activities">Intent クエリ監視</string>
+    <string name="op_device_env_get_property">システムプロパティ読み取り</string>
+    <string name="op_device_env_build_tags">Build.TAGS 検出</string>
+    <string name="op_device_env_getprop">getprop コマンド</string>
+    <string name="op_device_env_class_for_name">クラスロード監視</string>
+    <string name="op_device_env_load_class">loadClass 監視</string>
+    <string name="op_device_env_find_class">findClass 監視</string>
+    <string name="op_device_env_get_stack_trace">スタック取得フィルタ</string>
+    <string name="op_device_env_thread_stack">スレッドスタックフィルタ</string>
+    <string name="op_device_env_read_maps">maps 読み取りフィルタ</string>
+    <string name="op_device_env_open_maps">maps ファイル監視</string>
+    <string name="op_device_env_build_fingerprint">Build.FINGERPRINT 偽装</string>
+    <string name="op_device_env_build_model">Build.MODEL 偽装</string>
+    <string name="op_device_env_build_product">Build.PRODUCT 偽装</string>
+    <string name="op_device_env_build_manufacturer">Build.MANUFACTURER 偽装</string>
+    <string name="op_device_env_dev_file_exists">qemu_pipe 検出</string>
+    <string name="op_device_env_sys_file_exists">システムファイル検出</string>
+    <string name="op_device_env_lib_file_exists">ライブラリファイル検出</string>
+    <string name="op_device_env_get_default_sensor">センサー照会監視</string>
+    <string name="op_device_env_sensor_list">センサーリスト監視</string>
+    <string name="op_device_env_get_mac_address">MAC アドレス偽装</string>
+    <string name="op_device_env_get_device_id">デバイス ID 偽装</string>
+    <string name="op_device_env_get_imei">IMEI 偽装</string>
+    <string name="op_device_env_android_id">ANDROID_ID 偽装</string>
+    <string name="op_device_env_phone_device_id">TelephonyManager.getDeviceId</string>
+    <string name="op_device_env_phone_imei">TelephonyManager.getImei</string>
+    <string name="op_device_env_phone_subscriber_id">TelephonyManager.getSubscriberId</string>
+    <string name="op_device_env_phone_sim_serial">TelephonyManager.getSimSerialNumber</string>
+    <string name="op_device_env_phone_line1_number">TelephonyManager.getLine1Number</string>
+    <string name="op_device_env_cpu_available_processors">Runtime.availableProcessors</string>
+    <string name="op_device_env_cpu_proc_info">/proc/cpuinfo</string>
+    <string name="op_device_env_cpu_sysconf">os.sysconf</string>
+    <string name="op_device_env_battery_int_property">BatteryManager.getIntProperty</string>
+    <string name="op_device_env_battery_is_charging">BatteryManager.isCharging</string>
+    <string name="op_device_env_battery_changed">ACTION_BATTERY_CHANGED</string>
+    <string name="op_device_env_build_device">Build.DEVICE</string>
+    <string name="op_device_env_build_board">Build.BOARD</string>
+    <string name="op_device_env_build_hardware">Build.HARDWARE</string>
+    <string name="op_device_env_build_brand">Build.BRAND</string>
+    <string name="op_device_env_build_host">Build.HOST</string>
+    <string name="op_device_env_build_user">Build.USER</string>
+    <string name="op_device_env_build_display">Build.DISPLAY</string>
+    <string name="op_device_env_build_serial">Build.SERIAL</string>
+    <string name="op_device_env_build_type">Build.TYPE</string>
+    <string name="op_device_env_root_check_api">Root 検出 API 記録</string>
+    <string name="op_device_env_root_check_file">Root 検出ファイル記録</string>
+    <string name="op_device_env_root_check_exec">Root 検出コマンド記録</string>
+    <string name="op_device_env_emulator_check_build">エミュレータ Build 確認</string>
+    <string name="op_device_env_emulator_check_file">エミュレータファイル確認</string>
+    <string name="op_device_env_emulator_check_prop">エミュレータプロパティ確認</string>
+    <string name="op_device_env_sys_prop_get">SystemProperties.get</string>
+    <string name="op_device_env_proc_status_read">/proc/self/status read</string>
+    <string name="op_device_env_proc_mount_read">/proc/self/mountinfo read</string>
+    <string name="op_device_env_proc_cgroup_read">/proc/self/cgroup read</string>
+    <string name="op_device_env_proc_net_read">/proc/net/tcp read</string>
+    <string name="op_device_env_settings_global_get">Settings.Global.get</string>
+    <string name="op_device_env_settings_secure_get">Settings.Secure.get</string>
+    <string name="op_device_env_content_query_settings">ContentResolver.query settings</string>
+
+    <!-- V33 UI Interaction -->
+    <string name="filter_type_ui_interaction">UI インタラクション</string>
+    <string name="ui_interaction_records_title">UI インタラクション記録</string>
+    <string name="listen_row_master_ui">UI インタラクション</string>
+    <string name="kind_ui_DIALOG_SHOW">ダイアログ表示</string>
+    <string name="kind_ui_DIALOG_KEYWORD">ダイアログキーワード</string>
+    <string name="kind_ui_WIDGET_TEXT">ウィジェットテキスト</string>
+    <string name="kind_ui_ACTIVITY_START">Activity 起動</string>
+    <string name="kind_ui_ACTIVITY_RESUME">Activity 再開</string>
+    <string name="op_ui_show">表示</string>
+    <string name="op_ui_back_dismiss">戻るキーで閉じる</string>
+    <string name="op_ui_intercept">遮断</string>
+    <string name="op_ui_assign">代入</string>
+    <string name="op_ui_start">起動</string>
+    <string name="op_ui_create">作成</string>
+
+    <!-- V33 System Information -->
+    <string name="filter_type_system">システム情報</string>
+    <string name="system_records_title">システム情報記録</string>
+    <string name="listen_row_master_system">システム情報監視</string>
+    <string name="kind_system_LOGCAT">Logcat</string>
+    <string name="kind_system_APP_INFO">アプリ情報</string>
+    <string name="kind_system_SIGNATURE">署名</string>
+    <string name="op_system_capture">キャプチャ</string>
+    <string name="op_system_get_info">情報取得</string>
+    <string name="op_system_read">読み取り</string>
+
+    <!-- V33 Process Control -->
+    <string name="filter_type_process_control">プロセス制御</string>
+    <string name="process_control_records_title">プロセス制御記録</string>
+    <string name="listen_row_master_process">プロセスガード</string>
+    <string name="kind_process_EXIT_INTERCEPT">終了遮断</string>
+    <string name="kind_process_CRASH_PREVENT">クラッシュ防止</string>
+    <string name="kind_process_SCREEN_RECORD">録画解除</string>
+    <string name="op_process_system_exit">System.exit</string>
+    <string name="op_process_kill_process">killProcess</string>
+    <string name="op_process_catch">捕捉</string>
+    <string name="op_process_block">遮断</string>
+    <string name="ui_interaction_records_search">UI インタラクション記録を検索…</string>
+    <string name="system_records_search">システム情報記録を検索…</string>
+    <string name="process_control_records_search">プロセス制御記録を検索…</string>
+
+    <!-- V37 dual-domain: monitor screen sections -->
+    <string name="monitor_section_listen">監視</string>
+    <string name="monitor_section_feature">機能</string>
+    <string name="monitor_domain_listen">監視記録</string>
+    <string name="monitor_domain_feature">機能介入</string>
+    <!-- V37 dual-domain: per-app feature settings -->
+    <string name="feature_settings_entry">機能設定</string>
+    <string name="feature_settings_hint">機能はアプリの動作を能動的に変更します。有効化すると直ちに適用されます。</string>
+    <string name="feature_masters_section">機能マスタースイッチ</string>
+    <string name="feature_group_dialog_intercept">ダイアログキーワード遮断</string>
+    <string name="feature_group_process_guard">プロセスガード</string>
+    <string name="feature_group_ssl_bypass">SSL 検証バイパス</string>
+    <string name="feature_group_proxy_vpn_hide">プロキシと VPN の隠蔽</string>
+    <string name="feature_group_root_xposed_hide">Root と Xposed の隠蔽</string>
+    <string name="feature_group_device_spoof">エミュレータとデバイス偽装</string>
+    <string name="feature_profile_row">偽装プロファイル</string>
+    <string name="feature_profile_row_hint">偽装フックが使用するデバイス識別値のグループ</string>
+    <string name="feature_profile_sheet_title">偽装プロファイルを選択</string>
+    <string name="feature_profile_follow_global">グローバルに従う</string>
+    <string name="feature_profile_auto">自動(エミュレータ系統別)</string>
+    <string name="feature_profile_pixel7pro">Pixel 7 Pro</string>
+    <string name="feature_profile_xiaomi13">Xiaomi 13</string>
+    <string name="feature_keyword_follow_global">グローバルキーワードライブラリに従う</string>
+    <string name="feature_keyword_follow_global_hint">有効時、グローバルで有効化されたキーワードがこのアプリすべてに適用されます</string>
+    <string name="feature_keyword_library_empty">キーワードライブラリが空です</string>
+    <string name="feature_keyword_open_library">ライブラリを開く</string>
+    <string name="feature_keyword_subset_title">有効なキーワード</string>
+    <string name="danger_reset_feature_msg">%1$s のすべての機能カスタマイズを消去してデフォルトに戻しますか?</string>
+    <!-- V37 dual-domain: listen page environment observation section -->
+    <string name="listen_section_env_observe">環境観測</string>
+    <!-- V37 T3.5: global keyword library -->
+    <string name="keywords_title">ダイアログ遮断キーワード</string>
+    <string name="keywords_add_action">キーワードを追加</string>
+    <string name="keywords_add_title">キーワードを追加</string>
+    <string name="keywords_edit_title">キーワードを編集</string>
+    <string name="keywords_text_label">キーワードテキスト</string>
+    <string name="keywords_mode_label">一致モード</string>
+    <string name="keyword_mode_contains">包含</string>
+    <string name="keyword_mode_regex">正規表現</string>
+    <string name="keyword_mode_equals">完全一致</string>
+    <string name="keywords_empty_title">キーワードはまだありません</string>
+    <string name="keywords_empty_hint">キーワードを追加すると、スコープ済みアプリで一致したダイアログを遮断できます。</string>
+    <string name="keywords_delete_action">削除</string>
+    <string name="keywords_delete_confirm_msg">キーワード「%1$s」を削除しますか?スコープ済みアプリは直ちに遮断を停止します。</string>
+    <!-- V37 T3.5: spoof profiles -->
+    <string name="profiles_title">偽装プロファイル</string>
+    <string name="profiles_hint">内蔵プリセットは一般的なデバイス識別をカバーし、フィールド上書きは選択したプリセットの上に適用されます。</string>
+    <string name="profiles_global_section">プロファイルプリセット</string>
+    <string name="profiles_overrides_section">フィールド上書き</string>
+    <string name="profiles_overrides_empty">フィールド上書きなし</string>
+    <string name="profiles_override_add">上書きを追加</string>
+    <string name="profiles_override_delete">上書きを削除</string>
+    <string name="profiles_override_delete_confirm">上書き「%1$s」を削除しますか?</string>
+    <string name="profiles_override_key_label">キー(例: build.MODEL、ro.hardware、wifi.ssid)</string>
+    <string name="profiles_override_value_label">値</string>
+    <string name="profiles_override_key_hint">接頭辞:build. / ro. / telephony. / wifi. / cpu.</string>
+    <!-- V37 T3.5: detection blacklist -->
+    <string name="blacklist_title">検出ブラックリスト</string>
+    <string name="blacklist_hint">追加項目は内蔵ベースラインと統合されて有効になり、内蔵項目は削除できません。</string>
+    <string name="blacklist_root_packages">Root パッケージ</string>
+    <string name="blacklist_xposed_prefixes">Xposed クラス接頭辞</string>
+    <string name="blacklist_frida_ports">Frida ポート</string>
+    <string name="blacklist_mask_keywords">マスクキーワード</string>
+    <string name="blacklist_section_empty">追加項目なし</string>
+    <string name="blacklist_add_action">追加</string>
+    <string name="blacklist_value_label">値</string>
+    <!-- V37 T3.5: settings hub entries;V41 分区标题改 settings_section_feature_domain -->
+    <string name="settings_keywords_entry">キーワードライブラリ</string>
+    <string name="settings_keywords_entry_hint">グローバルのダイアログ遮断キーワード</string>
+    <string name="settings_profiles_entry">偽装プロファイル</string>
+    <string name="settings_profiles_entry_hint">デバイス識別プリセットとフィールド上書き</string>
+    <string name="settings_blacklist_entry">検出ブラックリスト</string>
+    <string name="settings_blacklist_entry_hint">追加で隠すパッケージ・接頭辞・ポート</string>
+
+    <!-- V37 T3.6: data management for the 5 late-added record types -->
+    <string name="settings_records_network">ネットワーク記録</string>
+    <string name="settings_records_device_env">デバイス環境記録</string>
+    <string name="settings_records_ui_interaction">UI インタラクション記録</string>
+    <string name="settings_records_system">システム情報記録</string>
+    <string name="settings_records_process_control">プロセス制御記録</string>
+    <string name="danger_clear_network_msg">すべてのネットワーク記録を完全に削除しますか?この操作は元に戻せません。</string>
+    <string name="danger_clear_device_env_msg">すべてのデバイス環境記録を完全に削除しますか?この操作は元に戻せません。</string>
+    <string name="danger_clear_ui_interaction_msg">すべての UI インタラクション記録を完全に削除しますか?この操作は元に戻せません。</string>
+    <string name="danger_clear_system_msg">すべてのシステム情報記録を完全に削除しますか?この操作は元に戻せません。</string>
+    <string name="danger_clear_process_control_msg">すべてのプロセス制御記録を完全に削除しますか?この操作は元に戻せません。</string>
+
+    <!-- V37 T3.2: record list appbar clear action -->
+    <string name="records_clear_action">この種別を消去</string>
+    <string name="danger_clear_page_records_msg">このアプリのこの種別の記録をすべて完全に削除しますか?この操作は元に戻せません。</string>
+
+</resources>

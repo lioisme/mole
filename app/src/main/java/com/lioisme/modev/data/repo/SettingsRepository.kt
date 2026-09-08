@@ -156,24 +156,30 @@ class SettingsRepository(
     private val _serverExternalAccess = MutableStateFlow(false)
 
     /**
-     * 服务监听外部访问(V26):false(默认)= 127.0.0.1 仅本机;
-     * true = 0.0.0.0 所有接口(同网段设备可连)。宿主本地偏好,
-     * 不经远程镜像(注入侧零感知)。
+     * 统一外部访问(V41 T2,D-1):wire ConfigServer 与 MCP McpServer **双服务消费**
+     * 的单一开关——false(默认)= 127.0.0.1 仅本机;true = 0.0.0.0 所有接口
+     * (同网段设备可连)。宿主本地偏好,不经远程镜像(注入侧零感知)。
+     * V41 起取代 V26/V38 的 wire/MCP 双键分裂(`MCP_EXTERNAL_ACCESS` 仅迁移输入)。
      */
     val serverExternalAccess: StateFlow<Boolean> = _serverExternalAccess
 
     /**
-     * 写入外部访问开关并即时生效:本地持久化 → 服务端改绑([ConfigServer.restart],
-     * 已连接会话由注入侧重连循环恢复)。
+     * 写入统一外部访问开关并即时生效(D-1):本地持久化 → 双服务改绑——
+     * wire volatile 置位 + 异步 restart([ConfigServer.restart],已连接会话由
+     * 注入侧重连循环恢复);MCP 经 [mcpRestarter] 回填绑定态后异步重启。
+     * 与令牌认证互相独立(V40 D-4 语义保持):是否要求 Bearer 仅由
+     * [ConfigKeys.MCP_TOKEN_AUTH] 决定。
      */
-    suspend fun setServerExternalAccess(enabled: Boolean) {
+    suspend fun setExternalAccess(enabled: Boolean) {
         withContext(Dispatchers.IO) {
             localPrefs.edit { putBoolean(ConfigKeys.SERVER_EXTERNAL_ACCESS, enabled) }
         }
         _serverExternalAccess.value = enabled
-        // volatile 同步置位(状态可观测确定性),重启改绑异步执行
+        // wire:volatile 同步置位(状态可观测确定性),重启改绑异步执行
         server.externalAccess = enabled
         scope.launch { server.restart() }
+        // MCP:回调内回填 externalAccess 后 restart(异步,见 restartMcpAsync)
+        restartMcpAsync()
     }
 
     private val _serverPort = MutableStateFlow(WireProtocol.PORT)
@@ -302,11 +308,6 @@ class SettingsRepository(
     /** MCP 监听端口(V39):默认 1510,与 wire 1511 区隔。 */
     val mcpPort: StateFlow<Int> = _mcpPort
 
-    private val _mcpExternalAccess = MutableStateFlow(false)
-
-    /** MCP 外部访问(V38;V40 D-4 起与令牌认证互相独立):false(默认)= 127.0.0.1;true = 0.0.0.0。 */
-    val mcpExternalAccess: StateFlow<Boolean> = _mcpExternalAccess
-
     private val _mcpTokenAuth = MutableStateFlow(false)
 
     /** MCP 令牌认证(V39):默认停用;启用后**全接口**(含回环 adb forward)必须携带 Bearer 令牌。 */
@@ -320,6 +321,16 @@ class SettingsRepository(
     /** MCP 回调:端口/绑定/启停变更后由仓库驱动服务端重启(setter 装配,AppContainer 接线)。 */
     var mcpRestarter: (() -> Unit)? = null
 
+    /**
+     * MCP 重启统一收口(V41 V1.4):**恒异步**——调用方多为 Main 调度的 VM 写路径,
+     * 回调链直达 NanoHTTPD start(主线程开 ServerSocket,曾致 jank/StrictMode 违规、
+     * NetworkOnMainThreadException 被服务端 catch-all 吞掉后静默 bind 失败)。
+     * 与 wire 侧 `scope.launch { server.restart() }` 模式对齐。
+     */
+    private fun restartMcpAsync() {
+        scope.launch { mcpRestarter?.invoke() }
+    }
+
     /** MCP 回调:令牌集合变更后原地推送服务端校验集(无需重启,避免踢掉已连会话)。 */
     var mcpTokenSetUpdater: ((Set<String>) -> Unit)? = null
 
@@ -329,7 +340,7 @@ class SettingsRepository(
             localPrefs.edit { putBoolean(ConfigKeys.MCP_ENABLED, enabled) }
         }
         _mcpEnabled.value = enabled
-        mcpRestarter?.invoke()
+        restartMcpAsync()
     }
 
     /** 写 MCP 端口(1..65535):持久化 → 内存 → 异步重启改绑。 */
@@ -339,23 +350,10 @@ class SettingsRepository(
             localPrefs.edit { putInt(ConfigKeys.MCP_PORT, clamped) }
         }
         _mcpPort.value = clamped
-        mcpRestarter?.invoke()
+        restartMcpAsync()
     }
 
-    /**
-     * 写 MCP 外部访问(V40 D-4 解耦):true = 改绑 0.0.0.0,与令牌认证**相互独立**——
-     * 是否要求 Bearer 完全由令牌认证开关决定;false = 仅改绑回环。
-     */
-    suspend fun setMcpExternalAccess(enabled: Boolean) {
-        withContext(Dispatchers.IO) {
-            localPrefs.edit { putBoolean(ConfigKeys.MCP_EXTERNAL_ACCESS, enabled) }
-        }
-        _mcpExternalAccess.value = enabled
-        mcpRestarter?.invoke()
-    }
-
-    /**
-     * 写 MCP 令牌认证(V40 D-4 解耦):true = 启用后全接口强制 Bearer(列表为空即时派生一枚,
+    /** 写 MCP 令牌认证(V40 D-4 解耦):true = 启用后全接口强制 Bearer(列表为空即时派生一枚,
      * 避免「启用即锁死」);false = 停用认证。与外部访问无级联——外部 0.0.0.0 监听
      * 是否可无认证访问由用户显式选择(UI 文案承载风险提示)。
      */
@@ -364,7 +362,7 @@ class SettingsRepository(
             persistMcpTokens(_mcpTokens.value + com.lioisme.modev.core.model.McpTokenEntry.create(label = ""))
         }
         persistMcpTokenAuth(enabled)
-        mcpRestarter?.invoke()
+        restartMcpAsync()
     }
 
     /** 新增令牌(label 可空 = 未命名,UI 回落资源文案):持久化 → 原地更新校验集;返回新条目。 */
@@ -434,10 +432,22 @@ class SettingsRepository(
         _overrides.value.forEach { (pkg, override) ->
             writer.put(ConfigKeys.overrideKey(pkg), override.toJson(gson))
         }
-        // V26:恢复服务监听外部访问偏好(进程重启后重放;默认停用零动作)
+        // V41 T2 统一外部访问:双键 OR 合并迁移(D-1)——SERVER_EXTERNAL_ACCESS 为唯一
+        // 事实源;V38 遗留 mcp_external_access 读后删除(幂等:旧键不存在即零动作)。
+        // 曾单独开启 MCP 外部访问的用户升级后双服务同绑 0.0.0.0(RK-1 决策语义)。
+        val legacyMcpExternal = localPrefs.getBoolean(ConfigKeys.MCP_EXTERNAL_ACCESS, false)
         val storedExternalAccess = localPrefs.getBoolean(ConfigKeys.SERVER_EXTERNAL_ACCESS, false)
-        _serverExternalAccess.value = storedExternalAccess
-        if (storedExternalAccess) {
+        val unifiedExternalAccess = storedExternalAccess || legacyMcpExternal
+        if (localPrefs.contains(ConfigKeys.MCP_EXTERNAL_ACCESS)) {
+            localPrefs.edit {
+                remove(ConfigKeys.MCP_EXTERNAL_ACCESS)
+                if (unifiedExternalAccess != storedExternalAccess) {
+                    putBoolean(ConfigKeys.SERVER_EXTERNAL_ACCESS, unifiedExternalAccess)
+                }
+            }
+        }
+        _serverExternalAccess.value = unifiedExternalAccess
+        if (unifiedExternalAccess) {
             server.externalAccess = true
             // 服务端可能已在容器惰性初始化时以回环启动,restart 立即改绑全接口
             scope.launch { server.restart() }
@@ -449,11 +459,10 @@ class SettingsRepository(
             server.port = storedPort
             scope.launch { server.restart() }
         }
-        // V38→V39:恢复 MCP 服务偏好(进程重启后重放;enabled 默认 true,端口/外部访问默认零动作)
+        // V38→V39:恢复 MCP 服务偏好(进程重启后重放;enabled 默认 true,端口默认零动作)。
+        // V41 T2:外部访问已随统一键上方重放(mcp_external_access 退役为迁移输入)。
         _mcpEnabled.value = localPrefs.getBoolean(ConfigKeys.MCP_ENABLED, true)
         _mcpPort.value = localPrefs.getInt(ConfigKeys.MCP_PORT, com.lioisme.modev.mcp.protocol.McpProtocol.DEFAULT_PORT)
-        val storedMcpExternal = localPrefs.getBoolean(ConfigKeys.MCP_EXTERNAL_ACCESS, false)
-        _mcpExternalAccess.value = storedMcpExternal
         // V39 令牌迁移:旧单键 mcp_token 导入为未命名条目(一次性,导入后删旧键);
         // 令牌认证直读偏好(V40 D-4 解耦;V39 升级用户曾级联写入过显式 prefs 值,保持不变)。
         var tokens = localPrefs.getString(ConfigKeys.MCP_TOKENS, null)

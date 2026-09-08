@@ -61,6 +61,9 @@ class TimelineGroupTest {
         val t = ts(2026, 8, 19, 0, 0, 0)
         assertEquals("Aug 19", formatDay(t, Locale.US))
         assertEquals("8月19日", formatDay(t, Locale.SIMPLIFIED_CHINESE))
+        // V42 T5:ja/ko 母语惯形(默认 MMM 在 ja/ko 输出「8月 19」截断形态,禁回退)
+        assertEquals("8月19日", formatDay(t, Locale.JAPANESE))
+        assertEquals("8월 19일", formatDay(t, Locale.KOREAN))
     }
 
     @Test

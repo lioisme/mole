@@ -51,7 +51,7 @@ class DiagnosticsScreenTest {
     private fun setContent() {
         val container = (ctx.applicationContext as ModevApp).container
         settings = container.settings
-        runBlocking { settings.setServerExternalAccess(false) }
+        runBlocking { settings.setExternalAccess(false) }
         vm = DiagnosticsViewModelFactory(container).create(DiagnosticsViewModel::class.java)
         // 等回环改绑落定(上一用例可能遗留 0.0.0.0 重启窗口),杜绝跨用例地址污染。
         val deadline = System.currentTimeMillis() + 10_000
@@ -81,7 +81,7 @@ class DiagnosticsScreenTest {
             rule.onAllNodesWithText(str(R.string.mcp_section)).fetchSemanticsNodes().isEmpty(),
         )
         assertTrue(
-            "外部访问开关已迁服务页,诊断页不得渲染",
+            "外部访问开关已迁服务页(V41 统一),诊断页不得渲染",
             rule.onAllNodesWithTag("services-wire-external").fetchSemanticsNodes().isEmpty(),
         )
         scrollTo(str(R.string.settings_stats_section))
@@ -198,7 +198,7 @@ class DiagnosticsScreenTest {
     @After
     fun tearDown() {
         if (this::settings.isInitialized) {
-            runBlocking { settings.setServerExternalAccess(false) }
+            runBlocking { settings.setExternalAccess(false) }
         }
     }
 

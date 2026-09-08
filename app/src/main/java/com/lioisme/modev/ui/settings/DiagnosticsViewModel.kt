@@ -47,7 +47,7 @@ class DiagnosticsViewModel(
             .map { it ?: ConnectionMonitor.BIND_LOOPBACK }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), ConnectionMonitor.BIND_LOOPBACK)
 
-    /** 外部访问状态(只读;复制快照消费,开关在服务页)。 */
+    /** 外部访问状态(只读;复制快照消费,V41 统一开关,配置动作在服务页「通用」分区)。 */
     val externalAccess: StateFlow<Boolean> = settings.serverExternalAccess
 
     // ---- V39: MCP 只读态(复制快照消费;配置动作在服务页/令牌页) ----

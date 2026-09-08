@@ -150,7 +150,7 @@ class AppContainer(private val context: Context) {
         )
         val built = com.lioisme.modev.mcp.McpServer(
             port = settings.mcpPort.value,
-            externalAccess = settings.mcpExternalAccess.value,
+            externalAccess = settings.serverExternalAccess.value,
             tokenAuthEnabled = settings.mcpTokenAuth.value,
             requiredTokens = settings.mcpTokens.value.map { it.value }.toSet(),
             serverInfo = com.lioisme.modev.mcp.tools.McpJson.obj(
@@ -162,11 +162,11 @@ class AppContainer(private val context: Context) {
             instructions = com.lioisme.modev.mcp.tools.McpTools.SERVER_INSTRUCTIONS,
             registry = registry,
         )
-        // 配置变更 → 重启(enabled=false 时停机)
+        // 配置变更 → 重启(enabled=false 时停机;仓库侧已保证异步,见 restartMcpAsync)
         settings.mcpRestarter = {
             if (settings.mcpEnabled.value) {
                 built.port = settings.mcpPort.value
-                built.externalAccess = settings.mcpExternalAccess.value
+                built.externalAccess = settings.serverExternalAccess.value
                 built.tokenAuthEnabled = settings.mcpTokenAuth.value
                 built.requiredTokens = settings.mcpTokens.value.map { it.value }.toSet()
                 built.restart()

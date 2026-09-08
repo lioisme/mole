@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- per-app language 支持语言清单(Android 13+ 系统面板「语言偏好」按此表展示
-     可选语言;en 为不含 region 的通用英文,zh 为中文)。
-     与 LocaleManager 支持的 TAG_EN/TAG_ZH 保持一致(App 内选择同表驱动)。 -->
+     可选语言;en 为不含 region 的通用英文,zh 中文,ja 日文,ko 韩文)。
+     与 LocaleManager.SUPPORTED_TAGS 保持一致(新增语言双处同步)。 -->
 <locale-config xmlns:android="http://schemas.android.com/apk/res/android">
     <locale android:name="en" />
     <locale android:name="zh" />
+    <locale android:name="ja" />
+    <locale android:name="ko" />
 </locale-config>

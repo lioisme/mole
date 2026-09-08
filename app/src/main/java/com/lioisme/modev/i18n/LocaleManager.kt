@@ -46,6 +46,11 @@ object LocaleManager {
     const val TAG_SYSTEM = "system"
     const val TAG_EN = "en"
     const val TAG_ZH = "zh"
+    const val TAG_JA = "ja"
+    const val TAG_KO = "ko"
+
+    /** 全部支持的应用内显式语言标签(locales_config.xml 同表,新增语言双处同步)。 */
+    val SUPPORTED_TAGS = listOf(TAG_EN, TAG_ZH, TAG_JA, TAG_KO)
 
     private val _localeFlow = MutableStateFlow(TAG_SYSTEM)
 

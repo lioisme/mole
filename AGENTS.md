@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法/数据库/行为/偏好/WebView/系统信息 + 环境观测)+ 功能域(退出拦截/崩溃预防/解除录屏/弹窗关键词拦截/SSL 绕过/代理 VPN 隐藏/设备环境伪装)+ 宿主双进程日志。
-构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀;2026-08-26 V27 记录列表重构/行为监听一等公民增量沉淀;2026-08-26 V28 详情页纯 markdown 化/偏好监听一等公民增量沉淀;2026-09-04 V37 双域拆分/FeatureGate 红线/关键词库与画像契约增量沉淀;2026-09-05 V38 MCP 服务/工具面 parity/注入侧 seq 续号修复增量沉淀;2026-09-06 V39 MCP 端口 1510/多令牌/服务诊断拆分/对话框统一/Appbar 排他/双击退出增量沉淀)。
+构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀;2026-08-26 V27 记录列表重构/行为监听一等公民增量沉淀;2026-08-26 V28 详情页纯 markdown 化/偏好监听一等公民增量沉淀;2026-09-04 V37 双域拆分/FeatureGate 红线/关键词库与画像契约增量沉淀;2026-09-05 V38 MCP 服务/工具面 parity/注入侧 seq 续号修复增量沉淀;2026-09-06 V39 MCP 端口 1510/多令牌/服务诊断拆分/对话框统一/Appbar 排他/双击退出增量沉淀;2026-09-07 V41 令牌页崩溃修复/统一外部访问双服务消费/端口行纯端口化/副标题动态有效值/按应用浏览退役/根页 IA 五分区/DAO 直调门禁/全局记录路由 e2e 增量沉淀;2026-09-08 V42 搜索槽长按门禁/AppIcon 底图状态驱动/端口可用性校验链/主题色板回退 v8/四语 i18n 增量沉淀)。
 
 ## 构建 / 测试(Windows,gradlew.bat)
 
@@ -42,7 +42,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 | 默认配置 | 内置推荐值 `HookSwitch.DEFAULT`(无 UI;`switch_global` 仅为注入侧兜底种子,init 强制重置) | 全局设置(联动语义)、跟随全局 |
 | 自定义偏差 / 恢复默认 | 每应用二态覆盖(V24)与清除动作 | 覆盖=三态、强制开/关、重置为全局 |
 | 代码组 CodeGroup | 多表示字节区块的标签页代码块(mikepenz codeFence 扩展点聚合连续 text/base64/hex 围栏) | 三态分段、SegmentedButton(V26 退役) |
-| 外部访问 External Access | 服务监听 0.0.0.0(默认停用 = 127.0.0.1 仅本机);诊断页开关即写即重启改绑 | 监听 IP、开放端口 |
+| 外部访问 External Access | **统一开关**(V41 D-1):wire+MCP 双服务同绑,服务页首「通用」分区;启用副标题 = 0.0.0.0 / 停用 = 127.0.0.1(动态);端口行仅显示端口,`IP:端口` 完整形态仅诊断复制快照保留 | 监听 IP、开放端口、MCP/wire 独立外部访问开关、双键分裂 |
 | 行为监听 Behavior Listen | 文件读/写/删/重命名/列目录 + Assets 资源 + Shell 命令三类域(V27 一等公民,与算法/数据库并列) | 文件日志、hook 日志 |
 | 内容捕获 fileContentCapture | 仅「随调用即可得」的整读 API 正文预览(Files.readAllBytes/readAllLines/write/copy 与 AssetManager.open 元数据;流式路径绝不触碰句柄) | 文件内容抓取、全量读取 |
 | 监听域 Listen Domain | 被动采集能力域(算法/数据库/行为/偏好/WebView/系统信息 + 请求监控/检测监控/弹窗·控件·Activity 观测);`CategoryTaxonomy.domain = LISTEN` | 把干预功能称「××监听」 |
@@ -50,19 +50,26 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 | 关键词库 Keyword Library | 全局弹窗拦截关键词资产(Room `keyword_library`,text 唯一 + matchMode + 全局启停);每应用默认跟随全局,可显式子集 | 仅 override 扁平词表、无库 |
 | 伪装画像 Spoof Profile | 设备/网络伪装值组(auto/pixel7pro/xiaomi13 内置档位 + 字段覆写);`SpoofProfiles` 为机型字面量唯一事实源 | 钩子内硬编码机型值 |
 | 检测黑名单追加项 extra* | Root 包名/Xposed 前缀/Frida 端口/掩码词的用户追加项(内置基线 ∪ 追加,只增不删) | 覆盖内置基线 |
-| MCP 服务 MCP Server | 进程内常驻 Streamable HTTP(spec 2025-06-18,V39 起端口默认 **1510**(wire 迁 1511 让位),单端点 POST /mcp,偏好 `mcp_port` 可改);监听默认 127.0.0.1,外部访问开关 = 0.0.0.0(V40 D-4 起与令牌认证**互相独立**,无级联);令牌认证独立开关(V39,默认停用)启用后**全接口强制**(含回环),服务端是否鉴权仅由 `tokenAuthEnabled` 决定(`McpServer` 无 externalAccess 耦合);多令牌 `McpTokenEntry`(SecureRandom 32 hex,宿主本地 `mcp_tokens` 不镜像,V38 单键惰性迁移);与 wire ConfigServer 完全独立生命周期(独立端口/开关/restart,互不触碰,VERSION 恒 4 零感知) | 把 MCP 当 wire 通道扩展、恢复 resources/prompts 双通道、令牌暴露为 MCP 工具(引导悖论 + PII)、恢复外部访问↔认证级联 |
+| MCP 服务 MCP Server | 进程内常驻 Streamable HTTP(spec 2025-06-18,V39 起端口默认 **1510**(wire 迁 1511 让位),单端点 POST /mcp,偏好 `mcp_port` 可改);监听绑定随**统一外部访问开关**(V41 D-1,见 #19);令牌认证独立开关(V39,默认停用)启用后**全接口强制**(含回环),服务端是否鉴权仅由 `tokenAuthEnabled` 决定(`McpServer` 无 externalAccess 耦合);多令牌 `McpTokenEntry`(SecureRandom 32 hex,宿主本地 `mcp_tokens` 不镜像,V38 单键惰性迁移);与 wire ConfigServer 完全独立生命周期(独立端口/开关/restart,互不触碰,VERSION 恒 4 零感知) | 把 MCP 当 wire 通道扩展、恢复 resources/prompts 双通道、令牌暴露为 MCP 工具(引导悖论 + PII)、恢复外部访问↔认证级联、恢复 mcp_external_access 独立键 |
 | 令牌管理 Token Management | MCP 访问令牌管理页(`settings/mcp-tokens`):认证开关 + 多令牌列表(显隐/复制/撤销/创建,经 `mcpTokenSetUpdater` 原地生效,不重启不踢会话);撤销最后一枚不停用认证(空集 = 全拒);令牌值宿主本地秘密,恒不进 MCP 工具输出与诊断快照 | 单令牌 UUID 惰性生成(V38 遗留形态,init 一次性迁移) |
 | 工具面 Tool Surface 43 | MCP 对 Agent 的能力清单(记录 14/应用 6/监听 4/功能 4/资产 8/服务 4/作用域 3),与 UI 能力逐行对照、同上游继承;`McpToolParityTest` 冻结快照 + B1 边界源码扫描双门禁 | 「MCP 子集」「UI 专属阉割」(§5.3 明示排除除外) |
+| 端口校验 Port Validation | 端口编辑可用性链(V42 T3,强约束 #29):`ModevPortSheet` 异步校验 → `PortValidator`(特权 <1024/双服务冲突/占用探测三闸 + 自身豁免),失败硬阻止保存;wire/MCP 双 `bindError` 观测面 + 服务页对称错误行 | 恢复静默保存(无校验)、特权端口可录入、双服务同端口、wire 绑定失败不可见 |
+| 语言 Language | 四语 en/zh/ja/ko(V42 T5):枚举唯一事实源 `LocaleManager.SUPPORTED_TAGS`(`locales_config.xml` 同表);选择面板 5 项(system + 四语,自名键 `lang_*`);values-ja/values-ko 全量 701 键经生成器产出(技术词回落 en);ja/ko plurals 仅 other;`AppCountFormat` zh/ja/ko 同 10^4 万进位档;`TimelineGroup.formatDay` ja/ko 母语惯形分支 | 三语硬编码枚举(TAG 单常量散落)、ja/ko 资源缺键静默回落 en、日韩日期走 MMM 截断形态 |
 
 ## 强约束(改了会挂测试/降级质量)
 
-1. **i18n**:用户可见文本一律走 `values/strings.xml`(en)+ `values-zh/strings.xml`;
-   新增键必须双语齐备、占位符形态一致(`StringResourceParityTest` 强制);
-   `ui` 包源码字符串字面量禁止中文(`HardcodedStringConventionTest` 强制)。
+1. **i18n(V42 T5 四语升级)**:用户可见文本一律走 `values/strings.xml`(en)+
+   `values-zh`/`values-ja`/`values-ko`(四语);新增键必须四语齐备、占位符形态
+   一致(`StringResourceParityTest` 四语循环 + plurals 逐 locale 标识符断言强制);
+   ja/ko plurals 按 CLDR 仅 `other` 量项;ja/ko 与 en 同文仅限
+   `IDENTICAL_ALLOWED`(+ ja/ko 例外 `confirm`="OK" —— 生成器
+   `scripts/v42_generate.mjs` 同源);`ui` 包源码字符串字面量禁止中文
+   (`HardcodedStringConventionTest` 强制)。
    语言解析:`LocaleManager.resolveTag` = App 内显式选择优先,仅「跟随系统」
-   时读系统 per-app locale;重建路径须经 `MainActivity.attachBaseContext` 调
-   `LocaleManager.refreshForRecreation`;locale 敏感值用 `remember(context)`
-   (包 Context 换实例,不残留旧 locale)。
+   时读系统 per-app locale;支持语言枚举唯一事实源 = `LocaleManager.SUPPORTED_TAGS`
+   (en/zh/ja/ko,`locales_config.xml` 同表双处同步);重建路径须经
+   `MainActivity.attachBaseContext` 调 `LocaleManager.refreshForRecreation`;
+   locale 敏感值用 `remember(context)`(包 Context 换实例,不残留旧 locale)。
 2. **数值格式**:记录数/统计用 `AppCountFormat`(locale 驱动;zh ≥1万、其他 ≥1K
    平台紧凑格式 ≤1 位小数,以下千分位)。禁止自造单位(万+/千+/K+ 后缀)。
    资源格式串大数用 `%1$,d`。
@@ -112,7 +119,11 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
    语义——勾选态断言不可行,改行为级断言(点击项 → 行现/行隐)。
 9. **RecordFilter 查询契约**:`LogRepository.paged(filter)` / `counts(filter)`
    唯一入口(REST/MCP 未来仅依赖 `LogRepository` + `RecordType` + `RecordFilter`);
-   `recordType` 可空 = 全部类型。DAO `observeCountByFilter`/`observePagedRowsByFilter`
+   `recordType` 可空 = 全部类型。**DAO 直调门禁(V41)**:`cryptoRecordDao()/
+   keywordLibraryDao()` 调用白名单 = ModevApp(装配)/LogRepository/
+   KeywordLibraryRepository/ModevDatabase(声明点),越界即红
+   (`RecordDaoAccessGateTest` 源码扫描)。DAO `observeCountByFilter`/
+   `observePagedRowsByFilter`
    用哨兵计数语义(0=过滤关闭,1=启用),空集合须传哨兵值 + `toBindList()`;
    `row.toRowModelOrNull()` 对非法 kind/operation 枚举名返回 null(行被丢弃,
    种子数据必须用合法枚举,如 `MESSAGE_DIGEST`/`CIPHER`/`MAC` +
@@ -199,14 +210,18 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
     `listen-reset`,副标题 plurals `listen_settings_custom_n`);
     测试种子 hook 开关默认值见 V18(dbOpen 等噪点类别默认关),集成测试
     setUp 须显式开。
-17. **记录浏览双维度(V24;V40 T4 修订)**:`records/all`(GlobalRecordsScreen)
+17. **记录浏览双维度(V24;V40 T4 修订;V41 T5 收敛)**:`records/all`(GlobalRecordsScreen)
     退役不恢复;记录浏览 = 两维度——**按应用×类型**(`records/{type}/{packageName}`
     10 目的地,自每应用监控页 EntryRow 进入)+ **按类型×全部应用**
     (`records/type/{recordType}` 全局列表,自数据管理页类型计数行进入);
+    **数据管理页「按应用浏览」区已退役(V41)——应用维度浏览唯一入口 =
+    主界面应用列表(目标路由原本相同),`data-app-*`/`onOpenApp`/`AppBrowseRow`
+    禁止复活**;
     `RecordsViewModelFactory(recordType, packageName: String?)`——packageName
     非 null = 单应用语境,null = 全局列表(presetPackages=null 哨兵直透
     RecordFilter,数据层零新查询);VM 可变面仅 query/kindName,全局形态
-    `packageLabels` 提供行内应用名上下文(目录内存映射,禁逐行 binder);
+    `packageLabels` 提供行内应用名上下文(目录内存映射,禁逐行 binder;
+    未安装包不入目录 → contextLabel=null,无包名回落属现网正确行为);
     「清空本类」在两形态分别 = 本应用该类型 / 该类型全部应用(deleteByFilter
     hasConstraint 对 type-only 过滤放行);数据管理页保留「清空全部」唯一危险行,
     按类型清理行退役(清理并入列表);危险清理行文案断言一律
@@ -225,17 +240,35 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
     detail_remove_scope/listen_settings_title/record_copied/
     settings_pin_scoped_hint/settings_apps_section/detail_framework_error,
     新增计数文案必须 plurals 如 listen_settings_custom_n)。
-19. **服务监听绑定契约(V26)**:`ConfigServer.externalAccess`(volatile,
-    默认 false = 绑定 `ConnectionMonitor.BIND_LOOPBACK`;true = 
-    `BIND_ALL_INTERFACES`);偏好键 `server_external_access`
-    (`SettingsRepository`,宿主本地 prefs,**不入远程镜像**——仅宿主进程消费);
-    写路径唯一 = `setServerExternalAccess`(持久化 + volatile 同步置位 +
-    异步 `restart()`);restart 带 epoch 代元守卫(旧 accept 线程不触碰新代
-    running 状态),已连接会话由注入侧重连循环恢复;注入侧恒连回环,
-    wire 协议 VERSION 恒 4 零感知。UI 观测经 domain `ConnectionMonitor.
-    boundAddress`(P5-1:ui 禁 import data.server,VM 组合
-    `listeningAddress` 回退口径)。诊断页开关 testTag
-    `diagnostics-bind-all`,默认停用,风险提示进副标题。
+19. **统一外部访问契约(V41,取代 V26 双键形态)**:单一开关 **wire + MCP 双服务消费**
+    ——偏好键 `server_external_access`(`SettingsRepository`,宿主本地 prefs,
+    **不入远程镜像**,注入侧零感知)为唯一事实源;`mcp_external_access` 已退役为
+    迁移输入(init OR 合并后删除,幂等,**禁止复活双键分裂**)。写路径唯一 =
+    `setExternalAccess`(持久化 → StateFlow → wire `server.externalAccess`
+    volatile 置位 + 异步 `server.restart()` → `restartMcpAsync()` 异步
+    `mcpRestarter` 回调回填 MCP 绑定态后重启;**MCP 重启恒异步**——`mcpRestarter`
+    消费方多为 Main 调度,主线程 NanoHTTPD start 会致 jank/静默 bind 失败);
+    双服务 restart 均带 epoch 代元守卫,已连接会话由注入侧重连循环恢复;
+    服务端是否鉴权仅由 `tokenAuthEnabled` 决定(与外部访问无级联,V40 D-4 不变);
+    注入侧恒连回环,wire 协议 VERSION 恒 4 零感知。UI 观测经 domain
+    `ConnectionMonitor.boundAddress`(P5-1:ui 禁 import data.server,VM 组合
+    `listeningAddress` 回退口径)。UI 唯一入口 = 服务页首「通用」分区单开关
+    testTag `services-external-access`,副标题 = 动态绑定地址(0.0.0.0/127.0.0.1,
+    VM `externalAccessAddress`),默认停用;wire/MCP 各自端口行仅显示端口(IP 由
+    统一开关唯一承载,`IP:端口` 完整形态仅存于诊断复制快照);端口编辑经
+    **PortValidator 可用性校验**(见 #29,探测地址消费本开关)。
+29. **端口校验链契约(V42 T3)**:端口编辑唯一链 = `ModevPortSheet`(异步校验,
+    busy 态 + maxLength 5)→ `ServicesViewModel.validateWirePort/validateMcpPort`
+    → domain `PortValidator.check`——校验序 = 范围 → **特权 <1024 硬拒**
+    (Android 应用进程绑定必 EACCES)→ **双服务冲突硬拒**(wire ≠ MCP)→
+    **自身当前端口豁免**(重存原值 no-op,不探测)→ **占用探测硬拒**
+    (ServerSocket 试绑 `reuseAddress=true`,与 ConfigServer 自绑语义一致,
+    TIME_WAIT 不假阳性;地址随统一外部访问开关 0.0.0.0/127.0.0.1);
+    校验失败 = 硬阻止保存(行内分型错误,偏好零写入);探测为即时快照非终审,
+    最终裁决 = 真实绑定——wire `ConfigServer.bindError`/MCP `McpServer.bindError`
+    双观测面(失败置位/成功清空),服务页各自错误行对称渲染
+    (`wire_bind_error_*`/`mcp_bind_error_*`);退避重试机制不变;`ModevInputSheet`
+    零改动(其他消费方零波及)。
 20. **行为监听一等公民契约(V27)**:第三记录类型 `RecordType.BEHAVIOR`
     (wire=`behavior`),单表扩展(ADR-1,迁移 v8→v9 新增 10 可空列:
     path/destPath/command/fileSize + content 五元组);wire VERSION 恒 4
@@ -326,14 +359,20 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
      (`AppbarSearchExclusivityTest` 源码扫描门禁)——10 记录列表页「清空本类」
      收进搜索条动作槽(`CollapsedSearchInput`/`SearchInputField` `actionSlot`,
      折叠/展开同 testTag `records-clear-type` → 居中确认 `records-clear-confirm`,
-     deleteByFilter 按预设语境);危险确认恒居中无图标 AlertDialog
+     deleteByFilter 按预设语境);**搜索条槽按钮长按不展开全屏 SearchView**
+     (V42 T1:SearchInputField 槽按压窗口 + 400ms 宽限门禁抑制展开意图,
+     文本区长按选词聚焦展开保持 MD3 标准;探针 SearchInputComponentsTest
+     longPress_* 三槽锁定);危险确认恒居中无图标 AlertDialog
      + surfaceContainerHigh(见 #27)。
 25. **视觉 token 契约(V37 T4)**:alpha 魔法数一律 `ui/theme/Tokens`
      (pillContainerAlpha/badgeContainerAlpha/chevronAlpha/disabledContentAlpha/
-     emptyIcon*/codeBorderAlpha);记录行内边距 16dp 统一(旧 14dp 已归一);
+     emptyIcon*/codeBorderAlpha/swatchBorderAlpha);记录行内边距 16dp 统一(旧 14dp 已归一);
      设置类行开关统一 `ToggleListItem`(PerAppSettingRows 共享);
       kind→标签映射唯一入口 `KindLabelRes.resolve`(监听/功能两页共用,
-      Prefs OPEN/CLEAR 碰撞前置规则不变)。
+      Prefs OPEN/CLEAR 碰撞前置规则不变);
+      AppIcon 占位底图 = **加载中/失败态限定**(V42 T2,`onState` 驱动 Success 即移除,
+      testTag `app-icon-placeholder`;图标本体恒原样绘制禁裁切——不规则/透明图标
+      禁再透出底层色块;主题色板 = v8 圆形色点网格形态唯一,FilterChip+hex 色板禁复活)。
 26. **MCP 服务契约(V38,Agent 一等公民)**:`mcp.*` 包边界 = B1(禁 import
       `ui.*`/`androidx.compose.*`/`data.db.*`/`hook.*`/`data.server.*`/`framework.*`,
       `McpToolParityTest.mcp_layer_boundary_allowlist` 源码扫描)+ B2(允许
@@ -345,7 +384,8 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       `result.isError`),会话头 `Mcp-Session-Id`(restart 整体失效);认证(V39 令牌化;
       V40 D-4 解耦)= 令牌认证独立开关默认停用、启用后**全接口强制 Bearer(含回环)**;
       服务端是否鉴权**仅**由 `tokenAuthEnabled` 决定,外部访问与认证互相独立
-      (0.0.0.0 无认证监听 = 用户显式选择,UI 副标题承载风险提示);校验集 =
+      (0.0.0.0 无认证监听 = 用户显式选择;V41 起 MCP 绑定随统一外部访问开关,
+      风险语义由令牌页状态行与确认弹窗承载,开关副标题仅动态绑定地址);校验集 =
       多令牌集合,变更经 `mcpTokenSetUpdater` 原地生效(不重启不踢会话);
       令牌管理仅 UI(`settings/mcp-tokens`),不暴露为 MCP 工具
       (`token_management_is_documented_exclusion` 登记引导悖论 + PII);`McpDtos` 必须用专用
@@ -363,7 +403,8 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       `confirmTestTag` 锚点);弹层一律 `ModevSheet`(标题 titleLarge@24dp +
       `ModevSheetScope.dismissWith` **hide 动画后回调收口** + imePadding 单内边距 +
       surfaceContainerHigh)系:`ModevInputSheet`(label 可空/error/maxLength/
-      inputTestTag/confirmTestTag)、`ModevPortSheet`(wire/MCP 端口唯一实现)、
+      inputTestTag/confirmTestTag)、`ModevPortSheet`(wire/MCP 端口唯一实现,
+      V42 起自带异步可用性校验见 #29,testTag `port-input`/`port-confirm`)、
       `ModevChoiceSheet<T>`、`ModevSheetButtonRow`(自定义内容复用);诊断/服务页
       两端口 sheet 已合并,`SettingsSheets` 三件为薄封装(签名不变零波及)。
 28. **服务/诊断拆分 + 双击退出契约(V39)**:服务页(`settings/services`,

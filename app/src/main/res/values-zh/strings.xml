@@ -382,9 +382,11 @@
     <string name="capture_ignore_path_dialog_hint">每行一个前缀,例如 /data/local/tmp/</string>
     <!-- 设置页 -->
     <string name="settings_title">设置</string>
-    <string name="settings_display_section">显示</string>
-    <string name="settings_language_section">语言与地区</string>
-    <string name="settings_features_section">功能</string>
+    <!-- V41 根页 IA 重排:分区按归属归类(通用/数据/服务/功能域/关于) -->
+    <string name="settings_section_general">通用</string>
+    <string name="settings_section_data">数据</string>
+    <string name="settings_section_services">服务与诊断</string>
+    <string name="settings_section_feature_domain">功能域</string>
     <string name="settings_data_section">数据</string>
     <string name="settings_framework_section">框架与作用域</string>
     <string name="settings_server_section">通信服务</string>
@@ -404,26 +406,34 @@
     <string name="settings_port_value">%1$s:%2$d</string>
     <string name="settings_port_scope_local">(仅本机)</string>
     <string name="settings_port_scope_all">(所有接口)</string>
+    <string name="services_common_section">通用</string>
+    <!-- V41:外部访问 = 统一开关(wire + MCP 双服务);副标题为动态绑定地址,无静态 hint -->
     <string name="settings_external_access">外部访问</string>
-    <string name="settings_external_access_hint">监听 0.0.0.0,供局域网连接。</string>
     <string name="settings_online_targets">运行中目标进程</string>
     <string name="settings_online_targets_value">%1$,d 个</string>
     <string name="settings_port_edit">端口设置</string>
     <string name="settings_port_invalid">端口需为 1–65535</string>
+    <!-- V42 T3 端口校验 -->
+    <string name="settings_port_privileged">低于 1024 的端口需系统权限</string>
+    <string name="settings_port_in_use">端口已被占用</string>
+    <string name="settings_port_conflict">与 %1$s 端口冲突</string>
+    <string name="settings_port_checking">校验中…</string>
+    <!-- V42 T3 wire 绑定失败(对位 mcp_bind_error) -->
+    <string name="wire_bind_error_title">Wire 绑定</string>
+    <string name="wire_bind_error">绑定失败:%1$s</string>
     <!-- V38 MCP 服务 -->
     <string name="mcp_section">MCP 服务(Agent)</string>
     <string name="mcp_enabled">MCP 服务</string>
-    <string name="mcp_enabled_hint">Agent 端点,默认仅本机访问。</string>
-    <string name="mcp_external_access">MCP 外部访问</string>
-    <string name="mcp_external_access_hint">绑定 0.0.0.0;未开令牌认证时局域网可直连。</string>
+    <!-- V41:开态副标题为技术字面量 POST /mcp(非资源);静态 hint 退役 -->
     <string name="mcp_port">MCP 端口</string>
     <!-- V39 MCP 令牌管理 -->
     <string name="mcp_token_auth">令牌认证</string>
-    <string name="mcp_token_auth_hint">所有请求(含回环)均需令牌。</string>
+    <string name="mcp_token_auth_off_hint">无需令牌</string>
     <string name="mcp_tokens_entry">访问令牌</string>
     <plurals name="mcp_tokens_count">
         <item quantity="other">%1$,d 个令牌</item>
     </plurals>
+    <string name="mcp_bind_error_title">MCP 绑定</string>
     <string name="mcp_bind_error">绑定失败:%1$s</string>
     <string name="mcp_disabled">已停用</string>
     <string name="mcp_state_on">已启用</string>
@@ -450,8 +460,7 @@
     <string name="settings_total_records">总记录数</string>
     <string name="settings_total_records_value">%1$,d 条</string>
     <string name="settings_type_counts_section">记录分类</string>
-    <string name="settings_apps_browse_section">按应用浏览</string>
-    <string name="apps_browse_empty">暂无记录。</string>
+    <!-- V41:「按应用浏览」退役——应用维度唯一入口 = 主界面应用列表 -->
     <string name="settings_records_algorithm">算法记录</string>
     <string name="settings_records_database">数据库记录</string>
     <string name="settings_records_behavior">行为记录</string>
@@ -489,6 +498,9 @@
     <string name="system_default">跟随系统</string>
     <string name="lang_en">English</string>
     <string name="lang_zh">中文</string>
+    <!-- V42 T5:语言自名(autonym),四 locale 同文 -->
+    <string name="lang_ja">日本語</string>
+    <string name="lang_ko">한국어</string>
     <string name="about">关于</string>
     <string name="version">%1$s v%2$s</string>
     <string name="about_version">版本</string>
@@ -748,8 +760,7 @@
     <string name="blacklist_section_empty">暂无追加项</string>
     <string name="blacklist_add_action">添加</string>
     <string name="blacklist_value_label">值</string>
-    <!-- V37 T3.5:设置页功能域入口 -->
-    <string name="settings_interception_section">拦截与伪装</string>
+    <!-- V37 T3.5:设置页功能域入口;V41 分区标题改 settings_section_feature_domain -->
     <string name="settings_keywords_entry">关键词库</string>
     <string name="settings_keywords_entry_hint">全局弹窗拦截关键词</string>
     <string name="settings_profiles_entry">伪装画像</string>

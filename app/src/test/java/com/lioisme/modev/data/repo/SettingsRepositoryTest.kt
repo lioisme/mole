@@ -97,15 +97,15 @@ class SettingsRepositoryTest {
     }
 
     @Test
-    fun `setServerExternalAccess persists and updates flow both ways`() = kotlinx.coroutines.runBlocking {
+    fun `setExternalAccess persists and updates flow both ways`() = kotlinx.coroutines.runBlocking {
         val r = repo()
 
-        r.setServerExternalAccess(true)
+        r.setExternalAccess(true)
         assertTrue(r.serverExternalAccess.value)
         assertTrue(prefs.getBoolean(com.lioisme.modev.core.model.ConfigKeys.SERVER_EXTERNAL_ACCESS, false))
         assertTrue(server.externalAccess)
 
-        r.setServerExternalAccess(false)
+        r.setExternalAccess(false)
         assertFalse(r.serverExternalAccess.value)
         assertFalse(prefs.getBoolean(com.lioisme.modev.core.model.ConfigKeys.SERVER_EXTERNAL_ACCESS, true))
         assertFalse(server.externalAccess)

@@ -66,10 +66,11 @@ import com.lioisme.modev.ui.theme.Tokens
 
 /**
  * 数据管理页(V10 设置分级;V19 T7 扩展;V37 T3.6 枚举驱动全 10 记录类型;
- * V40 T4 双维度记录浏览):三区 = 类型计数(每行可点 → 按类型全局列表)+
- * 按应用浏览(有记录的应用 → 每应用监控页)+ 存储占用与「清空全部」。
- * V40 变更:按类型危险清理行退役——清理并入各记录列表(搜索条动作槽,
- * 单应用/全局语境各有确认文案),本页仅保留「清空全部」兜底。
+ * V40 T4 双维度记录浏览;V41 T5 收敛):两区 = 类型计数(每行可点 → 按类型
+ * 全局列表)+ 存储占用与「清空全部」。V40 变更:按类型危险清理行退役——清理
+ * 并入各记录列表(搜索条动作槽,单应用/全局语境各有确认文案),本页仅保留
+ * 「清空全部」兜底。V41 变更:「按应用浏览」区退役——应用维度浏览唯一入口 =
+ * 主界面应用列表(全量目录 + 作用域管理 + 启动,目标路由原本就相同)。
  * 新增 RecordType 零改动(RecordType.entries 驱动)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -78,12 +79,9 @@ fun DataSettingsScreen(
     viewModel: DataSettingsViewModel,
     onBack: () -> Unit,
     onOpenTypeRecords: (RecordType) -> Unit,
-    onOpenApp: (String) -> Unit,
 ) {
     val totalRecords by viewModel.totalRecords.collectAsStateWithLifecycle()
     val typeCounts by viewModel.typeCounts.collectAsStateWithLifecycle()
-    val packageCounts by viewModel.packageCounts.collectAsStateWithLifecycle()
-    val packageLabels by viewModel.packageLabels.collectAsStateWithLifecycle()
     // 存储占用:仓库唯一出口(V23 R4,DB+wal+shm;清理动作后 VM 自动重取)
     val storageBytes by viewModel.storageBytes.collectAsStateWithLifecycle()
     var pendingClearAll by remember { mutableStateOf(false) }
@@ -121,65 +119,7 @@ fun DataSettingsScreen(
                 }
             }
             Spacer(Modifier.height(Dimens.pageBottom))
-            // 按应用浏览(V40 T4 第二维度入口):有记录的应用 → 每应用监控页。
-            SettingsSection(stringResource(R.string.settings_apps_browse_section)) {
-                val packages =
-                    packageCounts.filterValues { it > 0 }.keys
-                        .sortedWith(
-                            compareBy<String> { it }
-                                .thenByDescending { packageCounts[it] ?: 0L },
-                        )
-                if (packages.isEmpty()) {
-                    // V40 T5.4:空态内联(EmptyState 组件退役)——MD3 原语组合。
-                    val emptyMessage = stringResource(R.string.apps_browse_empty)
-                    Column(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 24.dp)
-                                .wrapContentSize(Alignment.Center)
-                                .semantics { stateDescription = emptyMessage },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        Box(
-                            Modifier
-                                .size(56.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                        .copy(alpha = Tokens.emptyIconContainerAlpha),
-                                ),
-                            contentAlignment = Alignment.Center,
-                        ) {
-                            Icon(
-                                Icons.Default.PhoneAndroid,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                    .copy(alpha = Tokens.emptyIconAlpha),
-                                modifier = Modifier.size(28.dp),
-                            )
-                        }
-                        Spacer(Modifier.height(16.dp))
-                        Text(
-                            emptyMessage,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            textAlign = TextAlign.Center,
-                            modifier = Modifier.padding(horizontal = 32.dp),
-                        )
-                    }
-                } else {
-                    packages.forEach { pkg ->
-                        AppBrowseRow(
-                            label = packageLabels[pkg] ?: pkg,
-                            packageName = pkg,
-                            count = packageCounts.getValue(pkg),
-                            onClick = { onOpenApp(pkg) },
-                        )
-                    }
-                }
-            }
-            Spacer(Modifier.height(Dimens.pageBottom))
+            // V41 T5:「按应用浏览」区退役——应用维度浏览唯一入口 = 主界面应用列表。
             SettingsSection(stringResource(R.string.settings_storage_section)) {
                 SettingsInfoItem(
                     icon = Icons.Default.Storage,
@@ -216,57 +156,6 @@ fun DataSettingsScreen(
             onDismiss = { pendingClearAll = false },
         )
     }
-}
-
-/**
- * 按应用浏览行(V40 T4):AppIcon + 应用名(headline,目录未收录回落包名)+
- * 包名 + 记录数(supporting)+ chevron;计数资源格式串驱动(#2 契约)。
- */
-@Composable
-private fun AppBrowseRow(
-    label: String,
-    packageName: String,
-    count: Long,
-    onClick: () -> Unit,
-) {
-    ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
-        headlineContent = {
-            Text(label, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
-        },
-        supportingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    packageName,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f, fill = false),
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    // #2 契约:资源格式串 %1$,d 自带千分位,直接消费 Long 原始值。
-                    stringResource(R.string.settings_total_records_value, count),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        },
-        leadingContent = { AppIcon(packageName = packageName, size = 40.dp) },
-        trailingContent = {
-            Icon(
-                Icons.Default.ChevronRight,
-                null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = Tokens.chevronAlpha),
-                modifier = Modifier.size(20.dp),
-            )
-        },
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .testTag("data-app-$packageName")
-                .clickable(onClick = onClick),
-    )
 }
 
 /** 记录类型图标(与监控入口页同语义色系)。 */

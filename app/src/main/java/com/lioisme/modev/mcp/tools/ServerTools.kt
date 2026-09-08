@@ -57,8 +57,7 @@ class ServerTools(
                 "port" to com.google.gson.JsonPrimitive(settings.serverPort.value),
                 "boundAddress" to McpJson.tree(connectionMonitor.boundAddress.value),
                 "externalAccess" to com.google.gson.JsonPrimitive(settings.serverExternalAccess.value),
-                "connectedPackages" to McpJson.tree(connectionMonitor.connectedPackagesFlow.value.sorted()),
-            ),
+                "connectedPackages" to McpJson.tree(connectionMonitor.connectedPackagesFlow.value.sorted()),            ),
             "mcp" to mcpSnapshot(),
             "framework" to frameworkJson(),
         )
@@ -66,13 +65,14 @@ class ServerTools(
 
     private fun serverSetExternalAccess() = schemaTool(
         name = "server_set_external_access",
-        description = "Toggle wire ConfigServer external access: false = bind 127.0.0.1 (default), " +
-            "true = bind 0.0.0.0 (same-segment devices can connect; connected sessions recover via " +
-            "inject-side reconnect loop). This toggles the WIRE server; MCP binding is UI-managed only.",
+        description = "Toggle external access for BOTH wire ConfigServer and MCP server (unified switch, " +
+            "V41): false = bind 127.0.0.1 (default), true = bind 0.0.0.0 (same-segment devices can " +
+            "connect; connected wire sessions recover via inject-side reconnect loop). MCP auth is " +
+            "independent: Bearer is enforced only when token auth is enabled.",
         schema = { required(listOf("enabled")); bool("enabled", "true = bind all interfaces") },
     ) { args ->
         val enabled = McpJson.bool(args, "enabled") ?: throw McpTool.McpToolException("enabled is required")
-        kotlinx.coroutines.runBlocking { settings.setServerExternalAccess(enabled) }
+        kotlinx.coroutines.runBlocking { settings.setExternalAccess(enabled) }
         McpJson.obj(
             "ok" to com.google.gson.JsonPrimitive(true),
             "externalAccess" to com.google.gson.JsonPrimitive(settings.serverExternalAccess.value),

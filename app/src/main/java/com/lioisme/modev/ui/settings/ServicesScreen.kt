@@ -36,13 +36,25 @@ import com.lioisme.modev.ui.components.SettingsItem
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.components.SettingsToggleItem
 
+/** MCP 端点形态副标题(V41 D-4:开态动态有效值,非中文技术字面量)。 */
+private const val MCP_ENDPOINT_SUBTITLE = "POST /mcp"
+
 /**
- * 服务页(V39 拆分自「服务与诊断」;V40 T2 注入侧分区标注):两分区 = 通信服务(注入侧 wire)
- * + MCP 服务。只承载**配置动作**(开关/端口/令牌入口);运行时观测(框架/作用域/统计/快照)
+ * 令牌认证开态副标题(V41 D-4):鉴权机制一词承载,风险语义由令牌页状态行承载。
+ * internal = 服务页/令牌页两处开关同源共用(同包跨文件)。
+ */
+internal const val TOKEN_AUTH_BEARER_SUBTITLE = "Bearer"
+
+/**
+ * 服务页(V39 拆分自「服务与诊断」;V40 T2 注入侧分区标注;V41 T2 统一外部访问):
+ * 三分区 = 通用(统一外部访问)/ 通信服务(注入侧 wire)/ MCP 服务。
+ * 只承载**配置动作**(开关/端口/令牌入口);运行时观测(框架/作用域/统计/快照)
  * 归诊断页。端口编辑统一走 [ModevPortSheet](此前 wire/MCP 两份逐行重复实现收编)。
  *
- * 认证语义(V40 D-4 解耦):MCP 外部访问与令牌认证**互相独立**——外部 0.0.0.0
- * 是否可无认证访问由用户显式选择(外部访问行副标题承载风险提示)。
+ * 外部访问(D-1 统一):单一开关同时控制 wire + MCP 绑定(启用 0.0.0.0 / 停用
+ * 127.0.0.1,副标题经 [ServicesViewModel.externalAddressLabel] 动态承载),
+ * 中性归属——既不属于通信服务也不属于 MCP。认证语义(V40 D-4)不变:令牌认证
+ * 独立开关,启用后全接口强制 Bearer,与外部访问无级联。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,14 +63,12 @@ fun ServicesScreen(
     onBack: () -> Unit,
     onOpenTokens: () -> Unit,
 ) {
-    val wireExternalAccess by viewModel.wireExternalAccess.collectAsStateWithLifecycle()
+    val externalAccess by viewModel.externalAccess.collectAsStateWithLifecycle()
     val wirePort by viewModel.wirePort.collectAsStateWithLifecycle()
-    val wireAddress by viewModel.wireListeningAddress.collectAsStateWithLifecycle()
+    val wireBindError by viewModel.wireBindError.collectAsStateWithLifecycle()
     val mcpEnabled by viewModel.mcpEnabled.collectAsStateWithLifecycle()
     val mcpPort by viewModel.mcpPort.collectAsStateWithLifecycle()
-    val mcpAddress by viewModel.mcpListeningAddress.collectAsStateWithLifecycle()
     val mcpBindError by viewModel.mcpBindError.collectAsStateWithLifecycle()
-    val mcpExternalAccess by viewModel.mcpExternalAccess.collectAsStateWithLifecycle()
     val mcpTokenAuth by viewModel.mcpTokenAuth.collectAsStateWithLifecycle()
     val mcpTokenCount by viewModel.mcpTokenCount.collectAsStateWithLifecycle()
 
@@ -82,47 +92,61 @@ fun ServicesScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             Spacer(Modifier.height(8.dp))
-            // V40 T2:注入侧标注(与诊断页共用 settings_server_section 语义解耦,
-            // 明示 wire 通道 = 注入侧 TCP,非 HTTP)。
-            SettingsSection(stringResource(R.string.settings_server_section_injection)) {
+            // V41 T2:「通用」中性分区——统一外部访问开关(D-1:双服务消费,
+            // 既不属于通信服务也不属于 MCP;副标题 = 动态绑定地址 0.0.0.0/127.0.0.1)。
+            SettingsSection(stringResource(R.string.services_common_section)) {
                 SettingsToggleItem(
                     icon = Icons.Default.Public,
                     title = stringResource(R.string.settings_external_access),
-                    subtitle = stringResource(R.string.settings_external_access_hint),
-                    checked = wireExternalAccess,
-                    modifier = Modifier.testTag("services-wire-external"),
-                    onCheckedChange = viewModel::setWireExternalAccess,
-                )
-                SettingsInfoItem(
-                    icon = Icons.Default.Dns,
-                    title = stringResource(R.string.settings_port),
-                    value = stringResource(R.string.settings_port_value, wireAddress, wirePort),
-                    onClick = { wirePortSheetOpen = true },
+                    subtitle = viewModel.externalAddressLabel(externalAccess),
+                    checked = externalAccess,
+                    modifier = Modifier.testTag("services-external-access"),
+                    onCheckedChange = viewModel::setExternalAccess,
                 )
             }
             Spacer(Modifier.height(24.dp))
+            // V40 T2:注入侧标注(与诊断页共用 settings_server_section 语义解耦,
+            // 明示 wire 通道 = 注入侧 TCP,非 HTTP)。端口行 V41 起仅显示端口(IP 由
+            // 统一外部访问开关唯一承载,D-2)。
+            SettingsSection(stringResource(R.string.settings_server_section_injection)) {
+                SettingsInfoItem(
+                    icon = Icons.Default.Dns,
+                    title = stringResource(R.string.settings_port),
+                    value = wirePort.toString(),
+                    onClick = { wirePortSheetOpen = true },
+                )
+                // wire 绑定失败观测行(V42 T3 D-4,与 MCP 错误行形态对称):
+                // 静默退避重试保持不变,本行仅承载「用户可见性」。
+                wireBindError?.let { error ->
+                    SettingsInfoItem(
+                        icon = Icons.Default.Warning,
+                        title = stringResource(R.string.wire_bind_error_title),
+                        value = stringResource(R.string.wire_bind_error, error),
+                        valueMaxLines = 1,
+                        modifier = Modifier.testTag("wire-bind-error-row"),
+                    )
+                }
+            }
+            Spacer(Modifier.height(24.dp))
             SettingsSection(stringResource(R.string.mcp_section)) {
+                // 副标题动态有效值(V41 D-4):开 = 端点形态(技术字面量);关 = 无副标题。
                 SettingsToggleItem(
                     icon = Icons.Default.Hub,
                     title = stringResource(R.string.mcp_enabled),
-                    subtitle = stringResource(R.string.mcp_enabled_hint),
+                    subtitle = if (mcpEnabled) MCP_ENDPOINT_SUBTITLE else "",
                     checked = mcpEnabled,
                     modifier = Modifier.testTag("services-mcp-enabled"),
                     onCheckedChange = viewModel::setMcpEnabled,
                 )
-                SettingsToggleItem(
-                    icon = Icons.Default.Public,
-                    title = stringResource(R.string.mcp_external_access),
-                    subtitle = stringResource(R.string.mcp_external_access_hint),
-                    checked = mcpExternalAccess,
-                    enabled = mcpEnabled,
-                    modifier = Modifier.testTag("services-mcp-external"),
-                    onCheckedChange = viewModel::setMcpExternalAccess,
-                )
+                // 令牌认证副标题动态化(V41 D-4):开 = Bearer;关 = 简短「无需令牌」。
                 SettingsToggleItem(
                     icon = Icons.Default.Key,
                     title = stringResource(R.string.mcp_token_auth),
-                    subtitle = stringResource(R.string.mcp_token_auth_hint),
+                    subtitle = if (mcpTokenAuth) {
+                        TOKEN_AUTH_BEARER_SUBTITLE
+                    } else {
+                        stringResource(R.string.mcp_token_auth_off_hint)
+                    },
                     checked = mcpTokenAuth,
                     enabled = mcpEnabled,
                     modifier = Modifier.testTag("services-mcp-token-auth"),
@@ -131,9 +155,7 @@ fun ServicesScreen(
                 SettingsInfoItem(
                     icon = Icons.Default.Dns,
                     title = stringResource(R.string.mcp_port),
-                    value = mcpAddress?.let {
-                        stringResource(R.string.settings_port_value, it, mcpPort)
-                    } ?: mcpPort.toString(),
+                    value = mcpPort.toString(),
                     onClick = { mcpPortSheetOpen = true },
                 )
                 Box(Modifier.testTag("services-tokens-entry")) {
@@ -151,7 +173,7 @@ fun ServicesScreen(
                 mcpBindError?.let { error ->
                     SettingsInfoItem(
                         icon = Icons.Default.Warning,
-                        title = stringResource(R.string.mcp_enabled),
+                        title = stringResource(R.string.mcp_bind_error_title),
                         value = stringResource(R.string.mcp_bind_error, error),
                         valueMaxLines = 1,
                     )
@@ -170,6 +192,7 @@ fun ServicesScreen(
                 wirePortSheetOpen = false
             },
             onDismiss = { wirePortSheetOpen = false },
+            validatePort = viewModel.validateWirePort(),
             modifier = Modifier.testTag("port-setting-sheet"),
         )
     }
@@ -182,6 +205,7 @@ fun ServicesScreen(
                 mcpPortSheetOpen = false
             },
             onDismiss = { mcpPortSheetOpen = false },
+            validatePort = viewModel.validateMcpPort(),
             modifier = Modifier.testTag("mcp-port-setting-sheet"),
         )
     }

@@ -13,6 +13,8 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isDialog
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.longClick
+import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
@@ -22,6 +24,7 @@ import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTouchInput
 import androidx.compose.ui.test.printToLog
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -331,8 +334,43 @@ class MonitorListScreensTest {
         rule.onNodeWithText(str(R.string.algorithm_records_title)).assertIsDisplayed()
     }
 
+    @Test
+    fun inApp_longPressOnClearTypeSlot_doesNotExpandSearch() {
+        // V42 T1 实机锚点(组件探针之外的整链路验证):Appbar 内长按清空动作槽
+        // (records-clear-type)不得展开全屏搜索(V42 前长按经焦点链路误触展开);
+        // 单击仍弹危险确认,取消后列表保持。折叠/展开双份槽取首个(折叠条)。
+        rule.waitForIdle()
+        openMonitorEntry()
+        openList(str(R.string.algorithm_records_title))
+        waitForVisible("SHA-256")
+
+        // 长按动作槽(折叠条内)→ tooltip 显示为设计行为,但零展开。
+        rule.onAllNodesWithTag("records-clear-type").onFirst()
+            .performTouchInput { longClick() }
+        rule.waitForIdle()
+        Thread.sleep(SLOT_EXPAND_GRACE_MS + 200)
+        rule.waitForIdle()
+        // 展开态判据:Dialog 窗口内出现第二份搜索输入域(展开后双输入域并存)。
+        val expandedInputs = rule.onAllNodes(
+            hasSetTextAction() and hasAnyAncestor(isDialog()),
+        ).fetchSemanticsNodes().size
+        assertEquals("长按清空槽不得展开搜索视图", 0, expandedInputs)
+
+        // 单击仍走危险确认(V42 门禁不得误伤点击)。
+        rule.onAllNodesWithTag("records-clear-type").onFirst().performClick()
+        rule.waitForIdle()
+        rule.onNodeWithText(str(R.string.danger_clear_algorithm_msg)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.cancel)).performClick()
+        rule.waitForIdle()
+        waitForVisible("SHA-256")
+        assertEquals(1, rowCount("SHA-256"))
+    }
+
     companion object {
         /** Room IN 哨兵(与 LogRepository.toBindList 同源:内容无意义,由计数短路)。 */
         private const val EMPTY_IN_SENTINEL = ""
     }
 }
+
+/** 主源槽展开宽限(internal 可见,探针等待窗与门禁同源)。 */
+private val SLOT_EXPAND_GRACE_MS = com.lioisme.modev.ui.components.SLOT_EXPAND_GRACE_MS

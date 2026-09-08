@@ -4,7 +4,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.lioisme.modev.AppContainer
-import com.lioisme.modev.data.repo.AppCatalogSource
 import com.lioisme.modev.data.repo.LogRepository
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
@@ -19,18 +18,18 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * 数据管理页(V10 设置分级;V19 T7 扩展;V40 T4 双维度记录浏览):
- * 类型计数 + 按应用计数/应用名(浏览维度)+ 全库总数 + 清空全部(危险操作;
- * V40 起按类型清理并入各记录列表,本页退役 clearByType)。
+ * 数据管理页(V10 设置分级;V19 T7 扩展;V40 T4 双维度记录浏览;V41 T5 收敛):
+ * 类型计数 + 全库总数 + 清空全部(危险操作;V40 起按类型清理并入各记录列表,
+ * 本页退役 clearByType)。V41:「按应用浏览」退役——packageCounts/packageLabels
+ * 页面接线拆除(仓库 `observeRecordCounts` 保留,AppsViewModel 列表徽章在消费);
+ * 应用维度浏览唯一入口 = 主界面应用列表。
  * V11 M4:依赖收窄为 [LogRepository],不再持有整个容器。
  * V23 R4:存储占用改经仓库出口([LogRepository.storageUsage],DB+wal+shm),
  * UI 禁再直触 data.db;计数流为 Room 实时流(清理后自动刷新),
  * 存储占用为快照读,由 [invalidated] 触发器在清理完成后重取。
- * V40:目录源可选注入产应用名映射(未收录包回落包名;目录内存加载零逐行 binder)。
  */
 class DataSettingsViewModel(
     private val logs: LogRepository,
-    catalog: AppCatalogSource? = null,
 ) : ViewModel() {
 
     /** 存储占用重取信号(replay=1 保证订阅即取初值;DROP_OLDEST 防连发堆积)。 */
@@ -47,16 +46,6 @@ class DataSettingsViewModel(
     val typeCounts: StateFlow<Map<String, Long>> = logs.observeRecordTypeCounts()
         .map { list -> list.associate { it.recordType to it.count } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
-
-    /** 按应用计数(V40 T4 浏览维度;包名 → 全类型计数)。 */
-    val packageCounts: StateFlow<Map<String, Long>> = logs.observeRecordCounts()
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
-
-    /** 包名 → 应用名映射(V40 T4;目录未接入 = 恒空,UI 回落包名)。 */
-    val packageLabels: StateFlow<Map<String, String>> =
-        (catalog?.apps ?: MutableStateFlow(emptyList()))
-            .map { list -> list.associate { it.packageName to it.label } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     /** 存储占用字节(DB + -wal + -shm;仓库唯一出口,V23 R4 解耦契约)。 */
     @OptIn(ExperimentalCoroutinesApi::class)
@@ -77,6 +66,6 @@ class DataSettingsViewModelFactory(
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return DataSettingsViewModel(container.logs, container.catalog) as T
+        return DataSettingsViewModel(container.logs) as T
     }
 }

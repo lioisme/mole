@@ -50,9 +50,31 @@ class AppCountFormatTest {
     fun thresholds_follow_locale() {
         assertEquals(10_000L, AppCountFormat.compactThreshold(zh))
         assertEquals(1_000L, AppCountFormat.compactThreshold(en))
+        // V42 T5:ja/ko 归入 CJK 万进位组(10^4,与 ICU 原生万/만 进位一致)
+        assertEquals(10_000L, AppCountFormat.compactThreshold(Locale.JAPANESE))
+        assertEquals(10_000L, AppCountFormat.compactThreshold(Locale.KOREAN))
         // 边界:恰在阈值上走紧凑,之下走千分位
         assertEquals("1万", AppCountFormat.compact(10_000, zh))
         assertEquals("9,999", AppCountFormat.compact(9_999, zh))
+    }
+
+    // ---- V42 T5:ja/ko 紧凑格式(ICU 原生万/만 进位) ----
+
+    @Test
+    fun ja_compact_aboveTenThousand() {
+        val ja = Locale.JAPANESE
+        assertEquals("1.2万", AppCountFormat.compact(12_345, ja))
+        assertEquals("1万", AppCountFormat.compact(10_000, ja))
+        // 阈值之下走千分位(与 zh 同 10^4 档,不再提前进位为「9.9千」)
+        assertEquals("9,999", AppCountFormat.compact(9_999, ja))
+    }
+
+    @Test
+    fun ko_compact_aboveTenThousand() {
+        val ko = Locale.KOREAN
+        assertEquals("1.2만", AppCountFormat.compact(12_345, ko))
+        assertEquals("1만", AppCountFormat.compact(10_000, ko))
+        assertEquals("9,999", AppCountFormat.compact(9_999, ko))
     }
 
     @Test

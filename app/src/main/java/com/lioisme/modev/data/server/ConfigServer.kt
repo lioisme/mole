@@ -53,6 +53,14 @@ class ConfigServer(
     private val _boundAddress = MutableStateFlow<String?>(null)
     override val boundAddress: StateFlow<String?> = _boundAddress
 
+    /**
+     * 最近一次绑定失败原因(V42 T3,对位 McpServer.bindError 可观测性;null = 正常):
+     * bind 失败置位、成功清空;指数退避重试机制不变,本流仅承载观测面
+     * (服务页错误行消费,与 MCP 行形态对称)。
+     */
+    private val _bindError = MutableStateFlow<String?>(null)
+    val bindError: StateFlow<String?> = _bindError
+
 
     /**
      * 类型化记录回调(ADR-1,由 LogRepository 接线,可热替换):
@@ -132,6 +140,7 @@ class ConfigServer(
                 ss.bind(InetSocketAddress(address, port))
                 serverSocket = ss
                 _boundAddress.value = address
+                _bindError.value = null
                 bindRetryMs = 2000L
                 while (isCurrentEpoch(myEpoch)) {
                     val socket =
@@ -145,7 +154,8 @@ class ConfigServer(
                 runCatching { ss.close() }
             } catch (t: Throwable) {
                 if (!isCurrentEpoch(myEpoch)) break
-                // 端口 bind 失败:指数退避重试(2s→30s)
+                // 端口 bind 失败:指数退避重试(2s→30s);失败原因置观测面(V42 T3)。
+                _bindError.value = t.message ?: t.javaClass.simpleName
                 android.util.Log.w("Modev", "config server bind failed, retry in ${bindRetryMs}ms: $t")
                 try {
                     Thread.sleep(bindRetryMs)

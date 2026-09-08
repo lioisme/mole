@@ -28,4 +28,7 @@ object Tokens {
 
     /** 代码块描边 alpha(outlineVariant)。 */
     const val codeBorderAlpha = 0.4f
+
+    /** 主题色板未选中色点描边 alpha(surfaceVariant,V42 T4 回退 v8 定档)。 */
+    const val swatchBorderAlpha = 0.3f
 }

@@ -18,8 +18,15 @@ import java.util.Locale
  */
 object AppCountFormat {
 
-    /** 紧凑档位阈值(zh=万 / 其他=千),以下用千分位整数。 */
-    fun compactThreshold(locale: Locale): Long = if (locale.language.startsWith("zh")) 10_000L else 1_000L
+    /** 万进位(10^4 组)语言集:zh/ja/ko 的 CJK 计数惯例(V42 T5)。 */
+    private val CJK_10_4_LANGUAGES = setOf("zh", "ja", "ko")
+
+    /**
+     * 紧凑档位阈值:zh/ja/ko = 万进位组(CJK 计数惯例,ICU 原生 10^4 组),
+     * 其余 = 千;以下用千分位整数(V42 T5 增 ja/ko)。
+     */
+    fun compactThreshold(locale: Locale): Long =
+        if (locale.language in CJK_10_4_LANGUAGES) 10_000L else 1_000L
 
     /** 千分位整数(locale 分组,供统计数值/资源格式串 %1$,d 之外的场景)。 */
     fun grouped(

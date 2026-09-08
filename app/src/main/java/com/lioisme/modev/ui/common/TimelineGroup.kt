@@ -39,16 +39,21 @@ fun formatSecond(
     SimpleDateFormat(if (is24h) "HH:mm:ss" else "h:mm:ss a", locale).format(Date(timestamp))
 
 /**
- * 日文案(en "Aug 19" / zh「8月19日」)。
- * zh 的「月/日」为模式字面量,经 Unicode 转义书写(源码零中文硬编码,
- * HardcodedStringConventionTest 强制)。
+ * 日文案(en "Aug 19" / zh·ja「8月19日」/ ko「8월 19일」)。
+ * zh/ja/ko 的「月/日/월/일」为模式字面量,经 Unicode 转义书写(源码零 CJK
+ * 硬编码,HardcodedStringConventionTest 强制;V42 T5 增 ja/ko 母语惯形——
+ * 默认 MMM 模式在日/韩 locale 输出「9月 8」截断形态)。
  */
 fun formatDay(
     timestamp: Long,
     locale: Locale,
 ): String =
     SimpleDateFormat(
-        if (locale.language == "zh") "M\u6708d\u65e5" else "MMM d",
+        when (locale.language) {
+            "zh", "ja" -> "M\u6708d\u65e5"
+            "ko" -> "M\uC6D4 d\uC77C"
+            else -> "MMM d"
+        },
         locale,
     ).format(Date(timestamp))
 

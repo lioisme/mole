@@ -3,8 +3,6 @@
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +15,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.shape.CircleShape
@@ -39,7 +36,6 @@ import androidx.compose.material.icons.filled.Sensors
 import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material.icons.filled.Wallpaper
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
@@ -59,6 +55,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -75,12 +72,20 @@ import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsItem
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.theme.AppearanceMode
+import com.lioisme.modev.ui.theme.LocalIsDarkTheme
 import com.lioisme.modev.ui.theme.ThemeConfig
 import com.lioisme.modev.ui.theme.ThemeSeeds
 import com.lioisme.modev.ui.theme.ThemeSettingsManager
+import com.lioisme.modev.ui.theme.Tokens
 
 // 主题色预设单一事实源 = ThemeSeeds.OPTIONS(ui/theme)。
 private val colorOptions: List<Long> = ThemeSeeds.OPTIONS
+
+/**
+ * 色板选中标记色(V42 T4 回退 v8 helper):暗色模式恒白、亮色模式恒黑,
+ * 任意 seed 色点(含黑/白灰阶)下勾选边框与图标均清晰可见。
+ */
+private fun selectedMarkColor(isDark: Boolean): Color = if (isDark) Color.White else Color.Black
 
 /**
  * 设置页(V10 设置分级,通用设置收敛本页;V21 T3 功能入口;V25 收敛二入口):
@@ -120,6 +125,8 @@ fun SettingsScreen(
             LocaleManager.TAG_SYSTEM -> stringResource(R.string.system_default)
             LocaleManager.TAG_EN -> stringResource(R.string.lang_en)
             LocaleManager.TAG_ZH -> stringResource(R.string.lang_zh)
+            LocaleManager.TAG_JA -> stringResource(R.string.lang_ja)
+            LocaleManager.TAG_KO -> stringResource(R.string.lang_ko)
             else -> currentLanguageTag
         }
 
@@ -140,7 +147,9 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             Spacer(Modifier.height(8.dp))
-            SettingsSection(stringResource(R.string.settings_display_section)) {
+            // V41 T6 根页 IA 重排:分区按归属归类——通用(显示/语言)/ 数据 / 服务与诊断 /
+            // 功能域(全局资产)/ 关于;行内容、路由、回调零变化,仅分区容器重组。
+            SettingsSection(stringResource(R.string.settings_section_general)) {
                 SettingsItem(
                     icon =
                         when (config.appearanceMode) {
@@ -163,10 +172,6 @@ fun SettingsScreen(
                     subtitle = if (config.useWallpaper) stringResource(R.string.follow_wallpaper) else stringResource(R.string.custom_accent),
                     onClick = { showColorSheet = true },
                 )
-            }
-
-            Spacer(Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_language_section)) {
                 SettingsItem(
                     icon = Icons.Default.Language,
                     title = stringResource(R.string.language),
@@ -179,13 +184,18 @@ fun SettingsScreen(
             // (算法监听 / 数据库监听全局页退役,监听配置唯一入口 = 每应用「监听设置」;
             // 能力注册表 UI 呈现已于 V19 退役)。已作用域应用置顶开关于 V22 R2 迁回筛选菜单。
             // V39:「服务与诊断」按功能类型拆分为「服务」(配置面)与「诊断」(运行时观测)。
+            // V41 T6:按归属重排为「数据」「服务与诊断」两分区。
             Spacer(Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_features_section)) {
+            SettingsSection(stringResource(R.string.settings_section_data)) {
                 SettingsItem(
                     icon = Icons.Default.Inventory,
                     title = stringResource(R.string.data_settings_title),
                     onClick = onOpenDataSettings,
                 )
+            }
+
+            Spacer(Modifier.height(24.dp))
+            SettingsSection(stringResource(R.string.settings_section_services)) {
                 SettingsItem(
                     icon = Icons.Default.Dns,
                     title = stringResource(R.string.services_settings_title),
@@ -199,8 +209,9 @@ fun SettingsScreen(
             }
 
             // V37 T3.5 功能域全局资产:关键词库 / 伪装画像 / 检测黑名单
+            // (V41 T6:分区名「拦截与伪装」→「功能域」,对齐双域词汇表 Feature Domain)
             Spacer(Modifier.height(24.dp))
-            SettingsSection(stringResource(R.string.settings_interception_section)) {
+            SettingsSection(stringResource(R.string.settings_section_feature_domain)) {
                 SettingsItem(
                     icon = Icons.Default.Chat,
                     title = stringResource(R.string.settings_keywords_entry),
@@ -308,6 +319,19 @@ private fun LanguageSheet(
                 selected = currentTag == LocaleManager.TAG_ZH,
                 onClick = { sheet.dismissWith { onSelect(LocaleManager.TAG_ZH) } },
             )
+            // V42 T5:日/韩新增(V42 R5;选择项与 SUPPORTED_TAGS/locales_config 同表)。
+            IconChoiceRow(
+                icon = Icons.Default.Language,
+                label = stringResource(R.string.lang_ja),
+                selected = currentTag == LocaleManager.TAG_JA,
+                onClick = { sheet.dismissWith { onSelect(LocaleManager.TAG_JA) } },
+            )
+            IconChoiceRow(
+                icon = Icons.Default.Language,
+                label = stringResource(R.string.lang_ko),
+                selected = currentTag == LocaleManager.TAG_KO,
+                onClick = { sheet.dismissWith { onSelect(LocaleManager.TAG_KO) } },
+            )
         }
     }
 }
@@ -403,6 +427,7 @@ private fun ColorSheet(
     ModevSheet(
         title = stringResource(R.string.theme_color),
         onDismiss = onDismiss,
+        modifier = Modifier.testTag("theme-color-sheet"),
     ) {
         Column(Modifier.fillMaxWidth().padding(bottom = 32.dp)) {
             Spacer(Modifier.height(8.dp))
@@ -428,35 +453,57 @@ private fun ColorSheet(
                 )
             }
 
-            // V40 T5.5:色板 = 标准 M3 FilterChip 行(手绘 CircleShape 网格退役;
-            // leadingIcon 色点自描述十六进制、selected 态语义由 MD3 承担)。
-            FlowRow(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                colorOptions.forEach { argb ->
-                    val color = Color(argb)
-                    val isSelected = !useWallpaper && color == selectedColor
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { onSelectColor(argb) },
-                        label = { Text("#%06X".format(argb and 0xFFFFFF)) },
-                        leadingIcon = {
+            // V42 T4:色板回退 v8 原版形态(5 列圆形色点网格 + selectedMarkColor
+            // 对比安全选中标记,任意 seed 下清晰可见);V39 FilterChip + hex 文本
+            // 标签形态退役(禁用旧词)。20 色固定数量 → 非惰性 chunked(5) × Row
+            // (ModevSheet 纯 Column 容器,禁嵌套惰性布局)。
+            Column(Modifier.padding(horizontal = 24.dp)) {
+                colorOptions.chunked(5).forEach { rowColors ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        rowColors.forEach { argb ->
+                            val color = Color(argb)
+                            val isSelected = !useWallpaper && color == selectedColor
+                            // 选中标记色:暗色恒白、亮色恒黑(与 LIDE 同规,中灰 seed 下不消失)。
+                            val markColor = selectedMarkColor(LocalIsDarkTheme.current)
                             Box(
                                 modifier =
                                     Modifier
-                                        .size(18.dp)
+                                        .weight(1f)
+                                        .aspectRatio(1f)
+                                        .testTag("color-swatch")
                                         .clip(CircleShape)
                                         .background(color)
-                                        .border(
-                                            1.dp,
-                                            MaterialTheme.colorScheme.outlineVariant,
-                                            CircleShape,
-                                        ),
-                            )
-                        },
-                    )
+                                        .then(
+                                            if (isSelected) {
+                                                Modifier.border(3.dp, markColor, CircleShape)
+                                            } else {
+                                                Modifier.border(
+                                                    1.dp,
+                                                    MaterialTheme.colorScheme.surfaceVariant.copy(alpha = Tokens.swatchBorderAlpha),
+                                                    CircleShape,
+                                                )
+                                            },
+                                        )
+                                        .semantics { selected = isSelected }
+                                        .clickable { onSelectColor(argb) },
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Default.Check,
+                                        null,
+                                        tint = markColor,
+                                        modifier = Modifier.size(20.dp),
+                                    )
+                                }
+                            }
+                        }
+                        // 尾行不满 5 列时以 weight 占位保持等宽网格节奏。
+                        repeat(5 - rowColors.size) { Spacer(Modifier.weight(1f)) }
+                    }
                 }
             }
         }
