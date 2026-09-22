@@ -399,9 +399,21 @@ public 面 `spoofProfiles: SpoofProfileService` 取自 domain ⇒ G2 闸成立)�
 - **证据分工(实锤后写回 AGENTS)**:Robolectric 下 `ModalBottomSheet` 内手势不送达,
   故「点了画什么」只能在插桩档证;两档缺一侧即不完整。
 
-### WP-6 · 导入导出与传输 ⬜
-- 产出:JSON 文件 / HTTPS URL / 二维码生成 + 扫码(相机 + 相册);新信封 `modev1:`。
-- 出口:codec JVM 往返测试(含上限、非前缀回落、超量拒绝、`distinctBy id`)+ 安全:URL 仅 https、大小双闸、无路径拼接。
+### WP-6 · 导入导出与传输 🔵(文件通道已落;URL / 二维码按下列理由显式推迟)
+- 已落:**画像库文件导出 / 导入**(SAF `CreateDocument` / `OpenDocument`,与记录导出同一先例同形状;
+  导入先 `dryRun` 逐条结论上屏、确认才落库;读盘前按 `ProfileEnvelope.MAX_IMPORT_BYTES` 的
+  `statSize` 硬拒 —— 字符闸在解析阶段,拦不住「先把整文件读进内存」)。
+  导出与 MCP `spoof_profile_import` 共用同一 `exportJson`/`importJson` 出口 ⇒ 两侧格式不可能分叉。
+- 已证:`SpoofProfileRepositoryTest.exported envelope round-trips back and repeats as duplicates`
+  (导出→导入闭环原样读回 + 二次导入全判 DUPLICATE,关掉「重复导入会翻倍」)。
+- **推迟 1 · HTTPS URL 导入**:需要一个安全裁决 —— 该应用本身在回环上跑 wire(1511)/MCP(1510) 服务,
+  「任意 URL 拉取」= 给设备开一条可指向内网与本机服务的入口。协议白名单(仅 https)、
+  私网/回环主机拒绝、流式大小闸这三条要先定档再落,不在本轮顺手做。
+- **推迟 2 · 二维码生成 / 扫码**:生成需 ZXing、扫码需 CameraX + 相机权限(基线正是这两个依赖)。
+  新增依赖会动 lint 基线(必须重新登记),且扫码只能在真机验证 —— 与设备档(WP-8)同轮做,
+  不在无设备状态下留半成品。
+- 出口(未改口径,只分段落):codec 往返 + 上限 + 非前缀回落 + 超量拒绝 + `distinctBy id` 已在 WP-2 落;
+  文件通道本轮落;URL 通道待安全裁决;二维码通道待依赖与设备档。
 
 ### WP-7 · MCP 工具面与 parity ⬜
 - 产出:9 新工具 + 2 处语义变更 + 能力行登记。
@@ -543,8 +555,8 @@ teardown: feature_settings_reset(FEATURE) + 全局画像回默认
 | | WP-3c/3d | | | | | ⬜ |
 | 2026-09-22 | WP-7 ✅ | MCP 画像库工具面 45→50:`spoof_profile_save/delete/apply/catalog/import` 五工具 + `spoof_profiles_list` 改读画像库真身(41 键 field map 可直接回灌 save);`feature_settings_set.spoofProfileId` 由 3 内置 enum 改为自由字符串(画像已是库主键);`spoofOverrides` 一字未动(冻结遗留通道)。`UiMcpCapabilityParityTest` 新增画像库能力行(ui 空 + WP-8 必须撤销的理由),并把 `profiles` 加入 `upstreamReceivers`(**收紧而非放宽** R1 审计面) | `SpoofProfileToolsTest` 17 用例(Robolectric + 真 Room + 真 SettingsRepository,零 mock 上游;含 field map 往返、-32602 vs 业务错误分型) | **142 类 / 989 用例 / 0 失败 / 0 跳过**(--rerun 真执行,结果全新鲜);lint **--rerun-tasks 3m22s 真跑 → 0e/43w/1h 未漂移** | 子代理首稿把 `screenshotsFlag` 槽位写反(0=允许,实为 0=禁止)。没改文案了事,改为**用 `ProfileFieldCatalog.validate` 反扫取值域** ⇒ 广告出去的槽位恒等于 `spoof_profile_save` 真正接受的槽位。另:我一度引用了 1195 秒前的陈旧 lint 报告当本轮证据,自查产物 mtime 后作废重跑 | ✅ |
 | 2026-09-22 | WP-5 ✅ | 画像库页(列表 + 单一「更多」菜单 + 旧通路接管前段落)+ **可视化参数编辑器**(41 项按 `ProfileValueType` 落控件、身份三色对账卡、实时生效组/矛盾预览、就近与整组随机、保存闸)+ 草稿新建(`draft:<name>` 路由,库里永不留空行)+ 每应用绑定三态上屏(GAP-02 关闭)+ 四语 145 键经生成器落地 | 定向 `ui.settings.profiles` **54 用例全绿**(6 个测试类:状态派生 21 / 标签穷尽 11 / 返回栈 6 / 草稿落库 5 / 编辑器整屏 7 / 库页整屏 4)+ 架构与 i18n 门禁(`UiMcpCapabilityParityTest` 6、`StringResourceParityTest` 等)全绿 | **148 类 / 1043 用例 / 0 失败 / 0 跳过**(HEAD 145/989 ⇒ +3 类 +54);lint `--rerun-tasks` 2m53s 真跑 → **0e/43w/1h 与 V46 基线逐字相同**;插桩档 `ProfileEditorFlowTest` 已编译待跑(设备档另记) | **自审抓到 2 个真缺陷(都不是子代理自报的)**:① 「新建画像」是**必然静默失败路径** —— UI 先 `create(name, "", EMPTY)`,而契约按设计拒绝零字段正文(返回 null)⇒ 名称校验过后既不报错也不进编辑器;裁决 = 改走**草稿态**(名称随路由携带,首次保存 `create` 后就地升格为主键),而不是给契约开「允许空档」的洞 —— 半途而废的草稿不该在库里留一行装不了钩子的垃圾。测试写出来第一次跑就抓到 `targetId = draftName?.let { null } ?: profileId` 的 elvis 误写(草稿被判成已落行)。② 保存拒绝态复用 `profile_name_required` 文案(屏幕上说的是另一件事)⇒ 新增 `profile_save_rejected` 四语 + 断言「拒绝态必须有自己且非借用的文案」。另:三条红的我先按猜测改了期望(depth 与 isDirty),**其中两处确实是测试写错、一处(clearAll)是我改错了**——重读实现后按「脏 = 与载入基线不同」重写用例并补一条空基线对照;`ModalBottomSheet` 手势在 Robolectric 不送达由**共享组件控制实验**(`submitted=[] dismissed=0`)定性为 harness 限制,据此把弹层交互移入插桩档并写入 AGENTS 实锤条。环境:一次 OOM(commit 38.6/40.6 GB)撕裂 KSP 增量缓存 ⇒ `StreamCorruptedException`,停 daemon 后删 `kspCaches/modernDebugAndroidTest` 恢复 | ✅ |
+| 2026-09-22 | WP-6 🔵(文件通道) | 画像库 **SAF 文件导出 / 导入**:导出走 `CreateDocument("application/json")`(与记录导出同一先例同形状,后台构建文本),导入走 `OpenDocument` → **读盘前 `statSize` 硬拒** → `dryRun` 逐条结论确认框 → 确认才落库 + Snackbar 回执;新增 `ProfileEnvelope.MAX_IMPORT_BYTES`(字符闸 ×4);新增 6 串 + 2 复数 × 四语(生成器 `DONE`,ja/ko 833 串 / 12 复数) | 新增 `SpoofProfileRepositoryTest.exported envelope rebuilds an empty library and repeats as duplicates in place`(空库重建逐字段等价 + id 不随包复制 + 原地再导入全判 DUPLICATE);`UiMcpCapabilityParityTest` R4 认领 `commitImport` | **148 类 / 1044 用例 / 0 失败 / 0 跳过**(全新鲜);lint `--rerun-tasks` 真跑 → **0e/43w/1h 未漂移**;androidTest 编译绿 | 首版我把闭环断言写成「同一库里导出→导入应 IMPORTED」⇒ 实测 `[DUPLICATE]` 才看清**我的前提错了**(同内容在同一库里本就是重复),按真实语义改成「空库重建 + 原地再导入判重」。**未测到的一层如实登记**:SAF 文档选择器是系统 UI 边界,`statSize` 拒绝与写流只能真机验证(设备当前不可用,见 WP-5 行),故本轮不声称端到端已证。**显式推迟两条通道并给理由**:HTTPS URL 导入(需先裁决 SSRF 面 —— 本 App 自己在回环跑 1510/1511,任意 URL 拉取 = 内网入口)、二维码(需 ZXing/CameraX 新依赖会动 lint 基线,且扫码只能真机验) | 🔵 |
 | | WP-4 | | | | | ⬜ |
-| | WP-6 | | | | | ⬜ |
 | | WP-8 | | | | | ⬜ |
 | | WP-9 | | | | | ⬜ |
 

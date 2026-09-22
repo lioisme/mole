@@ -274,6 +274,12 @@ export const T3 = {
   profile_invalid_field: ['「%1$s」を先に修正してください:%2$s', '「%1$s」을(를) 먼저 수정하세요: %2$s'],
   profile_range_hint: ['許容範囲:%1$s', '허용 범위: %1$s'],
   profile_binding_missing: ['プロフィールが見つかりません - 再バインドしてください', '프로필이 없습니다 - 다시 바인딩하세요'],
+  profile_export_action: ['ライブラリをエクスポート', '라이브러리 내보내기'],
+  profile_import_action: ['インポート', '가져오기'],
+  profile_import_too_large: ['このファイルは大きすぎてインポートできません', '파일이 너무 커서 가져올 수 없습니다'],
+  profile_import_failed: ['そのファイルを読み込めませんでした', '해당 파일을 읽을 수 없습니다'],
+  profile_import_default_name: ['インポートしたプロフィール', '가져온 프로필'],
+  profile_import_schema_rejected: ['対応バージョンの Modev プロフィールバンドルではありません', '지원되는 버전의 Modev 프로필 번들이 아닙니다'],
   profile_section_device: ['端末とビルド', '기기와 빌드'],
   profile_section_network: ['ネットワーク', '네트워크'],
   profile_section_sim: ['SIM 通信事業者', 'SIM 통신사'],
@@ -379,4 +385,6 @@ export const PLURALS = {
   // V47 WP-5 设备画像库
   profile_summary_filled: { ja: '%1$,d 項目を設定済み', ko: '%1$,d개 항목 설정' },
   profile_summary_bound: { ja: '%1$,d 個のアプリでバインド済み', ko: '%1$,d개 앱에 바인딩됨' },
+  profile_import_preview_msg: { ja: '%1$,d 件のプロフィールをインポートできます(%2$,d 件は重複、%3$,d 件は拒否)。今すぐインポートしますか?', ko: '%1$,d개 프로필을 가져올 수 있습니다(%2$,d개 중복, %3$,d개 거부). 지금 가져올까요?' },
+  profile_import_done: { ja: '%1$,d 件のプロフィールをインポートしました', ko: '%1$,d개 프로필을 가져왔습니다' },
 };

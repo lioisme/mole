@@ -1,5 +1,7 @@
 package com.lioisme.modev.ui.settings.profiles
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -18,6 +20,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FileDownload
+import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material3.Badge
@@ -27,6 +31,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
@@ -38,9 +44,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -55,6 +63,8 @@ import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.DeviceProfileEntry
 import com.lioisme.modev.core.model.FeatureConfig
+import com.lioisme.modev.core.model.ProfileEnvelope
+import com.lioisme.modev.core.model.ProfileImportOutcome
 import com.lioisme.modev.core.model.SpoofProfiles
 import com.lioisme.modev.domain.config.FeatureService
 import com.lioisme.modev.domain.config.ListenConfigService
@@ -75,7 +85,9 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 设备画像库页 VM(V47 WP-5)。
@@ -121,6 +133,21 @@ class SpoofProfileLibraryViewModel(
 
     fun remove(id: String) {
         viewModelScope.launch { profiles.delete(id) }
+    }
+
+    // ---------------------------------------------------------------- 传输(WP-6)
+
+    /** 导出全库为信封文本(与 MCP `spoof_profile_import` 同一格式,两侧零分叉)。 */
+    fun exportAll(): String = profiles.exportJson()
+
+    /** 导入预览:只校验不落库,逐条结论交回屏侧确认(与 [create] 同一回调形态)。 */
+    fun previewImport(text: String, defaultName: String, onResult: (ProfileImportOutcome) -> Unit) {
+        viewModelScope.launch { onResult(profiles.importJson(text, dryRun = true, defaultName = defaultName)) }
+    }
+
+    /** 导入落库(名称空白的条目回落 [defaultName] —— 数据层零用户可见字面量)。 */
+    fun commitImport(text: String, defaultName: String, onResult: (ProfileImportOutcome) -> Unit) {
+        viewModelScope.launch { onResult(profiles.importJson(text, dryRun = false, defaultName = defaultName)) }
     }
 
     /** 旧版全局档位(auto / 两个内置常量档,与 MCP `spoof_global_set` 同一 id 空间)。 */
@@ -188,11 +215,66 @@ fun SpoofProfileLibraryScreen(
     var deleteTarget by remember { mutableStateOf<DeviceProfileEntry?>(null) }
     var showOverrideSheet by remember { mutableStateOf(false) }
     var pendingDeleteKey by remember { mutableStateOf<String?>(null) }
+    var exportText by remember { mutableStateOf<String?>(null) }
+    /** 待确认的导入正文 + 其 dryRun 结论(两者同时非 null 才出确认框;确认前零写入)。 */
+    var importSource by remember { mutableStateOf<String?>(null) }
+    var importPreview by remember { mutableStateOf<ProfileImportOutcome?>(null) }
+
+    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    fun snack(text: String) {
+        scope.launch { snackbarHostState.showSnackbar(text) }
+    }
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.CreateDocument("application/json"),
+    ) { uri ->
+        val json = exportText
+        exportText = null
+        if (uri == null || json == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(json) }
+                }
+            }.onSuccess { snack(res.getString(R.string.export_ok)) }
+                .onFailure { snack(res.getString(R.string.export_failed)) }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        scope.launch {
+            // 读盘前先按 statSize 硬拒:字符闸在解析阶段,拦不住「先把整文件读进内存」这一步。
+            val size = runCatching {
+                context.contentResolver.openFileDescriptor(uri, "r")?.use { it.statSize } ?: -1L
+            }.getOrDefault(-1L)
+            if (size > ProfileEnvelope.MAX_IMPORT_BYTES) {
+                snack(res.getString(R.string.profile_import_too_large))
+                return@launch
+            }
+            val text = runCatching {
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+                }
+            }.getOrNull()
+            if (text.isNullOrBlank()) {
+                snack(res.getString(R.string.profile_import_failed))
+                return@launch
+            }
+            viewModel.previewImport(text, res.getString(R.string.profile_import_default_name)) { outcome ->
+                importSource = text
+                importPreview = outcome
+            }
+        }
+    }
 
     LaunchedEffect(Unit) { viewModel.synchronize() }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.surface,
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             ModevTopBar(
                 title = stringResource(R.string.profiles_title),
@@ -204,6 +286,31 @@ fun SpoofProfileLibraryScreen(
                         modifier = Modifier.testTag("profiles-create"),
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.profile_create_action))
+                    }
+                    TipIconButton(
+                        tooltip = stringResource(R.string.profile_export_action),
+                        onClick = {
+                            scope.launch {
+                                exportText = withContext(Dispatchers.Default) { viewModel.exportAll() }
+                                exportLauncher.launch("modev-profiles.json")
+                            }
+                        },
+                        modifier = Modifier.testTag("profiles-export"),
+                    ) {
+                        Icon(
+                            Icons.Filled.FileUpload,
+                            contentDescription = stringResource(R.string.profile_export_action),
+                        )
+                    }
+                    TipIconButton(
+                        tooltip = stringResource(R.string.profile_import_action),
+                        onClick = { scope.launch { importLauncher.launch(arrayOf("application/json", "text/plain")) } },
+                        modifier = Modifier.testTag("profiles-import"),
+                    ) {
+                        Icon(
+                            Icons.Filled.FileDownload,
+                            contentDescription = stringResource(R.string.profile_import_action),
+                        )
                     }
                 },
             )
@@ -340,6 +447,48 @@ fun SpoofProfileLibraryScreen(
                 showOverrideSheet = false
             },
         )
+    }
+
+    /**
+     * 导入确认(先 dryRun 逐条结论上屏,确认才落库):
+     * 版本不匹配整包拒绝的形态必须与「可导入 N 条」分文案,否则用户读到的是矛盾的数。
+     */
+    importSource?.let { text ->
+        importPreview?.let { preview ->
+            ModevConfirmDialog(
+                title = stringResource(R.string.profile_import_action),
+                message = if (preview.schemaRejected) {
+                    res.getString(R.string.profile_import_schema_rejected)
+                } else {
+                    res.getQuantityString(
+                        R.plurals.profile_import_preview_msg,
+                        preview.imported,
+                        preview.imported,
+                        preview.skipped,
+                        preview.rejected,
+                    )
+                },
+                confirmTextRes = R.string.profile_import_action,
+                onConfirm = {
+                    importSource = null
+                    importPreview = null
+                    viewModel.commitImport(text, res.getString(R.string.profile_import_default_name)) { outcome ->
+                        snack(
+                            res.getQuantityString(
+                                R.plurals.profile_import_done,
+                                outcome.imported,
+                                outcome.imported,
+                            ),
+                        )
+                    }
+                },
+                onDismiss = {
+                    importSource = null
+                    importPreview = null
+                },
+                confirmTestTag = "profile-import-confirm",
+            )
+        }
     }
 
     pendingDeleteKey?.let { key ->

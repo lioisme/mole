@@ -820,6 +820,12 @@
     <string name="profile_invalid_field">请先修正「%1$s」:%2$s</string>
     <string name="profile_range_hint">允许范围:%1$s</string>
     <string name="profile_binding_missing">画像缺失 - 请重新绑定该应用</string>
+    <string name="profile_export_action">导出画像库</string>
+    <string name="profile_import_action">导入</string>
+    <string name="profile_import_too_large">文件过大,无法导入</string>
+    <string name="profile_import_failed">无法读取该文件</string>
+    <string name="profile_import_default_name">导入画像</string>
+    <string name="profile_import_schema_rejected">这不是受支持版本的 Modev 画像包</string>
     <string name="profile_section_device">设备与构建</string>
     <string name="profile_section_network">网络</string>
     <string name="profile_section_sim">SIM 运营商</string>
@@ -915,5 +921,11 @@
     </plurals>
     <plurals name="profile_summary_bound">
         <item quantity="other">被 %1$,d 个应用绑定</item>
+    </plurals>
+    <plurals name="profile_import_preview_msg">
+        <item quantity="other">%1$,d 条画像可导入(%2$,d 重复、%3$,d 被拒),现在导入?</item>
+    </plurals>
+    <plurals name="profile_import_done">
+        <item quantity="other">已导入 %1$,d 条画像</item>
     </plurals>
 </resources>

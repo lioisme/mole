@@ -27,6 +27,14 @@ data class ProfileEnvelope(
 
         /** 导入文本字符上限(与基线 2,000,000 同档)。 */
         const val MAX_IMPORT_CHARS = 2_000_000
+
+        /**
+         * 导入文件字节上限(UI 侧读盘前的第一道闸)。
+         *
+         * 字符闸在解析前拦不住「先 slurp 一个 5GB 文件」这一步 ⇒ 读盘必须按
+         * `statSize` 硬拒。取字符闸 ×4(UTF-8 上界,留转义余量)。
+         */
+        const val MAX_IMPORT_BYTES = MAX_IMPORT_CHARS * 4L
     }
 }
 

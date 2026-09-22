@@ -831,6 +831,12 @@
     <string name="profile_invalid_field">Fix \"%1$s\" first: %2$s</string>
     <string name="profile_range_hint">Allowed range: %1$s</string>
     <string name="profile_binding_missing">Profile missing - re-bind this app</string>
+    <string name="profile_export_action">Export library</string>
+    <string name="profile_import_action">Import</string>
+    <string name="profile_import_too_large">This file is too large to import</string>
+    <string name="profile_import_failed">Could not read that file</string>
+    <string name="profile_import_default_name">Imported profile</string>
+    <string name="profile_import_schema_rejected">Not a Modev profile bundle of a supported version</string>
     <string name="profile_section_device">Device and Build</string>
     <string name="profile_section_network">Network</string>
     <string name="profile_section_sim">SIM Operator</string>
@@ -928,5 +934,13 @@
     <plurals name="profile_summary_bound">
         <item quantity="one">Bound in %1$,d app</item>
         <item quantity="other">Bound in %1$,d apps</item>
+    </plurals>
+    <plurals name="profile_import_preview_msg">
+        <item quantity="one">%1$,d profile can be imported (%2$,d duplicate, %3$,d rejected). Import now?</item>
+        <item quantity="other">%1$,d profiles can be imported (%2$,d duplicate, %3$,d rejected). Import now?</item>
+    </plurals>
+    <plurals name="profile_import_done">
+        <item quantity="one">%1$,d profile imported</item>
+        <item quantity="other">%1$,d profiles imported</item>
     </plurals>
 </resources>

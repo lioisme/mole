@@ -158,6 +158,7 @@ class UiMcpCapabilityParityTest {
                 "SpoofProfileLibraryViewModel.duplicate",
                 "SpoofProfileLibraryViewModel.remove",
                 "SpoofProfileLibraryViewModel.synchronize",
+                "SpoofProfileLibraryViewModel.commitImport",
                 "ProfileEditorViewModel.update",
                 "ProfileEditorViewModel.clear",
                 "ProfileEditorViewModel.clearAll",

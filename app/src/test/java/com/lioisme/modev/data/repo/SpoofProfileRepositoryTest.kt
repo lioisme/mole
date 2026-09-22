@@ -269,6 +269,33 @@ class SpoofProfileRepositoryTest {
         assertEquals(1, repo.profiles.value.size)
     }
 
+    /**
+     * 导出 → 导入闭环(V47 WP-6 的 UI 通路就建在这一对方法上):
+     * 导出的信封必须能在**空库**上原样重建(name / summary / 41 项正文,除 id 与账本列),
+     * 而在同一套库里再导入一次必须全判 DUPLICATE ⇒ 「重复导入会翻倍」这条路被关掉。
+     */
+    @Test
+    fun `exported envelope rebuilds an empty library and repeats as duplicates in place`() = runBlocking {
+        val created = requireNotNull(repo.create("迁移档", "摘要", sampleProfile("Delta", "Six")))
+        val envelope = repo.exportJson()
+        assertTrue("导出必须带内容指纹", envelope.contains("迁移档"))
+
+        // 空库重建:等价于「换一台设备导入同一份文件」。
+        assertTrue(repo.delete(created.id))
+        val rebuilt = repo.importJson(envelope, defaultName = "d")
+        assertEquals(listOf(ProfileImportVerdict.IMPORTED), rebuilt.verdicts)
+        val imported = repo.profiles.value.single()
+        assertEquals("迁移档", imported.name)
+        assertEquals("摘要", imported.summary)
+        assertEquals(created.profile, imported.profile)
+        assertTrue("id 不得随包复制", imported.id != created.id)
+
+        // 原地再导入:同一份文件在同一库里只该被判重复。
+        val again = repo.importJson(envelope, defaultName = "d")
+        assertEquals(listOf(ProfileImportVerdict.DUPLICATE), again.verdicts)
+        assertEquals("重复导入不得增加行数", 1, repo.profiles.value.size)
+    }
+
     @Test
     fun `dry run validates without writing`() = runBlocking {
         val envelope = ProfileEnvelope(
