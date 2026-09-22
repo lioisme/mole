@@ -24,6 +24,9 @@ object ProfileOptionSource {
         ProfileField.LANGUAGE -> languages()
         ProfileField.SIM_COUNTRY -> countries()
         ProfileField.TIME_ZONE -> timeZones()
+        // 这两档平台没有可枚举 API(见 ProfileValueSets 头注),值表在仓里,入口仍收口在本函数。
+        ProfileField.DENSITY_DPI -> ProfileValueSets.densities()
+        ProfileField.CPU_CORES -> ProfileValueSets.cpuCores()
         else -> null
     }
 

@@ -1,5 +1,6 @@
 package com.lioisme.modev.ui.settings.profiles
 
+import com.lioisme.modev.core.model.CarrierEntry
 import com.lioisme.modev.core.model.DeviceBrandEntry
 import com.lioisme.modev.core.model.DeviceCatalog
 import com.lioisme.modev.core.model.DeviceModelEntry
@@ -8,6 +9,7 @@ import com.lioisme.modev.core.model.DeviceProfileEntry
 import com.lioisme.modev.core.model.ProfileCodec
 import com.lioisme.modev.core.model.ProfileImportOutcome
 import com.lioisme.modev.core.model.ProfileResolution
+import com.lioisme.modev.domain.config.CarrierCatalogService
 import com.lioisme.modev.domain.config.DeviceCatalogService
 import com.lioisme.modev.domain.config.SpoofProfileService
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -130,4 +132,22 @@ class FakeSpoofProfileStore(
         dryRun: Boolean,
         defaultName: String,
     ): ProfileImportOutcome = throw AssertionError("unused by these tests")
+}
+
+/**
+ * 运营商库替身(V48 R-3)。两条自带项正好各自钉住一条裁决:
+ * `CN` 是国家码合法形态(三字段一次写全),`AU/CC/CX` 是数据集里真实存在的多地区串
+ * (必须**只留空国家码**,不拆不猜)。[result] = null 复刻「资产读不到」,
+ * 与「目录为空」分列可测。
+ */
+class FakeCarrierCatalog(private val result: List<CarrierEntry>?) : CarrierCatalogService {
+
+    override suspend fun carriers(): List<CarrierEntry>? = result
+
+    companion object {
+        val READY = listOf(
+            CarrierEntry(name = "China Mobile", plmn = "46000", countryCode = "CN", countryName = "China"),
+            CarrierEntry(name = "Telstra", plmn = "50501", countryCode = "AU/CC/CX", countryName = "Australia"),
+        )
+    }
 }

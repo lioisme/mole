@@ -196,4 +196,32 @@ class SpoofProfileLibraryRenderRoboTest {
         assertTrue(textCount(str(R.string.profile_library_empty)) > 0)
         assertTrue(textCount(str(R.string.profile_library_empty_hint)) > 0)
     }
+
+    /**
+     * V48-DFC-12:一页三段必须**在名字上就能分清谁是谁**。
+     * 旧形态是「画像库 / 画像档位 / 字段覆写」—— 三段都叫"画像/档",而其中两段写的
+     * 是另一套状态(遗留常量档 + 覆写字典),用户据此以为在改同一份东西。
+     */
+    @Test
+    fun threeSections_areNamedSoTheLivePathIsNotAmbiguous() {
+        show(builtinStore())
+        val library = str(R.string.profile_library_section)
+        val legacyPresets = str(R.string.profiles_global_section)
+        val legacyOverrides = str(R.string.profiles_overrides_section)
+        assertEquals(3, setOf(library, legacyPresets, legacyOverrides).size)
+        // 两段遗留通路必须自己声明"仍在生效"(Robolectric 默认 locale = en ⇒ 断英文形态),
+        // 否则用户会以为它们是待删的残渣。
+        assertTrue(legacyPresets, legacyPresets.contains("still in effect"))
+        assertTrue(legacyOverrides, legacyOverrides.contains("still in effect"))
+        // 新库这一段不许被读成"已接管":它只承诺编辑/校验/绑定。
+        assertTrue(library, library.contains("Profile library"))
+    }
+
+    /** 接管边界必须**恒在上屏第一屏**说清(AGENTS #30:说「画像已生效于靶程序」即假)。 */
+    @Test
+    fun takeoverBoundaryIsAlwaysOnScreen() {
+        show(builtinStore())
+        assertEquals(1, slotTagCount("profile-takeover-status"))
+        assertTrue(textCount(str(R.string.profile_takeover_status_hint)) > 0)
+    }
 }

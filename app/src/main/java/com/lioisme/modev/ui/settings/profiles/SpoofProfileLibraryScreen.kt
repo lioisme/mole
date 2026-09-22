@@ -328,7 +328,17 @@ fun SpoofProfileLibraryScreen(
                 stringResource(R.string.profile_library_hint),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 4.dp, bottom = 12.dp),
+                modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
+            )
+            // V48 R-3 接管边界(AGENTS #30 的 UI 兑现):本页管编辑/校验/绑定,而靶程序当前
+            // 仍读旧档 —— 不写这句,页面就会被读成「画像已经生效」。这是诚实呈现,不是免责声明。
+            Text(
+                stringResource(R.string.profile_takeover_status_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier
+                    .padding(start = 4.dp, bottom = 12.dp)
+                    .testTag("profile-takeover-status"),
             )
 
             SettingsSection(

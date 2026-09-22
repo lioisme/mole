@@ -19,9 +19,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Android
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.PhoneAndroid
+import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AssistChip
@@ -47,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -63,6 +66,8 @@ import androidx.lifecycle.viewModelScope
 import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
 import com.lioisme.modev.domain.config.DeviceCatalogService
+import com.lioisme.modev.domain.config.CarrierCatalogService
+import com.lioisme.modev.core.model.CarrierEntry
 import com.lioisme.modev.core.model.DeviceProfile
 import com.lioisme.modev.core.model.DeviceBrandEntry
 import com.lioisme.modev.core.model.DeviceProfileEntry
@@ -72,9 +77,11 @@ import com.lioisme.modev.core.model.ProfileFieldCatalog
 import com.lioisme.modev.core.model.ProfileSection
 import com.lioisme.modev.core.model.ProfileKind
 import com.lioisme.modev.core.model.ProfileOptionSource
+import com.lioisme.modev.core.model.ProfileValueSets
 import com.lioisme.modev.core.model.ProfileValueType
 import com.lioisme.modev.core.model.stringOf
 import com.lioisme.modev.core.model.applyBrandIdentity
+import com.lioisme.modev.core.model.applyCarrierPreset
 import com.lioisme.modev.core.model.applyDevicePreset
 import com.lioisme.modev.domain.config.SpoofProfileService
 import com.lioisme.modev.ui.apps.ToggleListItem
@@ -115,6 +122,7 @@ class ProfileEditorViewModel(
     private val draftName: String?,
     private val profiles: SpoofProfileService,
     private val deviceCatalog: DeviceCatalogService,
+    private val carrierCatalog: CarrierCatalogService,
     randomProvider: () -> kotlin.random.Random = { kotlin.random.Random.Default },
 ) : ViewModel() {
 
@@ -155,10 +163,16 @@ class ProfileEditorViewModel(
     /** 机型库加载态:未加载 / 加载中 / 不可用 / 可用必须可区分(零静默红线)。 */
     val catalog: StateFlow<DeviceCatalogState> = _catalog
 
+    /** 运营商库加载态(V48 R-3;同四态。**必须声明在 init 之前** —— Kotlin 按声明序初始化,晚一行就是 init 里读到 null)。 */
+    private val _carriers = MutableStateFlow<CarrierChoiceState>(CarrierChoiceState.Idle)
+
+    val carriers: StateFlow<CarrierChoiceState> = _carriers
+
     init {
         // 预取:选择器点开即得,不做「第一次点只触发加载、第二次才开列」的两段式;
         // 解析只在进程内发生一次(仓储带缓存),代价不换语义。
         loadCatalog()
+        loadCarriers()
     }
 
     private fun loadCatalog() {
@@ -167,6 +181,15 @@ class ProfileEditorViewModel(
             val brands = runCatching { deviceCatalog.catalog()?.brands.orEmpty() }.getOrNull().orEmpty()
             _catalog.value = if (brands.isEmpty()) DeviceCatalogState.Unavailable
             else DeviceCatalogState.Ready(brands)
+        }
+    }
+
+    private fun loadCarriers() {
+        _carriers.value = CarrierChoiceState.Loading
+        viewModelScope.launch {
+            val entries = runCatching { carrierCatalog.carriers() }.getOrNull().orEmpty()
+            _carriers.value = if (entries.isEmpty()) CarrierChoiceState.Unavailable
+            else CarrierChoiceState.Ready(entries)
         }
     }
 
@@ -199,6 +222,43 @@ class ProfileEditorViewModel(
 
     fun clear(field: ProfileField) {
         state.clear(field)
+        bump()
+    }
+
+    // ---------------------------------------------------------- 成对选型(V48 R-3)
+
+    /**
+     * 选 Android 版本:**release 与 SDK_INT 一次写全**。
+     *
+     * 这两个字段互相牵连(写 14 配 API 31 = 一台从不存在的设备,而「不存在的组合」本身就是
+     * 检测点),所以它们不该各自是一个手填框。查不到对应 SDK 时整个动作放弃(不猜半边)。
+     */
+    fun pickAndroidRelease(release: String) {
+        val sdk = ProfileValueSets.sdkForRelease(release) ?: return
+        state.applyValues(
+            mapOf(
+                ProfileField.ANDROID_VERSION to release,
+                ProfileField.SDK_INT to sdk,
+            ),
+        )
+        bump()
+    }
+
+    /**
+     * 选运营商:一次写全 SIM_OPERATOR / SIM_OPERATOR_NAME / SIM_COUNTRY。
+     * 国家码是否写入由 [applyCarrierPreset] 裁决(数据集里 77 条是多地区串,不可直写)。
+     */
+    fun pickCarrier(plmn: String) {
+        val entry = (_carriers.value as? CarrierChoiceState.Ready)?.entries?.firstOrNull { it.plmn == plmn }
+            ?: return
+        val next = applyCarrierPreset(state.snapshot(), entry)
+        state.applyValues(
+            mapOf(
+                ProfileField.SIM_OPERATOR to ProfileField.SIM_OPERATOR.stringOf(next),
+                ProfileField.SIM_OPERATOR_NAME to ProfileField.SIM_OPERATOR_NAME.stringOf(next),
+                ProfileField.SIM_COUNTRY to ProfileField.SIM_COUNTRY.stringOf(next),
+            ),
+        )
         bump()
     }
 
@@ -272,6 +332,7 @@ class ProfileEditorViewModelFactory(
             draftName = draftName,
             profiles = container.spoofProfiles,
             deviceCatalog = container.deviceCatalog,
+            carrierCatalog = container.carrierCatalog,
         ) as T
 }
 
@@ -284,6 +345,21 @@ sealed interface DeviceCatalogState {
     data object Unavailable : DeviceCatalogState
 
     data class Ready(val brands: List<DeviceBrandEntry>) : DeviceCatalogState
+}
+
+/**
+ * 运营商库加载态(V48 R-3):与 [DeviceCatalogState] 同四态同语义。
+ * 没抽成一个泛型 `CatalogState<T>` 是因为那要改名三处已绿的测试锚点,换来的只是少九行;
+ * 真正会腐烂的重复(选择行的渲染)已经收口在 [CatalogPickerRow]。
+ */
+sealed interface CarrierChoiceState {
+    data object Idle : CarrierChoiceState
+    data object Loading : CarrierChoiceState
+
+    /** carriers.json 读不到或解析失败(必须点名,不得退化成「库里没运营商」)。 */
+    data object Unavailable : CarrierChoiceState
+
+    data class Ready(val entries: List<CarrierEntry>) : CarrierChoiceState
 }
 
 /**
@@ -316,7 +392,10 @@ fun ProfileEditorScreen(
     var editingField by remember { mutableStateOf<ProfileField?>(null) }
     var confirmClearAll by remember { mutableStateOf(false) }
     val catalog by viewModel.catalog.collectAsStateWithLifecycle()
+    val carriers by viewModel.carriers.collectAsStateWithLifecycle()
     var showBrandSheet by remember { mutableStateOf(false) }
+    var showAndroidSheet by remember { mutableStateOf(false) }
+    var showCarrierSheet by remember { mutableStateOf(false) }
     var pickBrandKey by remember { mutableStateOf<String?>(null) }
     var manualEntryFor by remember { mutableStateOf<ProfileField?>(null) }
 
@@ -420,6 +499,16 @@ fun ProfileEditorScreen(
                         DevicePresetRow(
                             state = catalog,
                             onPick = { showBrandSheet = true },
+                        )
+                        HorizontalDivider16()
+                        // Android 版本与 API level 是同一件事的两半,故也放在字段之前一次选全。
+                        AndroidVersionRow(onPick = { showAndroidSheet = true })
+                        HorizontalDivider16()
+                    }
+                    if (section == ProfileSection.SIM) {
+                        CarrierPresetRow(
+                            state = carriers,
+                            onPick = { showCarrierSheet = true },
                         )
                         HorizontalDivider16()
                     }
@@ -588,6 +677,59 @@ fun ProfileEditorScreen(
         )
     }
 
+    // Android 版本选择(新在旧后:用户要的是「最近的系统」,不是 19 年前的第一台)。
+    if (showAndroidSheet) {
+        ModevSearchableChoiceSheet(
+            title = stringResource(R.string.profile_android_pick_action),
+            options = ProfileValueSets.androidReleases().asReversed().map { release ->
+                ChoiceOption(
+                    value = release,
+                    label = ProfileValueSets.releaseLabel(release),
+                    testTag = "profile-android-option-$release",
+                )
+            },
+            selected = view.texts[ProfileField.ANDROID_VERSION],
+            placeholder = stringResource(R.string.profile_device_search_hint),
+            emptyText = stringResource(R.string.profile_device_no_match),
+            truncatedText = { total ->
+                res.getString(R.string.profile_device_truncated, SHEET_MAX_VISIBLE_ROWS, total)
+            },
+            onSelect = { release ->
+                viewModel.pickAndroidRelease(release)
+                showAndroidSheet = false
+            },
+            onDismiss = { showAndroidSheet = false },
+            modifier = Modifier.testTag("profile-android-sheet"),
+        )
+    }
+
+    // 运营商选择(PLMN + 名 + 国家码一次选全;1597 条 ⇒ 必须可搜)。
+    val readyCarriers = (carriers as? CarrierChoiceState.Ready)?.entries.orEmpty()
+    if (showCarrierSheet) {
+        ModevSearchableChoiceSheet(
+            title = stringResource(R.string.profile_carrier_pick_action),
+            options = readyCarriers.map { entry ->
+                ChoiceOption(
+                    value = entry.plmn,
+                    label = entry.label(),
+                    testTag = "profile-carrier-option-${entry.plmn}",
+                )
+            },
+            selected = view.texts[ProfileField.SIM_OPERATOR],
+            placeholder = stringResource(R.string.profile_device_search_hint),
+            emptyText = stringResource(R.string.profile_device_no_match),
+            truncatedText = { total ->
+                res.getString(R.string.profile_device_truncated, SHEET_MAX_VISIBLE_ROWS, total)
+            },
+            onSelect = { plmn ->
+                viewModel.pickCarrier(plmn)
+                showCarrierSheet = false
+            },
+            onDismiss = { showCarrierSheet = false },
+            modifier = Modifier.testTag("profile-carrier-sheet"),
+        )
+    }
+
     if (confirmClearAll) {
         ModevConfirmDialog(
             title = stringResource(R.string.profile_clear_all),
@@ -741,28 +883,29 @@ private fun ProfileFieldRow(
     )
 }
 
-/** 机型库选择行:状态即文案(加载 / 不可用 / 可点),禁用态不出 sheet(点了没反应最费解)。 */
+/**
+ * 目录选择行(V48 抽出):机型库 / 运营商库 / Android 版本表共用同一形态 ——
+ * 「一句副标说清这次点选会写全哪几项」+「数据不可用时点名,不退化成空列表」。
+ * 状态文案只有 Loading / Unavailable 两句要换名词,故整段 ListItem 只留一份。
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun DevicePresetRow(
-    state: DeviceCatalogState,
+private fun CatalogPickerRow(
+    icon: ImageVector,
+    testTag: String,
+    headline: String,
+    supporting: String,
+    enabled: Boolean,
+    error: Boolean = false,
     onPick: () -> Unit,
 ) {
-    val enabled = state is DeviceCatalogState.Ready
-    val supporting = stringResource(
-        when (state) {
-            DeviceCatalogState.Loading -> R.string.profile_device_loading
-            DeviceCatalogState.Unavailable -> R.string.profile_device_unavailable
-            else -> R.string.profile_device_pick_hint
-        },
-    )
     ListItem(
         colors = ListItemDefaults.colors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
         ),
         headlineContent = {
             Text(
-                stringResource(R.string.profile_device_pick_action),
+                headline,
                 style = MaterialTheme.typography.bodyLarge,
                 color = if (enabled) {
                     MaterialTheme.colorScheme.primary
@@ -775,25 +918,71 @@ private fun DevicePresetRow(
             Text(
                 supporting,
                 style = MaterialTheme.typography.bodySmall,
-                color = if (state == DeviceCatalogState.Unavailable) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-                modifier = Modifier.testTag("profile-device-pick-hint"),
+                color = if (error) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.testTag("$testTag-hint"),
             )
         },
         leadingContent = {
-            Icon(
-                Icons.Filled.PhoneAndroid,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-            )
+            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         },
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("profile-device-pick")
+            .testTag(testTag)
             .then(if (enabled) Modifier.clickable(onClick = onPick) else Modifier),
+    )
+}
+
+/** 机型库选择行(禁用态不出 sheet —— 点了没反应最费解)。 */
+@Composable
+private fun DevicePresetRow(state: DeviceCatalogState, onPick: () -> Unit) {
+    val devices = stringResource(R.string.profile_catalog_devices)
+    CatalogPickerRow(
+        icon = Icons.Filled.PhoneAndroid,
+        testTag = "profile-device-pick",
+        headline = stringResource(R.string.profile_device_pick_action),
+        supporting = when (state) {
+            DeviceCatalogState.Loading -> stringResource(R.string.profile_catalog_loading, devices)
+            DeviceCatalogState.Unavailable -> stringResource(R.string.profile_catalog_unavailable, devices)
+            else -> stringResource(R.string.profile_device_pick_hint)
+        },
+        enabled = state is DeviceCatalogState.Ready,
+        error = state == DeviceCatalogState.Unavailable,
+        onPick = onPick,
+    )
+}
+
+/** 运营商选择行(V48 R-3)。 */
+@Composable
+private fun CarrierPresetRow(state: CarrierChoiceState, onPick: () -> Unit) {
+    val carriers = stringResource(R.string.profile_catalog_carriers)
+    CatalogPickerRow(
+        icon = Icons.Filled.SimCard,
+        testTag = "profile-carrier-pick",
+        headline = stringResource(R.string.profile_carrier_pick_action),
+        supporting = when (state) {
+            CarrierChoiceState.Loading -> stringResource(R.string.profile_catalog_loading, carriers)
+            CarrierChoiceState.Unavailable -> stringResource(R.string.profile_catalog_unavailable, carriers)
+            else -> stringResource(R.string.profile_carrier_pick_hint)
+        },
+        enabled = state is CarrierChoiceState.Ready,
+        error = state == CarrierChoiceState.Unavailable,
+        onPick = onPick,
+    )
+}
+
+/**
+ * Android 版本选择行(V48 R-3):值表在仓内([ProfileValueSets]),无外部资产
+ * ⇒ 无 Loading / Unavailable 态,恒可点。
+ */
+@Composable
+private fun AndroidVersionRow(onPick: () -> Unit) {
+    CatalogPickerRow(
+        icon = Icons.Filled.Android,
+        testTag = "profile-android-pick",
+        headline = stringResource(R.string.profile_android_pick_action),
+        supporting = stringResource(R.string.profile_android_pick_hint),
+        enabled = true,
+        onPick = onPick,
     )
 }
 

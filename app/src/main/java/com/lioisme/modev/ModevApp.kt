@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import com.google.gson.Gson
 import com.lioisme.modev.data.db.ModevDatabase
 import com.lioisme.modev.data.repo.AppCatalogRepository
+import com.lioisme.modev.data.repo.CarrierCatalogRepository
 import com.lioisme.modev.data.repo.DeviceCatalogRepository
 import com.lioisme.modev.data.repo.KeywordLibraryRepository
 import com.lioisme.modev.data.repo.SpoofProfileRepository
@@ -19,6 +20,7 @@ import com.lioisme.modev.data.server.ConfigServer
 import com.lioisme.modev.domain.app.AppCatalogService
 import com.lioisme.modev.domain.app.AppListPreferences
 import com.lioisme.modev.domain.asset.KeywordLibraryService
+import com.lioisme.modev.domain.config.CarrierCatalogService
 import com.lioisme.modev.domain.config.DeviceCatalogService
 import com.lioisme.modev.domain.config.SpoofProfileService
 import com.lioisme.modev.domain.config.FeatureService
@@ -158,6 +160,11 @@ class AppContainer(private val context: Context) {
         DeviceCatalogRepository(context.assets)
     }
 
+    /** 运营商目录实现(carriers.json 唯一读者):与机型目录同一条懒建口径,启动路径零 IO。 */
+    private val carrierCatalogRepo: CarrierCatalogRepository by lazy {
+        CarrierCatalogRepository(context.assets)
+    }
+
     // ------------------------------------------------------------------
     // 方法层出口(UI ViewModel 与 MCP 工具组的唯一依赖面)
     // ------------------------------------------------------------------
@@ -188,6 +195,9 @@ class AppContainer(private val context: Context) {
 
     /** 真机目录契约(品牌 → 机型;public 类型来自 domain,G2 闸,实现 = [deviceCatalogRepo])。 */
     val deviceCatalog: DeviceCatalogService get() = deviceCatalogRepo
+
+    /** 运营商契约(PLMN / 名 / 国家码;public 类型来自 domain,G2 闸,实现 = [carrierCatalogRepo])。 */
+    val carrierCatalog: CarrierCatalogService get() = carrierCatalogRepo
 
     /** 应用列表浏览偏好契约面(进程级单一事实源,init 于 ModevApp.onCreate)。 */
     val appListPrefs: AppListPreferences get() = AppListSettings

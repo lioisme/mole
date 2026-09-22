@@ -737,8 +737,8 @@
     <!-- V37 T3.5: spoof profiles -->
     <string name="profiles_title">위장 프로필</string>
     <string name="profiles_hint">내장 프리셋은 일반적인 기기 식별을 다루며, 필드 덮어쓰기는 선택한 프리셋 위에 적용됩니다.</string>
-    <string name="profiles_global_section">프로필 프리셋</string>
-    <string name="profiles_overrides_section">필드 덮어쓰기</string>
+    <string name="profiles_global_section">레거시 내장 프리셋(현재 유효)</string>
+    <string name="profiles_overrides_section">레거시 필드 덮어쓰기(현재 유효)</string>
     <string name="profiles_overrides_empty">필드 덮어쓰기 없음</string>
     <string name="profiles_override_add">덮어쓰기 추가</string>
     <string name="profiles_override_delete">덮어쓰기 삭제</string>
@@ -775,7 +775,8 @@
     <string name="records_clear_action">이 유형 삭제</string>
     <string name="danger_clear_page_records_msg">이 앱의 이 유형 기록을 모두 영구 삭제하시겠습니까? 되돌릴 수 없습니다.</string>
     <!-- V47 WP-5:设备画像库(可视化参数配置页;分区/字段/干预组/校验/枚举槽全量标签) -->
-    <string name="profile_library_section">프로필 라이브러리</string>
+    <string name="profile_library_section">프로필 라이브러리(편집·검증·바인딩)</string>
+    <string name="profile_takeover_status_hint">라이브러리는 편집·검증·바인딩 대상입니다. 훅 인계 완료 시까지 대상 앱이 읽는 값은 아래의 레거시 행입니다. 이 화면을 위장 적용 근거로 보지 마세요.</string>
     <string name="profile_library_hint">재사용 가능한 기기 프로필. 열면 모든 매개변수를 편집하고 어떤 중재 그룹이 설치되는지 즉시 확인할 수 있습니다.</string>
     <string name="profile_library_empty">프로필이 없습니다</string>
     <string name="profile_library_empty_hint">처음으로 만들거나 내장 프로필을 복사해 조정하세요.</string>
@@ -825,8 +826,14 @@
     <string name="profile_import_schema_rejected">지원되는 버전의 Modev 프로필 번들이 아닙니다</string>
     <string name="profile_device_pick_action">실제 기기 선택</string>
     <string name="profile_device_pick_hint">브랜드·제조사·모델·기기 코드를 한 번에 채웁니다</string>
-    <string name="profile_device_loading">기기 카탈로그를 불러오는 중…</string>
-    <string name="profile_device_unavailable">기기 카탈로그를 사용할 수 없습니다</string>
+    <string name="profile_catalog_loading">%1$s을(를) 불러오는 중…</string>
+    <string name="profile_catalog_unavailable">%1$s을(를) 사용할 수 없습니다</string>
+    <string name="profile_catalog_devices">기기 카탈로그</string>
+    <string name="profile_catalog_carriers">통신사 카탈로그</string>
+    <string name="profile_android_pick_action">Android 버전 선택</string>
+    <string name="profile_android_pick_hint">릴리스와 API 레벨을 함께 설정합니다</string>
+    <string name="profile_carrier_pick_action">실제 통신사 선택</string>
+    <string name="profile_carrier_pick_hint">PLMN·통신사 이름·국가를 함께 설정합니다</string>
     <string name="profile_device_search_hint">검색</string>
     <string name="profile_device_no_match">일치하는 항목 없음 - 더 짧은 키워드로 시도하세요</string>
     <string name="profile_device_truncated">전체 %2$,d개 중 처음 %1$,d개 표시 - 검색 범위를 좁히세요</string>

@@ -741,8 +741,8 @@
     <!-- V37 T3.5: spoof profiles -->
     <string name="profiles_title">Spoof Profiles</string>
     <string name="profiles_hint">Built-in presets cover common device identities; field overrides apply on top of the selected preset.</string>
-    <string name="profiles_global_section">Profile Preset</string>
-    <string name="profiles_overrides_section">Field Overrides</string>
+    <string name="profiles_global_section">Legacy presets (still in effect)</string>
+    <string name="profiles_overrides_section">Legacy field overrides (still in effect)</string>
     <string name="profiles_overrides_empty">No field overrides</string>
     <string name="profiles_override_add">Add override</string>
     <string name="profiles_override_delete">Remove override</string>
@@ -779,7 +779,8 @@
     <string name="records_clear_action">Clear this type</string>
     <string name="danger_clear_page_records_msg">Permanently delete all records of this type for this app? This cannot be undone.</string>
     <!-- V47 WP-5:设备画像库(可视化参数配置页;分区/字段/干预组/校验/枚举槽全量标签) -->
-    <string name="profile_library_section">Profile Library</string>
+    <string name="profile_library_section">Profile library (edit, validate, bind)</string>
+    <string name="profile_takeover_status_hint">The library is what you edit, validate and bind. Until the hook takeover lands the target app still reads the legacy rows below - do not treat this page as proof that spoofing is live.</string>
     <string name="profile_library_hint">Reusable device profiles. Open one to edit every parameter and see which intervention groups it installs.</string>
     <string name="profile_library_empty">No profiles yet</string>
     <string name="profile_library_empty_hint">Create one from scratch, or copy a built-in profile and adjust it.</string>
@@ -829,8 +830,14 @@
     <string name="profile_import_schema_rejected">Not a Modev profile bundle of a supported version</string>
     <string name="profile_device_pick_action">Pick a real device</string>
     <string name="profile_device_pick_hint">Fills brand, manufacturer, model and device code name together</string>
-    <string name="profile_device_loading">Loading the device catalogue…</string>
-    <string name="profile_device_unavailable">Device catalogue unavailable</string>
+    <string name="profile_catalog_loading">Loading the %1$s…</string>
+    <string name="profile_catalog_unavailable">The %1$s is unavailable.</string>
+    <string name="profile_catalog_devices">device catalogue</string>
+    <string name="profile_catalog_carriers">carrier catalogue</string>
+    <string name="profile_android_pick_action">Pick an Android version</string>
+    <string name="profile_android_pick_hint">Fills the release and its API level together</string>
+    <string name="profile_carrier_pick_action">Pick a real carrier</string>
+    <string name="profile_carrier_pick_hint">Fills PLMN, carrier name and country code together</string>
     <string name="profile_device_search_hint">Search</string>
     <string name="profile_device_no_match">No match - try a shorter keyword</string>
     <string name="profile_device_truncated">Showing the first %1$,d of %2$,d - narrow the search</string>

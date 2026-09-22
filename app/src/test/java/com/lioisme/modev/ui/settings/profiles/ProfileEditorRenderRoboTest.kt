@@ -12,6 +12,7 @@ import com.lioisme.modev.core.model.DeviceProfile
 import com.lioisme.modev.core.model.DeviceProfileEntry
 import com.lioisme.modev.core.model.ProfileConflict
 import com.lioisme.modev.core.model.ProfileField
+import com.lioisme.modev.core.model.ProfileOptionSource
 import com.lioisme.modev.core.model.ProfileKind
 import com.lioisme.modev.core.model.ProfileSection
 import com.lioisme.modev.core.model.ProfileValueType
@@ -59,6 +60,7 @@ class ProfileEditorRenderRoboTest {
         draftName = draftName,
         profiles = store,
         deviceCatalog = FakeDeviceCatalog(FakeDeviceCatalog.READY),
+        carrierCatalog = FakeCarrierCatalog(FakeCarrierCatalog.READY),
     )
 
     /**
@@ -241,10 +243,104 @@ class ProfileEditorRenderRoboTest {
             draftName = null,
             profiles = storeWith(),
             deviceCatalog = FakeDeviceCatalog(null),
+            carrierCatalog = FakeCarrierCatalog(FakeCarrierCatalog.READY),
         )
         showEditor(vm)
         assertEquals(DeviceCatalogState.Unavailable, vm.catalog.value)
-        assertTextPresent(str(R.string.profile_device_unavailable), "读不到资产必须点名,不得退化成「库里没机型」")
+        assertTextPresent(
+            str(R.string.profile_catalog_unavailable, str(R.string.profile_catalog_devices)),
+            "读不到资产必须点名,不得退化成「库里没机型」",
+        )
+    }
+
+    // ------------------------------------------- 成对选型(V48 R-3:Android 版本 / 运营商)
+
+    /** 选 Android 版本必须把 release 与 API level **一起**写全(只写一半 = 一台不存在的设备)。 */
+    @Test
+    fun androidVersionPicking_fillsReleaseAndSdkTogether() {
+        val vm = editorVm(storeWith())
+        showEditor(vm)
+        assertTagPresent("profile-android-pick", "设备分区必须有 Android 版本选择行")
+
+        vm.pickAndroidRelease("14")
+        compose.waitForIdle()
+
+        val texts = vm.view.value.texts
+        assertEquals("14", texts[ProfileField.ANDROID_VERSION])
+        assertEquals("API level 必须同次写全", "34", texts[ProfileField.SDK_INT])
+    }
+
+    /** 认不出的 release 不许猜半边(整动作放弃,屏上值保持原样)。 */
+    @Test
+    fun unknownAndroidRelease_writesNothing() {
+        val vm = editorVm(storeWith())
+        showEditor(vm)
+        vm.pickAndroidRelease("14")
+        vm.pickAndroidRelease("99")
+        compose.waitForIdle()
+        val texts = vm.view.value.texts
+        assertEquals("14", texts[ProfileField.ANDROID_VERSION])
+        assertEquals("34", texts[ProfileField.SDK_INT])
+    }
+
+    /**
+     * 选运营商:PLMN + 名 + 国家码一次写全;而数据集里真实存在的多地区国家码串
+     * (`AU/CC/CX`)必须**只留空国家码** —— 拆一个两字母凑就是自造值。
+     */
+    @Test
+    fun carrierPicking_fillsThreeFields_andNeverGuessesAMultiRegionCountryCode() {
+        val vm = editorVm(storeWith())
+        showEditor(vm)
+        assertTagPresent("profile-carrier-pick", "SIM 分区首行必须是运营商选择行")
+
+        vm.pickCarrier("46000")
+        compose.waitForIdle()
+        var texts = vm.view.value.texts
+        assertEquals("46000", texts[ProfileField.SIM_OPERATOR])
+        assertEquals("China Mobile", texts[ProfileField.SIM_OPERATOR_NAME])
+        assertEquals("CN", texts[ProfileField.SIM_COUNTRY])
+
+        vm.pickCarrier("50501")
+        compose.waitForIdle()
+        texts = vm.view.value.texts
+        assertEquals("50501", texts[ProfileField.SIM_OPERATOR])
+        assertEquals("Telstra", texts[ProfileField.SIM_OPERATOR_NAME])
+        assertEquals("多地区国家码不得进画像", "", texts[ProfileField.SIM_COUNTRY])
+    }
+
+    /** 运营商库读不到时同样要上屏点名(与机型库同一红线)。 */
+    @Test
+    fun unavailableCarrierCatalog_isNamedOnTheRow() {
+        val vm = ProfileEditorViewModel(
+            profileId = "id-1",
+            draftName = null,
+            profiles = storeWith(),
+            deviceCatalog = FakeDeviceCatalog(FakeDeviceCatalog.READY),
+            carrierCatalog = FakeCarrierCatalog(null),
+        )
+        showEditor(vm)
+        assertEquals(CarrierChoiceState.Unavailable, vm.carriers.value)
+        assertTextPresent(
+            str(R.string.profile_catalog_unavailable, str(R.string.profile_catalog_carriers)),
+            "读不到运营商库必须点名",
+        )
+    }
+
+    /**
+     * 密度档 / 核数档改走选择器(V48 R-3):本档只证「候选表已挂上且逐值合法」——
+     * 「点开确实出列表」这一层在 Robolectric 打不动弹层手势,归插桩档
+     * `ProfileEditorFlowTest.pickerSheets_openWithManualEscape`。
+     */
+    @Test
+    fun densityAndCoreFields_nowHaveCandidateTables() {
+        assertTrue(
+            "密度档必须有候选表",
+            checkNotNull(ProfileOptionSource.optionsFor(ProfileField.DENSITY_DPI)).contains("420"),
+        )
+        assertTrue(
+            "核数档必须有候选表",
+            checkNotNull(ProfileOptionSource.optionsFor(ProfileField.CPU_CORES)).contains("8"),
+        )
     }
 
     @Test

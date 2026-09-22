@@ -730,8 +730,8 @@
     <!-- V37 T3.5:伪装画像 -->
     <string name="profiles_title">伪装画像</string>
     <string name="profiles_hint">内置档位覆盖常见设备标识;字段覆写在所选档位之上生效。</string>
-    <string name="profiles_global_section">画像档位</string>
-    <string name="profiles_overrides_section">字段覆写</string>
+    <string name="profiles_global_section">旧内置档（仍生效中）</string>
+    <string name="profiles_overrides_section">旧字段覆写（仍生效中）</string>
     <string name="profiles_overrides_empty">暂无字段覆写</string>
     <string name="profiles_override_add">添加覆写</string>
     <string name="profiles_override_delete">删除覆写</string>
@@ -768,7 +768,8 @@
     <string name="records_clear_action">清空本类</string>
     <string name="danger_clear_page_records_msg">确定永久删除本应用该类型全部记录?此操作不可撤销。</string>
     <!-- V47 WP-5:设备画像库(可视化参数配置页;分区/字段/干预组/校验/枚举槽全量标签) -->
-    <string name="profile_library_section">画像库</string>
+    <string name="profile_library_section">画像库（编辑 · 校验 · 绑定）</string>
+    <string name="profile_takeover_status_hint">画像库负责取值、校验、编辑、传输、绑定与下发;但在钩子接管落地前,靶程序读到的仍是下方旧档。不要把本页当成伪装已生效的证据。</string>
     <string name="profile_library_hint">可复用的设备画像。打开任一项即可逐项配置全部参数,并实时看到它会安装哪些干预组。</string>
     <string name="profile_library_empty">还没有画像</string>
     <string name="profile_library_empty_hint">从零新建一份,或复制内置档后修改。</string>
@@ -818,8 +819,14 @@
     <string name="profile_import_schema_rejected">这不是受支持版本的 Modev 画像包</string>
     <string name="profile_device_pick_action">选择真实机型</string>
     <string name="profile_device_pick_hint">一次填好品牌、制造商、型号与设备代号</string>
-    <string name="profile_device_loading">正在加载机型库…</string>
-    <string name="profile_device_unavailable">机型库不可用</string>
+    <string name="profile_catalog_loading">正在加载%1$s…</string>
+    <string name="profile_catalog_unavailable">%1$s不可用</string>
+    <string name="profile_catalog_devices">机型库</string>
+    <string name="profile_catalog_carriers">运营商库</string>
+    <string name="profile_android_pick_action">选择 Android 版本</string>
+    <string name="profile_android_pick_hint">一次写全系统版本与 API level</string>
+    <string name="profile_carrier_pick_action">选择真实运营商</string>
+    <string name="profile_carrier_pick_hint">一次写全 PLMN、运营商名与国家码</string>
     <string name="profile_device_search_hint">搜索</string>
     <string name="profile_device_no_match">无匹配项 - 换个更短的关键词</string>
     <string name="profile_device_truncated">共 %2$,d 项,仅显示前 %1$,d 项 - 请缩小搜索范围</string>

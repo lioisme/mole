@@ -34,6 +34,7 @@ class ProfileEditorDraftRoboTest {
         draftName = name,
         profiles = store,
         deviceCatalog = FakeDeviceCatalog(FakeDeviceCatalog.READY),
+        carrierCatalog = FakeCarrierCatalog(FakeCarrierCatalog.READY),
     )
 
     @Test
@@ -93,7 +94,8 @@ class ProfileEditorDraftRoboTest {
             profile = DeviceProfile(brand = "google", model = "Pixel 7 Pro"),
         )
         val store = FakeSpoofProfileStore(listOf(seeded))
-        val vm = ProfileEditorViewModel(profileId = seeded.id, draftName = null, profiles = store, deviceCatalog = FakeDeviceCatalog(FakeDeviceCatalog.READY))
+        val vm = ProfileEditorViewModel(profileId = seeded.id, draftName = null, profiles = store, deviceCatalog = FakeDeviceCatalog(FakeDeviceCatalog.READY),
+        carrierCatalog = FakeCarrierCatalog(FakeCarrierCatalog.READY))
 
         assertFalse("已落行不是草稿", vm.isDraft)
         assertEquals("Pixel 7 Pro", vm.view.value.let { it.texts[ProfileField.MODEL] })
@@ -116,7 +118,8 @@ class ProfileEditorDraftRoboTest {
             profile = DeviceProfile(model = "Pixel 7 Pro"),
         )
         val store = FakeSpoofProfileStore(listOf(seeded))
-        val vm = ProfileEditorViewModel(profileId = seeded.id, draftName = null, profiles = store, deviceCatalog = FakeDeviceCatalog(FakeDeviceCatalog.READY))
+        val vm = ProfileEditorViewModel(profileId = seeded.id, draftName = null, profiles = store, deviceCatalog = FakeDeviceCatalog(FakeDeviceCatalog.READY),
+        carrierCatalog = FakeCarrierCatalog(FakeCarrierCatalog.READY))
         kotlinx.coroutines.runBlocking { store.delete(seeded.id) }
 
         vm.update(ProfileField.MODEL, "Pixel 9")

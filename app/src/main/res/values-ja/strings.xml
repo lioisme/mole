@@ -737,8 +737,8 @@
     <!-- V37 T3.5: spoof profiles -->
     <string name="profiles_title">偽装プロファイル</string>
     <string name="profiles_hint">内蔵プリセットは一般的なデバイス識別をカバーし、フィールド上書きは選択したプリセットの上に適用されます。</string>
-    <string name="profiles_global_section">プロファイルプリセット</string>
-    <string name="profiles_overrides_section">フィールド上書き</string>
+    <string name="profiles_global_section">旧・内蔵プリセット（現在も有効）</string>
+    <string name="profiles_overrides_section">旧・フィールド上書き（現在も有効）</string>
     <string name="profiles_overrides_empty">フィールド上書きなし</string>
     <string name="profiles_override_add">上書きを追加</string>
     <string name="profiles_override_delete">上書きを削除</string>
@@ -775,7 +775,8 @@
     <string name="records_clear_action">この種別を消去</string>
     <string name="danger_clear_page_records_msg">このアプリのこの種別の記録をすべて完全に削除しますか?この操作は元に戻せません。</string>
     <!-- V47 WP-5:设备画像库(可视化参数配置页;分区/字段/干预组/校验/枚举槽全量标签) -->
-    <string name="profile_library_section">プロフィールライブラリ</string>
+    <string name="profile_library_section">プロフィールライブラリ（編集・検証・バインド）</string>
+    <string name="profile_takeover_status_hint">ライブラリは編集・検証・バインドの対象です。フック引き継ぎ完了まで、対象アプリが読むのは下の旧プリセット行です。このページをもって偽装が有効だと確認しないでください。</string>
     <string name="profile_library_hint">再利用可能な端末プロフィール。開くと全パラメータを編集でき、どの介入グループがインストールされるか即時に分かります。</string>
     <string name="profile_library_empty">プロフィールがありません</string>
     <string name="profile_library_empty_hint">ゼロから作成するか、内蔵プロフィールをコピーして調整してください。</string>
@@ -825,8 +826,14 @@
     <string name="profile_import_schema_rejected">対応バージョンの Modev プロフィールバンドルではありません</string>
     <string name="profile_device_pick_action">実機モデルを選択</string>
     <string name="profile_device_pick_hint">ブランド・メーカー・モデル・機器コードをまとめて入力</string>
-    <string name="profile_device_loading">デバイスカタログを読み込み中…</string>
-    <string name="profile_device_unavailable">デバイスカタログを使用できません</string>
+    <string name="profile_catalog_loading">%1$sを読み込み中…</string>
+    <string name="profile_catalog_unavailable">%1$sを使用できません</string>
+    <string name="profile_catalog_devices">デバイスカタログ</string>
+    <string name="profile_catalog_carriers">通信事業者カタログ</string>
+    <string name="profile_android_pick_action">Android バージョンを選択</string>
+    <string name="profile_android_pick_hint">リリースと API レベルを同時に設定します</string>
+    <string name="profile_carrier_pick_action">実在する通信事業者を選択</string>
+    <string name="profile_carrier_pick_hint">PLMN·事業者名·国コードを同時に設定します</string>
     <string name="profile_device_search_hint">検索</string>
     <string name="profile_device_no_match">一致する項目がありません - 短いキーワードでお試しください</string>
     <string name="profile_device_truncated">全 %2$,d 件中最初の %1$,d 件を表示 - 検索範囲を絞ってください</string>
