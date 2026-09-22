@@ -1,5 +1,6 @@
 package com.lioisme.modev
 
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyDescendant
 import androidx.compose.ui.test.hasScrollAction
@@ -15,6 +16,8 @@ import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performScrollToNode
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import com.lioisme.modev.core.model.AppListenOverride
+import com.lioisme.modev.core.model.CapabilityDomain
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
@@ -70,6 +73,11 @@ class AppMonitorRedesignTest {
 
     @After
     fun restore() {
+        // V48-B3:本类会写功能域偏差,必须按域清回零(禁全量删键 —— AGENTS #23 DUAL-12)。
+        runBlocking {
+            (ctx.applicationContext as ModevApp).container.listenConfig
+                .resetOverride(ownPackage, CapabilityDomain.FEATURE)
+        }
         AppListSettings.setShowModules(false)
     }
 
@@ -134,6 +142,27 @@ class AppMonitorRedesignTest {
             rule.onAllNodesWithText(str(R.string.listen_summary_default))
                 .fetchSemanticsNodes().isNotEmpty(),
         )
+    }
+
+    /**
+     * V48-B3(V48-DFC-04):监控页两条入口行的计数必须**各报自己那一域**。
+     * 旧实装两行同读跨域总数 `deviationCount` ⇒ 只定制功能域时,「监听设置」也显示
+     * 「1 项已自定义」,而点进去监听页是干净的 —— 两行同数让用户以为它们管同一批开关。
+     */
+    @Test
+    fun hubEntriesCountTheirOwnDomain() {
+        runBlocking {
+            (ctx.applicationContext as ModevApp).container.listenConfig
+                .setOverride(ownPackage, AppListenOverride(uiListen = true))
+        }
+        openMonitorEntry()
+
+        val defaultText = str(R.string.listen_summary_default)
+        val customText = ctx.resources.getQuantityString(R.plurals.listen_settings_custom_n, 1, 1)
+        rule.onNodeWithTag("monitor-entry-listen-settings")
+            .performScrollTo().assert(hasText(defaultText))
+        rule.onNodeWithTag("monitor-entry-feature-settings")
+            .performScrollTo().assert(hasText(customText))
     }
 
     @Test

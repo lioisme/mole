@@ -63,4 +63,23 @@ internal object KindLabelRes {
         RecordType.PROCESS_CONTROL -> ProcessKind.entries.firstOrNull { it.name == kindId }
             ?.let(::processKindLabelRes)
     } ?: R.string.unknown_error
+
+    /**
+     * 记录类型 → 其 master 行的显示标签(V48 R-2 单点):功能页渲染这 10 行、
+     * 监听页的跨域提示也要**报出同一个名字**,两处各写一份字面量就会各说各话。
+     * 穷尽 `when`,新增类型即编译期点名。
+     */
+    @StringRes
+    fun masterLabelRes(type: RecordType): Int = when (type) {
+        RecordType.CRYPTO -> R.string.algorithm_monitor_master
+        RecordType.DATABASE -> R.string.database_monitor_master
+        RecordType.BEHAVIOR -> R.string.behavior_monitor_master
+        RecordType.PREFS -> R.string.prefs_monitor_master
+        RecordType.WEBVIEW -> R.string.webview_monitor_master
+        RecordType.SYSTEM -> R.string.listen_row_master_system
+        RecordType.NETWORK -> R.string.network_monitor_master
+        RecordType.DEVICE_ENV -> R.string.device_env_master
+        RecordType.UI_INTERACTION -> R.string.listen_row_master_ui
+        RecordType.PROCESS_CONTROL -> R.string.listen_row_master_process
+    }
 }

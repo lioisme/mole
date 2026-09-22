@@ -123,17 +123,17 @@ class DataSettingsScreenTest {
         setContent(robot)
 
         // 类型计数区:算法 2 / 数据库 3 行渲染 + 可点回调(全局列表入口)。
-        waitForVisible(str(R.string.settings_records_algorithm))
-        scrollTo(str(R.string.settings_records_algorithm))
-        rule.onNodeWithText(str(R.string.settings_records_algorithm)).performClick()
+        waitForVisible(str(R.string.algorithm_records_title))
+        scrollTo(str(R.string.algorithm_records_title))
+        rule.onNodeWithText(str(R.string.algorithm_records_title)).performClick()
         rule.waitForIdle()
-        scrollTo(str(R.string.settings_records_database))
-        rule.onNodeWithText(str(R.string.settings_records_database)).performClick()
+        scrollTo(str(R.string.database_records_title))
+        rule.onNodeWithText(str(R.string.database_records_title)).performClick()
         rule.waitForIdle()
         assertEquals(listOf(RecordType.CRYPTO, RecordType.DATABASE), robot.openedTypes)
 
         // V41 T5 红线:按应用浏览区退役——分区文案/应用行全库不复存在。
-        scrollTo(str(R.string.settings_records_database))
+        scrollTo(str(R.string.database_records_title))
         rule.onAllNodesWithTag("data-app-pkg.test", useUnmergedTree = true).assertCountEquals(0)
         rule.onAllNodesWithTag("data-app-pkg.other", useUnmergedTree = true).assertCountEquals(0)
         assertTrue(

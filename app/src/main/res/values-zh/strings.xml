@@ -69,6 +69,7 @@
     <string name="listen_settings_hint">各类别初始为默认配置;单独调整后即成为该应用的自定义配置,变更即时生效</string>
     <string name="listen_reset_action">恢复默认配置</string>
     <string name="danger_reset_listen_msg">将 %1$s 的全部监听设置恢复为默认?</string>
+    <string name="listen_kind_master_off_hint">%1$s 当前为关,该类不会产生任何记录或干预;它的上级开关在「功能设置」页。</string>
     <string name="section_record_options">记录选项</string>
     <string name="algorithm_monitor_master">算法监听</string>
     <string name="database_monitor_master">数据库监听</string>
@@ -453,11 +454,6 @@
     <string name="settings_total_records_value">%1$,d 条</string>
     <string name="settings_type_counts_section">记录分类</string>
     <!-- V41:「按应用浏览」退役——应用维度唯一入口 = 主界面应用列表 -->
-    <string name="settings_records_algorithm">算法记录</string>
-    <string name="settings_records_database">数据库记录</string>
-    <string name="settings_records_behavior">行为记录</string>
-    <string name="settings_records_prefs">偏好记录</string>
-    <string name="settings_records_webview">WebView 记录</string>
     <string name="danger_clear_prefs_msg">清空全部 SharedPreferences 记录?此操作不可撤销。</string>
     <string name="danger_clear_webview_msg">清空全部 WebView 记录?此操作不可撤销。</string>
     <string name="settings_storage_section">存储占用</string>
@@ -762,11 +758,6 @@
     <string name="settings_blacklist_entry_hint">额外隐藏的包名、前缀与端口</string>
 
     <!-- V37 T3.6:数据管理补齐后 5 类记录 -->
-    <string name="settings_records_network">网络环境记录</string>
-    <string name="settings_records_device_env">设备环境记录</string>
-    <string name="settings_records_ui_interaction">UI 交互记录</string>
-    <string name="settings_records_system">系统信息记录</string>
-    <string name="settings_records_process_control">进程控制记录</string>
     <string name="danger_clear_network_msg">确定永久删除全部网络环境记录?此操作不可撤销。</string>
     <string name="danger_clear_device_env_msg">确定永久删除全部设备环境记录?此操作不可撤销。</string>
     <string name="danger_clear_ui_interaction_msg">确定永久删除全部 UI 交互记录?此操作不可撤销。</string>

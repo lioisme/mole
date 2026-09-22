@@ -74,6 +74,7 @@
     <string name="listen_settings_hint">各スイッチはデフォルト設定から始まります。切り替えるとこのアプリの個別設定になり、即時適用されます。</string>
     <string name="listen_reset_action">デフォルト設定に戻す</string>
     <string name="danger_reset_listen_msg">%1$s のすべての監視設定をデフォルトに戻しますか?</string>
+    <string name="listen_kind_master_off_hint">%1$s は現在オフのため、この項目は記録も介入も生成しません。上位のスイッチは「機能設定」ページにあります。</string>
     <string name="section_record_options">記録オプション</string>
     <string name="algorithm_monitor_master">アルゴリズム監視</string>
     <string name="database_monitor_master">データベース監視</string>
@@ -457,11 +458,6 @@
     <string name="settings_total_records_value">%1$,d 件</string>
     <string name="settings_type_counts_section">記録分類</string>
     <!-- V41:「按应用浏览」退役——应用维度唯一入口 = 主界面应用列表 -->
-    <string name="settings_records_algorithm">アルゴリズム記録</string>
-    <string name="settings_records_database">データベース記録</string>
-    <string name="settings_records_behavior">動作記録</string>
-    <string name="settings_records_prefs">プリファレンス記録</string>
-    <string name="settings_records_webview">WebView 記録</string>
     <string name="danger_clear_prefs_msg">すべての SharedPreferences 記録を消去しますか?この操作は元に戻せません。</string>
     <string name="danger_clear_webview_msg">すべての WebView 記録を消去しますか?この操作は元に戻せません。</string>
     <string name="settings_storage_section">ストレージ使用량</string>
@@ -769,11 +765,6 @@
     <string name="settings_blacklist_entry_hint">追加で隠すパッケージ・接頭辞・ポート</string>
 
     <!-- V37 T3.6: data management for the 5 late-added record types -->
-    <string name="settings_records_network">ネットワーク記録</string>
-    <string name="settings_records_device_env">デバイス環境記録</string>
-    <string name="settings_records_ui_interaction">UI インタラクション記録</string>
-    <string name="settings_records_system">システム情報記録</string>
-    <string name="settings_records_process_control">プロセス制御記録</string>
     <string name="danger_clear_network_msg">すべてのネットワーク記録を完全に削除しますか?この操作は元に戻せません。</string>
     <string name="danger_clear_device_env_msg">すべてのデバイス環境記録を完全に削除しますか?この操作は元に戻せません。</string>
     <string name="danger_clear_ui_interaction_msg">すべての UI インタラクション記録を完全に削除しますか?この操作は元に戻せません。</string>

@@ -247,30 +247,32 @@ fun PerAppFeatureSettingsScreen(
             )
 
             SettingsSection(stringResource(R.string.feature_masters_section)) {
+                // V48 R-2:标签与现值一律经单点解析(KindLabelRes.masterLabelRes / HookSwitch.masterFor)
+                // —— 监听页的跨域闸提示要报出**同一个名字**,这里再各写一份字面量就会各说各话。
                 ToggleListItem(
-                    label = res.getString(R.string.listen_row_master_ui),
-                    checked = effective.uiListen,
+                    label = res.getString(KindLabelRes.masterLabelRes(RecordType.UI_INTERACTION)),
+                    checked = effective.masterFor(RecordType.UI_INTERACTION),
                     onCheckedChange = { viewModel.setUiMaster(it) },
                     testTag = "feature-row-master-ui",
                 )
                 HorizontalDivider16()
                 ToggleListItem(
-                    label = res.getString(R.string.network_monitor_master),
-                    checked = effective.networkListen,
+                    label = res.getString(KindLabelRes.masterLabelRes(RecordType.NETWORK)),
+                    checked = effective.masterFor(RecordType.NETWORK),
                     onCheckedChange = { viewModel.setNetworkMaster(it) },
                     testTag = "feature-row-master-network",
                 )
                 HorizontalDivider16()
                 ToggleListItem(
-                    label = res.getString(R.string.device_env_master),
-                    checked = effective.deviceEnvListen,
+                    label = res.getString(KindLabelRes.masterLabelRes(RecordType.DEVICE_ENV)),
+                    checked = effective.masterFor(RecordType.DEVICE_ENV),
                     onCheckedChange = { viewModel.setDeviceEnvMaster(it) },
                     testTag = "feature-row-master-device-env",
                 )
                 HorizontalDivider16()
                 ToggleListItem(
-                    label = res.getString(R.string.listen_row_master_process),
-                    checked = effective.processControlListen,
+                    label = res.getString(KindLabelRes.masterLabelRes(RecordType.PROCESS_CONTROL)),
+                    checked = effective.masterFor(RecordType.PROCESS_CONTROL),
                     onCheckedChange = { viewModel.setProcessControlMaster(it) },
                     testTag = "feature-row-master-process",
                 )

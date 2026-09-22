@@ -71,6 +71,7 @@
     <string name="listen_settings_hint">Every switch starts from the default configuration. Toggling creates a custom setting for this app and applies instantly.</string>
     <string name="listen_reset_action">Restore default configuration</string>
     <string name="danger_reset_listen_msg">Restore all listen settings for %1$s to the default?</string>
+    <string name="listen_kind_master_off_hint">%1$s is currently off, so this category produces nothing. Its master switch lives on the Feature Settings page.</string>
     <string name="section_record_options">Record Options</string>
     <string name="algorithm_monitor_master">Algorithm Listen</string>
     <string name="database_monitor_master">Database Listen</string>
@@ -461,11 +462,6 @@
     <string name="settings_total_records_value">%1$,d</string>
     <string name="settings_type_counts_section">Records by type</string>
     <!-- V41:「按应用浏览」退役——应用维度唯一入口 = 主界面应用列表 -->
-    <string name="settings_records_algorithm">Algorithm records</string>
-    <string name="settings_records_database">Database records</string>
-    <string name="settings_records_behavior">Behavior records</string>
-    <string name="settings_records_prefs">Prefs records</string>
-    <string name="settings_records_webview">WebView records</string>
     <string name="danger_clear_prefs_msg">Clear all SharedPreferences records? This cannot be undone.</string>
     <string name="danger_clear_webview_msg">Clear all WebView records? This cannot be undone.</string>
     <string name="settings_storage_section">Storage</string>
@@ -773,11 +769,6 @@
     <string name="settings_blacklist_entry_hint">Extra packages, prefixes and ports to hide</string>
 
     <!-- V37 T3.6: data management for the 5 late-added record types -->
-    <string name="settings_records_network">Network Records</string>
-    <string name="settings_records_device_env">Device Environment Records</string>
-    <string name="settings_records_ui_interaction">UI Interaction Records</string>
-    <string name="settings_records_system">System Information Records</string>
-    <string name="settings_records_process_control">Process Control Records</string>
     <string name="danger_clear_network_msg">Permanently delete all network records? This cannot be undone.</string>
     <string name="danger_clear_device_env_msg">Permanently delete all device environment records? This cannot be undone.</string>
     <string name="danger_clear_ui_interaction_msg">Permanently delete all UI interaction records? This cannot be undone.</string>

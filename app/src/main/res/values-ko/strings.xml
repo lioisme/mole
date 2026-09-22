@@ -74,6 +74,7 @@
     <string name="listen_settings_hint">각 스위치는 기본 설정에서 시작합니다. 전환하면 이 앱의 개별 설정이 되며 즉시 적용됩니다.</string>
     <string name="listen_reset_action">기본 설정으로 복원</string>
     <string name="danger_reset_listen_msg">%1$s의 모든 감시 설정을 기본값으로 복원하시겠습니까?</string>
+    <string name="listen_kind_master_off_hint">%1$s이(가) 현재 꺼져 있어 이 항목은 기록도 개입도 생성하지 않습니다. 상위 스위치는 「기능 설정」 페이지에 있습니다.</string>
     <string name="section_record_options">기록 옵션</string>
     <string name="algorithm_monitor_master">알고리즘 감시</string>
     <string name="database_monitor_master">데이터베이스 감시</string>
@@ -457,11 +458,6 @@
     <string name="settings_total_records_value">%1$,d개</string>
     <string name="settings_type_counts_section">기록 분류</string>
     <!-- V41:「按应用浏览」退役——应用维度唯一入口 = 主界面应用列表 -->
-    <string name="settings_records_algorithm">알고리즘 기록</string>
-    <string name="settings_records_database">데이터베이스 기록</string>
-    <string name="settings_records_behavior">행동 기록</string>
-    <string name="settings_records_prefs">프리퍼런스 기록</string>
-    <string name="settings_records_webview">WebView 기록</string>
     <string name="danger_clear_prefs_msg">모든 SharedPreferences 기록을 삭제하시겠습니까? 되돌릴 수 없습니다.</string>
     <string name="danger_clear_webview_msg">모든 WebView 기록을 삭제하시겠습니까? 되돌릴 수 없습니다.</string>
     <string name="settings_storage_section">저장 공간</string>
@@ -769,11 +765,6 @@
     <string name="settings_blacklist_entry_hint">추가로 숨길 패키지, 접두어, 포트</string>
 
     <!-- V37 T3.6: data management for the 5 late-added record types -->
-    <string name="settings_records_network">네트워크 기록</string>
-    <string name="settings_records_device_env">기기 환경 기록</string>
-    <string name="settings_records_ui_interaction">UI 상호작용 기록</string>
-    <string name="settings_records_system">시스템 정보 기록</string>
-    <string name="settings_records_process_control">프로세스 제어 기록</string>
     <string name="danger_clear_network_msg">모든 네트워크 기록을 영구 삭제하시겠습니까? 되돌릴 수 없습니다.</string>
     <string name="danger_clear_device_env_msg">모든 기기 환경 기록을 영구 삭제하시겠습니까? 되돌릴 수 없습니다.</string>
     <string name="danger_clear_ui_interaction_msg">모든 UI 상호작용 기록을 영구 삭제하시겠습니까? 되돌릴 수 없습니다.</string>

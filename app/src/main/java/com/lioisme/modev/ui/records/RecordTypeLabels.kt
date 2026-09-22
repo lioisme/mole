@@ -13,19 +13,23 @@ import com.lioisme.modev.core.model.RecordType
  * 新增 RecordType 补齐两处 when(编译器穷尽性强制)。
  */
 
-/** 类型计数行标题(全 10 类型;既有 5 键保留,新增 5 键同构命名)。 */
+/**
+ * 类型计数行标题(V48-B4 去重:原 `settings_records_*` 十键与监控页入口的
+ * `××_records_title` 十键同义双份,且已漂移 —— `UI交互记录` vs `UI 交互记录`。
+ * 一个类型一个标题键,数据管理页与监控页入口共用)。
+ */
 @StringRes
 internal fun recordTypeCountLabelRes(type: RecordType): Int = when (type) {
-    RecordType.CRYPTO -> R.string.settings_records_algorithm
-    RecordType.DATABASE -> R.string.settings_records_database
-    RecordType.BEHAVIOR -> R.string.settings_records_behavior
-    RecordType.PREFS -> R.string.settings_records_prefs
-    RecordType.WEBVIEW -> R.string.settings_records_webview
-    RecordType.NETWORK -> R.string.settings_records_network
-    RecordType.DEVICE_ENV -> R.string.settings_records_device_env
-    RecordType.UI_INTERACTION -> R.string.settings_records_ui_interaction
-    RecordType.SYSTEM -> R.string.settings_records_system
-    RecordType.PROCESS_CONTROL -> R.string.settings_records_process_control
+    RecordType.CRYPTO -> R.string.algorithm_records_title
+    RecordType.DATABASE -> R.string.database_records_title
+    RecordType.BEHAVIOR -> R.string.behavior_records_title
+    RecordType.PREFS -> R.string.prefs_records_title
+    RecordType.WEBVIEW -> R.string.webview_records_title
+    RecordType.NETWORK -> R.string.network_records_title
+    RecordType.DEVICE_ENV -> R.string.device_records_title
+    RecordType.UI_INTERACTION -> R.string.ui_interaction_records_title
+    RecordType.SYSTEM -> R.string.system_records_title
+    RecordType.PROCESS_CONTROL -> R.string.process_control_records_title
 }
 
 /** 按类型清空确认文案(语义 = 该类型 × 全部应用,危险确认)。 */

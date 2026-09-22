@@ -76,6 +76,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.BehaviorKind
+import com.lioisme.modev.core.model.CapabilityDomain
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.NetworkKind
@@ -240,7 +241,7 @@ fun AppMonitorScreen(
                 EntryRow(
                     icon = Icons.Filled.Tune,
                     title = stringResource(R.string.listen_settings_entry),
-                    value = listenSummary(listenOverride),
+                    value = listenSummary(listenOverride, CapabilityDomain.LISTEN),
                     onClick = onOpenListenSettings,
                     modifier = Modifier.testTag("monitor-entry-listen-settings"),
                 )
@@ -299,7 +300,7 @@ fun AppMonitorScreen(
                 EntryRow(
                     icon = Icons.Filled.Shield,
                     title = stringResource(R.string.feature_settings_entry),
-                    value = listenSummary(listenOverride),
+                    value = listenSummary(listenOverride, CapabilityDomain.FEATURE),
                     onClick = onOpenFeatureSettings,
                     modifier = Modifier.testTag("monitor-entry-feature-settings"),
                 )
@@ -697,15 +698,17 @@ private fun countText(count: Long): String {
 }
 
 /**
- * 「设置」摘要(V24 G3;V37 C8 计数收敛 [AppListenOverride.deviationCount]):
- * 未定制 → 「使用默认配置」;有自定义 → 「N 项已自定义」。
+ * 「设置」摘要(V24 G3;V37 C8 计数收敛 [AppListenOverride.deviationCount];
+ * **V48-B3 按域计数**):两页入口恒各报自己那一域的偏差数 —— 编辑页早已用
+ * `deviationCountFor(domain)`,而入口仍读跨域总数,导致「只定制了功能」时
+ * 监听入口也显示同一个数字(两行同数 = 用户以为它们管的是同一批开关)。
  */
 @Composable
-private fun listenSummary(override: AppListenOverride): String {
-    if (override.isDefault) {
+private fun listenSummary(override: AppListenOverride, domain: CapabilityDomain): String {
+    val n = override.deviationCountFor(domain)
+    if (n == 0) {
         return stringResource(R.string.listen_summary_default)
     }
-    val n = override.deviationCount
     // 复数契约 6:计数文案走 plurals(one/other;zh 仅 other)。
     return pluralStringResource(R.plurals.listen_settings_custom_n, n, n)
 }

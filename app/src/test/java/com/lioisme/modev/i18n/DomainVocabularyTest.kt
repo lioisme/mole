@@ -2,7 +2,7 @@ package com.lioisme.modev.i18n
 
 import android.content.res.Configuration
 import android.os.LocaleList
-import com.lioisme.modev.R
+import java.io.File
 import java.util.Locale
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
@@ -123,5 +123,32 @@ class DomainVocabularyTest {
     fun emptyListHintPointsAtBothDomainPages() {
         val hint = text("zh", "detail_empty_hint")
         assertTrue("hint must name both pages: $hint", hint.contains("监听设置") && hint.contains("功能设置"))
+    }
+
+    /**
+     * D-2:「总开关 / Masters」这一层命名在四语的**分区标题与行标签**里全部退役。
+     * 理由:本产品有 12 个层级的上级闸(1 作用域 + 10 类型 master + 服务开关),
+     * 该词对用户不携带信息,且与真正的顶层闸「作用域此应用」争名。
+     * 逐 locale 列具体退役形态(不是正则扫一切),因为英文正文里 "master switch" 作描述语是合法的。
+     */
+    @Test
+    fun theMasterSwitchLabelsAreRetired() {
+        val retired = mapOf(
+            "values" to "Feature Masters",
+            "values-zh" to "总开关",
+            "values-ja" to "マスター",
+            "values-ko" to "마스터",
+        )
+        retired.forEach { (dir, dead) ->
+            val xml = File("src/main/res/$dir/strings.xml").readText()
+            assertFalse("[$dir] 已退役的层命名仍在屏上: $dead", xml.contains(dead))
+        }
+    }
+
+    /** 跨域闸点名行必须**指名那个上级开关**(而不是含糊说「请先开启上级开关」)。 */
+    @Test
+    fun crossDomainHintNamesTheGatingSwitchAndItsPage() {
+        val hint = text("zh", "listen_kind_master_off_hint")
+        assertTrue(hint, hint.contains("%1\$s") && hint.contains("功能设置"))
     }
 }

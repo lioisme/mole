@@ -463,6 +463,24 @@ data class HookSwitch(
         ProcessKind.SCREEN_RECORD -> screenRecordBypass
     }
 
+    /**
+     * 该记录类型的 master 现值(V48 R-2 唯一通路):跨域提示(监听页要说出「管着这一类的总开关
+     * 现在是不是关着」)与任何按类型聚合的观测都经此取,禁止在消费方各拼一份 `when`。
+     * 穷尽 `when` ⇒ 新增 [RecordType] 必须同步补 master,编译期即暴露漏配。
+     */
+    fun masterFor(type: RecordType): Boolean = when (type) {
+        RecordType.CRYPTO -> cryptoListen
+        RecordType.DATABASE -> dbListen
+        RecordType.BEHAVIOR -> behaviorListen
+        RecordType.PREFS -> prefsListen
+        RecordType.WEBVIEW -> webviewListen
+        RecordType.SYSTEM -> systemListen
+        RecordType.NETWORK -> networkListen
+        RecordType.DEVICE_ENV -> deviceEnvListen
+        RecordType.UI_INTERACTION -> uiListen
+        RecordType.PROCESS_CONTROL -> processControlListen
+    }
+
     companion object {
         /** 当前配置版本号:V32 干预型 hook 默认关闭迁移;V37 功能域数据段(feature);V47 设备画像库。 */
         private const val CURRENT_CONFIG_VERSION = 3

@@ -44,6 +44,7 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.CapabilityDomain
+import com.lioisme.modev.core.model.CapabilityMap
 import com.lioisme.modev.core.model.CategoryTaxonomy
 import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.HookSwitch
@@ -382,20 +383,27 @@ fun PerAppListenSettingsScreen(
             }
             Spacer(Modifier.height(16.dp))
 
-            // 环境观测(V37 双域拆分):NETWORK/DEVICE_ENV/UI_INTERACTION 三类型中属
-            // 监听域的观测类别(请求监控/检测监控/弹窗·控件·Activity 观测),
-            // 由 CategoryTaxonomy LISTEN 域驱动;干预类别一律在「功能设置」页管理。
+            // 环境监听(V37 双域拆分;V48 R-2 行集合改由能力表驱动,页面不再自拼跨域清单):
+            // 这些监听域类别的行落在本页,而**管着它们的 master 只画在功能设置页**(跨域闸)。
+            // kind 已开而 master 关时必须在行上点名(V48-DFC-03)—— 否则用户勾完什么都不会发生。
             SettingsSection(stringResource(R.string.listen_section_env_observe)) {
-                val envObserveKinds = listOf(RecordType.NETWORK, RecordType.DEVICE_ENV, RecordType.UI_INTERACTION)
-                    .flatMap { type -> CategoryTaxonomy.forType(type) }
-                    .filter { it.domain == com.lioisme.modev.core.model.CapabilityDomain.LISTEN }
-                envObserveKinds.forEachIndexed { index, category ->
+                CapabilityMap.crossDomainListen.forEachIndexed { index, row ->
                     if (index > 0) HorizontalDivider16()
+                    val kindOn = EffectiveSwitch.readKind(effective, row.type, row.kind) == true
                     ToggleListItem(
-                        label = res.getString(KindLabelRes.resolve(category.type, category.id)),
-                        checked = EffectiveSwitch.readKind(effective, category.type, category.id) == true,
-                        onCheckedChange = { viewModel.setKind(category.type, category.id, it) },
-                        testTag = "listen-row-${category.type.wire}-${category.id}",
+                        label = res.getString(KindLabelRes.resolve(row.type, row.kind)),
+                        checked = kindOn,
+                        onCheckedChange = { viewModel.setKind(row.type, row.kind, it) },
+                        testTag = "listen-row-${row.type.wire}-${row.kind}",
+                        supporting =
+                            if (kindOn && !effective.masterFor(row.type)) {
+                                res.getString(
+                                    R.string.listen_kind_master_off_hint,
+                                    res.getString(KindLabelRes.masterLabelRes(row.type)),
+                                )
+                            } else {
+                                null
+                            },
                     )
                 }
             }
