@@ -59,7 +59,7 @@
     <string name="records_count_subtitle">%1$s 条记录</string>
     <string name="record_copied_toast">记录摘要已复制</string>
     <string name="section_monitor_kinds">监听类别</string>
-    <string name="app_monitor_scope_row">监听此应用</string>
+    <string name="app_monitor_scope_row">作用域此应用</string>
     <string name="listen_settings_entry">功能配置</string>
     <string name="listen_summary_default">使用默认配置</string>
     <plurals name="listen_settings_custom_n">

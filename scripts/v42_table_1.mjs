@@ -50,7 +50,7 @@ export const T1 = {
   records_count_subtitle: ['記録 %1$s 件', '기록 %1$s개'],
   record_copied_toast: ['記録の概要をコピーしました', '기록 요약을 복사했습니다'],
   section_monitor_kinds: ['監視カテゴリ', '모니터링 항목'],
-  app_monitor_scope_row: ['このアプリを監視', '이 앱 모니터링'],
+  app_monitor_scope_row: ['このアプリをフック対象にする', '이 앱을 적용 범위에 포함'],
   listen_settings_entry: ['機能設定', '기능 설정'],
   listen_summary_default: ['デフォルト設定を使用', '기본 설정 사용'],
   app_monitor_actions_section: ['操作', '작업'],

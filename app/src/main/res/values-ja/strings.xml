@@ -64,7 +64,7 @@
     <string name="records_count_subtitle">記録 %1$s 件</string>
     <string name="record_copied_toast">記録の概要をコピーしました</string>
     <string name="section_monitor_kinds">監視カテゴリ</string>
-    <string name="app_monitor_scope_row">このアプリを監視</string>
+    <string name="app_monitor_scope_row">このアプリをフック対象にする</string>
     <string name="listen_settings_entry">機能設定</string>
     <string name="listen_summary_default">デフォルト設定を使用</string>
     <plurals name="listen_settings_custom_n">

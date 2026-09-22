@@ -64,7 +64,7 @@
     <string name="records_count_subtitle">기록 %1$s개</string>
     <string name="record_copied_toast">기록 요약을 복사했습니다</string>
     <string name="section_monitor_kinds">모니터링 항목</string>
-    <string name="app_monitor_scope_row">이 앱 모니터링</string>
+    <string name="app_monitor_scope_row">이 앱을 적용 범위에 포함</string>
     <string name="listen_settings_entry">기능 설정</string>
     <string name="listen_summary_default">기본 설정 사용</string>
     <plurals name="listen_settings_custom_n">

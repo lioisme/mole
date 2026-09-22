@@ -60,7 +60,7 @@
     <string name="records_count_subtitle">%1$s records</string>
     <string name="record_copied_toast">Record summary copied</string>
     <string name="section_monitor_kinds">Monitor Kinds</string>
-    <string name="app_monitor_scope_row">Monitor this app</string>
+    <string name="app_monitor_scope_row">Scope this app</string>
     <string name="listen_settings_entry">Feature Configuration</string>
     <string name="listen_summary_default">Uses default configuration</string>
     <plurals name="listen_settings_custom_n">
