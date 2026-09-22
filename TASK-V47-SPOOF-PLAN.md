@@ -295,7 +295,34 @@ public 面 `spoofProfiles: SpoofProfileService` 取自 domain ⇒ G2 闸成立)�
 - 产出:Room v15(`spoof_profile` + `crypto_records.maskedValue`)+ 实体/DAO(表名走 `TABLE_NAME` 常量)+ `SpoofProfileService` 契约与实现 + 内置三档 catalog 与账本算法 + `AppListenOverride`(绑定 + 快照,含 `isDefault`/`deviationCountFor`/`clearDomain` 三处同步)+ 展开 + `configVersion 2→3` 迁移。
 - 出口:`DbMigrationParityTest` / `FeatureConfigMigrationTest` / `AppListenOverrideDomainTest` / `RecordWriteModelParityTest` / `SingleWriteEntryPointTest` 全绿 + 新增 `BuiltinProfileConsistencyTest`(整组自洽:三元组/fingerprint/ro/SDK/DPI)+ 未知 id 硬失败断言。
 
-### WP-3 · 注入侧第一批(身份与标识)⬜
+### WP-3 · 注入侧第一批(身份与标识)🔵 3a/3b 已绿,3c(kind 登记)待做
+
+**已落地(2026-09-22,零耦合纯逻辑先行)**
+- **3a `ProfileHookPlan`**:`activeGroups()`(空画像 = 零组冻结断言 + 逐组「任一字段生效即激活」)、
+  互斥裁决 **R-B**(隐藏 Wi-Fi 定位压制 `PROFILE_WIFI`)、**R-C**(隐藏基站定位压制 `PROFILE_CELL`)、
+  **R-D** `adaptiveMaskShouldYield()`(Build 族任一字段被显式改写 ⇒ 强制档在场,条件档让位)、
+  `conflicts()` 三条矛盾自检(半设坐标 / 无坐标的抖动 / 只勾应用列表)。
+  裁决集中在这一处,**不散进各钩子**(基线把同一裁决写在 HookPlan 与 WifiHook 两处是反面教材)。
+- **3b `ProfileGenerators`**:Luhn IMEI、**本地管理单播 MAC**(置 bit1 清 bit0,
+  且 3000 样本断言永不落进 `02:42:ac`/`00:05:69`/`00:1c:14`/`00:0c:29`/`00:50:56` 虚拟化 OUI
+  ⇒ 直接清偿 **DFC-04 / GAP-07**)、16 位小写 hex SSAID、版本关联 Build ID
+  (前缀表 + 年份随大版本世代走,防「未来构建」)、fingerprint 骨架派生(段值含 `/` `:` 空白
+  一律清洗为 `_`,空段回落占位,保证恒为三段)、坐标六位小数全球域、电量 0..100。
+  **全部函数接受可注入 `Random`** ⇒ 固定种子大样本可复现直测,注入侧与宿主 UI 共用一份实现。
+- 定向 `ProfileHookPlanTest` 10 + `ProfileGeneratorsTest` 13 = **23 全绿**;
+  全量 **140 类 / 952 用例 / 0 失败 / 0 跳过**(WP-2 收口 929 ⇒ +23);lint 仍 **0e/43w/1h**。
+- 过程中被测试抓到的一处**真产品逻辑错**:`RANDOM_OFFSET` 自身属于 `PROFILE_LOCATION` 组,
+  故「开了抖动但没坐标」时该组恒激活,原判据 `PROFILE_LOCATION !in active` 永不成立;
+  改为按坐标字段本身判定。
+
+**3c 为什么不能再拆细、也不能与 3a/3b 同批落**:18 个 kind 一旦进 `CategoryTaxonomy`,
+就同时强制 `HookSwitch` 18 个布尔位 + `readKind`/`applyKinds` 双臂 + `FeatureGroups` 新组 +
+`KindLabelRes` 18 标签 + **四语资源(≈95 键含 41 字段标签,ja/ko 必须回写
+`scripts/v42_table_*.mjs` 并跑生成器看到 `DONE`)** + `gatedFields` +18 +
+`HotPathGateConventionTest` 白名单 +18 + MCP `kindEntries` enum 快照,
+外加 D-10 的 5 个 kind 退役同步动 UI/MCP/矩阵 —— 这些必须一次改完,否则编译与既有用例同崩。
+故 3c 与钩子本体(3d)按批次原子提交。
+
 - 覆盖 kind:`PROFILE_BUILD / UNIQUE_ID / SIM / CELL / WIFI / NETWORK / DENSITY / CPU`。
 - 产出:`ProfileHookPlan` + `ProfileBaseHooker` + 8 钩子组 + 互斥裁决 R-A..R-D + 值生成器(强制档无条件写)+ DFC-01/02/04/05/08 清偿。
 - 出口:`ProfileHookPlanTest`(空画像=零组 + 四条裁决)+ `InterventionGateConventionTest`/`HotPathGateConventionTest` 名单同步 + **每项二态 JVM/Robolectric 行为测试**(禁自抄实现,直测 internal 本体)。
@@ -447,7 +474,8 @@ teardown: feature_settings_reset(FEATURE) + 全局画像回默认
 | 2026-09-22 | WP-0 | 设备冷自愈复位(`05-bringup-device.ps1`)、基线三组实测留档 `docs/test-reports/v47-baseline-20260922.md` | `00-env-verify -Mode env` 7P/0F | 单测 132类/856用例/0失败;lint 0e/43w/1h;assemble 双 ABI | **环境故障两例**:①`--no-daemon` 遗留空闲 daemon 持 `classes.jar` 句柄 ⇒ `bundleModernDebugClassesToCompileJar` FileSystemException(0 个 Kotlin 错误却连红 4 次)→ `gradlew --stop` 处置并改用可复用 daemon;②自查失误 —— 用 `: > file` 探测占用把该 jar 截断为 0 字节,已删污染目录强制重生成。探测占用禁截断式打开,已写入基线留档 §4 | ✅ |
 | 2026-09-22 | WP-1 | `ProfileKind`18 / `ProfileSection`10 / `ProfileField`41(baselineKey 逐字段对齐)/ `ProfileValues` 哨兵 / `DeviceProfile` 41 字段值对象 / `ProfileFieldCatalog` 行为面 / 穷尽 `when` 桥接零反射 | `ProfileFieldCatalogTest` 16 + `DeviceProfilePropertyParityTest` 5 = **21 全绿**(首轮即过) | **134 类 / 877 用例 / 0 失败 / 0 跳过**(基线 +21,零波及) | 编译期自纠 3 处:`ClosedDoubleRange` 为文件私有 ⇒ 改 `ClosedFloatingPointRange<Double>`;`when` 内 NETWORK/SCREENSHOT 槽位 `Int?` 不可 `in` 区间 ⇒ 改先取非空;误留 `LANGUAGE.copy()` 非法表达式与 `SIM_COUNTRY` 复用 PLMN 错误标签 ⇒ 新增 `SIM_COUNTRY_FORMAT` | ✅ |
 | 2026-09-22 | WP-2 ✅(2a–2d) | 存储 v15(`spoof_profile` + `crypto_records.maskedValue`)+ 实体/DAO;领域 `ProfileCodec`/`ProfileResolution` 三态/`BuiltinDeviceProfiles` 三档/传输信封/`SpoofProfileService` 契约 + `SpoofProfileRepository` 账本实现;配置 `FeatureConfig.deviceProfile`+`adaptiveMask`、`AppListenOverride.resolvedProfile`、`EffectiveSwitch` 快照支、**`configVersion 2→3` 迁移矩阵**;装配 `SettingsRepository.resolveFor`+`ModevApp`;计划外收敛 `ALL_MIGRATIONS` 单一事实源 | `ProfileCodecTest` 7 + `SpoofProfileRepositoryTest` 18 + `BuiltinProfileConsistencyTest` 8 + `FeatureConfigMigrationTest` +6 + `SettingsRepositoryProfileExpansionTest` 11(真 Room 无 mock)= **定向 50 全绿** | **138 类 / 929 用例 / 0 失败 / 0 跳过**(基线 +73);lint **0e/43w/1h 与 V46 基线逐字相同**;迁移由 `CryptoRecordDaoTest` 真实跑 v1..v9→v15 全链验证 | **一轮假绿风险**:某轮全量报 4 红 868 完成 + 1 skipped ⇒ 查日志为**守护进程崩溃截断**(`hs_err_pid21476.log`),Robolectric 用例被连带撕掉;`--stop` + `--no-daemon -Xmx2048m` 重跑后 markdown 两类复绿,确认非回归。真红只有 2 条,均为 `configVersion` 抬版后**必须随之更新的冻结期望**(v1→3;v2 夹具旧档名 `xiaomi13`→`builtin:xiaomi-13`),改期望的同时补 6 条迁移断言而非仅调绿。另自纠:`exportJson`/`init` 首版写出幽灵 API ⇒ 整份重写 | ✅ |
-| | WP-3 | | | | | ⬜ |
+| 2026-09-22 | WP-3a/3b 🔵 | `ProfileHookPlan`(空画像=零组 / R-B / R-C / R-D 裁决 + 三条矛盾自检)、`ProfileGenerators`(Luhn IMEI / 本地管理单播 MAC / hex SSAID / 世代关联 Build ID / fingerprint 骨架派生 / 坐标域,全函数可注入 Random) | `ProfileHookPlanTest` 10 + `ProfileGeneratorsTest` 13 = **23 全绿** | **140 类 / 952 用例 / 0 失败 / 0 跳过**(WP-2 收口 929 ⇒ +23);lint **0e/43w/1h 未漂移** | 测试抓到 **1 处真产品逻辑错**:`OFFSET_WITHOUT_COORDINATES` 用「LOCATION 组未激活」作判据,而抖动位自身属于该组 ⇒ 判据恒假,改为按坐标字段判定。另自纠 4 处:`Char.forDigit` 在 `-no-jdk` 下不可解析(改 `'0' + d'`)、MAC 掩码误写 `inv().inv()` 且 `or/and` 优先级需显式加括号、Build ID 年份回绕断言绕成三层算术(改为枚举允许集)、`sampleFor` 尾随 `let` 把 BOOL/TEXT 混成一谈(改按 `ProfileValueType` 分支) | 🔵 |
+| | WP-3c/3d | | | | | ⬜ |
 | | WP-4 | | | | | ⬜ |
 | | WP-5 | | | | | ⬜ |
 | | WP-6 | | | | | ⬜ |
