@@ -844,6 +844,7 @@
     <string name="profile_device_search_hint">Search</string>
     <string name="profile_device_no_match">No match - try a shorter keyword</string>
     <string name="profile_device_truncated">Showing the first %1$,d of %2$,d - narrow the search</string>
+    <string name="profile_picker_manual">Type a value instead</string>
     <string name="profile_section_device">Device and Build</string>
     <string name="profile_section_network">Network</string>
     <string name="profile_section_sim">SIM Operator</string>

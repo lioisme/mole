@@ -840,6 +840,7 @@
     <string name="profile_device_search_hint">검색</string>
     <string name="profile_device_no_match">일치하는 항목 없음 - 더 짧은 키워드로 시도하세요</string>
     <string name="profile_device_truncated">전체 %2$,d개 중 처음 %1$,d개 표시 - 검색 범위를 좁히세요</string>
+    <string name="profile_picker_manual">직접 입력하기</string>
     <string name="profile_section_device">기기와 빌드</string>
     <string name="profile_section_network">네트워크</string>
     <string name="profile_section_sim">SIM 통신사</string>

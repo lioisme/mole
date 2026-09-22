@@ -71,6 +71,7 @@ import com.lioisme.modev.core.model.ProfileField
 import com.lioisme.modev.core.model.ProfileFieldCatalog
 import com.lioisme.modev.core.model.ProfileSection
 import com.lioisme.modev.core.model.ProfileKind
+import com.lioisme.modev.core.model.ProfileOptionSource
 import com.lioisme.modev.core.model.ProfileValueType
 import com.lioisme.modev.core.model.stringOf
 import com.lioisme.modev.core.model.applyBrandIdentity
@@ -317,6 +318,7 @@ fun ProfileEditorScreen(
     val catalog by viewModel.catalog.collectAsStateWithLifecycle()
     var showBrandSheet by remember { mutableStateOf(false) }
     var pickBrandKey by remember { mutableStateOf<String?>(null) }
+    var manualEntryFor by remember { mutableStateOf<ProfileField?>(null) }
 
     val entry = viewModel.entry
     if (entry == null && !viewModel.isDraft) {
@@ -439,7 +441,54 @@ fun ProfileEditorScreen(
     }
 
     editingField?.let { field ->
-        when (field.type) {
+        // 语言 / 国家 / 时区:取值是平台权威表里的枚举 ⇒ 先给列表,手填作为表内一项保留
+        // (列表不覆盖用户已填的自定义形态,例如带地区的语言标签)。
+        val enumerated =
+            if (manualEntryFor == field) null else ProfileOptionSource.optionsFor(field)
+        if (enumerated != null) {
+            ModevSearchableChoiceSheet(
+                title = res.getString(profileFieldLabelRes(field)),
+                options = buildList {
+                    add(
+                        ChoiceOption(
+                            value = MANUAL_ENTRY,
+                            label = res.getString(R.string.profile_picker_manual),
+                            testTag = "profile-option-${field.name}-manual",
+                        ),
+                    )
+                    addAll(
+                        enumerated.map { value ->
+                            ChoiceOption(
+                                value = value,
+                                label = value,
+                                testTag = "profile-option-${field.name}-$value",
+                            )
+                        },
+                    )
+                },
+                selected = view.texts[field],
+                placeholder = stringResource(R.string.profile_device_search_hint),
+                emptyText = stringResource(R.string.profile_device_no_match),
+                truncatedText = { total ->
+                    res.getString(R.string.profile_device_truncated, SHEET_MAX_VISIBLE_ROWS, total)
+                },
+                onSelect = { value ->
+                    if (value == MANUAL_ENTRY) {
+                        manualEntryFor = field
+                    } else {
+                        viewModel.update(field, value)
+                        editingField = null
+                        manualEntryFor = null
+                    }
+                },
+                onDismiss = {
+                    editingField = null
+                    manualEntryFor = null
+                },
+                modifier = Modifier.testTag("profile-enum-${field.name}"),
+            )
+        } else {
+            when (field.type) {
             // 布尔项 = 行内 Switch,无弹层(契约 #20 开关行形态;置 false 即取消该项干预)。
             ProfileValueType.BOOL -> Unit
 
@@ -486,7 +535,8 @@ fun ProfileEditorScreen(
                 modifier = Modifier.testTag("profile-input-${field.name}"),
                 inputTestTag = "profile-input-field",
                 confirmTestTag = "profile-input-confirm",
-            )
+                )
+            }
         }
     }
 
@@ -1082,3 +1132,4 @@ private fun ProfileSaveBar(
 
 private val IDENTITY_LABEL_WIDTH = 120.dp
 private const val GROUPS_PER_LINE = 3
+private const val MANUAL_ENTRY = "__manual__"

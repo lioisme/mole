@@ -840,6 +840,7 @@
     <string name="profile_device_search_hint">検索</string>
     <string name="profile_device_no_match">一致する項目がありません - 短いキーワードでお試しください</string>
     <string name="profile_device_truncated">全 %2$,d 件中最初の %1$,d 件を表示 - 検索範囲を絞ってください</string>
+    <string name="profile_picker_manual">手動で入力する</string>
     <string name="profile_section_device">端末とビルド</string>
     <string name="profile_section_network">ネットワーク</string>
     <string name="profile_section_sim">SIM 通信事業者</string>

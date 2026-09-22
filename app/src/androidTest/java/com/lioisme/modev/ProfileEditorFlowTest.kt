@@ -10,6 +10,7 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.lioisme.modev.core.model.BuiltinDeviceProfiles
+import com.lioisme.modev.core.model.DeviceProfile
 import com.lioisme.modev.core.model.ProfileField
 import com.lioisme.modev.core.model.ProfileGenerators
 import com.lioisme.modev.core.model.ProfileKind
@@ -58,6 +59,10 @@ class ProfileEditorFlowTest {
     private fun tagPresent(tag: String) = rule.onAllNodesWithTag(tag).fetchSemanticsNodes().isNotEmpty()
 
     /** 本仓 Compose 测试库缺 `assertExists`,且 SemanticsNodeInteraction.fetchSemanticsNodes 是 internal ⇒ 走集合接收者。 */
+    private fun assertTextAbsent(text: String) {
+        assertTrue("屏上不得再有 \"$text\"", !rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty())
+    }
+
     private fun assertTextOnScreen(text: String) {
         assertTrue("屏上必须找到 \"$text\"", rule.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty())
     }
@@ -92,6 +97,58 @@ class ProfileEditorFlowTest {
         rule.openSettings(str(R.string.cd_settings))
         rule.clickScrolledIntoView(hasText(str(R.string.settings_profiles_entry)))
         rule.awaitAnchor("profiles-library-section", "点「画像库」行应进画像库页")
+    }
+
+    /** 在库里落一行(经契约写入口,不走 UI),返回主键。 */
+    private fun seedProfile(profile: DeviceProfile): String = runBlocking {
+        requireNotNull(profiles().create("点选档", "", profile)).id
+    }
+
+    private fun openEditor(id: String) {
+        openLibrary()
+        click("profile-row-$id")
+        rule.awaitAnchor("profile-identity-card", "点画像行应进参数编辑器")
+    }
+
+    /**
+     * 机型库整条点选通路(V47 WP-5b):行 → 品牌 sheet → 型号 sheet → 四项身份同时落值,
+     * 且原有 PRODUCT 不被猜写(库里没有该项)。
+     */
+    @Test
+    fun devicePreset_twoTaps_fillTheIdentityCoherently() {
+        val id = seedProfile(
+            DeviceProfile(model = "keep-me", product = "raven", board = "raven"),
+        )
+        openEditor(id)
+
+        click("profile-device-pick")
+        rule.awaitAnchor("profile-device-brand-sheet", "点「选择真实机型」应开品牌 sheet")
+        click("profile-device-brand-xiaomi")
+        rule.awaitAnchor("profile-device-model-sheet", "选完品牌应进型号 sheet")
+        click("profile-device-model-2211133C")
+
+        assertTextOnScreen("2211133C")
+        assertTextOnScreen("fuxi")
+        assertTextOnScreen("Xiaomi")
+        assertTextOnScreen("raven")
+        // 手填的原型号必须被整组换掉:它不在屏上才是「四项同时落值」的证据
+        assertTextAbsent("keep-me")
+    }
+
+    /** 枚举字段(语言)选择即写值;sheet 内「改为手动填写」仍能落到文本输入通路。 */
+    @Test
+    fun enumeratedField_pickerSetsValue_andManualEscapeWorks() {
+        val id = seedProfile(DeviceProfile.EMPTY)
+        openEditor(id)
+
+        click("profile-row-${ProfileField.LANGUAGE.name}")
+        rule.awaitAnchor("profile-enum-LANGUAGE", "语言行应开枚举 sheet(而非文本输入)")
+        click("profile-option-LANGUAGE-ja")
+        assertTextOnScreen("ja")
+
+        click("profile-row-${ProfileField.LANGUAGE.name}")
+        click("profile-option-LANGUAGE-manual")
+        rule.awaitAnchor("profile-input-LANGUAGE", "选「改为手动填写」必须落到文本输入 sheet")
     }
 
     // ------------------------------------------------------------------ 库

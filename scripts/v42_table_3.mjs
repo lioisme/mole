@@ -287,6 +287,7 @@ export const T3 = {
   profile_device_search_hint: ['検索', '검색'],
   profile_device_no_match: ['一致する項目がありません - 短いキーワードでお試しください', '일치하는 항목 없음 - 더 짧은 키워드로 시도하세요'],
   profile_device_truncated: ['全 %2$,d 件中最初の %1$,d 件を表示 - 検索範囲を絞ってください', '전체 %2$,d개 중 처음 %1$,d개 표시 - 검색 범위를 좁히세요'],
+  profile_picker_manual: ['手動で入力する', '직접 입력하기'],
   profile_section_device: ['端末とビルド', '기기와 빌드'],
   profile_section_network: ['ネットワーク', '네트워크'],
   profile_section_sim: ['SIM 通信事業者', 'SIM 통신사'],
