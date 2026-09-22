@@ -2,26 +2,37 @@ package com.lioisme.modev.mcp.tools
 
 import com.google.gson.JsonObject
 import com.lioisme.modev.core.model.BlacklistKind
+import com.lioisme.modev.core.model.DeviceProfileEntry
 import com.lioisme.modev.core.model.FeatureConfig
 import com.lioisme.modev.core.model.KeywordEntry
 import com.lioisme.modev.core.model.KeywordMatchMode
+import com.lioisme.modev.core.model.ProfileField
+import com.lioisme.modev.core.model.ProfileFieldCatalog
 import com.lioisme.modev.core.model.SpoofProfiles
 import com.lioisme.modev.core.model.merged
+import com.lioisme.modev.core.model.stringOf
 import com.lioisme.modev.domain.asset.KeywordLibraryService
 import com.lioisme.modev.domain.config.FeatureService
+import com.lioisme.modev.domain.config.SpoofProfileService
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 全局资产组工具(V38 8 个 + V44 条目启停/词表清空 = 10 个):关键词库 CRUD + 启停 +
- * 清空 + 伪装画像 + 黑名单追加。
+ * 全局资产组工具(V38 8 个 + V44 条目启停/词表清空 + V47 WP-7 画像库改读真库 = 10 个):
+ * 关键词库 CRUD + 启停 + 清空 + 伪装画像 + 黑名单追加。
  * 上游与 KeywordLibraryViewModel/SpoofProfileViewModel/FeatureBlacklistViewModel
  * **同契约面**(V45 T2.2:[KeywordLibraryService] + [FeatureService];
  * 推送链路 pushToAllConnected 由实现内自动触发)。
+ *
+ * V47 WP-7 起 [spoof_profiles_list] 不再回吐 `SpoofProfiles` 的三个编译期常量,而是
+ * **画像库真身**([SpoofProfileService],含全部 DIY 档与内置档),键序与
+ * `spoof_profile_catalog` 同源派生 ⇒ 读出的字段表可原样回灌 `spoof_profile_save`。
+ * `SpoofProfiles` 仍由 [spoof_global_set] 与钩子侧消费(逐组接管前不删)。
  */
 class GlobalAssetTools(
     private val keywords: KeywordLibraryService,
     private val settings: FeatureService,
+    private val profiles: SpoofProfileService,
 ) {
 
     val tools: List<McpTool> = listOf(
@@ -156,30 +167,48 @@ class GlobalAssetTools(
         McpJson.obj("ok" to com.google.gson.JsonPrimitive(true))
     }
 
+    /**
+     * 画像条目 → 出参(V47 WP-7):身份 + 账本元数据 + 整张字段表。
+     *
+     * 字段表键序**派生自** [ProfileFieldCatalog](`jsonKeyOf` 即 wire/MCP 唯一键名),
+     * 值经 [stringOf] 取**编辑态文本**(未生效项 = 空串)⇒ 与 `spoof_profile_save`
+     * 的入参形态逐字对称,Agent 读出来改一笔就能写回去。
+     */
+    private fun profileJson(entry: DeviceProfileEntry): JsonObject {
+        val fields = LinkedHashMap<String, String>()
+        ProfileField.entries.forEach { field ->
+            fields[ProfileFieldCatalog.jsonKeyOf(field)] = field.stringOf(entry.profile)
+        }
+        return McpJson.obj(
+            "id" to entry.id,
+            "name" to entry.name,
+            "summary" to entry.summary,
+            "builtinSeedId" to entry.builtinSeedId,
+            "builtinVersion" to entry.builtinVersion,
+            "builtin" to entry.isBuiltin,
+            "managed" to entry.managed,
+            "filledCount" to entry.filledCount,
+            "createTime" to entry.createTime,
+            "updateTime" to entry.updateTime,
+            "fields" to fields,
+        )
+    }
+
     private fun spoofProfilesList() = schemaTool(
         name = "spoof_profiles_list",
-        description = "Built-in spoof profiles (${PROFILE_IDS.joinToString("/")}) with resolved Build/ro fields, " +
-            "telephony/wifi/cpu fake values, plus the currently selected global profile id and overrides.",
+        description = "Device profile library (Room-backed: built-in tiers plus every DIY profile), each " +
+            "entry with id, name, builtin seed id, filledCount and the full field map keyed by " +
+            "spoof_profile_catalog json keys (empty value = that field does nothing). Also returns the " +
+            "currently selected global profile id and the frozen legacy field-override table. " +
+            "Per-app bindings go through spoof_profile_apply.",
         schema = emptySchema(),
     ) { _ ->
-        val profiles = SpoofProfiles.BUILTINS.map { profile ->
-            McpJson.obj(
-                "id" to com.google.gson.JsonPrimitive(profile.id),
-                "buildFields" to McpJson.tree(profile.buildFields),
-                "roProperties" to McpJson.tree(profile.roProperties),
-                "imeiPrefix" to com.google.gson.JsonPrimitive(profile.imeiPrefix),
-                "imsiPrefix" to com.google.gson.JsonPrimitive(profile.imsiPrefix),
-                "iccidPrefix" to com.google.gson.JsonPrimitive(profile.iccidPrefix),
-                "phonePrefix" to com.google.gson.JsonPrimitive(profile.phonePrefix),
-                "fakeSsid" to com.google.gson.JsonPrimitive(profile.fakeSsid),
-                "fakeBssid" to com.google.gson.JsonPrimitive(profile.fakeBssid),
-                "cpuCores" to com.google.gson.JsonPrimitive(profile.cpuCores),
-            )
-        }
+        val entries = profiles.profiles.value.map { entryJson -> profileJson(entryJson) }
         val global = settings.globalFeature.value
         McpJson.obj(
-            "profiles" to McpJson.arr(profiles),
-            "currentProfileId" to com.google.gson.JsonPrimitive(global.spoofProfileId),
+            "profiles" to McpJson.arr(entries),
+            "total" to entries.size,
+            "currentProfileId" to global.spoofProfileId,
             "currentOverrides" to McpJson.tree(global.spoofOverrides),
         )
     }

@@ -54,7 +54,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 | 检测黑名单追加项 extra* | Root 包名/Xposed 前缀/Frida 端口/掩码词的用户追加项(内置基线 ∪ 追加,只增不删) | 覆盖内置基线 |
 | MCP 服务 MCP Server | 进程内常驻 Streamable HTTP(spec 2025-06-18,V39 起端口默认 **1510**(wire 迁 1511 让位),单端点 POST /mcp,偏好 `mcp_port` 可改);监听绑定随**统一外部访问开关**(V41 D-1,见 #19);令牌认证独立开关(V39,默认停用)启用后**全接口强制**(含回环),服务端是否鉴权仅由 `tokenAuthEnabled` 决定(`McpServer` 无 externalAccess 耦合);多令牌 `McpTokenEntry`(SecureRandom 32 hex,宿主本地 `mcp_tokens` 不镜像,V38 单键惰性迁移);与 wire ConfigServer 完全独立生命周期(独立端口/开关/restart,互不触碰,VERSION 恒 4 零感知) | 把 MCP 当 wire 通道扩展、恢复 resources/prompts 双通道、令牌暴露为 MCP 工具(引导悖论 + PII)、恢复外部访问↔认证级联、恢复 mcp_external_access 独立键 |
 | 令牌管理 Token Management | MCP 访问令牌管理页(`settings/mcp-tokens`):认证开关 + 多令牌列表(**行内零动作按钮,动作唯一入口 = trailing「更多」菜单三项:查看 / 重命名 / 删除**,V46 R3;创建走 Appbar `tokens-add`);重命名走 `McpServiceConfig.setMcpTokenLabel` 方法层契约(仅动 label,值与顺序不变 ⇒ 校验集内容零变化,经 `mcpTokenSetUpdater` 原地生效,不重启不踢会话);**行内恒掩码,明文只在 `ModevValueDialog` 一处上屏**(复制后关窗);删除最后一枚不停用认证(空集 = 全拒);令牌值宿主本地秘密,恒不进 MCP 工具输出与诊断快照 | 显隐(行内 toggle)/行内复制按钮/「撤销」措辞/`token_show`·`token_hide` 键(V46 全部退役);UI 直写 prefs 改名 |
-| 工具面 Tool Surface 45 | MCP 对 Agent 的能力清单(记录 14/应用 6/监听 4/功能 4/资产 10/服务 4/作用域 3),与 UI 能力逐行对照、同上游继承;`McpToolParityTest` 冻结快照 + B1 边界源码扫描 + `UiMcpCapabilityParityTest` 能力归属与动作单点(R1-R6)三门禁(V45 T3.5:`app_clear_records` 与 `records_clear_package` 同上游重复已整体删除,应用组 7→6) | 「MCP 子集」「UI 专属阉割」(§5.3 明示排除除外)、「同一动作两处广告」(R1 红) |
+| 工具面 Tool Surface 50 | MCP 对 Agent 的能力清单(记录 14/应用 6/监听 4/功能 4/资产 10/画像库 5/服务 4/作用域 3),与 UI 能力逐行对照、同上游继承;`McpToolParityTest` 冻结快照 + B1 边界源码扫描 + `UiMcpCapabilityParityTest` 能力归属与动作单点(R1-R6)三门禁(V45 T3.5:`app_clear_records` 与 `records_clear_package` 同上游重复已整体删除,应用组 7→6;V47 WP-7:画像库五工具 = 存/删/绑/目录/导入,`spoof_profiles_list` 改读画像库真身) | 「MCP 子集」「UI 专属阉割」(§5.3 明示排除除外)、「同一动作两处广告」(R1 红) |
 | 端口校验 Port Validation | 端口编辑可用性链(V42 T3,强约束 #29):`ModevPortSheet` 异步校验 → `PortValidator`(特权 <1024/双服务冲突/占用探测三闸 + 自身豁免),失败硬阻止保存;wire/MCP 双 `bindError` 观测面 + 服务页对称错误行 | 恢复静默保存(无校验)、特权端口可录入、双服务同端口、wire 绑定失败不可见 |
 | 语言 Language | 四语 en/zh/ja/ko(V42 T5):枚举唯一事实源 `LocaleManager.SUPPORTED_TAGS`(`locales_config.xml` 同表);选择面板 5 项(system + 四语,自名键 `lang_*`);values-ja/values-ko 为**生成物**(`scripts/v42_table_*.mjs` + `node scripts/v42_generate.mjs`;V46 复核实测 en 695 键、plurals 8 —— 旧记 701 为 V42 时点口径,以生成器控制台输出为准;技术词回落 en);ja/ko plurals 仅 other;`AppCountFormat` zh/ja/ko 同 10^4 万进位档;`TimelineGroup.formatDay` ja/ko 母语惯形分支 | 三语硬编码枚举(TAG 单常量散落)、ja/ko 资源缺键静默回落 en、日韩日期走 MMM 截断形态、**直写 values-ja/ko 而不回写翻译表**(V46 实锤的静默失效根因) |
 
@@ -443,8 +443,8 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       **扫描为文本级全限定匹配,V43 T7,`is com.lioisme.modev.data.mapping.X` 内联 FQN 亦红**,
       `McpToolParityTest.mcp_layer_boundary_allowlist` 源码扫描门禁)+ B2(允许
       `domain.*`/`data.repo.*`/`core.*`,与 UI 同一上游 allowlist——「同一起游继承」
-      由测试锁定);**工具面 parity**:`McpToolParityTest.frozen_45_tool_names` 冻结
-      45 工具名快照,新增 UI 能力必须同步 MCP 工具(否则红),防「旁路上游」与
+      由测试锁定);**工具面 parity**:`McpToolParityTest.frozen_50_tool_names` 冻结
+      50 工具名快照,新增 UI 能力必须同步 MCP 工具(否则红),防「旁路上游」与
       「功能阉割」双向漂移;**声明面即生效面**(V45 T3.2,`McpToolRegistry.validate` 四条):
       `additionalProperties=false` ⇒ 未声明参数 = `-32602`(禁「广告了但不生效」/「生效了但没广告」)、
       schema `enum` 由注册表强制(非法枚举 = 协议错误,不再穿透成业务错误)、

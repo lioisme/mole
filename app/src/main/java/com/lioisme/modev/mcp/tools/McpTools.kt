@@ -7,6 +7,7 @@ import com.lioisme.modev.domain.app.AppListPreferences
 import com.lioisme.modev.domain.asset.KeywordLibraryService
 import com.lioisme.modev.domain.config.FeatureService
 import com.lioisme.modev.domain.config.ListenConfigService
+import com.lioisme.modev.domain.config.SpoofProfileService
 import com.lioisme.modev.domain.record.RecordService
 import com.lioisme.modev.domain.server.ServerConfigService
 import com.lioisme.modev.domain.server.ConnectionMonitor
@@ -28,7 +29,8 @@ object McpTools {
             "and actively intervenes (exit intercept, crash prevention, screen-record unlock, dialog " +
             "keyword intercept, SSL bypass, proxy/VPN hiding, root/xposed/emulator spoofing). " +
             "Use taxonomy_listen / taxonomy_feature to discover valid kind ids before filtering " +
-            "records or changing settings. Destructive tools require confirm=true."
+            "records or changing settings. Use spoof_profile_catalog to discover device-profile field " +
+            "keys before spoof_profile_save. Destructive tools require confirm=true."
 
     /** 组装全部工具(顺序稳定,parity 快照消费)。 */
     fun create(
@@ -38,6 +40,7 @@ object McpTools {
         featureConfig: FeatureService,
         serverConfig: ServerConfigService,
         keywords: KeywordLibraryService,
+        profiles: SpoofProfileService,
         catalog: AppCatalogService,
         listPrefs: AppListPreferences,
         scopeRepository: ScopeRepository,
@@ -47,7 +50,8 @@ object McpTools {
         AppTools(catalog, logs, listPrefs, scopeRepository, connectionMonitor, AppTools.launcher(context)).tools +
         ListenConfigTools(listenConfig).tools +
         FeatureConfigTools(listenConfig).tools +
-        GlobalAssetTools(keywords, featureConfig).tools +
+        GlobalAssetTools(keywords, featureConfig, profiles).tools +
+        SpoofProfileTools(profiles, listenConfig).tools +
         ServerTools(serverConfig, connectionMonitor, scopeRepository, pipelineStats = { logs.stats.value }, mcpSnapshot = mcpSnapshot).tools +
         ScopeTools(scopeRepository).tools
 }

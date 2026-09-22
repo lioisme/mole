@@ -151,6 +151,18 @@ class UiMcpCapabilityParityTest {
             tools = listOf("spoof_profiles_list", "spoof_global_set"),
         ),
         Capability(
+            name = "设备画像库 DIY(存 / 删 / 绑 / 目录 / 导入)",
+            ui = emptyList(),
+            tools = listOf(
+                "spoof_profile_save", "spoof_profile_delete", "spoof_profile_apply",
+                "spoof_profile_catalog", "spoof_profile_import",
+            ),
+            reason = "Agent 专属(V47 WP-7 先行于 UI):画像库 UI 编辑页(WP-8)尚未落地," +
+                "「建画像 → 查目录 → 绑应用 → 导信封」端到端当前只有本工具面一条通路。" +
+                "WP-8 落地后本行必须补 ui 侧入口(SpoofProfileLibraryViewModel 一族)并删除本理由," +
+                "禁止让这条理由变成长期豁免。",
+        ),
+        Capability(
             name = "检测黑名单追加项",
             ui = listOf("FeatureBlacklistViewModel.add", "FeatureBlacklistViewModel.remove"),
             tools = listOf("blacklist_list", "blacklist_edit"),
@@ -203,14 +215,16 @@ class UiMcpCapabilityParityTest {
      * 新增共享必须先在此登记理由,否则 R1 红 —— 例外是审计面,不是逃生门。
      */
     private val sharedUpstreamExceptions = mapOf(
-        "settings.setOverride" to "listen/feature 两面写同一份 AppListenOverride 存储,由 CategoryTaxonomy 双域闸分列(AGENTS #23)",
+        "settings.setOverride" to "三个广告面写同一份 AppListenOverride 存储,由 CategoryTaxonomy 双域闸分列" +
+            "(AGENTS #23);V47 WP-7 的 spoof_profile_apply 是**同一写入路径上的窄面**" +
+            "(只动 spoofProfileId 且先验画像库存在性),不是第四张旁路",
         "settings.resetOverride" to "同一契约方法带**域参数** = 两个正交动作(V45 T3.5/DUAL-12:按域清,互不越界)",
         "settings.setGlobalFeature" to "FeatureConfig 是一个聚合(画像 + 黑名单追加),两面各写自己的段",
     )
 
     /** 参与 R1 判定的上游接收者(全部是方法层契约,不是实现类型)。 */
     private val upstreamReceivers = listOf(
-        "logs", "settings", "keywords", "listPrefs", "scopeRepository", "catalog", "mcpServer",
+        "logs", "settings", "keywords", "listPrefs", "scopeRepository", "catalog", "mcpServer", "profiles",
     )
 
     private val mutatorName = Regex(
@@ -275,7 +289,7 @@ class UiMcpCapabilityParityTest {
     @Test
     fun r2_every_tool_is_owned_by_exactly_one_capability() {
         val declared = toolBlocks().keys
-        assertEquals("工具面快照应为 45", 45, declared.size)
+        assertEquals("工具面快照应为 50", 50, declared.size)
         val owned = capabilities.flatMap { it.tools }
         val unowned = declared - owned.toSet()
         val phantom = owned - declared.toSet()

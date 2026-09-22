@@ -10,6 +10,7 @@ import com.lioisme.modev.data.db.ModevDatabase
 import com.lioisme.modev.data.repo.KeywordLibraryRepository
 import com.lioisme.modev.data.repo.LogRepository
 import com.lioisme.modev.data.repo.SettingsRepository
+import com.lioisme.modev.data.repo.SpoofProfileRepository
 import com.lioisme.modev.data.server.ConfigServer
 import com.lioisme.modev.domain.record.RecordFilter
 import com.lioisme.modev.core.model.CryptoKind
@@ -33,7 +34,7 @@ import org.robolectric.annotation.Config
 
 /**
  * 工具面分组门禁(V38,Robolectric 真仓库):记录 CRUD 闭环、配置 merge 三态语义、
- * 资产推送、parity 快照(45 工具冻结 + 上游 allowlist)。
+ * 资产推送、parity 快照(50 工具冻结 + 上游 allowlist)。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -43,13 +44,15 @@ class McpToolsTest {
     private lateinit var logs: LogRepository
     private lateinit var settings: SettingsRepository
     private lateinit var keywords: KeywordLibraryRepository
+    private lateinit var profiles: SpoofProfileRepository
     private lateinit var recordTools: RecordTools
     private lateinit var listenTools: ListenConfigTools
     private lateinit var featureTools: FeatureConfigTools
     private lateinit var assetTools: GlobalAssetTools
+    private lateinit var profileTools: SpoofProfileTools
 
-    /** 关键词库 scope:随测试关闭,防 arch_disk_io 线程泄漏污染后续 Robolectric 用例。 */
-    private lateinit var keywordScope: kotlinx.coroutines.CoroutineScope
+    /** 全局资产库(关键词 + 画像)收集器 scope:随测试关闭,防 arch_disk_io 线程泄漏污染后续 Robolectric 用例。 */
+    private lateinit var libraryScope: kotlinx.coroutines.CoroutineScope
 
     @Before
     fun setUp() {
@@ -75,16 +78,20 @@ class McpToolsTest {
             gson = com.google.gson.Gson(),
             localPrefs = context.getSharedPreferences("test_settings", 0),
         )
-        keywordScope = kotlinx.coroutines.CoroutineScope(
+        libraryScope = kotlinx.coroutines.CoroutineScope(
             kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
         )
-        keywords = KeywordLibraryRepository(db.keywordLibraryDao(), keywordScope)
+        keywords = KeywordLibraryRepository(db.keywordLibraryDao(), libraryScope)
+        // 画像库(V47 WP-7):与 AppContainer 同序补内置三档,spoof_profiles_list 才有真身可列
+        profiles = SpoofProfileRepository(db.spoofProfileDao(), libraryScope)
+        runBlocking { profiles.synchronizeBuiltins() }
         // init 需要装配关键词库(与 AppContainer 同序)
         settings.attachKeywordLibrary(keywords)
         recordTools = RecordTools(logs)
         listenTools = ListenConfigTools(settings)
         featureTools = FeatureConfigTools(settings)
-        assetTools = GlobalAssetTools(keywords, settings)
+        assetTools = GlobalAssetTools(keywords, settings, profiles)
+        profileTools = SpoofProfileTools(profiles, settings)
     }
 
     @After
@@ -93,7 +100,7 @@ class McpToolsTest {
         // 仍被发射路径触达(Illegal connection pointer 异步污染后续用例)。
         runBlocking {
             kotlinx.coroutines.withTimeoutOrNull(3_000) {
-                keywordScope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+                libraryScope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
             }
         }
         db.close()
@@ -416,7 +423,7 @@ class McpToolsTest {
     fun parity_tools_frozen_snapshot_32_assembled() {
         val names = recordTools.tools + listenTools.tools + featureTools.tools + assetTools.tools
         // 本测试不装配 App/Server/Scope(需 Android 全家桶),快照断言覆盖 32 个;
-        // 全量 45 断言在 McpToolParityTest(源码级,防漂移)。
+        // 全量 50 断言在 McpToolParityTest(源码级,防漂移)。
         assertEquals(32, names.size)
         val expected = setOf(
             "records_query", "records_count", "records_type_counts", "records_category_counts",
@@ -449,7 +456,7 @@ class McpToolsTest {
     // ---- V45 T3.2:schema 与实现镜像(DUAL-6) ----
 
     private fun allTools(): List<McpTool> =
-        recordTools.tools + listenTools.tools + featureTools.tools + assetTools.tools
+        recordTools.tools + listenTools.tools + featureTools.tools + assetTools.tools + profileTools.tools
 
     private suspend fun call(
         tool: String,

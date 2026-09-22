@@ -7,7 +7,7 @@ import java.io.File
 
 /**
  * MCP 工具面 parity 门禁(V38 D5,源码扫描):
- * - 冻结 45 工具名快照(新增 UI 能力必须同步工具面,否则此测试红);
+ * - 冻结 50 工具名快照(新增 UI 能力必须同步工具面,否则此测试红);
  * - mcp 包上游 allowlist:禁 import ui/compose/data.db/hook/data.server(B1),
  *   允许 domain/data.repo/core(B2)——与 UI 同源继承的结构性保证。
  */
@@ -32,7 +32,7 @@ class McpToolParityTest {
     }
 
     @Test
-    fun frozen_45_tool_names() {
+    fun frozen_50_tool_names() {
         val expected = listOf(
             // 记录组 14
             "records_query", "records_count", "records_type_counts", "records_category_counts",
@@ -46,16 +46,19 @@ class McpToolParityTest {
             "listen_settings_get", "listen_settings_set", "listen_settings_reset", "taxonomy_listen",
             // 功能配置组 4
             "feature_settings_get", "feature_settings_set", "feature_settings_reset", "taxonomy_feature",
-            // 全局资产组 10(V44 keyword_set_enabled / keywords_clear)
+            // 全局资产组 10(V44 keyword_set_enabled / keywords_clear;V47 WP-7 spoof_profiles_list 改读画像库真身)
             "keywords_list", "keywords_add", "keywords_update", "keywords_remove",
             "keyword_set_enabled", "keywords_clear",
             "spoof_profiles_list", "spoof_global_set", "blacklist_list", "blacklist_edit",
+            // 画像库组 5(V47 WP-7:DIY 端到端 = 存 / 删 / 绑 / 目录 / 导入)
+            "spoof_profile_save", "spoof_profile_delete", "spoof_profile_apply",
+            "spoof_profile_catalog", "spoof_profile_import",
             // 服务诊断组 4
             "server_status", "server_set_external_access", "server_set_port", "diagnostics",
             // 作用域组 3
             "scope_state", "scope_add", "scope_remove",
         )
-        assertEquals(45, expected.size)
+        assertEquals(50, expected.size)
         assertEquals(expected.size, expected.toSet().size)
         // 源码内 name= 声明与快照一致
         val declared = mcpSources()
@@ -72,7 +75,7 @@ class McpToolParityTest {
      * V39 §5.3 明示排除:令牌管理(McpTokensScreen:认证开关 / 多令牌创建撤销)
      * **不**暴露为 MCP 工具——引导悖论(启用认证后需令牌才能调用造令牌工具,
      * 回环自锁风险)+ PII 纪律(令牌值属宿主本地秘密,Agent 面零可见)。
-     * 本快照恒 45;若未来新增 UI 能力须同步工具面或在此登记排除理由。
+     * 本快照恒 50;若未来新增 UI 能力须同步工具面或在此登记排除理由。
      */
     @Test
     fun token_management_is_documented_exclusion() {

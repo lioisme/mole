@@ -214,6 +214,7 @@ class AppContainer(private val context: Context) {
                 featureConfig = featureConfig,
                 serverConfig = serverConfig,
                 keywords = keywordLibrary,
+                profiles = spoofProfiles,
                 catalog = catalog,
                 listPrefs = appListPrefs,
                 scopeRepository = scopeRepository,

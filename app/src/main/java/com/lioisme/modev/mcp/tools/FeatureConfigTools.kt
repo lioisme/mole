@@ -8,13 +8,16 @@ import com.lioisme.modev.core.model.FeatureGroup
 import com.lioisme.modev.core.model.FeatureGroups
 import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.RecordType
-import com.lioisme.modev.core.model.SpoofProfiles
 import com.lioisme.modev.domain.config.ListenConfigService
 
 /**
  * 功能配置组工具(V38,4 个):每应用功能偏差读/写/重置 + FEATURE 域分类法(6 组 37 类)。
  * 上游与 PerAppFeatureSettingsViewModel **同契约面**(V45 T2.2:同一 [ListenConfigService]
  * 偏差存储 —— feature 域字段 = masters 4 项 + 功能 kind + V37 功能数据段)。
+ *
+ * V47 WP-7:`spoofProfileId` 自此由「3 个编译期常量的 enum」放开为**画像库主键自由串**
+ * (DIY 画像的键在运行时才存在,schema 枚举无法广告)。`spoofOverrides` 按决策 D-3
+ * **原样冻结保留**为只读遗留通道:不删、不扩写入面。
  */
 class FeatureConfigTools(private val settings: ListenConfigService) {
 
@@ -61,8 +64,9 @@ class FeatureConfigTools(private val settings: ListenConfigService) {
         description = "Merge per-app feature deviation. master: " +
             featureMasterWires.joinToString("|") + " with masterValue true/false/null. kindEntries for " +
             "feature category keys (kindKey form '<recordType>:<kind>' from taxonomy_feature; bare ids " +
-            "accepted and resolved via taxonomy). Feature data fields: spoofProfileId (" +
-            SpoofProfiles.BUILTINS.joinToString("|") { it.id } + "), spoofOverrides (map, " +
+            "accepted and resolved via taxonomy). Feature data fields: spoofProfileId (a device-profile " +
+            "library key, free-form since V47 WP-7 - see spoof_profiles_list; spoof_profile_apply is the " +
+            "validated single-purpose binding entry), spoofOverrides (legacy frozen override map, " +
             "null resets), extraRootPackages/extraXposedPrefixes/extraMaskKeywords (string arrays), " +
             "extraFridaPorts (integer array), keywordIds (library entry ids), keywordFollowGlobal " +
             "(true = follow global enabled set; normalized to default). Empty arrays reset the field to default.",
@@ -72,7 +76,7 @@ class FeatureConfigTools(private val settings: ListenConfigService) {
             str("master", "Feature master (feature-domain record types)", featureMasterWires)
             bool("masterValue", "true/false for the chosen master; omit key or JSON null to reset to default")
             obj("kindEntries", "Map of feature kindKey -> true/false/null")
-            str("spoofProfileId", "Spoof profile id", SpoofProfiles.BUILTINS.map { it.id })
+            str("spoofProfileId", "Device profile library key (see spoof_profiles_list)")
             obj("spoofOverrides", "Spoof field overrides map (optional; null resets)")
             array("extraRootPackages", "Root package blacklist appends (optional)")
             array("extraXposedPrefixes", "Xposed prefix blacklist appends (optional)")
