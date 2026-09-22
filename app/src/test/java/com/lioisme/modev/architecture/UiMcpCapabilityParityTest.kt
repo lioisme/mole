@@ -144,23 +144,34 @@ class UiMcpCapabilityParityTest {
         Capability(
             name = "伪装画像与字段覆写",
             ui = listOf(
-                "SpoofProfileViewModel.setProfile",
-                "SpoofProfileViewModel.setOverride",
-                "SpoofProfileViewModel.removeOverride",
+                "SpoofProfileLibraryViewModel.setProfile",
+                "SpoofProfileLibraryViewModel.setOverride",
+                "SpoofProfileLibraryViewModel.removeOverride",
             ),
             tools = listOf("spoof_profiles_list", "spoof_global_set"),
+            reason = "V47 WP-5 起本行的 UI 承载者是画像库页的「接管前」段:全局档位与字段覆写" +
+                "仍是逐组接管(WP-3)完成前既有 hooker 的取值通路,与 spoof_global_set 同一 id 空间。",
         ),
         Capability(
             name = "设备画像库 DIY(存 / 删 / 绑 / 目录 / 导入)",
-            ui = emptyList(),
+            ui = listOf(
+                "SpoofProfileLibraryViewModel.duplicate",
+                "SpoofProfileLibraryViewModel.remove",
+                "SpoofProfileLibraryViewModel.synchronize",
+                "ProfileEditorViewModel.update",
+                "ProfileEditorViewModel.clear",
+                "ProfileEditorViewModel.clearAll",
+                "ProfileEditorViewModel.writeBool",
+                "ProfileEditorViewModel.writeSlot",
+                "ProfileEditorViewModel.randomizeField",
+                "ProfileEditorViewModel.randomizeAll",
+                "ProfileEditorViewModel.save",
+                "PerAppFeatureSettingsViewModel.setSpoofProfile",
+            ),
             tools = listOf(
                 "spoof_profile_save", "spoof_profile_delete", "spoof_profile_apply",
                 "spoof_profile_catalog", "spoof_profile_import",
             ),
-            reason = "Agent 专属(V47 WP-7 先行于 UI):画像库 UI 编辑页(WP-8)尚未落地," +
-                "「建画像 → 查目录 → 绑应用 → 导信封」端到端当前只有本工具面一条通路。" +
-                "WP-8 落地后本行必须补 ui 侧入口(SpoofProfileLibraryViewModel 一族)并删除本理由," +
-                "禁止让这条理由变成长期豁免。",
         ),
         Capability(
             name = "检测黑名单追加项",

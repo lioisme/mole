@@ -1,5 +1,6 @@
 package com.lioisme.modev
 
+import androidx.compose.ui.test.assertTextEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.assertIsOff
 import androidx.compose.ui.test.assertIsOn
@@ -16,9 +17,9 @@ import androidx.compose.ui.test.performTextReplacement
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.lioisme.modev.core.model.AppListenOverride
+import com.lioisme.modev.core.model.BuiltinDeviceProfiles
 import com.lioisme.modev.core.model.FeatureConfig
 import com.lioisme.modev.core.model.KeywordMatchMode
-import com.lioisme.modev.core.model.SpoofProfiles
 import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.ui.MainActivity
@@ -134,14 +135,35 @@ class PerAppFeatureSettingsTest {
         )
     }
 
+    /**
+     * V47 WP-5:每应用画像行改绑**画像库**(旧三常量档 sheet 退役)。
+     * 选项 testTag 携带库主键(内置档 = `builtin:<seedId>`),绑定即写偏差 spoofProfileId。
+     */
     @Test
     fun featurePage_profileSheet_selectsProfile() {
         openFeatureSettings()
         rule.onNodeWithTag("feature-profile-picker").performScrollTo().performClick()
         rule.waitForIdle()
-        rule.onNodeWithTag("feature-profile-option-${SpoofProfiles.XIAOMI_13}")
+        val xiaomiId = BuiltinDeviceProfiles.idFor(BuiltinDeviceProfiles.XIAOMI_13)
+        rule.onNodeWithTag("feature-profile-option-$xiaomiId")
             .performScrollTo().performClick()
-        awaitPersisted { it.spoofProfileId == SpoofProfiles.XIAOMI_13 }
+        awaitPersisted { it.spoofProfileId == xiaomiId }
+    }
+
+    /**
+     * 缺失态必须显式上屏(V47 WP-5 关掉静默回落):绑一个库里不存在的 id,
+     * 画像行尾栏应渲染「画像缺失」红字,而不是回落成任何档名。
+     */
+    @Test
+    fun featurePage_missingBinding_isSurfaced() {
+        runBlocking {
+            settings().setOverride(ownPackage, AppListenOverride(spoofProfileId = "no-such-profile"))
+        }
+        openFeatureSettings()
+        rule.onNodeWithTag("feature-profile-picker").performScrollTo()
+        rule.onNodeWithTag("feature-profile-binding")
+            .assertIsDisplayed()
+            .assertTextEquals(str(R.string.profile_binding_missing))
     }
 
     @Test

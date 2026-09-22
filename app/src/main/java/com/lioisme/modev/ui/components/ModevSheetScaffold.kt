@@ -105,6 +105,11 @@ val SheetContentPadding = PaddingValues(start = 24.dp, end = 24.dp, bottom = 24.
  * 输入型底部 sheet(标题 + 单行/多行输入 + 校验 + 取消/确认):
  * [validate] 返回 false 时置错误态(supportingText = [errorText]),不关闭;
  * 确认经 hide 动画后回调 [onSubmit](携带原样输入文本,数值解析由调用方负责)。
+ *
+ * [liveError] 是**输入期即裁决**的形态(V47 WP-5 画像参数编辑器):返回非 null 文案即
+ * 实时置错误态并硬闸确认 —— 与 [validate] 的「按确认才判」互补而非替代
+ * (既有消费方零改动)。返回的文案由调用方解析(本组件零业务与资源感知),
+ * 与提交前的最终裁决同源,故「看着合法却存不下」不可能发生。
  */
 @Composable
 fun ModevInputSheet(
@@ -122,10 +127,12 @@ fun ModevInputSheet(
     minLines: Int = 1,
     inputTestTag: String? = null,
     confirmTestTag: String? = null,
+    liveError: ((String) -> String?)? = null,
     validate: (String) -> Boolean = { it.isNotBlank() },
 ) {
     var text by remember { mutableStateOf(initialValue) }
     var error by remember { mutableStateOf(false) }
+    val liveErrorText = liveError?.invoke(text)
     ModevSheet(
         title = title,
         onDismiss = onDismiss,
@@ -140,15 +147,21 @@ fun ModevInputSheet(
                     error = false
                 },
                 label = label?.let { { Text(it) } },
-                isError = error,
+                isError = error || liveErrorText != null,
                 supportingText =
                     when {
                         error && errorText.isNotEmpty() -> {
                             { Text(errorText) }
                         }
+
+                        liveErrorText != null -> {
+                            { Text(liveErrorText, color = MaterialTheme.colorScheme.error) }
+                        }
+
                         hint != null -> {
                             { Text(hint) }
                         }
+
                         else -> null
                     },
                 singleLine = minLines == 1,
@@ -170,7 +183,7 @@ fun ModevInputSheet(
                 Spacer(Modifier.width(8.dp))
                 TextButton(
                     onClick = {
-                        if (validate(text)) {
+                        if (liveErrorText == null && validate(text)) {
                             sheet.dismissWith { onSubmit(text) }
                         } else {
                             error = true

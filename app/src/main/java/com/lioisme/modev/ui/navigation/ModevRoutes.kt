@@ -63,8 +63,28 @@ object ModevRoutes {
     const val APP_FEATURE_SETTINGS = "apps/{packageName}/feature-settings"
     /** 全局关键词库管理页(V37 T3.5)。 */
     const val KEYWORD_LIBRARY = "settings/keywords"
-    /** 全局伪装画像管理页(V37 T3.5)。 */
+    /** 全局伪装画像库管理页(V37 T3.5 三常量单选页;V47 WP-5 改为可视化画像库列表)。 */
     const val SPOOF_PROFILES = "settings/profiles"
+    /** 画像参数编辑器(V47 WP-5:41 项参数按形态落控件 + 实时生效预览)。 */
+    const val PROFILE_EDITOR = "settings/profiles/{profileId}"
+
+    /**
+     * 画像草稿前缀(V47 WP-5):**库里没有对应行的新建态**。
+     *
+     * 新建必须走草稿而不是先落一行空画像 —— 画像库契约拒绝零字段条目
+     * (`SpoofProfileService.create` 对空正文返回 null),且用户中途放弃不应
+     * 在库里留下一行装不了任何钩子的垃圾。真实主键形态 = 32 位十六进制或
+     * `builtin:<seedId>`,与本前缀不可能碰撞。
+     */
+    const val PROFILE_DRAFT_PREFIX = "draft:"
+
+    /** 画像草稿编辑器路由(携带用户输入的名称)。 */
+    fun profileDraft(name: String): String = "settings/profiles/${enc(PROFILE_DRAFT_PREFIX + name)}"
+
+    /** 该主键是否草稿态(是则返回名称,否则 null)。 */
+    fun draftNameOf(profileId: String): String? =
+        profileId.substringAfter(PROFILE_DRAFT_PREFIX).takeIf { profileId.startsWith(PROFILE_DRAFT_PREFIX) }
+
     /** 全局检测黑名单追加页(V37 T3.5)。 */
     const val FEATURE_BLACKLIST = "settings/blacklist"
 
@@ -98,6 +118,9 @@ object ModevRoutes {
     fun globalTypeRecords(recordType: String): String = "records/type/${enc(recordType)}"
 
     fun licenseDetail(index: Int): String = "settings/licenses/${index}"
+
+    /** 画像参数编辑器路由(画像库主键含 `:` 前缀 ⇒ 一律 Uri.encode)。 */
+    fun profileEditor(profileId: String): String = "settings/profiles/${enc(profileId)}"
 
     fun recordDetail(recordId: Long): String = "record/${enc(recordId.toString())}"
 

@@ -31,6 +31,8 @@ private val screenAnchors: List<Pair<String, String>> = listOf(
     "detail-more" to "记录详情页",
     "settings-page" to "设置页",
     "services-external-access" to "服务页",
+    "profiles-library-section" to "画像库页",
+    "profile-identity-card" to "画像参数编辑器",
 )
 
 /** 当前停住的屏(按登记表命中拼接;全不命中 = 未登记屏)。 */
@@ -111,4 +113,25 @@ fun ComposeTestRule.awaitSearchDialogInput(note: String, timeoutMs: Long = 8_000
         Thread.sleep(100)
     }
     fail("$note —— Dialog 内搜索输入域在 ${timeoutMs}ms 内未出现(展开未生效);当前停在:${currentScreenLabel()}")
+}
+
+/**
+ * 有界等待锚点**消失**(弹层收起、行被删、错误态清除这类「负向」结论)。
+ *
+ * 为什么不能写成 `assert(isEmpty())` 一次判定:退场动画与提交回调是同一串
+ * (`ModevSheet.dismissWith` 恒在 hide 之后才跑),单次 `waitForIdle` 后节点
+ * 仍可能在树上 —— 那时判定的是动画,不是行为。真崩的形态由超时消息给出。
+ */
+fun ComposeTestRule.awaitUntilGone(
+    tag: String,
+    note: String,
+    timeoutMs: Long = 10_000,
+) {
+    val deadline = System.currentTimeMillis() + timeoutMs
+    while (System.currentTimeMillis() < deadline) {
+        waitForIdle()
+        if (onAllNodesWithTag(tag).fetchSemanticsNodes().isEmpty()) return
+        Thread.sleep(100)
+    }
+    fail("$note —— 锚点 '$tag' 在 ${timeoutMs}ms 后仍在屏上;当前停在:${currentScreenLabel()}")
 }

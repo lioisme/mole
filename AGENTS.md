@@ -527,6 +527,15 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
   `onNode(hasTestTag(t)).assert(hasAnyDescendant(hasText(x)))`;几何换算的密度取
   `ComposeTestRule.density`(节点对象上没有 `density` 属性)。缺件清单再加
   `performTextClearance`(本仓无先例,预填输入框的用例改为**种子空值**规避清文本)。
+- **Robolectric 打不动 `ModalBottomSheet` 里的按钮(V47 WP-5 控制实验实锤)**:弹层内容
+  在语义树里可见(锚点存在性、行内文案都能断言),但对其按钮 `performClick` 后
+  `onSubmit`/`onDismiss` **恒零触发**(推时钟 + `shadowOf(mainLooper).idle()` 均无效)。
+  判据不是猜的:对 V39 起全 App 共用、真机正常的 `ModevInputSheet` 本体做同一操作,
+  结果 `submitted=[] dismissed=0` ⇒ **harness 限制**,非产品缺陷。故弹层交互一律归
+  `app/src/androidTest`(如 `ProfileEditorFlowTest`),Robolectric 档只测「一屏画什么」
+  (整屏结构 + 派生态渲染,经 VM 写入面驱动)——两侧合起来才是完整证据,单侧绿不算。
+  另注意:同一用例**只能一次 `setContent`**(换参数须拆用例);测「编辑既有条目」的
+  夹具必须在库里种下那一行,否则跑到的是「条目缺失 ⇒ 弹栈」分支,屏上零节点。
 - **Material3 1.4.0 `ListItem` 无 `shape` 形参(javap 实锤)**:圆角/自绘背景/可见波纹
   只能在容器层做(见 #13 行容器契约);另注意 `ListItem` 布局会按 `trailingContent`
   宽度**永久削减文本列宽度**(`TrailingContentStartPadding` 常量),尾栏放短内容 =

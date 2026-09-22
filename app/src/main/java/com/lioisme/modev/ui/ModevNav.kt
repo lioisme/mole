@@ -66,8 +66,10 @@ import com.lioisme.modev.ui.settings.features.FeatureBlacklistScreen
 import com.lioisme.modev.ui.settings.features.FeatureBlacklistViewModelFactory
 import com.lioisme.modev.ui.settings.features.KeywordLibraryScreen
 import com.lioisme.modev.ui.settings.features.KeywordLibraryViewModelFactory
-import com.lioisme.modev.ui.settings.features.SpoofProfileScreen
-import com.lioisme.modev.ui.settings.features.SpoofProfileViewModelFactory
+import com.lioisme.modev.ui.settings.profiles.ProfileEditorScreen
+import com.lioisme.modev.ui.settings.profiles.ProfileEditorViewModelFactory
+import com.lioisme.modev.ui.settings.profiles.SpoofProfileLibraryScreen
+import com.lioisme.modev.ui.settings.profiles.SpoofProfileLibraryViewModelFactory
 import kotlinx.coroutines.launch
 
 /**
@@ -523,8 +525,33 @@ fun ModevNavHost(navController: NavHostController) {
         }
         slideComposable(route = ModevRoutes.SPOOF_PROFILES) {
             BackGuarded(navController) {
-                SpoofProfileScreen(
-                    viewModel = viewModel(factory = SpoofProfileViewModelFactory(app.container)),
+                SpoofProfileLibraryScreen(
+                    viewModel = viewModel(factory = SpoofProfileLibraryViewModelFactory(app.container)),
+                    onBack = { navController.popGuarded() },
+                    onOpenProfile = { profileId ->
+                        navController.navigateGuarded(ModevRoutes.profileEditor(profileId))
+                    },
+                    onCreateProfile = { name ->
+                        navController.navigateGuarded(ModevRoutes.profileDraft(name))
+                    },
+                )
+            }
+        }
+        slideComposable(
+            route = ModevRoutes.PROFILE_EDITOR,
+            arguments = listOf(navArgument("profileId") { type = NavType.StringType }),
+        ) { entry ->
+            val profileId = ModevRoutes.dec(entry.arguments?.getString("profileId"))
+            BackGuarded(navController) {
+                ProfileEditorScreen(
+                    viewModel = viewModel(
+                        key = "profile-editor-$profileId",
+                        factory = ProfileEditorViewModelFactory(
+                            profileId = profileId,
+                            draftName = ModevRoutes.draftNameOf(profileId),
+                            container = app.container,
+                        ),
+                    ),
                     onBack = { navController.popGuarded() },
                 )
             }

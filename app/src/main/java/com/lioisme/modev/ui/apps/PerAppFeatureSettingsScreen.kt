@@ -43,6 +43,7 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.CapabilityDomain
 import com.lioisme.modev.core.model.CategoryTaxonomy
+import com.lioisme.modev.core.model.DeviceProfileEntry
 import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.FeatureGroup
 import com.lioisme.modev.core.model.FeatureGroups
@@ -52,6 +53,7 @@ import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.SpoofProfiles
 import com.lioisme.modev.domain.asset.KeywordLibraryService
 import com.lioisme.modev.domain.config.ListenConfigService
+import com.lioisme.modev.domain.config.SpoofProfileService
 import com.lioisme.modev.ui.components.ChoiceOption
 import com.lioisme.modev.ui.components.HorizontalDivider16
 import com.lioisme.modev.ui.components.ModevChoiceSheet
@@ -59,6 +61,9 @@ import com.lioisme.modev.ui.components.ModevConfirmDialog
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
+import com.lioisme.modev.ui.settings.profiles.ProfileBindingDisplay
+import com.lioisme.modev.ui.settings.profiles.profileDisplayNameFor
+import com.lioisme.modev.ui.settings.profiles.toBindingDisplay
 import com.lioisme.modev.ui.theme.Dimens
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -68,13 +73,19 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
 /**
- * 单应用功能设置状态(V37 T3.4):功能域干预开关 + 关键词启用子集 + 画像选择;
+ * 单应用功能设置状态(V37 T3.4;V47 WP-5 画像行改绑画像库):
+ * 功能域干预开关 + 关键词启用子集 + 画像绑定;
  * 与监听页共享同一偏差存储(override_{pkg}),各写各的字段互不覆盖。
+ *
+ * 画像绑定恒经 [SpoofProfileService.resolve] 的**三态**结论呈现:旧形态按三个编译期常量
+ * 反查标签,任何 DIY 画像 id 都会被吞成「自动」—— 用户在界面上选了档而伪装不发生
+ * 且零提示(GAP-02),本行把它显式化。
  */
 class PerAppFeatureSettingsViewModel(
     val packageName: String,
     private val settings: ListenConfigService,
     private val keywordLibrary: KeywordLibraryService,
+    private val profiles: SpoofProfileService,
 ) : ViewModel() {
 
     val effective: StateFlow<HookSwitch> =
@@ -93,6 +104,20 @@ class PerAppFeatureSettingsViewModel(
     /** 全局关键词库快照(启用条目)。 */
     val keywordEntries: StateFlow<List<KeywordEntry>> = keywordLibrary.entries
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 画像库快照(绑定 sheet 的唯一选项源,禁再列编译期常量档)。 */
+    val profileLibrary: StateFlow<List<DeviceProfileEntry>> = profiles.profiles
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    /** 本应用画像绑定三态(未绑定 / 已绑定 / 绑了但库里没有)。 */
+    val binding: StateFlow<ProfileBindingDisplay> =
+        combine(settings.overrides, profiles.profiles) { map, _ ->
+            profiles.resolve(map[packageName]?.spoofProfileId).toBindingDisplay()
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            profiles.resolve(settings.overrideFor(packageName).spoofProfileId).toBindingDisplay(),
+        )
 
     fun setUiMaster(value: Boolean) = update { it.copy(uiListen = value) }
     fun setNetworkMaster(value: Boolean) = update { it.copy(networkListen = value) }
@@ -133,7 +158,7 @@ class PerAppFeatureSettingsViewModel(
         }
     }
 
-    /** 画像选择(null = 跟随全局)。 */
+    /** 画像绑定(null = 不绑定、跟随全局档);写入即经 setOverride 定向推送。 */
     fun setSpoofProfile(profileId: String?) {
         update { it.copy(spoofProfileId = profileId) }
     }
@@ -163,6 +188,7 @@ class PerAppFeatureSettingsViewModelFactory(
             packageName = packageName,
             settings = container.listenConfig,
             keywordLibrary = container.keywordLibrary,
+            profiles = container.spoofProfiles,
         ) as T
     }
 }
@@ -182,6 +208,8 @@ fun PerAppFeatureSettingsScreen(
     val effective by viewModel.effective.collectAsStateWithLifecycle()
     val override by viewModel.override.collectAsStateWithLifecycle()
     val keywordEntries by viewModel.keywordEntries.collectAsStateWithLifecycle()
+    val profileLibrary by viewModel.profileLibrary.collectAsStateWithLifecycle()
+    val binding by viewModel.binding.collectAsStateWithLifecycle()
     var confirmReset by remember { mutableStateOf(false) }
     var showProfileSheet by remember { mutableStateOf(false) }
     val res = rememberLocaleAwareResources()
@@ -276,6 +304,7 @@ fun PerAppFeatureSettingsScreen(
                         )
                         FeatureGroup.DEVICE_SPOOF -> {
                             HorizontalDivider16()
+                            val missing = binding is ProfileBindingDisplay.Missing
                             ListItem(
                                 colors = ListItemDefaults.colors(
                                     containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
@@ -287,17 +316,50 @@ fun PerAppFeatureSettingsScreen(
                                     )
                                 },
                                 supportingContent = {
+                                    // 缺失态恒点名被绑定的 id:静默按「不伪装」处理正是旧三档
+                                    // 常量表把未知 id 吞成 auto 的那条洞(GAP-02)。
                                     Text(
-                                        res.getString(R.string.feature_profile_row_hint),
+                                        text = when (val current = binding) {
+                                            is ProfileBindingDisplay.Missing -> current.id
+                                            ProfileBindingDisplay.Unbound ->
+                                                res.getString(R.string.feature_profile_row_hint)
+
+                                            is ProfileBindingDisplay.Bound -> pluralStringResource(
+                                                R.plurals.profile_summary_filled,
+                                                current.filledCount,
+                                                current.filledCount,
+                                            )
+                                        },
                                         style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        color = if (missing) {
+                                            MaterialTheme.colorScheme.error
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        modifier = Modifier.testTag("feature-profile-supporting"),
                                     )
                                 },
                                 trailingContent = {
                                     Text(
-                                        res.getString(spoofProfileLabelRes(override.spoofProfileId)),
+                                        text = when (val current = binding) {
+                                            is ProfileBindingDisplay.Bound ->
+                                                profileDisplayNameFor(res, current.name, current.builtinSeedId)
+
+                                            is ProfileBindingDisplay.Missing ->
+                                                res.getString(R.string.profile_binding_missing)
+
+                                            ProfileBindingDisplay.Unbound ->
+                                                res.getString(R.string.feature_profile_follow_global)
+                                        },
                                         style = MaterialTheme.typography.bodyMedium,
-                                        color = MaterialTheme.colorScheme.primary,
+                                        color = if (missing) {
+                                            MaterialTheme.colorScheme.error
+                                        } else {
+                                            MaterialTheme.colorScheme.primary
+                                        },
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.testTag("feature-profile-binding"),
                                     )
                                 },
                                 modifier = Modifier
@@ -365,6 +427,7 @@ fun PerAppFeatureSettingsScreen(
     if (showProfileSheet) {
         SpoofProfileSheet(
             selectedId = override.spoofProfileId,
+            entries = profileLibrary,
             onSelect = { viewModel.setSpoofProfile(it) },
             onDismiss = { showProfileSheet = false },
         )
@@ -434,10 +497,17 @@ private fun KeywordSubsetSection(
     }
 }
 
-/** 画像选择底部 sheet(跟随全局 + 内置档位单选;契约 4;V39 收编统一 [ModevChoiceSheet])。 */
+/**
+ * 画像绑定底部 sheet(V47 WP-5:选项源改画像库,取代旧三常量档)。
+ *
+ * 内置行按 seedId 取四语展示名,DIY 行取存储名(与画像库页同一实现);
+ * 当前绑定了库里已不存在的 id 时**恒无选项命中**(不得回落成某一档),
+ * 缺失语义由本应用页的画像行红字承载。
+ */
 @Composable
 private fun SpoofProfileSheet(
     selectedId: String?,
+    entries: List<DeviceProfileEntry>,
     onSelect: (String?) -> Unit,
     onDismiss: () -> Unit,
 ) {
@@ -451,11 +521,11 @@ private fun SpoofProfileSheet(
             ),
         )
         addAll(
-            SpoofProfiles.BUILTINS.map {
+            entries.map { entry ->
                 ChoiceOption<String?>(
-                    value = it.id,
-                    label = res.getString(spoofProfileLabelRes(it.id)),
-                    testTag = "feature-profile-option-${it.id}",
+                    value = entry.id,
+                    label = profileDisplayNameFor(res, entry.name, entry.builtinSeedId),
+                    testTag = "feature-profile-option-${entry.id}",
                 )
             },
         )
@@ -472,9 +542,7 @@ private fun SpoofProfileSheet(
     )
 }
 
-private const val GLOBAL_FOLLOW_ID = "__follow_global__"
-
-/** 画像档位标签(auto 展示为「自动」;null 展示为「跟随全局」)。 */
+/** 画像档位标签(仅旧三常量档,供画像页的接管前配置面使用;DIY 与内置库行走展示名解析)。 */
 internal fun spoofProfileLabelRes(profileId: String?): Int = when (profileId) {
     null -> R.string.feature_profile_follow_global
     SpoofProfiles.AUTO -> R.string.feature_profile_auto

@@ -1,0 +1,235 @@
+package com.lioisme.modev.ui.settings.profiles
+
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.compose.ui.test.onAllNodesWithTag
+import androidx.compose.ui.test.onAllNodesWithText
+import com.lioisme.modev.R
+import com.lioisme.modev.core.model.DeviceProfile
+import com.lioisme.modev.core.model.DeviceProfileEntry
+import com.lioisme.modev.core.model.ProfileConflict
+import com.lioisme.modev.core.model.ProfileField
+import com.lioisme.modev.core.model.ProfileKind
+import com.lioisme.modev.core.model.ProfileSection
+import com.lioisme.modev.core.model.ProfileValueType
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
+import org.robolectric.annotation.Config
+
+/**
+ * 画像参数编辑器的**整屏组合渲染**回归(V47 WP-5,Robolectric 全装配驱动)。
+ *
+ * 本类只测「屏画什么」,不测「点了画什么」:实测确认 Robolectric 里
+ * `ModalBottomSheet` 内容能被语义树看到(故锚点存在性可断言),但打在弹层按钮上的
+ * 手势不会送达(`performClick` 后表单零变化、弹层不关),与真机行为不同。
+ * 因此**点击 → sheet → 校验 → 落值**这条主通路归 androidTest
+ * (`ProfileEditorFlowTest`,真机注入档),本类用 VM 写入面驱动同一批呈现判定 ——
+ * 两侧合起来才是完整证据,任何一侧单独绿都不算。
+ *
+ * 这条防线覆盖的是纯派生测试([ProfileEditorStateTest])与栈语义测试
+ * ([ProfileBackStackRoboTest])都够不到的一层:第一次把 41 行真画出来,
+ * 因而能抓到只在组合期炸的形态(占位符与资源参数量不匹配 = `McpTokensScreenStateTest`
+ * 记过的整屏闪退同型)、槽标签反查落空、分区与行序漂移。
+ */
+@RunWith(RobolectricTestRunner::class)
+@Config(sdk = [34])
+class ProfileEditorRenderRoboTest {
+
+    @get:Rule
+    val compose = createComposeRule()
+
+    private fun str(res: Int, vararg args: Any?): String =
+        RuntimeEnvironment.getApplication().getString(res, *args)
+
+    private fun editorVm(
+        store: FakeSpoofProfileStore,
+        profileId: String = "id-1",
+        draftName: String? = null,
+    ) = ProfileEditorViewModel(
+        profileId = profileId,
+        draftName = draftName,
+        profiles = store,
+    )
+
+    /**
+     * 库里恒带一行 `id-1`:编辑器的「条目已不在库里 ⇒ 弹栈」是**产品行为**,
+     * 空库只会测到那条弹栈分支(屏上一片空,断言全成假绿)。
+     */
+    private fun storeWith(
+        profile: DeviceProfile = DeviceProfile.EMPTY,
+        builtinSeedId: String? = null,
+    ) = FakeSpoofProfileStore(
+        listOf(entry(id = "id-1", profile = profile, builtinSeedId = builtinSeedId)),
+    )
+
+    private fun entry(id: String, profile: DeviceProfile, builtinSeedId: String? = null) =
+        DeviceProfileEntry(id = id, name = "已存画像", summary = "", profile = profile, builtinSeedId = builtinSeedId)
+
+    private fun showEditor(vm: ProfileEditorViewModel) {
+        compose.setContent {
+            MaterialTheme {
+                Surface(Modifier.fillMaxSize()) {
+                    ProfileEditorScreen(viewModel = vm, onBack = {})
+                }
+            }
+        }
+        compose.waitForIdle()
+    }
+
+    private fun tagCount(tag: String) = compose.onAllNodesWithTag(tag).fetchSemanticsNodes().size
+
+    private fun assertTagPresent(tag: String, why: String) {
+        assertTrue("$why(锚点 $tag)", tagCount(tag) > 0)
+    }
+
+    private fun assertTagAbsent(tag: String, why: String) {
+        assertEquals("$why(锚点 $tag 不应在屏上)", 0, tagCount(tag))
+    }
+
+    private fun assertTextPresent(text: String, why: String) {
+        assertTrue(
+            "$why(期望文本 \"$text\")",
+            compose.onAllNodesWithText(text).fetchSemanticsNodes().isNotEmpty(),
+        )
+    }
+
+    // ------------------------------------------------------------------ 一屏结构
+
+    @Test
+    fun everyParameter_rendersExactlyOneRowInItsSection() {
+        showEditor(editorVm(storeWith()))
+
+        assertEquals("分区数即 UI 段数", 10, ProfileSection.entries.size)
+        ProfileSection.entries.forEach { section ->
+            assertTagPresent("profile-section-${section.name}", "分区必须成段渲染")
+        }
+        ProfileField.entries.forEach { field ->
+            val tag = if (field.type == ProfileValueType.BOOL) {
+                "profile-toggle-${field.name}"
+            } else {
+                "profile-row-${field.name}"
+            }
+            assertEquals("参数 ${field.name} 必须恰有一行(一行一参数)", 1, tagCount(tag))
+        }
+        // 空项显式标「未设置」而非留白:用户须能区分「没填」与「填了个空」。
+        assertTextPresent(str(R.string.profile_unset), "未填项必须显式标注")
+    }
+
+    @Test
+    fun builtinRow_editingIt_isDeclaredOnScreen() {
+        val pixel = DeviceProfile(brand = "google", model = "Pixel 7 Pro", product = "raven", device = "raven")
+        showEditor(editorVm(storeWith(profile = pixel, builtinSeedId = "pixel-7-pro")))
+        assertTagPresent("profile-builtin-hint", "编辑内置档必须内联说明脱离账本的后果")
+        // 展示名取 seedId 资源,不是存储里的空串。
+        assertTextPresent(str(R.string.feature_profile_pixel7pro), "内置档展示名必须走四语资源")
+    }
+
+    @Test
+    fun draft_rendersWithoutABuiltinWarning() {
+        // 草稿在库里没有行:目的地侧不得弹栈,也不得挂内置提示。
+        var bounced = false
+        compose.setContent {
+            MaterialTheme {
+                Surface(Modifier.fillMaxSize()) {
+                    ProfileEditorScreen(
+                        viewModel = editorVm(FakeSpoofProfileStore(), profileId = "draft:我的档", draftName = "我的档"),
+                        onBack = { bounced = true },
+                    )
+                }
+            }
+        }
+        compose.waitForIdle()
+        assertFalse("草稿态不得被当成缺失条目弹栈", bounced)
+        assertTagPresent("profile-identity-card", "草稿同样要画出整屏")
+        assertTagAbsent("profile-builtin-hint", "草稿不是内置档")
+    }
+
+    // ------------------------------------------------------------------ 派生态上屏
+
+    @Test
+    fun identityCard_reportsTripleAgainstFingerprint_inThreeStates() {
+        val vm = editorVm(
+            storeWith(
+                profile = DeviceProfile(brand = "google", model = "Pixel 7 Pro", product = "raven", device = "raven"),
+            ),
+        )
+        showEditor(vm)
+
+        assertTagPresent("profile-identity-check", "身份卡必须有对账行")
+        assertTextPresent(str(R.string.profile_identity_unknown), "要素不全时报「尚不可判」而非矛盾")
+
+        vm.update(
+            ProfileField.FINGERPRINT,
+            "google/raven/raven:14/UP1A.231005.00B/10763597:user/release-keys",
+        )
+        compose.waitForIdle()
+        assertTextPresent(str(R.string.profile_identity_ok), "前缀与三元组一致时报一致")
+
+        vm.update(ProfileField.PRODUCT, "tokay")
+        compose.waitForIdle()
+        assertTextPresent(
+            str(R.string.profile_identity_mismatch, "google/raven/raven", "google/tokay/raven"),
+            "改产品名后必须点名两侧前缀",
+        )
+    }
+
+    @Test
+    fun invalidInput_namesTheFieldOnItsRowAndDisablesSave() {
+        val vm = editorVm(storeWith())
+        showEditor(vm)
+
+        vm.update(ProfileField.IMEI, "123")
+        compose.waitForIdle()
+
+        assertTextPresent(
+            str(R.string.profile_invalid_field, str(R.string.profile_field_imei), str(R.string.profile_error_imei_format)),
+            "保存闸必须点名「哪一项 + 为什么」",
+        )
+        assertTextPresent(str(R.string.profile_error_imei_format), "该行必须带错误说明")
+        assertTagPresent("profile-save-invalid", "非法输入时底栏切到错误态")
+        // 摘要态(「N 项已填」)让位给错误行:两个形态互斥,同屏不得并存。
+        assertEquals(0, tagCount("profile-save-summary"))
+    }
+
+    @Test
+    fun slotValue_rendersItsLabel_notTheRawNumber() {
+        val vm = editorVm(storeWith(profile = DeviceProfile(networkType = 5, screenshotsFlag = 0)))
+        showEditor(vm)
+
+        assertTextPresent(str(R.string.profile_slot_network_5g), "5G 槽必须显示槽标签")
+        assertTextPresent(str(R.string.profile_slot_screenshot_deny), "截图禁用槽必须显示槽标签")
+        assertTextPresent(str(R.string.profile_kind_network), "生效组预览")
+    }
+
+    @Test
+    fun groupsAndConflicts_surfaceLiveFromTheCompiledPlan() {
+        val vm = editorVm(storeWith())
+        showEditor(vm)
+        assertTagPresent("profile-groups-empty", "全空时必须明说「什么都不会装」")
+
+        vm.update(ProfileField.LONGITUDE, "12.34")
+        compose.waitForIdle()
+        assertTagPresent("profile-group-${ProfileKind.PROFILE_LOCATION.name}", "坐标组 chip 随输入出现")
+        assertTagPresent(
+            "profile-conflict-${ProfileConflict.COORDINATE_HALF_SET.name}",
+            "只填一半必须内联点名矛盾(不弹阻断式对话框)",
+        )
+
+        vm.writeBool(ProfileField.PASS_CONTACTS, true)
+        compose.waitForIdle()
+        assertTagPresent("profile-group-${ProfileKind.PROFILE_BLANK_CONTENT.name}", "布尔项一拨即进预览")
+
+        vm.writeBool(ProfileField.PASS_CONTACTS, false)
+        compose.waitForIdle()
+        assertTagAbsent("profile-group-${ProfileKind.PROFILE_BLANK_CONTENT.name}", "关掉即从预览消失(关 = 取消该项干预)")
+    }
+}
