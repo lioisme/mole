@@ -10,13 +10,19 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
@@ -366,6 +372,122 @@ fun <T> ModevChoiceSheet(
         }
     }
 }
+
+/**
+ * 可搜索单选底部 sheet(V47 WP-5b:机型库品牌 / 型号选择器专用)。
+ *
+ * 与 [ModevChoiceSheet] 同一出口(都建在 [ModevSheet] 上,契约 #27 的
+ * `ModalBottomSheet` 单点不破),差别只在**候选量级**:内置机型库单品牌型号数可达数百、
+ * 全库数千行,整表 `verticalScroll` 会一次组合全部行 ⇒ 列表走 LazyColumn,
+ * 并按 [SHEET_MAX_VISIBLE_ROWS] 截断渲染 + 明说「请缩小搜索范围」(截断必须可见,
+ * 否则用户读到的是「库里只有这些」)。
+ *
+ * 过滤留在组件内(默认按 label 子串、忽略大小写):唯一的调用形态就是「按名字找」,
+ * 让每个调用方各写一遍 filter 才是漂移源头。需要别的判据时再传 [match]。
+ */
+@Composable
+fun <T> ModevSearchableChoiceSheet(
+    title: String,
+    options: List<ChoiceOption<T>>,
+    selected: T?,
+    placeholder: String,
+    emptyText: String,
+    truncatedText: (Int) -> String,
+    onSelect: (T) -> Unit,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier,
+    match: (ChoiceOption<T>, String) -> Boolean = { option, query ->
+        query.isBlank() || option.label.contains(query, ignoreCase = true)
+    },
+) {
+    var query by remember { mutableStateOf("") }
+    val filtered = remember(options, query) { options.filter { match(it, query) } }
+    val visible = filtered.take(SHEET_MAX_VISIBLE_ROWS)
+
+    ModevSheet(
+        title = title,
+        onDismiss = onDismiss,
+        modifier = modifier,
+    ) { sheet ->
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .imePadding(),
+        ) {
+            OutlinedTextField(
+                value = query,
+                onValueChange = { query = it },
+                placeholder = { Text(placeholder) },
+                singleLine = true,
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("sheet-search-input"),
+            )
+            Spacer(Modifier.height(8.dp))
+            if (filtered.isEmpty()) {
+                Text(
+                    emptyText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 16.dp)
+                        .testTag("sheet-search-empty"),
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp),
+                ) {
+                    if (filtered.size > visible.size) {
+                        item {
+                            Text(
+                                truncatedText(filtered.size),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                                    .testTag("sheet-search-truncated"),
+                            )
+                        }
+                    }
+                    // 不设 key:同品牌内 label 可能重复(上游改数据即出现),
+                    // 而重复 key 是硬崩;这里也不需要跨重组保位。
+                    items(visible) { option ->
+                        ListItem(
+                            colors = ListItemDefaults.colors(
+                                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+                            ),
+                            headlineContent = {
+                                Text(
+                                    option.label,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                )
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 8.dp)
+                                .let { base ->
+                                    option.testTag?.let { base.testTag(it) } ?: base
+                                }
+                                .clickable {
+                                    sheet.dismissWith { onSelect(option.value) }
+                                },
+                        )
+                    }
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+        }
+    }
+}
+
+const val SHEET_MAX_VISIBLE_ROWS = 120
 
 /**
  * sheet 底部取消/确认按钮行(自定义内容 sheet 复用:键值编辑 / 关键词编辑等

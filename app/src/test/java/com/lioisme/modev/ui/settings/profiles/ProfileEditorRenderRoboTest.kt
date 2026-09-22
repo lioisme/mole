@@ -58,6 +58,7 @@ class ProfileEditorRenderRoboTest {
         profileId = profileId,
         draftName = draftName,
         profiles = store,
+        deviceCatalog = FakeDeviceCatalog(FakeDeviceCatalog.READY),
     )
 
     /**
@@ -208,6 +209,42 @@ class ProfileEditorRenderRoboTest {
         assertTextPresent(str(R.string.profile_slot_network_5g), "5G 槽必须显示槽标签")
         assertTextPresent(str(R.string.profile_slot_screenshot_deny), "截图禁用槽必须显示槽标签")
         assertTextPresent(str(R.string.profile_kind_network), "生效组预览")
+    }
+
+    // ------------------------------------------------------------------ 机型库选择(V47 WP-5b)
+
+    @Test
+    fun devicePicking_fillsFourIdentityFields_andNeverGuessesProduct() {
+        val vm = editorVm(storeWith())
+        showEditor(vm)
+        assertTagPresent("profile-device-pick", "设备分区首行必须是机型库选择行")
+
+        vm.pickDevice("xiaomi", "2211133C:fuxi")
+        compose.waitForIdle()
+
+        val texts = vm.view.value.texts
+        assertEquals("Xiaomi", texts[ProfileField.BRAND])
+        assertEquals("Xiaomi", texts[ProfileField.MANUFACTURER])
+        assertEquals("2211133C", texts[ProfileField.MODEL])
+        assertEquals("fuxi", texts[ProfileField.DEVICE])
+        // 机型库不提供 PRODUCT/BOARD/HARDWARE ⇒ 编一个「像真的」的猜测值就是自造矛盾画像。
+        assertEquals("PRODUCT 不得被猜出来", "", texts[ProfileField.PRODUCT])
+        assertEquals("BOARD 不得被猜出来", "", texts[ProfileField.BOARD])
+        // 选择必须一次成型:生效组预览随之出现。
+        assertTagPresent("profile-group-${ProfileKind.PROFILE_BUILD.name}", "选完机型即装 Build 组")
+    }
+
+    @Test
+    fun unavailableCatalog_isNamedOnTheRow_andNeverOpensAnEmptySheet() {
+        val vm = ProfileEditorViewModel(
+            profileId = "id-1",
+            draftName = null,
+            profiles = storeWith(),
+            deviceCatalog = FakeDeviceCatalog(null),
+        )
+        showEditor(vm)
+        assertEquals(DeviceCatalogState.Unavailable, vm.catalog.value)
+        assertTextPresent(str(R.string.profile_device_unavailable), "读不到资产必须点名,不得退化成「库里没机型」")
     }
 
     @Test

@@ -837,6 +837,13 @@
     <string name="profile_import_failed">Could not read that file</string>
     <string name="profile_import_default_name">Imported profile</string>
     <string name="profile_import_schema_rejected">Not a Modev profile bundle of a supported version</string>
+    <string name="profile_device_pick_action">Pick a real device</string>
+    <string name="profile_device_pick_hint">Fills brand, manufacturer, model and device code name together</string>
+    <string name="profile_device_loading">Loading the device catalogue…</string>
+    <string name="profile_device_unavailable">Device catalogue unavailable</string>
+    <string name="profile_device_search_hint">Search</string>
+    <string name="profile_device_no_match">No match - try a shorter keyword</string>
+    <string name="profile_device_truncated">Showing the first %1$,d of %2$,d - narrow the search</string>
     <string name="profile_section_device">Device and Build</string>
     <string name="profile_section_network">Network</string>
     <string name="profile_section_sim">SIM Operator</string>

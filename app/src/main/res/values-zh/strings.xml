@@ -826,6 +826,13 @@
     <string name="profile_import_failed">无法读取该文件</string>
     <string name="profile_import_default_name">导入画像</string>
     <string name="profile_import_schema_rejected">这不是受支持版本的 Modev 画像包</string>
+    <string name="profile_device_pick_action">选择真实机型</string>
+    <string name="profile_device_pick_hint">一次填好品牌、制造商、型号与设备代号</string>
+    <string name="profile_device_loading">正在加载机型库…</string>
+    <string name="profile_device_unavailable">机型库不可用</string>
+    <string name="profile_device_search_hint">搜索</string>
+    <string name="profile_device_no_match">无匹配项 - 换个更短的关键词</string>
+    <string name="profile_device_truncated">共 %2$,d 项,仅显示前 %1$,d 项 - 请缩小搜索范围</string>
     <string name="profile_section_device">设备与构建</string>
     <string name="profile_section_network">网络</string>
     <string name="profile_section_sim">SIM 运营商</string>

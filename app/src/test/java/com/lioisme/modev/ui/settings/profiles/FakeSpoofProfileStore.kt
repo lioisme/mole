@@ -1,13 +1,55 @@
 package com.lioisme.modev.ui.settings.profiles
 
+import com.lioisme.modev.core.model.DeviceBrandEntry
+import com.lioisme.modev.core.model.DeviceCatalog
+import com.lioisme.modev.core.model.DeviceModelEntry
 import com.lioisme.modev.core.model.DeviceProfile
 import com.lioisme.modev.core.model.DeviceProfileEntry
 import com.lioisme.modev.core.model.ProfileCodec
 import com.lioisme.modev.core.model.ProfileImportOutcome
 import com.lioisme.modev.core.model.ProfileResolution
+import com.lioisme.modev.domain.config.DeviceCatalogService
 import com.lioisme.modev.domain.config.SpoofProfileService
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+
+/**
+ * 机型库替身:替身自带一份三档真机身份的目录,足以驱动选择路径
+ * (品牌 → 型号 → 一次写全 BRAND/MANUFACTURER/MODEL/DEVICE)。
+ * [result] = null 复刻「资产读不到」的形态,那条路必须与「目录为空」分别可测。
+ */
+class FakeDeviceCatalog(
+    private val result: DeviceCatalog?,
+) : DeviceCatalogService {
+    override suspend fun catalog(): DeviceCatalog? = result
+
+    companion object {
+        /** 两档真机身份:够驱动「选品牌 → 选型号 → 一次写全四项」整条路径。 */
+        val READY = DeviceCatalog(
+            brands = listOf(
+                DeviceBrandEntry(
+                    key = "google",
+                    displayName = "Google",
+                    buildBrand = "google",
+                    manufacturer = "Google",
+                    models = listOf(
+                        DeviceModelEntry(model = "Pixel 7 Pro", name = "", device = "raven", type = "mob"),
+                        DeviceModelEntry(model = "Pixel 8", name = "", device = "tokay", type = "mob"),
+                    ),
+                ),
+                DeviceBrandEntry(
+                    key = "xiaomi",
+                    displayName = "Xiaomi",
+                    buildBrand = "Xiaomi",
+                    manufacturer = "Xiaomi",
+                    models = listOf(
+                        DeviceModelEntry(model = "2211133C", name = "Xiaomi 13", device = "fuxi", type = "mob"),
+                    ),
+                ),
+            ),
+        )
+    }
+}
 
 /**
  * 画像库契约的内存替身(V47 WP-5 测试夹具):校验口径与真仓储一致

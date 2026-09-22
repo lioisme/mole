@@ -86,6 +86,16 @@ class ProfileEditorState(
 
     fun clearAll() = form.clearAll()
 
+    /**
+     * 批量写入(机型库选择等「一次改数项」的通路)。
+     *
+     * 逐字段 `update` 会留下中间帧:型号已换而品牌未换的那一帧,屏上显示的正是
+     * 自相矛盾的画像。整批写完再由调用方 `bump()` 一次 ⇒ 屏上只见结论,不见半成品。
+     */
+    fun applyValues(values: Map<ProfileField, String>) {
+        values.forEach { (field, raw) -> form.update(field, raw) }
+    }
+
     /** 布尔项:关 = 清空(false 即缺省态,与哨兵语义同构,不留 "false" 文本)。 */
     fun writeBool(field: ProfileField, value: Boolean) {
         form.update(field, if (value) "true" else "")

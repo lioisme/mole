@@ -21,6 +21,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Calculate
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material3.AssistChip
@@ -61,13 +62,19 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
+import com.lioisme.modev.domain.config.DeviceCatalogService
 import com.lioisme.modev.core.model.DeviceProfile
+import com.lioisme.modev.core.model.DeviceBrandEntry
 import com.lioisme.modev.core.model.DeviceProfileEntry
 import com.lioisme.modev.core.model.ProfileConflict
 import com.lioisme.modev.core.model.ProfileField
 import com.lioisme.modev.core.model.ProfileFieldCatalog
+import com.lioisme.modev.core.model.ProfileSection
 import com.lioisme.modev.core.model.ProfileKind
 import com.lioisme.modev.core.model.ProfileValueType
+import com.lioisme.modev.core.model.stringOf
+import com.lioisme.modev.core.model.applyBrandIdentity
+import com.lioisme.modev.core.model.applyDevicePreset
 import com.lioisme.modev.domain.config.SpoofProfileService
 import com.lioisme.modev.ui.apps.ToggleListItem
 import com.lioisme.modev.ui.components.ChoiceOption
@@ -75,7 +82,9 @@ import com.lioisme.modev.ui.components.HorizontalDivider16
 import com.lioisme.modev.ui.components.ModevChoiceSheet
 import com.lioisme.modev.ui.components.ModevConfirmDialog
 import com.lioisme.modev.ui.components.ModevInputSheet
+import com.lioisme.modev.ui.components.ModevSearchableChoiceSheet
 import com.lioisme.modev.ui.components.ModevTopBar
+import com.lioisme.modev.ui.components.SHEET_MAX_VISIBLE_ROWS
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
@@ -104,6 +113,7 @@ class ProfileEditorViewModel(
     profileId: String,
     private val draftName: String?,
     private val profiles: SpoofProfileService,
+    private val deviceCatalog: DeviceCatalogService,
     randomProvider: () -> kotlin.random.Random = { kotlin.random.Random.Default },
 ) : ViewModel() {
 
@@ -136,6 +146,50 @@ class ProfileEditorViewModel(
     private val _lastSaveResult = MutableStateFlow<ProfileSaveResult?>(null)
 
     val lastSaveResult: StateFlow<ProfileSaveResult?> = _lastSaveResult
+
+    // -------------------------------------------------------------- 机型库(V47 WP-5b)
+
+    private val _catalog = MutableStateFlow<DeviceCatalogState>(DeviceCatalogState.Idle)
+
+    /** 机型库加载态:未加载 / 加载中 / 不可用 / 可用必须可区分(零静默红线)。 */
+    val catalog: StateFlow<DeviceCatalogState> = _catalog
+
+    init {
+        // 预取:选择器点开即得,不做「第一次点只触发加载、第二次才开列」的两段式;
+        // 解析只在进程内发生一次(仓储带缓存),代价不换语义。
+        loadCatalog()
+    }
+
+    private fun loadCatalog() {
+        _catalog.value = DeviceCatalogState.Loading
+        viewModelScope.launch {
+            val brands = runCatching { deviceCatalog.catalog()?.brands.orEmpty() }.getOrNull().orEmpty()
+            _catalog.value = if (brands.isEmpty()) DeviceCatalogState.Unavailable
+            else DeviceCatalogState.Ready(brands)
+        }
+    }
+
+    /**
+     * 选型号:一次写全 MODEL / DEVICE / BRAND / MANUFACTURER。
+     *
+     * **PRODUCT / BOARD / HARDWARE 恒不动** —— 内置机型库(MobileModels)不提供这三个值,
+     * 按 MODEL 或 DEVICE 猜 PRODUCT 会造出自相矛盾的画像(基线 `DevicePreset` 同一裁决)。
+     * 猜不出来就留空,让用户自己填,这比编一个像真的假值诚实。
+     */
+    fun pickDevice(brandKey: String, picked: String) {
+        val brands = (_catalog.value as? DeviceCatalogState.Ready)?.brands ?: return
+        val brand = brands.firstOrNull { it.key == brandKey } ?: return
+        val next = applyBrandIdentity(applyDevicePreset(state.snapshot(), picked), brand)
+        state.applyValues(
+            mapOf(
+                ProfileField.MODEL to ProfileField.MODEL.stringOf(next),
+                ProfileField.DEVICE to ProfileField.DEVICE.stringOf(next),
+                ProfileField.BRAND to ProfileField.BRAND.stringOf(next),
+                ProfileField.MANUFACTURER to ProfileField.MANUFACTURER.stringOf(next),
+            ),
+        )
+        bump()
+    }
 
     fun update(field: ProfileField, raw: String) {
         state.update(field, raw)
@@ -216,7 +270,19 @@ class ProfileEditorViewModelFactory(
             profileId = profileId,
             draftName = draftName,
             profiles = container.spoofProfiles,
+            deviceCatalog = container.deviceCatalog,
         ) as T
+}
+
+/** 机型库加载态(V47 WP-5b;Unavailable 与 Idle 必须分文案,前者是数据缺失不是未开始)。 */
+sealed interface DeviceCatalogState {
+    data object Idle : DeviceCatalogState
+    data object Loading : DeviceCatalogState
+
+    /** 资产读不到或解析失败(选择行必须点名,不得退化成「库里没机型」)。 */
+    data object Unavailable : DeviceCatalogState
+
+    data class Ready(val brands: List<DeviceBrandEntry>) : DeviceCatalogState
 }
 
 /**
@@ -248,6 +314,9 @@ fun ProfileEditorScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var editingField by remember { mutableStateOf<ProfileField?>(null) }
     var confirmClearAll by remember { mutableStateOf(false) }
+    val catalog by viewModel.catalog.collectAsStateWithLifecycle()
+    var showBrandSheet by remember { mutableStateOf(false) }
+    var pickBrandKey by remember { mutableStateOf<String?>(null) }
 
     val entry = viewModel.entry
     if (entry == null && !viewModel.isDraft) {
@@ -343,6 +412,15 @@ fun ProfileEditorScreen(
                     title = stringResource(profileSectionLabelRes(section)),
                     modifier = Modifier.testTag("profile-section-${section.name}"),
                 ) {
+                    if (section == ProfileSection.DEVICE) {
+                        // 机型库选择行恒在设备分区首行:它替掉的是「手打四个互相牵连的字段」,
+                        // 放在字段列表中间会被读成又一个字段,放前面才读成「先选设备,再修细节」。
+                        DevicePresetRow(
+                            state = catalog,
+                            onPick = { showBrandSheet = true },
+                        )
+                        HorizontalDivider16()
+                    }
                     fields.forEachIndexed { index, field ->
                         if (index > 0) HorizontalDivider16()
                         ProfileFieldRow(
@@ -410,6 +488,54 @@ fun ProfileEditorScreen(
                 confirmTestTag = "profile-input-confirm",
             )
         }
+    }
+
+    // 机型库两级选择:品牌 → 型号(同屏恒一个 sheet,型号表随品牌换)。
+    val readyBrands = (catalog as? DeviceCatalogState.Ready)?.brands.orEmpty()
+    val pickedBrand = readyBrands.firstOrNull { it.key == pickBrandKey }
+    if (pickedBrand != null) {
+        ModevSearchableChoiceSheet(
+            title = pickedBrand.displayName,
+            options = pickedBrand.models.map { model ->
+                ChoiceOption(
+                    value = "${model.model}:${model.resolvedDevice()}",
+                    label = model.label(),
+                    testTag = "profile-device-model-${model.model}",
+                )
+            },
+            selected = null,
+            placeholder = stringResource(R.string.profile_device_search_hint),
+            emptyText = stringResource(R.string.profile_device_no_match),
+            truncatedText = { total ->
+                res.getString(R.string.profile_device_truncated, SHEET_MAX_VISIBLE_ROWS, total)
+            },
+            onSelect = { picked ->
+                viewModel.pickDevice(pickedBrand.key, picked)
+                pickBrandKey = null
+            },
+            onDismiss = { pickBrandKey = null },
+            modifier = Modifier.testTag("profile-device-model-sheet"),
+        )
+    } else if (showBrandSheet) {
+        ModevSearchableChoiceSheet(
+            title = stringResource(R.string.profile_field_brand),
+            options = readyBrands.map { brand ->
+                ChoiceOption(
+                    value = brand.key,
+                    label = "${brand.displayName} (${brand.buildBrand})",
+                    testTag = "profile-device-brand-${brand.key}",
+                )
+            },
+            selected = null,
+            placeholder = stringResource(R.string.profile_device_search_hint),
+            emptyText = stringResource(R.string.profile_device_no_match),
+            truncatedText = { total ->
+                res.getString(R.string.profile_device_truncated, SHEET_MAX_VISIBLE_ROWS, total)
+            },
+            onSelect = { key -> pickBrandKey = key },
+            onDismiss = { showBrandSheet = false },
+            modifier = Modifier.testTag("profile-device-brand-sheet"),
+        )
     }
 
     if (confirmClearAll) {
@@ -562,6 +688,62 @@ private fun ProfileFieldRow(
             .fillMaxWidth()
             .testTag("profile-row-${spec.field.name}")
             .clickable(onClick = onOpen),
+    )
+}
+
+/** 机型库选择行:状态即文案(加载 / 不可用 / 可点),禁用态不出 sheet(点了没反应最费解)。 */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DevicePresetRow(
+    state: DeviceCatalogState,
+    onPick: () -> Unit,
+) {
+    val enabled = state is DeviceCatalogState.Ready
+    val supporting = stringResource(
+        when (state) {
+            DeviceCatalogState.Loading -> R.string.profile_device_loading
+            DeviceCatalogState.Unavailable -> R.string.profile_device_unavailable
+            else -> R.string.profile_device_pick_hint
+        },
+    )
+    ListItem(
+        colors = ListItemDefaults.colors(
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+        ),
+        headlineContent = {
+            Text(
+                stringResource(R.string.profile_device_pick_action),
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurface.copy(alpha = Tokens.disabledContentAlpha)
+                },
+            )
+        },
+        supportingContent = {
+            Text(
+                supporting,
+                style = MaterialTheme.typography.bodySmall,
+                color = if (state == DeviceCatalogState.Unavailable) {
+                    MaterialTheme.colorScheme.error
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+                modifier = Modifier.testTag("profile-device-pick-hint"),
+            )
+        },
+        leadingContent = {
+            Icon(
+                Icons.Filled.PhoneAndroid,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+        modifier = Modifier
+            .fillMaxWidth()
+            .testTag("profile-device-pick")
+            .then(if (enabled) Modifier.clickable(onClick = onPick) else Modifier),
     )
 }
 

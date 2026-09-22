@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import com.google.gson.Gson
 import com.lioisme.modev.data.db.ModevDatabase
 import com.lioisme.modev.data.repo.AppCatalogRepository
+import com.lioisme.modev.data.repo.DeviceCatalogRepository
 import com.lioisme.modev.data.repo.KeywordLibraryRepository
 import com.lioisme.modev.data.repo.SpoofProfileRepository
 import com.lioisme.modev.data.repo.LogRepository
@@ -18,6 +19,7 @@ import com.lioisme.modev.data.server.ConfigServer
 import com.lioisme.modev.domain.app.AppCatalogService
 import com.lioisme.modev.domain.app.AppListPreferences
 import com.lioisme.modev.domain.asset.KeywordLibraryService
+import com.lioisme.modev.domain.config.DeviceCatalogService
 import com.lioisme.modev.domain.config.SpoofProfileService
 import com.lioisme.modev.domain.config.FeatureService
 import com.lioisme.modev.domain.config.ListenConfigService
@@ -148,6 +150,14 @@ class AppContainer(private val context: Context) {
         )
     }
 
+    /**
+     * 真机目录实现(随包 devices.json 的唯一读者):对外经 [deviceCatalog] 契约。
+     * 懒建即够 —— 只有机型选择器打开时才读盘,启动路径零 IO。
+     */
+    private val deviceCatalogRepo: DeviceCatalogRepository by lazy {
+        DeviceCatalogRepository(context.assets)
+    }
+
     // ------------------------------------------------------------------
     // 方法层出口(UI ViewModel 与 MCP 工具组的唯一依赖面)
     // ------------------------------------------------------------------
@@ -175,6 +185,9 @@ class AppContainer(private val context: Context) {
 
     /** 画像库对外契约(V47 T2;public 类型必须来自 domain,G2 闸)。 */
     val spoofProfiles: SpoofProfileService get() = spoofProfileRepo
+
+    /** 真机目录契约(品牌 → 机型;public 类型来自 domain,G2 闸,实现 = [deviceCatalogRepo])。 */
+    val deviceCatalog: DeviceCatalogService get() = deviceCatalogRepo
 
     /** 应用列表浏览偏好契约面(进程级单一事实源,init 于 ModevApp.onCreate)。 */
     val appListPrefs: AppListPreferences get() = AppListSettings

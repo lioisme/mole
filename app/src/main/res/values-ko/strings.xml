@@ -833,6 +833,13 @@
     <string name="profile_import_failed">해당 파일을 읽을 수 없습니다</string>
     <string name="profile_import_default_name">가져온 프로필</string>
     <string name="profile_import_schema_rejected">지원되는 버전의 Modev 프로필 번들이 아닙니다</string>
+    <string name="profile_device_pick_action">실제 기기 선택</string>
+    <string name="profile_device_pick_hint">브랜드·제조사·모델·기기 코드를 한 번에 채웁니다</string>
+    <string name="profile_device_loading">기기 카탈로그를 불러오는 중…</string>
+    <string name="profile_device_unavailable">기기 카탈로그를 사용할 수 없습니다</string>
+    <string name="profile_device_search_hint">검색</string>
+    <string name="profile_device_no_match">일치하는 항목 없음 - 더 짧은 키워드로 시도하세요</string>
+    <string name="profile_device_truncated">전체 %2$,d개 중 처음 %1$,d개 표시 - 검색 범위를 좁히세요</string>
     <string name="profile_section_device">기기와 빌드</string>
     <string name="profile_section_network">네트워크</string>
     <string name="profile_section_sim">SIM 통신사</string>
