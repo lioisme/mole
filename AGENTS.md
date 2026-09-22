@@ -50,7 +50,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 | 监听域 Listen Domain | 被动采集能力域(算法/数据库/行为/偏好/WebView/系统信息 + 请求监控/检测监控/弹窗·控件·Activity 观测);`CategoryTaxonomy.domain = LISTEN` | 把干预功能称「××监听」 |
 | 功能域 Feature Domain | 主动干预能力域(退出拦截/崩溃预防/解除录屏/弹窗关键词拦截/SSL 绕过/代理 VPN 隐藏/Root·Xposed·模拟器伪装);`domain = FEATURE` | 伪装成监听类型 |
 | 关键词库 Keyword Library | 全局弹窗拦截关键词资产(Room `keyword_library`,text 唯一 + matchMode + 全局启停);每应用默认跟随全局,可显式子集 | 仅 override 扁平词表、无库 |
-| 伪装画像 Spoof Profile | 设备/网络伪装值组(auto/pixel7pro/xiaomi13 内置档位 + 字段覆写);`SpoofProfiles` 为机型字面量唯一事实源 | 钩子内硬编码机型值 |
+| 伪装画像 Spoof Profile | **两套并存,以 V47 画像库为准**:①画像库 `spoof_profile` 表(Room v15)= 41 项 `DeviceProfile` 正文 + 三内置档账本(墓碑/管辖列) + DIY + 草稿新建 + 绑定唯一入口 `spoofProfileId`(= 库主键或 `""`);②接管前遗留通路 `SpoofProfiles`(auto/pixel7pro/xiaomi13 常量档)+ `spoofOverrides` 字段覆写,仍是**当前实际生效**的取值源。机型字面量唯一事实源仍是 `SpoofProfiles` 与 `BuiltinDeviceProfiles` 各自承担的两层(钩子禁内置)。**当前边界(实至名归的分界,不是待办)**:画像库已完成「取值 / 校验 / 编辑 / 传输 / 绑定 / 下发」——即 `FeatureConfig.deviceProfile` 快照经 `SettingsRepository.expandProfile` 随有效配置推到注入进程;但 **`hook` 子树零消费者**,注入侧改写仍全部走 `SpoofProfiles.resolve(spoofProfileId, spoofOverrides)`。说「画像已生效于靶程序」即假 | 把画像库称已完成、把遗留档称退役(两者都还没)、`spoofOverrides` 称已合并(未合并,写面已冻结而已) |
 | 检测黑名单追加项 extra* | Root 包名/Xposed 前缀/Frida 端口/掩码词的用户追加项(内置基线 ∪ 追加,只增不删) | 覆盖内置基线 |
 | MCP 服务 MCP Server | 进程内常驻 Streamable HTTP(spec 2025-06-18,V39 起端口默认 **1510**(wire 迁 1511 让位),单端点 POST /mcp,偏好 `mcp_port` 可改);监听绑定随**统一外部访问开关**(V41 D-1,见 #19);令牌认证独立开关(V39,默认停用)启用后**全接口强制**(含回环),服务端是否鉴权仅由 `tokenAuthEnabled` 决定(`McpServer` 无 externalAccess 耦合);多令牌 `McpTokenEntry`(SecureRandom 32 hex,宿主本地 `mcp_tokens` 不镜像,V38 单键惰性迁移);与 wire ConfigServer 完全独立生命周期(独立端口/开关/restart,互不触碰,VERSION 恒 4 零感知) | 把 MCP 当 wire 通道扩展、恢复 resources/prompts 双通道、令牌暴露为 MCP 工具(引导悖论 + PII)、恢复外部访问↔认证级联、恢复 mcp_external_access 独立键 |
 | 令牌管理 Token Management | MCP 访问令牌管理页(`settings/mcp-tokens`):认证开关 + 多令牌列表(**行内零动作按钮,动作唯一入口 = trailing「更多」菜单三项:查看 / 重命名 / 删除**,V46 R3;创建走 Appbar `tokens-add`);重命名走 `McpServiceConfig.setMcpTokenLabel` 方法层契约(仅动 label,值与顺序不变 ⇒ 校验集内容零变化,经 `mcpTokenSetUpdater` 原地生效,不重启不踢会话);**行内恒掩码,明文只在 `ModevValueDialog` 一处上屏**(复制后关窗);删除最后一枚不停用认证(空集 = 全拒);令牌值宿主本地秘密,恒不进 MCP 工具输出与诊断快照 | 显隐(行内 toggle)/行内复制按钮/「撤销」措辞/`token_show`·`token_hide` 键(V46 全部退役);UI 直写 prefs 改名 |
@@ -507,6 +507,35 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       = `DoubleBackExit` 双击退出(2s 窗口,可注入时钟 JVM 直测;首次 Snackbar
       `exit_press_back_again`,窗口内再按 finish;根页 SnackbarHost 上提至
       `ModevNav` 与消息流共用宿主)。
+
+30. **画像库契约(V47,画像即值源)**:`spoof_profile` 表(Room v15,`ALL_MIGRATIONS` 链内)
+      是伪装取值的**目标事实源**,四视图(UI 表单行序 / MCP 参数域 / 门控表 / 靶程序期望表)
+      一律向 `ProfileFieldCatalog` + `DeviceProfile` 穷尽 `when` 桥接派生,**禁反射、禁第二份字段清单**
+      (`ProfileFieldCatalogTest` / `DeviceProfilePropertyParityTest` / `ProfileLabelsTest` 穷尽性锁 +
+      `SpoofProfileToolsTest` 反扫取值域;**第四视图即 `v47-spoof-expectations.json` 尚未落地,属 WP-8 出口**)。
+      新增一个 `ProfileField` 的**手工**站点只有:
+      `ProfileField` 条目(kind/section/type/baselineKey)、`DeviceProfile` 字段 + 三条穷尽桥接臂
+      (`stringOf`/`isSetIn`/`withText`)、catalog `validate`(有格式约束时)、`RANDOMIZABLE` 与对应生成器、
+      `profileFieldLabelRes` + 四语键 —— 其余(`byKind`/`bySection`/`jsonKeyOf`/codec 字段序/编辑器行序)
+      **全部由 `ProfileField.entries` 派生,再抄一份就是第二事实源**(漏抄由穷尽 `when` 与 parity 测试当场拦)。三条不可退让的语义:
+      ① **零静默**:`ProfileResolution` 三态(`Unbound`/`Bound`/`Missing`)必须可区分并在屏上点名
+      (GAP-02 旧形态:任何非内置 id 被吞成 auto = 用户选了而伪装不发生且零提示);
+      ② **不钳制**:`ProfileCodec.isValid` / catalog 校验失败 = **拒绝写入**,`ProfileEditorForm.snapshot`
+      忠实反映输入,可保存性由 `canSave` + 仓库原子拒绝两道把关(把非法值悄悄丢掉会让用户存进
+      一份与自己输入不同的画像 —— 契约已因此改过一次,勿再改回);
+      ③ **库里永不留空行**:新建走**草稿路由** `settings/profiles/draft:<name>`(`ModevRoutes.profileDraft`),
+      首次保存 `create` 成功后编辑器就地升格为主键;`create` 对零字段正文恒返回 null 是**设计**
+      (一行至少要装一个钩子,否则绑定它等于绑空气),不得为此开「允许空档」的洞。
+      内置档账本:`BuiltinDeviceProfiles.BUILTINS` 为首装/升级补档源,`builtinSeedId` +
+      `builtinFingerprint`(catalog 序派生,**不含 name/summary** —— 基线把呈现算进指纹导致切语言即
+      「用户改过」误判,是反面教材)+ `managed`/`deleted` 墓碑列;用户改过即脱离管辖,删过即不复活。
+      **当前接管边界(改任何一侧都要回访这条,别按想象写)**:画像库已覆盖取值/校验/编辑/传输/
+      绑定/下发(`FeatureConfig.deviceProfile` 随 `expandProfile` 推到注入进程),但 `hook` 子树
+      **零消费者** ⇒ 靶程序实际值仍出自 `SpoofProfiles.resolve(spoofProfileId, spoofOverrides)`;
+      逐组接管须按「kind 登记 + 操作枚举 + 发射该操作的钩子 + 冻结计数快照 + MCP enum」**同一提交原子落**
+      (`DeviceEnvKindTest` 要求每 kind 有 operation、声明面即生效面要求 enum 与钩子一致),
+      这也是 `ProfileKind`(18,画像层)与 `DeviceEnvKind`(21,taxonomy 层)目前**故意不合并**的原因 ——
+      合并只能在批量登记那一轮做,半合并即把仓库留在红色(实测链见 `TASK-V47-SPOOF-PLAN.md` §WP-3c)。
 
 ## 已知工具链坑
 
