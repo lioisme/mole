@@ -95,7 +95,6 @@
 
     <!-- Danger confirmations -->
     <string name="danger_title">操作の確認</string>
-    <string name="danger_remove_scope_msg">「%1$s」をスコープから解除しますか?対象プロセス再起動後に適用されます。</string>
     <string name="danger_clear_logs_msg">「%1$s」のすべての記録を消去しますか?この操作は元に戻せません。</string>
     <string name="danger_clear_all_msg">すべての記録を消去しますか?この操作は元に戻せません。</string>
     <string name="cancel">キャンセル</string>

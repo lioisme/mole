@@ -153,15 +153,6 @@ class AppMonitorViewModel(
             messages.emit(UiMessage(R.string.apps_records_cleared, listOf(packageName)))
         }
     }
-
-    /** 移出作用域,等价于 LSPosed 作用域取消勾选。*/
-    fun removeScope() {
-        if (scopePending.value) return
-        viewModelScope.launch {
-            val result = scopeRepository.remove(packageName)
-            messages.emit(scopeChangeMessage(packageName, result))
-        }
-    }
 }
 
 /** 简单工厂,避免在 Compose 中手动拼参。*/

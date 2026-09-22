@@ -93,7 +93,6 @@ export const T1 = {
   capture_ignore_stack_dialog_title: ['スタック接頭辞を除外', '스택 접두어 제외'],
   capture_ignore_stack_dialog_hint: ['1 行に 1 クラス接頭辞。例: com.google.gson', '한 줄에 클래스 접두어 하나. 예: com.google.gson'],
   danger_title: ['操作の確認', '작업 확인'],
-  danger_remove_scope_msg: ['「%1$s」をスコープから解除しますか?対象プロセス再起動後に適用されます。', '"%1$s"을(를) 스코프에서 제거하시겠습니까? 대상 프로세스 재시작 후 적용됩니다.'],
   danger_clear_logs_msg: ['「%1$s」のすべての記録を消去しますか?この操作は元に戻せません。', '"%1$s"의 모든 기록을 삭제하시겠습니까? 되돌릴 수 없습니다.'],
   danger_clear_all_msg: ['すべての記録を消去しますか?この操作は元に戻せません。', '모든 기록을 삭제하시겠습니까? 되돌릴 수 없습니다.'],
   cancel: ['キャンセル', '취소'],

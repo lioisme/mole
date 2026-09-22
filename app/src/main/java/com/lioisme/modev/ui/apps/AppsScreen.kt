@@ -549,10 +549,17 @@ private fun AppRowItem(
         },
         leadingContent = { AppIcon(packageName = row.packageName, size = 40.dp) },
         trailingContent = {
+            // V48-DFC-07:与监控页作用域开关同一状态、同一写路径,故必须共享同一个名词
+            // (此前是一个零标签零锚点的裸 Checkbox)。
+            val scopeLabel = stringResource(R.string.app_monitor_scope_row)
             Checkbox(
                 checked = row.scoped,
                 onCheckedChange = { onToggle() },
                 enabled = scopeReady && !pending,
+                modifier =
+                    Modifier
+                        .testTag("app-row-scope")
+                        .semantics { contentDescription = scopeLabel },
             )
         },
         modifier =

@@ -90,7 +90,11 @@ class UiMcpCapabilityParityTest {
         ),
         Capability(
             name = "框架作用域读与改",
-            ui = listOf("AppsViewModel.toggle", "AppMonitorViewModel.toggleScope", "AppMonitorViewModel.removeScope"),
+            // V48(R-1):作用域的唯一 UI 通路 = 双向开关(列表行 Checkbox / 监控页 Switch);
+            // 原登记的 AppMonitorViewModel.removeScope 是**零入口死路**(pendingDanger 只会置
+            // CLEAR_LOGS),移出恒由 toggleScope 的 off 分支承担,故随该实现一并删除。
+            // MCP 侧 scope_remove 仍在(Agent 面无「双向开关」这一 UI  affordance)。
+            ui = listOf("AppsViewModel.toggle", "AppMonitorViewModel.toggleScope"),
             tools = listOf("scope_state", "scope_add", "scope_remove"),
         ),
         Capability(

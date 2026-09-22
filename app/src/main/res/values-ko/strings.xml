@@ -95,7 +95,6 @@
 
     <!-- Danger confirmations -->
     <string name="danger_title">작업 확인</string>
-    <string name="danger_remove_scope_msg">"%1$s"을(를) 스코프에서 제거하시겠습니까? 대상 프로세스 재시작 후 적용됩니다.</string>
     <string name="danger_clear_logs_msg">"%1$s"의 모든 기록을 삭제하시겠습니까? 되돌릴 수 없습니다.</string>
     <string name="danger_clear_all_msg">모든 기록을 삭제하시겠습니까? 되돌릴 수 없습니다.</string>
     <string name="cancel">취소</string>

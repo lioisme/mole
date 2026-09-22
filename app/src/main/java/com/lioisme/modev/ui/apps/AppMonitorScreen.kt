@@ -157,7 +157,7 @@ fun AppMonitorScreen(
     val label = appInfo?.label?.takeIf { it.isNotBlank() } ?: viewModel.packageName
     val snackbarHostState = remember { SnackbarHostState() }
     val context = LocalContext.current
-    var pendingDanger by remember { mutableStateOf<DangerAction?>(null) }
+    var confirmClearLogs by remember { mutableStateOf(false) }
 
     LaunchedEffect(viewModel.messages) {
         viewModel.messages.collect { message ->
@@ -179,7 +179,7 @@ fun AppMonitorScreen(
                     TooltipAction(
                         tooltip = stringResource(R.string.detail_clear_records),
                         testTag = "app-clear-records",
-                    ) { pendingDanger = DangerAction.CLEAR_LOGS }
+                    ) { confirmClearLogs = true }
                     if (launchable == true) {
                         TooltipAction(
                             tooltip = stringResource(R.string.apps_launch),
@@ -340,29 +340,18 @@ fun AppMonitorScreen(
         }
     }
 
-    pendingDanger?.let { danger ->
+    if (confirmClearLogs) {
         ModevConfirmDialog(
             title = stringResource(R.string.danger_title),
-            message = stringResource(
-                when (danger) {
-                    DangerAction.REMOVE_SCOPE -> R.string.danger_remove_scope_msg
-                    DangerAction.CLEAR_LOGS -> R.string.danger_clear_logs_msg
-                },
-                viewModel.packageName,
-            ),
+            message = stringResource(R.string.danger_clear_logs_msg, viewModel.packageName),
             onConfirm = {
-                when (danger) {
-                    DangerAction.REMOVE_SCOPE -> viewModel.removeScope()
-                    DangerAction.CLEAR_LOGS -> viewModel.clearLogs()
-                }
-                pendingDanger = null
+                viewModel.clearLogs()
+                confirmClearLogs = false
             },
-            onDismiss = { pendingDanger = null },
+            onDismiss = { confirmClearLogs = false },
         )
     }
 }
-
-private enum class DangerAction { REMOVE_SCOPE, CLEAR_LOGS }
 
 /** Appbar 图标动作(TipIconButton 自带 tooltip + 长按振动;testTag 锚定)。 */
 @Composable

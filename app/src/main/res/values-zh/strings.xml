@@ -90,7 +90,6 @@
 
     <!-- 危险操作确认 -->
     <string name="danger_title">确认操作</string>
-    <string name="danger_remove_scope_msg">将「%1$s」移出作用域?目标进程重启后生效。</string>
     <string name="danger_clear_logs_msg">清空「%1$s」的全部记录?此操作不可撤销。</string>
     <string name="danger_clear_all_msg">清空全部记录?此操作不可撤销。</string>
     <string name="cancel">取消</string>

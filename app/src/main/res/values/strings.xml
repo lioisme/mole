@@ -92,7 +92,6 @@
 
     <!-- Danger confirmations -->
     <string name="danger_title">Confirm operation</string>
-    <string name="danger_remove_scope_msg">Remove "%1$s" from scope? Takes effect after the target process restarts.</string>
     <string name="danger_clear_logs_msg">Clear all records of "%1$s"? This cannot be undone.</string>
     <string name="danger_clear_all_msg">Clear ALL records? This cannot be undone.</string>
     <string name="cancel">Cancel</string>
