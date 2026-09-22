@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
     <string name="app_name">Modev</string>
-    <string name="app_description">Monitor target apps\' algorithm and database operations via scoped Xposed hooks.</string>
+    <string name="app_description">Observe and intervene target apps inside the Xposed scope: algorithm, database, behavior, preferences, WebView and system information listen, plus dialog interception, environment spoofing and process guard.</string>
 
     <!-- Common -->
     <string name="cd_back">Back</string>
@@ -56,12 +56,12 @@
     <string name="filter_type_webview">WebView</string>
 
     <string name="detail_empty">No records yet</string>
-    <string name="detail_empty_hint">Try adjusting filters or enable more categories in Feature Configuration</string>
+    <string name="detail_empty_hint">Try adjusting filters, or enable more categories in Listen Settings / Feature Settings</string>
     <string name="records_count_subtitle">%1$s records</string>
     <string name="record_copied_toast">Record summary copied</string>
-    <string name="section_monitor_kinds">Monitor Kinds</string>
+    <string name="section_monitor_kinds">Listen Switches</string>
     <string name="app_monitor_scope_row">Scope this app</string>
-    <string name="listen_settings_entry">Feature Configuration</string>
+    <string name="listen_settings_entry">Listen Settings</string>
     <string name="listen_summary_default">Uses default configuration</string>
     <plurals name="listen_settings_custom_n">
         <item quantity="one">%1$d item customized</item>
@@ -70,10 +70,10 @@
     <string name="app_monitor_actions_section">Actions</string>
     <string name="listen_settings_hint">Every switch starts from the default configuration. Toggling creates a custom setting for this app and applies instantly.</string>
     <string name="listen_reset_action">Restore default configuration</string>
-    <string name="danger_reset_listen_msg">Restore all feature configurations for %1$s to the default?</string>
+    <string name="danger_reset_listen_msg">Restore all listen settings for %1$s to the default?</string>
     <string name="section_record_options">Record Options</string>
-    <string name="algorithm_monitor_master">Enable Algorithm Listen</string>
-    <string name="database_monitor_master">Enable Database Listen</string>
+    <string name="algorithm_monitor_master">Algorithm Listen</string>
+    <string name="database_monitor_master">Database Listen</string>
     <string name="section_db_result_limits">Result Limits</string>
     <string name="db_max_result_rows">Max result rows</string>
     <string name="db_max_result_rows_hint">Rows collected per query result (0 = unlimited)</string>
@@ -707,7 +707,7 @@
     <!-- V37 dual-domain: per-app feature settings -->
     <string name="feature_settings_entry">Feature Settings</string>
     <string name="feature_settings_hint">Active measures change the app\'s behavior. Each takes effect immediately after being enabled.</string>
-    <string name="feature_masters_section">Feature Masters</string>
+    <string name="feature_masters_section">Feature Switches</string>
     <string name="feature_group_dialog_intercept">Dialog Keyword Intercept</string>
     <string name="feature_group_process_guard">Process Guard</string>
     <string name="feature_group_ssl_bypass">SSL Pinning Bypass</string>
@@ -726,9 +726,9 @@
     <string name="feature_keyword_library_empty">The keyword library is empty</string>
     <string name="feature_keyword_open_library">Open Library</string>
     <string name="feature_keyword_subset_title">Enabled Keywords</string>
-    <string name="danger_reset_feature_msg">Remove all feature customizations for %1$s and restore defaults?</string>
+    <string name="danger_reset_feature_msg">Restore all feature settings for %1$s to the default?</string>
     <!-- V37 dual-domain: listen page environment observation section -->
-    <string name="listen_section_env_observe">Environment Observation</string>
+    <string name="listen_section_env_observe">Environment Listen</string>
     <!-- V37 T3.5: global keyword library -->
     <string name="keywords_title">Dialog Intercept Keywords</string>
     <string name="keywords_add_action">Add keyword</string>

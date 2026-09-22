@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">Modev</string>
-    <string name="app_description">通过作用域 Xposed 钩子程序监听目标 App 的算法与数据库行为。</string>
+    <string name="app_description">在 Xposed 作用域内监听目标应用(算法/数据库/行为/偏好/WebView/系统信息),并干预其行为(弹窗拦截/环境伪装/进程守护)。</string>
 
     <!-- 通用 -->
     <string name="cd_back">返回</string>
@@ -55,12 +55,12 @@
     <string name="filter_type_prefs">SharedPreferences</string>
     <string name="filter_type_webview">WebView</string>
     <string name="detail_empty">暂无记录</string>
-    <string name="detail_empty_hint">试试调整筛选条件,或在功能配置中开启更多类别</string>
+    <string name="detail_empty_hint">试试调整筛选条件,或在监听设置/功能设置中开启更多类别</string>
     <string name="records_count_subtitle">%1$s 条记录</string>
     <string name="record_copied_toast">记录摘要已复制</string>
-    <string name="section_monitor_kinds">监听类别</string>
+    <string name="section_monitor_kinds">监听开关</string>
     <string name="app_monitor_scope_row">作用域此应用</string>
-    <string name="listen_settings_entry">功能配置</string>
+    <string name="listen_settings_entry">监听设置</string>
     <string name="listen_summary_default">使用默认配置</string>
     <plurals name="listen_settings_custom_n">
         <item quantity="other">%1$d 项已自定义</item>
@@ -68,10 +68,10 @@
     <string name="app_monitor_actions_section">操作</string>
     <string name="listen_settings_hint">各类别初始为默认配置;单独调整后即成为该应用的自定义配置,变更即时生效</string>
     <string name="listen_reset_action">恢复默认配置</string>
-    <string name="danger_reset_listen_msg">将 %1$s 的全部功能配置恢复为默认?</string>
+    <string name="danger_reset_listen_msg">将 %1$s 的全部监听设置恢复为默认?</string>
     <string name="section_record_options">记录选项</string>
-    <string name="algorithm_monitor_master">启用算法监听</string>
-    <string name="database_monitor_master">启用数据库监听</string>
+    <string name="algorithm_monitor_master">算法监听</string>
+    <string name="database_monitor_master">数据库监听</string>
     <string name="section_db_result_limits">结果闸门</string>
     <string name="db_max_result_rows">结果行数上限</string>
     <string name="db_max_result_rows_hint">每个查询结果采集的行数(0 = 不限制)</string>
@@ -696,7 +696,7 @@
     <!-- V37 双域拆分:每应用功能设置 -->
     <string name="feature_settings_entry">功能设置</string>
     <string name="feature_settings_hint">功能会主动改变应用行为,开启后立即生效。</string>
-    <string name="feature_masters_section">功能总开关</string>
+    <string name="feature_masters_section">功能开关</string>
     <string name="feature_group_dialog_intercept">弹窗关键词拦截</string>
     <string name="feature_group_process_guard">进程守护</string>
     <string name="feature_group_ssl_bypass">SSL 校验绕过</string>
@@ -715,9 +715,9 @@
     <string name="feature_keyword_library_empty">关键词库为空</string>
     <string name="feature_keyword_open_library">打开关键词库</string>
     <string name="feature_keyword_subset_title">启用的关键词</string>
-    <string name="danger_reset_feature_msg">清除 %1$s 的全部功能自定义并恢复默认?</string>
+    <string name="danger_reset_feature_msg">将 %1$s 的全部功能设置恢复为默认?</string>
     <!-- V37 双域拆分:监听页环境观测分区 -->
-    <string name="listen_section_env_observe">环境观测</string>
+    <string name="listen_section_env_observe">环境监听</string>
     <!-- V37 T3.5:全局关键词库 -->
     <string name="keywords_title">弹窗拦截关键词</string>
     <string name="keywords_add_action">添加关键词</string>

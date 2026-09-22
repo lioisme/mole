@@ -5,6 +5,7 @@ import android.os.LocaleList
 import com.lioisme.modev.R
 import java.util.Locale
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -78,5 +79,49 @@ class DomainVocabularyTest {
         assertTrue(text("zh", "detail_not_listening").contains("作用域"))
         assertFalse(text("zh", "detail_listening").contains("监听"))
         assertFalse(text("zh", "detail_not_listening").contains("监听"))
+    }
+
+    /** 四语全表(与 `LocaleManager.SUPPORTED_TAGS` 同集)。 */
+    private val localeTags = listOf("en", "zh", "ja", "ko")
+
+    /**
+     * V48-DFC-02:两个域页必须**在四种语言里都可区分**,且被动采集页不许占「功能」一词。
+     * 更名前的实锤形态:`listen_settings_entry` 与 `feature_settings_entry` 的 ja/ko 值
+     * 逐字符相同(機能設定 / 기능 설정)—— 两屏在两种语言里就是同一个名字。
+     */
+    @Test
+    fun theTwoDomainPagesHaveDistinctNamesInEveryLocale() {
+        localeTags.forEach { tag ->
+            val listen = text(tag, "listen_settings_entry")
+            val feature = text(tag, "feature_settings_entry")
+            assertNotEquals("[$tag] two different pages rendered one name: $listen", listen, feature)
+        }
+        val zhListen = text("zh", "listen_settings_entry")
+        assertTrue("listen page must own 监听: $zhListen", zhListen.contains("监听"))
+        assertFalse("listen page must not borrow 功能: $zhListen", zhListen.contains("功能"))
+        assertTrue(text("zh", "feature_settings_entry").contains("功能"))
+    }
+
+    /**
+     * 两页的「恢复默认配置」确认必须是同一动作的对称句(同动词、同句式,只换域词)。
+     * 旧形态一个是「将…全部功能配置恢复为默认」、另一个是「清除…全部功能自定义并恢复默认」,
+     * 读起来像两件不相关的操作,而实现是按域清除的一对镜像(`resetOverride(pkg, LISTEN/FEATURE)`)。
+     */
+    @Test
+    fun resetConfirmationsAreSymmetricPerDomain() {
+        val listen = text("zh", "danger_reset_listen_msg")
+        val feature = text("zh", "danger_reset_feature_msg")
+        val suffix = "恢复为默认?"
+        assertTrue("listen: $listen", listen.startsWith("将 ") && listen.endsWith(suffix))
+        assertTrue("feature: $feature", feature.startsWith("将 ") && feature.endsWith(suffix))
+        assertTrue(listen.contains("监听设置"))
+        assertTrue(feature.contains("功能设置"))
+    }
+
+    /** 空列表提示必须同时指向两页(10 类里 4 类归功能页管,只指监听页 = 死胡同)。 */
+    @Test
+    fun emptyListHintPointsAtBothDomainPages() {
+        val hint = text("zh", "detail_empty_hint")
+        assertTrue("hint must name both pages: $hint", hint.contains("监听设置") && hint.contains("功能设置"))
     }
 }

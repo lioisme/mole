@@ -5,7 +5,7 @@
      ja/ko CLDR plural rules: "other" quantity only. -->
 <resources>
     <string name="app_name">Modev</string>
-    <string name="app_description">스코프 Xposed 훅으로 대상 앱의 알고리즘과 데이터베이스 작업을 모니터링합니다.</string>
+    <string name="app_description">Xposed 적용 범위에서 대상 앱을 감시하고 동작에 간섭합니다(알고리즘·데이터베이스·동작·설정·WebView·시스템 정보 + 대화상자 차단·환경 위장·프로세스 보호).</string>
 
     <!-- Common -->
     <string name="cd_back">뒤로</string>
@@ -60,12 +60,12 @@
     <string name="filter_type_webview">WebView</string>
 
     <string name="detail_empty">기록이 아직 없습니다</string>
-    <string name="detail_empty_hint">필터를 조정하거나 기능 설정에서 더 많은 카테고리를 사용하세요</string>
+    <string name="detail_empty_hint">필터를 조정하거나 감시 설정·기능 설정에서 더 많은 카테고리를 사용하세요</string>
     <string name="records_count_subtitle">기록 %1$s개</string>
     <string name="record_copied_toast">기록 요약을 복사했습니다</string>
-    <string name="section_monitor_kinds">모니터링 항목</string>
+    <string name="section_monitor_kinds">감시 스위치</string>
     <string name="app_monitor_scope_row">이 앱을 적용 범위에 포함</string>
-    <string name="listen_settings_entry">기능 설정</string>
+    <string name="listen_settings_entry">감시 설정</string>
     <string name="listen_summary_default">기본 설정 사용</string>
     <plurals name="listen_settings_custom_n">
         <item quantity="other">%1$d개 항목 사용자 지정</item>
@@ -73,10 +73,10 @@
     <string name="app_monitor_actions_section">작업</string>
     <string name="listen_settings_hint">각 스위치는 기본 설정에서 시작합니다. 전환하면 이 앱의 개별 설정이 되며 즉시 적용됩니다.</string>
     <string name="listen_reset_action">기본 설정으로 복원</string>
-    <string name="danger_reset_listen_msg">%1$s의 모든 기능 설정을 기본값으로 복원하시겠습니까?</string>
+    <string name="danger_reset_listen_msg">%1$s의 모든 감시 설정을 기본값으로 복원하시겠습니까?</string>
     <string name="section_record_options">기록 옵션</string>
-    <string name="algorithm_monitor_master">알고리즘 모니터링 사용</string>
-    <string name="database_monitor_master">데이터베이스 모니터링 사용</string>
+    <string name="algorithm_monitor_master">알고리즘 감시</string>
+    <string name="database_monitor_master">데이터베이스 감시</string>
     <string name="section_db_result_limits">결과 제한</string>
     <string name="db_max_result_rows">최대 결과 행 수</string>
     <string name="db_max_result_rows_hint">쿼리 결과별 수집 행 수(0 = 무제한)</string>
@@ -703,7 +703,7 @@
     <!-- V37 dual-domain: per-app feature settings -->
     <string name="feature_settings_entry">기능 설정</string>
     <string name="feature_settings_hint">기능은 앱 동작을 능동적으로 변경합니다. 켜면 즉시 적용됩니다.</string>
-    <string name="feature_masters_section">기능 마스터 스위치</string>
+    <string name="feature_masters_section">기능 스위치</string>
     <string name="feature_group_dialog_intercept">다이얼로그 키워드 차단</string>
     <string name="feature_group_process_guard">프로세스 가드</string>
     <string name="feature_group_ssl_bypass">SSL 검증 우회</string>
@@ -722,9 +722,9 @@
     <string name="feature_keyword_library_empty">키워드 라이브러리가 비어 있습니다</string>
     <string name="feature_keyword_open_library">라이브러리 열기</string>
     <string name="feature_keyword_subset_title">활성화된 키워드</string>
-    <string name="danger_reset_feature_msg">%1$s의 모든 기능 사용자 지정을 지우고 기본값으로 복원하시겠습니까?</string>
+    <string name="danger_reset_feature_msg">%1$s의 모든 기능 설정을 기본값으로 복원하시겠습니까?</string>
     <!-- V37 dual-domain: listen page environment observation section -->
-    <string name="listen_section_env_observe">환경 관측</string>
+    <string name="listen_section_env_observe">환경 감시</string>
     <!-- V37 T3.5: global keyword library -->
     <string name="keywords_title">다이얼로그 차단 키워드</string>
     <string name="keywords_add_action">키워드 추가</string>

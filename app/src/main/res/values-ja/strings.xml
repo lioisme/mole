@@ -5,7 +5,7 @@
      ja/ko CLDR plural rules: "other" quantity only. -->
 <resources>
     <string name="app_name">Modev</string>
-    <string name="app_description">作用域付き Xposed フックで対象アプリのアルゴリズムとデータベース操作を監視します。</string>
+    <string name="app_description">Xposed のスコープ内で対象アプリを監視し、動作に干渉します(アルゴリズム/データベース/動作/設定/WebView/システム情報 + ダイアログ遮断・環境偽装・プロセス保護)。</string>
 
     <!-- Common -->
     <string name="cd_back">戻る</string>
@@ -60,12 +60,12 @@
     <string name="filter_type_webview">WebView</string>
 
     <string name="detail_empty">記録はまだありません</string>
-    <string name="detail_empty_hint">フィルタを調整するか、機能設定でさらにカテゴリを有効にしてください</string>
+    <string name="detail_empty_hint">フィルタを調整するか、監視設定/機能設定でさらにカテゴリを有効にしてください</string>
     <string name="records_count_subtitle">記録 %1$s 件</string>
     <string name="record_copied_toast">記録の概要をコピーしました</string>
-    <string name="section_monitor_kinds">監視カテゴリ</string>
+    <string name="section_monitor_kinds">監視スイッチ</string>
     <string name="app_monitor_scope_row">このアプリをフック対象にする</string>
-    <string name="listen_settings_entry">機能設定</string>
+    <string name="listen_settings_entry">監視設定</string>
     <string name="listen_summary_default">デフォルト設定を使用</string>
     <plurals name="listen_settings_custom_n">
         <item quantity="other">%1$d 項目をカスタマイズ</item>
@@ -73,10 +73,10 @@
     <string name="app_monitor_actions_section">操作</string>
     <string name="listen_settings_hint">各スイッチはデフォルト設定から始まります。切り替えるとこのアプリの個別設定になり、即時適用されます。</string>
     <string name="listen_reset_action">デフォルト設定に戻す</string>
-    <string name="danger_reset_listen_msg">%1$s のすべての機能設定をデフォルトに戻しますか?</string>
+    <string name="danger_reset_listen_msg">%1$s のすべての監視設定をデフォルトに戻しますか?</string>
     <string name="section_record_options">記録オプション</string>
-    <string name="algorithm_monitor_master">アルゴリズム監視を有効化</string>
-    <string name="database_monitor_master">データベース監視を有効化</string>
+    <string name="algorithm_monitor_master">アルゴリズム監視</string>
+    <string name="database_monitor_master">データベース監視</string>
     <string name="section_db_result_limits">結果上限</string>
     <string name="db_max_result_rows">最大結果行数</string>
     <string name="db_max_result_rows_hint">クエリ結果ごとに収集する行数(0 = 無制限)</string>
@@ -703,7 +703,7 @@
     <!-- V37 dual-domain: per-app feature settings -->
     <string name="feature_settings_entry">機能設定</string>
     <string name="feature_settings_hint">機能はアプリの動作を能動的に変更します。有効化すると直ちに適用されます。</string>
-    <string name="feature_masters_section">機能マスタースイッチ</string>
+    <string name="feature_masters_section">機能スイッチ</string>
     <string name="feature_group_dialog_intercept">ダイアログキーワード遮断</string>
     <string name="feature_group_process_guard">プロセスガード</string>
     <string name="feature_group_ssl_bypass">SSL 検証バイパス</string>
@@ -722,9 +722,9 @@
     <string name="feature_keyword_library_empty">キーワードライブラリが空です</string>
     <string name="feature_keyword_open_library">ライブラリを開く</string>
     <string name="feature_keyword_subset_title">有効なキーワード</string>
-    <string name="danger_reset_feature_msg">%1$s のすべての機能カスタマイズを消去してデフォルトに戻しますか?</string>
+    <string name="danger_reset_feature_msg">%1$s のすべての機能設定をデフォルトに戻しますか?</string>
     <!-- V37 dual-domain: listen page environment observation section -->
-    <string name="listen_section_env_observe">環境観測</string>
+    <string name="listen_section_env_observe">環境監視</string>
     <!-- V37 T3.5: global keyword library -->
     <string name="keywords_title">ダイアログ遮断キーワード</string>
     <string name="keywords_add_action">キーワードを追加</string>
