@@ -593,6 +593,13 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
   `compile…Kotlin FAILED` 而**无任何 `e:` 诊断**)——此时先
   `-Dkotlin.compiler.execution.strategy=in-process` 重跑再归因源码,
   否则会把环境故障误读成编译错误。
+  **OOM 崩溃还会撕裂 KSP 增量缓存**(V47 实锤:commit charge 38.6/40.6 GB 下测试执行器
+  `Chunk::new` malloc 失败被杀,之后 `ksp…AndroidTestKotlin` 恒报
+  `StreamCorruptedException: invalid stream header: 00000000`,`--rerun-tasks --no-build-cache`
+  **也修不好**;缓存目录被 `--stop` 前的 daemon 句柄持住 ⇒ `Device or resource busy`)。
+  处置 = `gradlew --stop`(只停闲置)→ 删 `app/build/kspCaches/<variant>`(纯生成物)→ 重跑。
+  另:测试执行器被杀时 gradle 可能仍报 `BUILD FAILED` 而**无任何失败用例**,后台通知的
+  「exit code 0」在这一族故障里同样不可信,判据是日志里 `BUILD` 行与结果 XML 的 mtime。
 - **Robolectric 双模式均不支持 `EXPLAIN QUERY PLAN`**(legacy/native shadow
   都剥离 EXPLAIN 前缀直接执行原查询,返回普通结果集)——查询计划级验证留待
   真机插桩;JVM 门禁用「sqlite_master 索引存在性 + 行为对账」组合
