@@ -188,7 +188,7 @@
 
 ---
 
-### WP-A · 作用域更名 + 文案域一致性（R-1，独立可交付）
+### WP-A · 作用域更名 + 文案域一致性（R-1，独立可交付）✅ 2026-09-23
 
 **规模:** S-M ｜ **依赖:** 无 ｜ **风险:** 仅文案与一个 contentDescription;`testTag`/路由/JSON 键零动（D-9）
 
@@ -198,7 +198,7 @@
 
 **Interfaces:** Consumes 无;Produces 键 `app_monitor_scope_row` 的新四语值（A2/A3 与 §2.2 表引用它）
 
-- [ ] **Step 1: 写失败门禁** —— 新建 `DomainVocabularyTest`(纯 JVM,读 `res/values*/strings.xml` 文本;本仓已有同形态源码/资源扫描测试可参照 `StringResourceParityTest`)
+- [x] **Step 1: 写失败门禁** —— 新建 `DomainVocabularyTest`(纯 JVM,读 `res/values*/strings.xml` 文本;本仓已有同形态源码/资源扫描测试可参照 `StringResourceParityTest`)
 
 ```kotlin
 class DomainVocabularyTest {
@@ -227,25 +227,25 @@ class DomainVocabularyTest {
 }
 ```
 
-- [ ] **Step 2: 跑测试确认红**
+- [x] **Step 2: 跑测试确认红**
 
 Run: `.\gradlew.bat :app:testModernDebugUnitTest --tests "com.lioisme.modev.i18n.DomainVocabularyTest"`
 Expected: FAIL —— `values must not call scoping a listener: Monitor this app`
 
-- [ ] **Step 3: 改 en + zh 源值**（`Edit` 工具,逐字节安全）
+- [x] **Step 3: 改 en + zh 源值**（`Edit` 工具,逐字节安全）
 
 `values/strings.xml:63` → `<string name="app_monitor_scope_row">Scope this app</string>`
 `values-zh/strings.xml:62` → `<string name="app_monitor_scope_row">作用域此应用</string>`
 
-- [ ] **Step 4: 回写翻译表并跑生成器**（禁直写 `values-ja`/`values-ko`）
+- [x] **Step 4: 回写翻译表并跑生成器**（禁直写 `values-ja`/`values-ko`）
 
 `scripts/v42_table_1.mjs:53` → `app_monitor_scope_row: ['このアプリを作用域', '이 앱을 작용 영역'],`
 
 Run: `node scripts/v42_generate.mjs` → Expected: 控制台末行 `DONE`（非 `missing from translation table`）
 
-- [ ] **Step 5: 复跑门禁确认绿** → Step 2 同一命令,Expected: PASS
+- [x] **Step 5: 复跑门禁确认绿** → Step 2 同一命令,Expected: PASS
 
-- [ ] **Step 6: 提交**
+- [x] **Step 6: 提交**
 
 ```bash
 git add app/src/main/res/values/strings.xml app/src/main/res/values-zh/strings.xml app/src/main/res/values-ja/strings.xml app/src/main/res/values-ko/strings.xml scripts/v42_table_1.mjs app/src/test/java/com/lioisme/modev/i18n/DomainVocabularyTest.kt
@@ -256,7 +256,7 @@ git commit -m "v48: rename the per-app master to \\"Scope this app\\" (R-1)"
 
 **Files:** Modify `values/strings.xml` + `values-zh/strings.xml`（键 `listen_settings_entry`, `danger_reset_listen_msg`, `detail_empty_hint`）+ `scripts/v42_table_1.mjs`;Test 扩展 `DomainVocabularyTest`
 
-- [ ] **Step 1: 加失败断言**（两页标题必须一个含「监听」一个含「功能」,且互不冒充）
+- [x] **Step 1: 加失败断言**（两页标题必须一个含「监听」一个含「功能」,且互不冒充）
 
 ```kotlin
 /** V48-DFC-02:被动采集页禁占「功能」一词。 */
@@ -268,8 +268,8 @@ git commit -m "v48: rename the per-app master to \\"Scope this app\\" (R-1)"
 }
 ```
 
-- [ ] **Step 2: 跑 → 确认 FAIL**
-- [ ] **Step 3: 改值**（zh/en 成对;ja/ko 走 Step 4）
+- [x] **Step 2: 跑 → 确认 FAIL**
+- [x] **Step 3: 改值**（zh/en 成对;ja/ko 走 Step 4）
 
 | 键 | zh 现值 | zh 新值 | en 现值 | en 新值 |
 |---|---|---|---|---|
@@ -278,15 +278,15 @@ git commit -m "v48: rename the per-app master to \\"Scope this app\\" (R-1)"
 | `danger_reset_feature_msg` | 清除 %1$s 的全部功能自定义并恢复默认? | **将 %1$s 的全部功能设置恢复为默认?**（与上行同动同名词） | Remove all feature customizations… | **Restore all feature settings for %1$s to the default?** |
 | `detail_empty_hint` | 试试调整筛选条件,或在功能配置中开启更多类别 | **试试调整筛选条件,或在监听设置/功能设置中开启更多类别** | （同步两词） | （同步两词） |
 
-- [ ] **Step 4: 回写 `v42_table_*.mjs` 对应四行 → `node scripts/v42_generate.mjs` → `DONE`**
-- [ ] **Step 5: 复跑 → PASS;并跑 `StringResourceParityTest`**（四语键集与占位符一致）
-- [ ] **Step 6: 提交** `git commit -m "v48: name the listen page by its domain (V48-DFC-02/05/06)"`
+- [x] **Step 4: 回写 `v42_table_*.mjs` 对应四行 → `node scripts/v42_generate.mjs` → `DONE`**
+- [x] **Step 5: 复跑 → PASS;并跑 `StringResourceParityTest`**（四语键集与占位符一致）
+- [x] **Step 6: 提交** `git commit -m "v48: name the listen page by its domain (V48-DFC-02/05/06)"`
 
 #### Task A3 · 应用列表作用域控件补标签 + 死路清除（V48-DFC-07/08）
 
 **Files:** Modify `ui/apps/AppsScreen.kt:551-556`;Modify `ui/apps/AppMonitorScreen.kt`（`DangerAction.REMOVE_SCOPE` 分支 + `danger_remove_scope_msg`）;Modify `ui/apps/AppMonitorViewModel.kt:158-164`
 
-- [ ] **Step 1: 行尾 Checkbox 补语义**（同一名词、可锚定；`contentDescription` 走资源，禁硬编码）
+- [x] **Step 1: 行尾 Checkbox 补语义**（同一名词、可锚定；`contentDescription` 走资源，禁硬编码）
 
 ```kotlin
         trailingContent = {
@@ -303,19 +303,19 @@ git commit -m "v48: rename the per-app master to \\"Scope this app\\" (R-1)"
         },
 ```
 
-- [ ] **Step 2: 删死路** —— `DangerAction.REMOVE_SCOPE` 枚举项与其 `when` 臂、`AppMonitorViewModel.removeScope()`、`values*/strings.xml` 的 `danger_remove_scope_msg` 四语 + 翻译表行。**不复活**：移出作用域已由同一开关双向承载（`toggleScope` 的 off 分支）。
-- [ ] **Step 3: 跑门禁**
+- [x] **Step 2: 删死路** —— `DangerAction.REMOVE_SCOPE` 枚举项与其 `when` 臂、`AppMonitorViewModel.removeScope()`、`values*/strings.xml` 的 `danger_remove_scope_msg` 四语 + 翻译表行。**不复活**：移出作用域已由同一开关双向承载（`toggleScope` 的 off 分支）。
+- [x] **Step 3: 跑门禁**
 
 Run: `.\gradlew.bat :app:testModernDebugUnitTest --tests "com.lioisme.modev.i18n.*" --tests "com.lioisme.modev.ui.apps.*"`
 Expected: PASS（若插桩档 `FourScreensNavTest`/`AppMonitorRedesignTest` 引用被删键,按其**新语义**改用 `app-row-scope` 锚点,禁回退本任务）
 
-- [ ] **Step 4: 提交** `v48: label the app-row scope checkbox and drop the dead remove-scope path`
+- [x] **Step 4: 提交** `v48: label the app-row scope checkbox and drop the dead remove-scope path`
 
 #### Task A4 · 「总开关/多词族」收口 + 死组件删除（V48-DFC-10/11/13/14）
 
 **Files:** Modify `values*/strings.xml`（9 键）+ 翻译表;Modify `ui/apps/PerAppSettingRows.kt:32-48`
 
-- [ ] **Step 1: 一次性改完这张表**（zh 列出;en 同口径各自翻译,ja/ko 回表）
+- [x] **Step 1: 一次性改完这张表**（zh 列出;en 同口径各自翻译,ja/ko 回表）
 
 | 键 | zh 现值 → 新值 | 理由 |
 |---|---|---|
@@ -326,14 +326,14 @@ Expected: PASS（若插桩档 `FourScreensNavTest`/`AppMonitorRedesignTest` 引�
 | `listen_section_env_observe` | 环境观测 → **环境监听** | 一个概念一个词（V48-DFC-10） |
 | `app_description` | 通过作用域 Xposed 钩子程序监听目标 App 的算法与数据库行为。 → **在 Xposed 作用域内监听目标应用(算法/数据库/行为/偏好/WebView/系统信息),并对功能进行干预(弹窗拦截/环境伪装/进程守护)。** | R-1 用户诉求的字面根因(V48-DFC-14) |
 
-- [ ] **Step 2: 删 `SwitchRowItem`**（零调用点;`ToggleListItem` 与 `SettingsToggleItem` 保留）
-- [ ] **Step 3: `node scripts/v42_generate.mjs` → `DONE`**
-- [ ] **Step 4: 全量单测 + lint**
+- [x] **Step 2: 删 `SwitchRowItem`**（零调用点;`ToggleListItem` 与 `SettingsToggleItem` 保留）
+- [x] **Step 3: `node scripts/v42_generate.mjs` → `DONE`**
+- [x] **Step 4: 全量单测 + lint**
 
 Run: `.\gradlew.bat :app:testModernDebugUnitTest` 然后 `.\gradlew.bat :app:lintModernRelease`
 Expected: `BUILD SUCCESSFUL` × 2;单测 0 失败;lint warning 恒 **43**（净新增 0;若 `UnusedResources` 因删键浮动,须复核是删键还是删消费者）
 
-- [ ] **Step 5: 提交** `v48: one noun per concept across the switch vocabulary`
+- [x] **Step 5: 提交** `v48: one noun per concept across the switch vocabulary`
 
 **WP-A 出口:** A1–A4 全绿 + `DomainVocabularyTest` 三条常驻 + 插桩档 `AppMonitorRedesignTest`/`MonitorEntryHeaderTest` 重跑绿 + 手工目视（模拟器:监控页 Hero 卡、应用列表行、两设置页标题、关于页描述、空列表提示）。**文案改动不得只靠 JVM 门禁宣布完成。**
 
@@ -714,13 +714,17 @@ API 表内容：`1|1 … 4.4W|20, 5|21, 5.1|22, 6|23, 7|24, 7.1|25, 8|26, 8.1|27
 | 日期 | WP/Task | 落地内容 | 定向测试 | 全量/lint/打包 | 红项归因与裁决 | 状态 |
 |---|---|---|---|---|---|---|
 | 2026-09-23 | — | 全量审计（前端 28 路由 / 后端 81 kind / 50 工具 / 画像 41 字段 / 基线三资产）+ 本任务书落盘 | —— | —— | 14 条 V48-DFC 登记;R-3 前置边界如实登记为 §2.4 | ✅ |
+| 2026-09-23 | WP-A/A1 ✅ | `app_monitor_scope_row` 四语更名:zh 监听此应用→**作用域此应用**、en→Scope this app、ja→このアプリをフック対象にする、ko→이 앱을 적용 범위에 포함(ja/ko 经翻译表 + 生成器);新建常驻门禁 `DomainVocabularyTest`(四语禁把作用域称作监听/监视 + 状态徽章与开关同名词) | `DomainVocabularyTest` 3 用例(先红 2 条 → 更名后绿) | i18n 全套绿 | O-1 按建议采纳 ja 母语惯形(不用「作用域」直译) | ✅ |
+| 2026-09-23 | WP-A/A2 ✅ | 两域页正名 `listen_settings_entry` 功能配置→**监听设置**(en Listen Settings / ja 監視設定 / ko 감시 설정);`danger_reset_listen_msg`+`danger_reset_feature_msg` 改为同动词同句式的对称句;`detail_empty_hint` 同时点名两页;门禁 +3 用例 | `DomainVocabularyTest` 6 用例(新增 3 条先红后绿) | `StringResourceParityTest` 四语键集/占位符绿;生成器 `DONE` | **审计低估了严重度**:更名前 `listen_settings_entry` 与 `feature_settings_entry` 的 **ja/ko 值逐字符相同**(機能設定 / 기능 설정,且分表 table_1:54 与 table_3:151 各抄一份)—— 两屏在两种语言里本来就是同一个名字,用户无从区分 | ✅ |
+| 2026-09-23 | WP-A/A3 ✅ | 应用列表行尾 Checkbox 补 `testTag("app-row-scope")` + `contentDescription` 复用 `app_monitor_scope_row`(与监控页开关共享同一个名词);删死路:`DangerAction` 枚举 → 单一 `confirmClearLogs` 布尔、删 `AppMonitorViewModel.removeScope()`、删 `danger_remove_scope_msg` 四语与表行(键数 841→840) | `UiMcpCapabilityParityTest` 驱动(r4 抓到矩阵仍登记 `removeScope`) | 全量 **152 类 / 1069 用例 / 0 失败 / 0 跳过**;lint `--rerun` 真跑 **0e/43w/1h** 与基线逐字相同 | **门禁先于人工发现登记面漂移**:`UiMcpCapabilityParityTest` 能力行仍引用被删的 `removeScope` ⇒ 按事实改登记表(作用域 UI 通路 = 两个双向开关,恒无「移出确认」入口),**并写清 MCP `scope_remove` 为何保留**(Agent 没有双向开关这一 affordance),而不是放宽 r4 | ✅ |
+| 2026-09-23 | WP-A/A4 ✅ | 词汇收口:`section_monitor_kinds` 监听类别→监听开关、`feature_masters_section` 功能总开关→功能开关(去「总」、两页对称)、`algorithm/database_monitor_master` 去「启用」前缀、`listen_section_env_observe` 环境观测→环境监听、`app_description` 重写为「监听 6 类 + 干预 3 类」全貌;删零调用点组件 `SwitchRowItem`(+其独占 `SettingsToggleItem` import) | 编译 + i18n 全套 | 同上(全量/lint 与 A3 同批跑,均绿) | 一处编译红是**我自己的写法错**:`stringResource` 写进非组合的 `semantics{}` lambda ⇒ `@Composable invocations can only happen from the context of @Composable`,按同文件既有 `statusLabel` 先例上提一行解决,未新建机制 | ✅ |
 | | | | | | | ⬜ |
 
 ## 8. 未决项（需用户裁决,阻塞对应任务）
 
 | ID | 事项 | 建议 | 阻塞 |
 |---|---|---|---|
-| **O-1** | 「作用域此应用」的 ja 译法 —— 「作用域」是日语读者不熟的直译,备选「このアプリをフック対象に」 | **推荐后者**（用户可见文本母语优先,契约文档已为 ja/ko 单开母语惯形分支） | A1 Step 4 |
+| ~~**O-1**~~ | ja 译法 —— 「作用域」是日语读者不熟的直译 | **已采纳并落地**(WP-A/A1):ja「このアプリをフック対象にする」、ko「이 앱을 적용 범위에 포함」;`DomainVocabularyTest` 禁四语把作用域称作监听/监视,直译形态亦不出现在 ja/ko | —— |
 | **O-2** | 是否接受 §2.4 的现实：画像库在 V47 WP-3d/4 落地前**不下发靶程序**;接受 ⇒ WP-C/D 按本序做（含库页状态提示行）,不接受 ⇒ 必须先做钩子接管,R-3 的 UI 部分推后 | **推荐先做 WP-3d 第一批钩子接管**（V47 已实测耦合链,一次原子提交）再落 WP-C,可省掉库页那条「尚未生效」提示 | WP-C/D/E 全部 |
 | **O-3** | 许可证长期形态（V47 D-9 未决）：`devices.json` CC BY-NC-SA（**非商业**）与 `carriers.json` MIT 同时进一个可能分发的 APK | 逐字 NOTICE 已在做;若产品要商用,`devices.json` 必须换源或自采 | C1 |
 | **O-4** | 内置档扩充到多少台、选哪些（D-1 只填身份 ⇒ 扩充零风险但收益上限也有限） | 推荐 12 台主流 + 让用户从目录里生成任意机型 | D1 |
