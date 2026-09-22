@@ -338,6 +338,44 @@ public 面 `spoofProfiles: SpoofProfileService` 取自 domain ⇒ G2 闸成立)�
 外加 D-10 的 5 个 kind 退役同步动 UI/MCP/矩阵 —— 这些必须一次改完,否则编译与既有用例同崩。
 故 3c 与钩子本体(3d)按批次原子提交。
 
+### WP-3c · kind 登记:实测耦合链(2026-09-22 尝试后主动退回,未落地)
+
+本轮把 18 个 kind 推进到编译通过 + 四语资源生成器 `DONE`,但在最后一道闸前**主动全量退回**
+(退回后实测 141 类 / 972 用例 / 0 失败,即 `2d86547` 的状态)。
+原因不是难度,是**发现 3c 的真实原子边界比本文档原先登记的更靠后一层**:
+`DeviceEnvKindTest` 要求「每个 kind 至少有一个 `DeviceEnvOperation`」——
+即 kind 登记必须**连带 18 个操作枚举 + 其四语操作标签**一起落,
+而操作枚举的含义取决于钩子实际发射什么,那属于 3d 的设计产出。
+在半成品状态下继续推就是把仓库留在红色。
+
+**实测耦合链(按编译报错顺序,不是推断)**——加 18 个 `DeviceEnvKind` 后依次被强制:
+
+| # | 站点 | 类型 | 本轮状态 |
+|---|---|---|---|
+| 1 | `EffectiveSwitch.readKind` / `applyKinds` | 穷尽 `when`,双臂各 +18 臂 | ✅ 通过 |
+| 2 | `HookSwitch` 18 布尔位 + `deviceEnvEnabled` + `anyDeviceEnvEnabled` | 编译期 | ✅ 通过 |
+| 3 | `CategoryTaxonomy` 18 条(`F` 域、默认 false、SIGNAL、序号 21..38) | 数据 | ✅ 通过 |
+| 4 | `KindIcons.deviceEnv` | 穷尽 `when` | ✅(暂复用 `Construction`) |
+| 5 | `RecordRow.deviceEnvKindLabelRes` + 18 键 × 四语 | 穷尽 `when` + 资源 | ✅ 生成器 `DONE`(713 键) |
+| 6 | `FeatureGroups`:新枚举 `DEVICE_PROFILE` + `kindIds` + `recordType` + 组标签 + 1 键 × 四语 | 穷尽 `when` + 资源 | ✅(714 键 `DONE`) |
+| 7 | `InterventionGateConventionTest.gatedFields` +18 | 名单 | ✅ |
+| 8 | **`DeviceEnvOperation` 18 个新操作 + 其四语标签** | 穷尽依赖 #1..7 | ⛔ **在此停手** |
+| 9 | 冻结计数快照 5 处:`DeviceEnvKindTest` 21→39、`CategoryTaxonomyTest` 三条(21 entries / feature 37→55 / device_env defaults)、`McpToolsTest` `37 kinds in 6 groups`→55/7 | 期望更新 | 未做 |
+| 10 | MCP `feature_settings_set.kindEntries` enum +18(`McpToolRegistry` 强制 schema enum) | 声明面 | 未做 |
+
+**两条可复用的环境事实**(省下一轮的时间):
+- 源文件在磁盘上是 **CRLF**;任何脚本化编辑的锚点必须按实际行尾构造,
+  否则锚点静默不匹配(本轮第一次批量注入就是这么失败的)。
+- `v42_table_3.mjs` 里有 **两个** 顶层对象(`T3` 与 `PLURALS`),
+  用 `lastIndexOf("\n};")` 定位会把新键插进 `PLURALS` —— 插完必须跑生成器验证,
+  本轮正是生成器抛 `missing from translation table` 才抓住这个错位。
+
+**定档(供 3d 一并执行)**:画像组的发射形态由 3d 的钩子决定,
+所以 #8 与 #9/#10 必须和 **3d 第一批钩子同一提交**落;
+`ProfileKind` 独立枚举与「一个记录类型一个 kind 枚举」的既有不变式冲突,
+定档为**并入 `DeviceEnvKind`**(记录仍走 `RecordType.DEVICE_ENV`,
+`FEATURE 37→55`、`DeviceEnvKind 21→39`,原计划 §6 的 50/34 两个数字按此更正)。
+
 - 覆盖 kind:`PROFILE_BUILD / UNIQUE_ID / SIM / CELL / WIFI / NETWORK / DENSITY / CPU`。
 - 产出:`ProfileHookPlan` + `ProfileBaseHooker` + 8 钩子组 + 互斥裁决 R-A..R-D + 值生成器(强制档无条件写)+ DFC-01/02/04/05/08 清偿。
 - 出口:`ProfileHookPlanTest`(空画像=零组 + 四条裁决)+ `InterventionGateConventionTest`/`HotPathGateConventionTest` 名单同步 + **每项二态 JVM/Robolectric 行为测试**(禁自抄实现,直测 internal 本体)。
