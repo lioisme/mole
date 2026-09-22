@@ -47,10 +47,14 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * v13 → v14:V37 T2.1 功能域数据层新增 `keyword_library` 表
  *   (全局弹窗拦截关键词库:id/text 唯一/matchMode/enabled/createdAt),
  *   纯 CREATE TABLE + UNIQUE INDEX,不触碰存量记录。
+ * v14 → v15:V47 T2 设备画像重建两件事同版本落地:
+ *   新增 `spoof_profile` 表(画像库:profileJson 正文 + 内置档账本列 + 删除墓碑,
+ *   builtinSeedId 建普通索引);`crypto_records` 新增可空列 `maskedValue`
+ *   (干预后的值,与 proxyHost 承载的原值配对成双侧 oracle),纯 ADD COLUMN 不触碰存量行。
  */
 @Database(
-    entities = [CryptoRecordEntity::class, KeywordEntity::class],
-    version = 14,
+    entities = [CryptoRecordEntity::class, KeywordEntity::class, SpoofProfileEntity::class],
+    version = 15,
     exportSchema = true,
 )
 abstract class ModevDatabase : RoomDatabase() {
@@ -58,6 +62,8 @@ abstract class ModevDatabase : RoomDatabase() {
     abstract fun cryptoRecordDao(): CryptoRecordDao
 
     abstract fun keywordLibraryDao(): KeywordLibraryDao
+
+    abstract fun spoofProfileDao(): SpoofProfileDao
 
     // ---- 治理面 PRAGMA 出口(V45 T1.7 / ST-8·ST-9) ----
     //
@@ -376,9 +382,63 @@ abstract class ModevDatabase : RoomDatabase() {
             }
         }
 
+        /**
+         * v14 → v15:V47 T2 设备画像重建。两件事同版本一次落地:
+         *  1. 新增 `spoof_profile` 表(画像库:41 字段画像正文 JSON + 内置档账本列 +
+         *     删除墓碑),纯 CREATE TABLE + INDEX,不触碰存量记录;
+         *  2. `crypto_records` 新增可空列 `maskedValue`(干预后的值),把设备环境记录
+         *     升级为「原值 → 伪装值」双侧 oracle —— 此前 maskedValue 只存在于内存模型、
+         *     读回恒 null(AGENTS 实锤 DFC-03),使伪装审计无第二证据源。
+         *     纯 ALTER TABLE ADD COLUMN,存量行该列为 NULL(语义 = 未记录,非空值)。
+         */
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "CREATE TABLE IF NOT EXISTS `spoof_profile` (" +
+                        "`id` TEXT NOT NULL, " +
+                        "`name` TEXT NOT NULL, " +
+                        "`summary` TEXT NOT NULL, " +
+                        "`profileJson` TEXT NOT NULL, " +
+                        "`builtinSeedId` TEXT, " +
+                        "`builtinVersion` INTEGER, " +
+                        "`builtinFingerprint` TEXT, " +
+                        "`managed` INTEGER NOT NULL, " +
+                        "`deleted` INTEGER NOT NULL, " +
+                        "`createTime` INTEGER NOT NULL, " +
+                        "`updateTime` INTEGER NOT NULL, " +
+                        "PRIMARY KEY(`id`))"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_spoof_profile_builtinSeedId` " +
+                        "ON `spoof_profile` (`builtinSeedId`)"
+                )
+                db.execSQL(
+                    "ALTER TABLE `${CryptoRecordEntity.TABLE_NAME}` " +
+                        "ADD COLUMN `maskedValue` TEXT"
+                )
+            }
+        }
+
+        /**
+         * 迁移清单**唯一事实源**(V47 T2 收敛):`builder()` 与全部迁移测试一律引用本数组,
+         * 不再各自枚举 `MIGRATION_x_y`。
+         *
+         * 收敛动因:此前生产侧三处(version / 定义 / addMigrations)由
+         * [com.lioisme.modev.architecture.DbMigrationParityTest] 盯住,但测试侧另有
+         * 七处手写清单在门禁视野之外 —— 每次升版本都要挨个补一行,漏一处即
+         * 「A migration from N to N+1 was required but not found」的假失败。
+         * 现在升版本只需:定义迁移 → 加进本数组 → 同步 `version`,测试零改动
+         * (禁就地枚举由同一门禁的 `migrationListHasSingleSource` 强制)。
+         */
+        val ALL_MIGRATIONS: Array<Migration> = arrayOf(
+            MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
+            MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+            MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+            MIGRATION_12_13, MIGRATION_13_14, MIGRATION_14_15,
+        )
+
         /** 数据库文件名(存储占用统计/测试同源)。 */
         const val NAME = "modev.db"
-
         /**
          * 体检判定表(T1.7,纯函数 = 删库这一不可逆动作的唯一裁决点):
          * 只有「探针跑通且读到非 `ok` 结论」才是 Suspect;探针自身失败或无结果行
@@ -524,12 +584,7 @@ abstract class ModevDatabase : RoomDatabase() {
                 // V23 T6.1:显式 WAL(写并发读、批量落库 fsync 摊薄;
                 // AUTOMATIC 在 API 16+ 实际同为 WAL,显式化表达意图并防 OEM 差异)
                 .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-                .addMigrations(
-                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                    MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                    MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-                    MIGRATION_12_13, MIGRATION_13_14,
-                )
+                .addMigrations(*ALL_MIGRATIONS)
                 .addCallback(GOVERNANCE)
                 .fallbackToDestructiveMigration(false)
     }

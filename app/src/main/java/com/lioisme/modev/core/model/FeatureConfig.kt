@@ -22,10 +22,36 @@ data class FeatureConfig(
     val dialogKeywords: List<String> = emptyList(),
     /** 弹窗拦截有效规则(文本 + 匹配模式;非空时优先于 [dialogKeywords])。 */
     val dialogKeywordRules: List<KeywordRule> = emptyList(),
-    /** 伪装画像档位 id([SpoofProfiles.AUTO] 默认;档位缺失回落 AUTO)。 */
-    val spoofProfileId: String = SpoofProfiles.AUTO,
-    /** 画像字段覆写(键形态见 [SpoofProfiles.resolve])。 */
+    /** 伪装画像档位 id(V47 T2 起 = **画像库主键**,不再是内置档位名;null/空 = 不伪装)。 */
+    val spoofProfileId: String = "",
+    /**
+     * 画像字段覆写(V47 T2 起为**只读遗留通道**:无 UI 入口、MCP 声明面已移除,
+     * 存量用户值仍生效。裁决见 TASK-V47-SPOOF-PLAN 决策 D-3 修订)。
+     * 生效顺序:先取 [deviceProfile] 展开快照,再以本表逐项覆盖。
+     */
     val spoofOverrides: Map<String, String> = emptyMap(),
+    /**
+     * **宿主展开后的画像快照**(V47 T2 / 决策 D-12):`spoofProfileId` → 画像库正文的解析结果。
+     *
+     * 为什么快照也要随配置下发,而不是让注入侧自己按 id 查库:
+     * 画像正文住在 Room,而注入侧的三条取配置路径都不经宿主进程
+     * (`/data/local/tmp/modev_config_{pkg}.json` 由外部推送、`switch_global` + `override_*`
+     * 直读、wire 断连时的磁盘兜底)—— 只带 id 就必然要求跨进程读 Room。
+     * 同一文件已有先例:[dialogKeywordRules] 就是宿主解析后的产物,而库侧的
+     * `keywordIds` 恒不下发。故:**id 是宿主侧绑定键,快照是注入侧消费物**。
+     *
+     * 空画像([DeviceProfile.EMPTY])= 无画像生效;注入侧禁按 id 自行反查。
+     */
+    val deviceProfile: DeviceProfile = DeviceProfile.EMPTY,
+    /**
+     * 自适应掩蔽(条件档,V47 T2 / 决策 D-5):画像**未填**的字段上,是否仍按模拟器
+     * 特征族做「只在脏值上改」的条件掩蔽。
+     *
+     * 与画像强制档严格分档:填了画像 = 无条件写入;本开关只管画像留空的字段。
+     * 迁移来路:旧 `spoofProfileId = "auto"`(纯条件掩蔽、无固定机型)⇒ 本位置 true
+     * 且画像解绑,以免一次升级把「条件档」静默升级成「无条件改写」。
+     */
+    val adaptiveMask: Boolean = false,
     /** Root 包名黑名单追加项(与内置 28 项并集)。 */
     val extraRootPackages: List<String> = emptyList(),
     /** Xposed 类名前缀追加项(与内置前缀并集)。 */

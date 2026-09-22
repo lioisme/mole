@@ -464,8 +464,8 @@ data class HookSwitch(
     }
 
     companion object {
-        /** 当前配置版本号:V32 干预型 hook 默认关闭迁移;V37 功能域数据段(feature)。 */
-        private const val CURRENT_CONFIG_VERSION = 2
+        /** 当前配置版本号:V32 干预型 hook 默认关闭迁移;V37 功能域数据段(feature);V47 设备画像库。 */
+        private const val CURRENT_CONFIG_VERSION = 3
 
         val DEFAULT = HookSwitch(configVersion = CURRENT_CONFIG_VERSION)
 
@@ -484,6 +484,8 @@ data class HookSwitch(
                 ?.takeIf { it.isJsonPrimitive }?.asInt ?: 0
             val needsInterventionReset = version < VERSION_INTERVENTION_DEFAULTS_OFF
             val needsFeatureMigration = version < CURRENT_CONFIG_VERSION
+            // V47 T2:画像库主键体系自 configVersion 3 起生效,旧档位名需映射一次。
+            val needsProfileIdMigration = version < VERSION_DEVICE_PROFILE_LIBRARY
             @Suppress("DEPRECATION")
             val legacyDialogKeywords = base.dialogKeywords
             base.copy(
@@ -537,10 +539,47 @@ data class HookSwitch(
                     base.feature.copy(dialogKeywords = legacyDialogKeywords)
                 } else {
                     base.feature
+                }.let { feature ->
+                    // V47 T2 迁移:旧三档档位名 → 画像库主键。
+                    // 不迁就会「升级即静默失效」:旧值 auto/pixel7pro/xiaomi13 在新主键体系
+                    // (builtin:*)里根本不存在,而缺失 id 按契约是硬失败(不伪装)——
+                    // 用户此前的伪装会无声消失。
+                    //  旧 auto      → 解绑画像 + 打开自适应掩蔽(保持**条件档**语义,
+                    //                 不把一次升级变成「无条件改写」的静默加压)
+                    //  旧 pixel7pro / xiaomi13 → 对应内置档(两者正是不伪造装的档位来源)
+                    //  旧未知值     → 原样保留,交给 resolve 报 Missing(UI 可见,不静默)
+                    if (!needsProfileIdMigration || feature.spoofProfileId.isEmpty()) {
+                        feature
+                    } else {
+                        when (val legacy = feature.spoofProfileId) {
+                            LEGACY_PROFILE_AUTO -> feature.copy(
+                                spoofProfileId = "",
+                                adaptiveMask = true,
+                            )
+
+                            LEGACY_PROFILE_PIXEL -> feature.copy(
+                                spoofProfileId = BuiltinDeviceProfiles.idFor(BuiltinDeviceProfiles.PIXEL_7_PRO),
+                            )
+
+                            LEGACY_PROFILE_XIAOMI -> feature.copy(
+                                spoofProfileId = BuiltinDeviceProfiles.idFor(BuiltinDeviceProfiles.XIAOMI_13),
+                            )
+
+                            else -> feature
+                        }
+                    }
                 },
             )
         }.getOrNull()
 
         private const val VERSION_INTERVENTION_DEFAULTS_OFF = 1
+
+        /** V47 T2 起画像库主键体系生效的最低 configVersion。 */
+        private const val VERSION_DEVICE_PROFILE_LIBRARY = 3
+
+        /** V37 T1.2 之前的隐式档位名(见 [SpoofProfiles]),V47 T2 起由画像库主键取代。 */
+        private const val LEGACY_PROFILE_AUTO = "auto"
+        private const val LEGACY_PROFILE_PIXEL = "pixel7pro"
+        private const val LEGACY_PROFILE_XIAOMI = "xiaomi13"
     }
 }

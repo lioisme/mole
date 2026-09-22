@@ -185,7 +185,8 @@ createTime / updateTime INT
 |---|---|---|---|
 | **D-1** | 能力范围 | **基线 40 项全量** | 用户定档 R-1。代价:与双域分区/MCP/FeatureGroups 冲突最大 |
 | **D-2** | 事实源形态 | **画像库为唯一实体 + 宿主侧展开快照** | wire `VERSION` 恒 4、注入侧零反查、双域不破。代价:Room v15 + 新契约服务 |
-| **D-3** | 每应用字段覆写 | **不做**(只存 `profileId`) | YAGNI + 避免三态语义;DIY 需求由「另存画像」完整满足。代价:微调需另建画像 |
+| **D-3** | 每应用字段覆写 | **不做**(只存 `profileId`);**V47 T2 修订**:存量 `spoofOverrides` 不删除,改为**写面冻结的遗留通道** —— 无 UI 入口、MCP 声明面移除(§2.7),但旧值仍按原语义作为叠加入生效 | 原判断漏了一点:`spoofOverrides` **已随 V37 发布且有真实用户数据**,删字段 = 静默销毁行为,违反 R-8「不降级既有能力」。冻结写面既守住 D-3 本意(覆写不是 DIY 机制),又不丢数据。代价:该字段以「只读遗留」形态多存活一个大版本 |
+| **D-12** | 画像展开的承载体(V47 T2 新增) | `AppListenOverride` 增 **`deviceProfile: DeviceProfile?`** = 宿主展开后的画像快照,随 wire 与磁盘兜底下发;`spoofProfileId` 保持为宿主侧绑定键 | 实锤约束:`/data/local/tmp/modev_config_{pkg}.json` 由**外部推送**、注入侧本地 resolve(`HookInstaller.kt:181-190`),而画像正文在 Room 里 ⇒ 只带 id 时宿主进程不在就无法展开。**同文件已有先例**:`keywordIds` 是宿主侧绑定、`dialogKeywords` 是宿主解析后下发的产物 —— 同一两层模式照搬。代价:FeatureConfig 体积 +41 字段(wire `VERSION` 仍恒 4,`configVersion 2→3`) |
 | **D-4** | kind 粒度 | **一组一 kind(18),比基线 13 更细** | FeatureGate 红线/UI 行/MCP/期望表四者严格一对一。代价:taxonomy 快照与五处同步清单改动大 |
 | **D-5** | 强制档 vs 条件档 | **画像填写 = 无条件生效**;自适应掩蔽降为独立布尔,只管画像未填字段 | 「100% 符合预期」的前置条件。代价:显式画像在无脏值设备上同样改写 |
 | **D-6** | `Build` 改写不可逆 | **接受并显式声明**(Java 侧无读取期路径,AOSP `Build` 无 getter) | 基线同边界。代价:关开关不复原、生效需冷启动 ⇒ 写进 UI 说明 + AGENTS |
@@ -202,18 +203,96 @@ createTime / updateTime INT
 状态图例:⬜ 未开始 · 🔵 进行中 · ✅ 已完成(须出口准则全绿 + 证据入 §9)· ⛔ 阻塞
 **纪律:每个 WP 收口必须同次跑「定向 + 全量 + 回归」三类测试并绿,且把新事实回写 AGENTS.md;门禁绿 ≠ 完成,须能复现症状已修。**
 
-### WP-0 · 环境与基线复位(前置,阻塞全链)⬜
+### WP-0 · 环境与基线复位(前置,阻塞全链)✅ 2026-09-22
+> 已完成:VM 僵死经仓库自带 `WaitDevice` 冷自愈恢复;基线三组实测数全部留档
+> `docs/test-reports/v47-baseline-20260922.md`。新增可复用前置脚本
+> `scripts/test-integration/05-bringup-device.ps1`(28 号位保留给 `28-run-spoof.ps1`)。
+> 实测:单测 132 类/856 用例/0 失败,lint 0 error/43 warning/1 hint,assemble 双 ABI 产物,
+> `00-env-verify -Mode env` 7 PASS/0 FAIL,设备 root + lspd + SDK 34 x86_64 可达。
 - 目标:设备可验收 + 现状基线实测留档(不信文档口径)。
 - 产出:`docs/test-reports/v47-baseline-<utc>.md` —— `testModernDebugUnitTest` / `lintModernRelease` / `assembleModernDebug` 三组实测计数;`adb devices` 单序列确认;LDPlayer 冷启 + scope 恢复 + `cached_apps_freezer` 禁用。
 - 出口准则:全量单测 BUILD SUCCESSFUL 且 0 失败;lint error=0;设备在线序列数 == 1;`00-env-verify.ps1 -Mode runtime` 非 BLOCKED。
 - 风险:恢复注入需整机重启(`dnconsole quit` + `dnplayer -index 0`);并发工作树(AGENTS.md 正被改)⇒ 每次改码前 `git status` 复核。
 
-### WP-1 · 规格冻结与 catalog 落地 ⬜
+### WP-1 · 规格冻结与 catalog 落地 ✅ 2026-09-22
+> 已完成:`ProfileKind`(18) + `ProfileSection`(10) + `ProfileValueType` +
+> `ProfileField`(41 项,含 `baselineKey` 逐字段对齐基线) + `ProfileValues`(哨兵与槽位常量,
+> 截屏方向按基线编号以免互换时语义倒置) + `DeviceProfile`(41 字段值对象,全参数带默认值 ⇒
+> 保 Kotlin 无参构造器 ⇒ Gson 默认值语义成立) + `ProfileFieldCatalog`(分区行序/按类别分组/
+> jsonKey 派生/值域/校验/整组随机集) + `ProfileField ↔ DeviceProfile` 穷尽 `when` 桥接
+> (stringOf / isSetIn / withText,零反射零字符串键)。
+> 定向 `ProfileFieldCatalogTest` 16 用例 + `DeviceProfilePropertyParityTest` 5 用例 = 21 全绿;
+> 全量回归 **134 类 / 877 用例 / 0 失败 / 0 跳过**(基线 132/856 ⇒ 净 +21,零波及)。
+> **基线字段对照表不再以 markdown 维护** —— 改由 `ProfileField.baselineKey` 机器可核承载,
+> 并由测试锁定「40 项有基线键 + 1 项为 Modev 超基线(CPU_CORES)」,比表格更抗漂移。
+> **本包遗留一项显式义务**(不得静默遗忘):§2.1 承诺的「四视图对账」目前只完成
+> catalog ↔ model 两视图;UI 表单视图(`ProfileEditorFieldCountTest`)、MCP 声明视图
+> (`spoof_profile_catalog` schema 对账)、期望表视图(`SpoofExpectationParityTest`)
+> 分别在 WP-5 / WP-7 / WP-8 落地时必须补齐同一等价断言。
 - 产出:`DeviceProfile`(41 字段)+ `ProfileFieldCatalog`(单点)+ 基线字段对照表(41 行逐条)+ 期望表 schema 定义 + JVM 门禁 `ProfileFieldCatalogTest`(分区完备 / kind 归属唯一 / 每字段恰属一 kind / validator 与 sentinel 一致 / MCP 名唯一 / 探针 ID 存在)。
 - 出口:`ProfileFieldCatalogTest` 绿;**派生测试证明「UI 表单 / MCP 声明 / 期望表 / 门控表」四视图字段集完全相同**(这是 D-2 之后防漂移的唯一硬闸)。
 
-### WP-2 · 数据与配置层 ⬜
-- 产出:Room v15(`spoof_profile` + `crypto_records.maskedValue`)+ 实体/DAO(表名走 `TABLE_NAME` 常量)+ `SpoofProfileService` 契约与实现 + 内置三档 catalog 与账本算法 + `AppListenOverride.profileId`(含 `isDefault`/`deviationCountFor`/`clearDomain` 三处同步)+ `EffectiveSwitch` 展开 + `configVersion 2→3` 迁移。
+### WP-2 · 数据与配置层 ✅ 2026-09-22(2a/2b/2c/2d 全部完成)
+
+**收口口径**:定向(画像库/编解码/一致性/展开链 4 个新测试类)+ 全量(**138 类 / 929 用例 /
+0 失败 / 0 跳过**,基线 132/856 ⇒ 净 +73)+ 回归(**lint 0 error / 43 warning / 1 hint,
+与 V46 基线逐字相同**,新增约 1500 行零新警告)三档齐绿才算完成。
+
+**2a 存储**:`SpoofProfileEntity`(`TABLE_NAME` 常量 + `builtinSeedId` 索引)+ `SpoofProfileDao`
+(含墓碑可见集查询)+ **Room v14→v15**(`spoof_profile` 建表 + `crypto_records.maskedValue` 新列)
++ 类 KDoc v15 段。
+**验证不是「编译过」而是「迁移真跑过」**:`CryptoRecordDaoTest` 33 用例含 v1/v2/v4/v6/v7/v8/v9→v15
+全链真实迁移 ⇒ Room 开库校验新表与新列 schema 与实体一致。
+
+**2a+ 迁移清单收敛(计划外但有价值)**:发现测试侧另有 **7 处手写迁移清单**在
+`DbMigrationParityTest` 视野外(每次升版本都要挨个补,漏一处即假失败)。
+收成 `ModevDatabase.ALL_MIGRATIONS` 单一事实源,并把门禁升级为
+`migrationListHasSingleSource`(任何 `addMigrations(` 就地枚举即红)。
+顺带修 `RecordDaoAccessGateTest` 假红:它做文本级匹配,把 KDoc 里写的
+`spoofProfileDao()` 当成调用点 ⇒ 改用与 `PackageBoundaryTest` 同一条去注释正则,
+并把 `spoofProfileDao()` 纳入扫描面、`SpoofProfileRepository.kt` 纳入白名单
+(**新表不吃既有红线例外**)。
+
+**2b 领域层**:`ProfileCodec`(canonical 文本 / SHA-256 指纹 / 整表校验 / 信封版本与体积闸)、
+`DeviceProfileEntry` + `ProfileResolution` **三态**(Unbound/Bound/Missing,GAP-02 的正面解法)、
+`BuiltinDeviceProfiles` 三档 + `BuiltinProfileSpec` 账本规格、`ProfileEnvelope`/
+`ProfileTransferItem`/`ProfileImportOutcome`(含 `REJECTED_INVALID`)、
+`SpoofProfileService` 契约 + `SpoofProfileRepository` 实现(写后同步回读快照、
+墓碑守约、`managed=false` 脱管守约、**同内容收养不重复建档**、超上限整包拒收、
+`dryRun` 零落库、注入式时钟)。
+
+**2c 配置模型**:`FeatureConfig` + `deviceProfile`(展开快照)+ `adaptiveMask`(条件档)、
+`spoofProfileId` 默认由 `"auto"` 改为 `""`(空 = 不伪装,新主键体系下无「隐式默认档」)、
+`spoofOverrides` 标注为**只读遗留通道**;`AppListenOverride` + `resolvedProfile`
+(派生数据:恒不计入 `isDefault`/`deviationCount`,但随 FEATURE 域同清);
+`EffectiveSwitch` 增快照覆盖支;**`configVersion 2→3`**。
+
+**2d 展开与装配**:`SettingsRepository` 单一解析出口 `resolveFor()`
+(偏差 → 关键词规则 → 画像快照,流与同步读同源);`assetRevision()` 合并两个可装配
+全局资产的变更触发(重构掉原 if/else 双分支,**关键词库「变更后立即重推」语义由既有测试守护**);
+`ModevApp` 装配 `spoofProfileRepo`(启动即补内置档 + 变更全量重推;
+public 面 `spoofProfiles: SpoofProfileService` 取自 domain ⇒ G2 闸成立)。
+
+**v3 迁移矩阵(本包最容易静默失效的地方)**:存量配置里的 `auto`/`pixel7pro`/`xiaomi13`
+在新主键体系下不存在,不迁就是「升级即伪装消失」。已定映射并由
+`FeatureConfigMigrationTest` 6 条新用例锁死:
+`pixel7pro→builtin:pixel-7-pro`、`xiaomi13→builtin:xiaomi-13`、
+**`auto→解绑 + adaptiveMask=true`**(不得把条件档悄悄升级成无条件改写)、
+未知旧值**原样保留**交 resolve 报 Missing(不吞不猜)、v3 配置永不二次迁移、
+快照经 feature 段完整往返。
+
+**定向测试合计**:`ProfileFieldCatalogTest` 16 + `DeviceProfilePropertyParityTest` 5 +
+`ProfileCodecTest` 7 + `SpoofProfileRepositoryTest` 18 + `BuiltinProfileConsistencyTest` 8 +
+`FeatureConfigMigrationTest` +6 + `SettingsRepositoryProfileExpansionTest` 11 = **+71 用例**。
+展开链的 11 条断言全部打在**真 Room + 真设置仓库 + 真持久化**上(无 mock 服务),
+含「未装配画像库时不得用空快照覆盖来路快照」这条注入侧兜底保护。
+
+**一处能力口径说明(不做有损映射)**:旧 `spoofOverrides` 承载 `ro.*` 属性键,
+而 `DeviceProfile` **没有 ro 字段族**(基线亦无)。故本包不把它折进画像
+(折叠即丢数据),而是原样透传给既有 hooker,直至 WP-3/WP-4 逐组接管 ——
+「ro.* 是否升为画像一等字段」记为 **O-7**(WP-3 定,涉及 catalog 与四种视图对账)。
+
+- 产出:Room v15(`spoof_profile` + `crypto_records.maskedValue`)+ 实体/DAO(表名走 `TABLE_NAME` 常量)+ `SpoofProfileService` 契约与实现 + 内置三档 catalog 与账本算法 + `AppListenOverride`(绑定 + 快照,含 `isDefault`/`deviationCountFor`/`clearDomain` 三处同步)+ 展开 + `configVersion 2→3` 迁移。
 - 出口:`DbMigrationParityTest` / `FeatureConfigMigrationTest` / `AppListenOverrideDomainTest` / `RecordWriteModelParityTest` / `SingleWriteEntryPointTest` 全绿 + 新增 `BuiltinProfileConsistencyTest`(整组自洽:三元组/fingerprint/ro/SDK/DPI)+ 未知 id 硬失败断言。
 
 ### WP-3 · 注入侧第一批(身份与标识)⬜
@@ -337,10 +416,12 @@ teardown: feature_settings_reset(FEATURE) + 全局画像回默认
 | ID | 事项 | 状态 | 需要谁 |
 |---|---|---|---|
 | **O-1** | D-9 许可证处置:基线 GPL-3 代码 + CC BY-NC-SA 机型库的长期合规形态(R-6 已定「先复制跑通」,交付前须裁决) | ⬜ 未决 | 用户 |
-| **O-2** | 设备与模拟器环境:本轮零在线,WP-0 阻塞 | ⬜ 阻塞 | 环境 |
+| ~~O-2~~ | 设备环境 | ✅ **已解**(WP-0):VM 僵死经 `WaitDevice` 冷自愈,`reachable=true` / root / lspd / SDK 34 / env-verify 7P-0F。恢复脚本 `05-bringup-device.ps1` 可重复执行 | 环境 |
 | **O-3** | 三方检测 App 的 APK 来源与可安装性(LDPlayer x86_64;部分检测 App 仅 arm) | ⬜ 待确认 | 用户/环境 |
 | **O-4** | 并发工作树:AGENTS.md 与 40+ 文件处于 modified 态,提交前须 `git status` 复核并只提交本任务面文件 | ⬜ 持续 | 执行方 |
-| **O-5** | `spoofOverrides` 扁平覆写表的存量用户数据迁移路径(现存 `feature_global` 用户值) | ⬜ 设计细节 | 执行方(WP-2 定) |
+| ~~O-5~~ | `spoofOverrides` 存量用户数据迁移路径 | ✅ **已裁**(V47 T2 → 决策 D-3 修订):字段**保留**为写面冻结的遗留通道(无 UI、MCP 声明面移除、旧值仍生效),不删数据 | 执行方 |
+| ~~O-6~~ | 画像展开快照随 `AppListenOverride` 下发 + `configVersion 3` 迁移 | ✅ **已落**(WP-2 2c/2d):`FeatureConfig.deviceProfile`+`adaptiveMask`、`AppListenOverride.resolvedProfile`、`EffectiveSwitch` 快照支、`configVersion 2→3` 六条迁移用例、`SettingsRepositoryProfileExpansionTest` 11 条端到端断言 | 执行方 |
+| **O-7** | 旧 `spoofOverrides` 的 `ro.*` 属性键是否升为 `DeviceProfile` 一等字段族(基线无此族,Modev 现有能力不可丢) | ⬜ **WP-3 定档**;升则同步四种视图对账与 `ProfileValueType`,不升则 ro 掩蔽恒留在自适应档 | 执行方 |
 
 ---
 
@@ -363,9 +444,9 @@ teardown: feature_settings_reset(FEATURE) + 全局画像回默认
 | 日期 | WP | 落地内容 | 定向测试 | 全量/回归 | 红项归因与裁决 | 状态 |
 |---|---|---|---|---|---|---|
 | 2026-09-22 | — | 基线全量审计 + 现状审计 + 两份文档落盘 | —— | —— | 见 AUDIT §5/§6 | ✅ |
-| | WP-0 | | | | | ⬜ |
-| | WP-1 | | | | | ⬜ |
-| | WP-2 | | | | | ⬜ |
+| 2026-09-22 | WP-0 | 设备冷自愈复位(`05-bringup-device.ps1`)、基线三组实测留档 `docs/test-reports/v47-baseline-20260922.md` | `00-env-verify -Mode env` 7P/0F | 单测 132类/856用例/0失败;lint 0e/43w/1h;assemble 双 ABI | **环境故障两例**:①`--no-daemon` 遗留空闲 daemon 持 `classes.jar` 句柄 ⇒ `bundleModernDebugClassesToCompileJar` FileSystemException(0 个 Kotlin 错误却连红 4 次)→ `gradlew --stop` 处置并改用可复用 daemon;②自查失误 —— 用 `: > file` 探测占用把该 jar 截断为 0 字节,已删污染目录强制重生成。探测占用禁截断式打开,已写入基线留档 §4 | ✅ |
+| 2026-09-22 | WP-1 | `ProfileKind`18 / `ProfileSection`10 / `ProfileField`41(baselineKey 逐字段对齐)/ `ProfileValues` 哨兵 / `DeviceProfile` 41 字段值对象 / `ProfileFieldCatalog` 行为面 / 穷尽 `when` 桥接零反射 | `ProfileFieldCatalogTest` 16 + `DeviceProfilePropertyParityTest` 5 = **21 全绿**(首轮即过) | **134 类 / 877 用例 / 0 失败 / 0 跳过**(基线 +21,零波及) | 编译期自纠 3 处:`ClosedDoubleRange` 为文件私有 ⇒ 改 `ClosedFloatingPointRange<Double>`;`when` 内 NETWORK/SCREENSHOT 槽位 `Int?` 不可 `in` 区间 ⇒ 改先取非空;误留 `LANGUAGE.copy()` 非法表达式与 `SIM_COUNTRY` 复用 PLMN 错误标签 ⇒ 新增 `SIM_COUNTRY_FORMAT` | ✅ |
+| 2026-09-22 | WP-2 ✅(2a–2d) | 存储 v15(`spoof_profile` + `crypto_records.maskedValue`)+ 实体/DAO;领域 `ProfileCodec`/`ProfileResolution` 三态/`BuiltinDeviceProfiles` 三档/传输信封/`SpoofProfileService` 契约 + `SpoofProfileRepository` 账本实现;配置 `FeatureConfig.deviceProfile`+`adaptiveMask`、`AppListenOverride.resolvedProfile`、`EffectiveSwitch` 快照支、**`configVersion 2→3` 迁移矩阵**;装配 `SettingsRepository.resolveFor`+`ModevApp`;计划外收敛 `ALL_MIGRATIONS` 单一事实源 | `ProfileCodecTest` 7 + `SpoofProfileRepositoryTest` 18 + `BuiltinProfileConsistencyTest` 8 + `FeatureConfigMigrationTest` +6 + `SettingsRepositoryProfileExpansionTest` 11(真 Room 无 mock)= **定向 50 全绿** | **138 类 / 929 用例 / 0 失败 / 0 跳过**(基线 +73);lint **0e/43w/1h 与 V46 基线逐字相同**;迁移由 `CryptoRecordDaoTest` 真实跑 v1..v9→v15 全链验证 | **一轮假绿风险**:某轮全量报 4 红 868 完成 + 1 skipped ⇒ 查日志为**守护进程崩溃截断**(`hs_err_pid21476.log`),Robolectric 用例被连带撕掉;`--stop` + `--no-daemon -Xmx2048m` 重跑后 markdown 两类复绿,确认非回归。真红只有 2 条,均为 `configVersion` 抬版后**必须随之更新的冻结期望**(v1→3;v2 夹具旧档名 `xiaomi13`→`builtin:xiaomi-13`),改期望的同时补 6 条迁移断言而非仅调绿。另自纠:`exportJson`/`init` 首版写出幽灵 API ⇒ 整份重写 | ✅ |
 | | WP-3 | | | | | ⬜ |
 | | WP-4 | | | | | ⬜ |
 | | WP-5 | | | | | ⬜ |

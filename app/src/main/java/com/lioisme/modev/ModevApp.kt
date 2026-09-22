@@ -10,6 +10,7 @@ import com.google.gson.Gson
 import com.lioisme.modev.data.db.ModevDatabase
 import com.lioisme.modev.data.repo.AppCatalogRepository
 import com.lioisme.modev.data.repo.KeywordLibraryRepository
+import com.lioisme.modev.data.repo.SpoofProfileRepository
 import com.lioisme.modev.data.repo.LogRepository
 import com.lioisme.modev.data.repo.MirroredConfigWriter
 import com.lioisme.modev.data.repo.SettingsRepository
@@ -17,6 +18,7 @@ import com.lioisme.modev.data.server.ConfigServer
 import com.lioisme.modev.domain.app.AppCatalogService
 import com.lioisme.modev.domain.app.AppListPreferences
 import com.lioisme.modev.domain.asset.KeywordLibraryService
+import com.lioisme.modev.domain.config.SpoofProfileService
 import com.lioisme.modev.domain.config.FeatureService
 import com.lioisme.modev.domain.config.ListenConfigService
 import com.lioisme.modev.domain.record.RecordService
@@ -119,6 +121,21 @@ class AppContainer(private val context: Context) {
         }
     }
 
+    /** 设备画像库(V47 T2):装配进设置仓库作展开源,变更即全量重推,首装补内置三档。 */
+    private val spoofProfileRepo: SpoofProfileRepository by lazy {
+        SpoofProfileRepository(database.spoofProfileDao(), appScope).also { profiles ->
+            settingsRepo.attachSpoofProfiles(profiles)
+            appScope.launch {
+                // 先补内置档再开始重推:否则「首装即绑定内置画像」会解析成 Missing。
+                runCatching { profiles.synchronizeBuiltins() }
+                runCatching {
+                    // 首帧空快照不触发重推;画像任一变化 → 全部在线会话按包重解析
+                    profiles.profiles.drop(1).collect { settingsRepo.repushAllConnected() }
+                }
+            }
+        }
+    }
+
     /** 记录摄入/查询仓库实现:对外经 [records] 契约。 */
     internal val logsRepo: LogRepository by lazy {
         LogRepository(
@@ -155,6 +172,9 @@ class AppContainer(private val context: Context) {
 
     /** 关键词库契约面。 */
     val keywordLibrary: KeywordLibraryService get() = keywordLibraryRepo
+
+    /** 画像库对外契约(V47 T2;public 类型必须来自 domain,G2 闸)。 */
+    val spoofProfiles: SpoofProfileService get() = spoofProfileRepo
 
     /** 应用列表浏览偏好契约面(进程级单一事实源,init 于 ModevApp.onCreate)。 */
     val appListPrefs: AppListPreferences get() = AppListSettings
@@ -258,6 +278,9 @@ class AppContainer(private val context: Context) {
         settingsRepo
         // 关键词库惰性装配接线(库变更 → 全量重推)必须在进程启动即生效
         keywordLibraryRepo
+        // V47 T2:画像库同上 —— 启动即补内置档并接线展开源,
+        // 否则握手期推给注入进程的 deviceProfile 快照恒为空。
+        spoofProfileRepo
         // V38:MCP 服务随进程常驻(默认启用回环;设置变更经 mcpRestarter 重启)
         if (mcpConfig.mcpEnabled.value) {
             appScope.launch { mcpServer.start() }

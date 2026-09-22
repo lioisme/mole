@@ -10,6 +10,7 @@ import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.FeatureConfig
 import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.domain.asset.KeywordLibraryService
+import com.lioisme.modev.domain.config.SpoofProfileService
 import com.lioisme.modev.domain.config.FeatureService
 import com.lioisme.modev.domain.config.ListenConfigService
 import com.lioisme.modev.domain.server.McpServiceConfig
@@ -24,6 +25,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -228,23 +230,63 @@ class SettingsRepository(
 
     /** 该包的有效配置快照(默认配置 ⊕ 偏差,纯解析;V37 T2.2 叠加关键词库解析)。 */
     override fun effectiveSwitch(packageName: String): HookSwitch =
-        withKeywordRules(
-            EffectiveSwitch.resolve(_globalSwitch.value, _overrides.value[packageName]),
-            _overrides.value[packageName],
-        )
+        resolveFor(_globalSwitch.value, _overrides.value[packageName])
 
-    /** 该包的有效配置流:默认配置、偏差或关键词库任一变化即重发射(distinct 由数据类 equals 保证)。 */
+    /** 该包的有效配置流:默认配置、偏差、关键词库或画像库任一变化即重发射(distinct 由数据类 equals 保证)。 */
     override fun effectiveSwitchFlow(packageName: String): Flow<HookSwitch> {
-        val library = keywordLibrary
         val global = globalSwitch
         val overrideFlow = combine(global, overrides) { g, map -> g to map[packageName] }
-        return if (library == null) {
-            overrideFlow.map { (g, ovr) -> withKeywordRules(EffectiveSwitch.resolve(g, ovr), ovr) }
+        return combine(overrideFlow, assetRevision()) { (g, ovr), _ -> resolveFor(g, ovr) }
+    }
+
+    /**
+     * 全局资产(关键词库 / 画像库)的「任一变更」触发流(V47 T2 与关键词库接线的合并重构):
+     * 两个可装配服务各自是 StateFlow(发射即有值),故未装配侧以恒流补齐,
+     * 保证装配组合任意一种都不改变「变更后立即重推」的既有语义。
+     */
+    private fun assetRevision(): Flow<Unit> {
+        val library = keywordLibrary
+        val profiles = spoofProfiles
+        return when {
+            library != null && profiles != null ->
+                combine(library.entries, profiles.profiles) { _, _ -> Unit }
+
+            library != null -> library.entries.map { Unit }
+            profiles != null -> profiles.profiles.map { Unit }
+            else -> flowOf(Unit)
+        }
+    }
+
+    /** 单一解析出口:偏差 → 关键词规则 → 画像快照(流与同步读同源,禁两侧各算一遍)。 */
+    private fun resolveFor(global: HookSwitch, override: AppListenOverride?): HookSwitch =
+        expandProfile(withKeywordRules(EffectiveSwitch.resolve(global, override), override))
+
+    // ---- V47 T2.2 画像库接线 ----
+
+    private var spoofProfiles: SpoofProfileService? = null
+
+    /** 装配画像库(容器初始化期一次;null = 未装配,快照恒保持来路值不覆盖)。 */
+    fun attachSpoofProfiles(service: SpoofProfileService) {
+        spoofProfiles = service
+    }
+
+    /**
+     * 把生效的 `spoofProfileId` 展开为注入侧消费的 [FeatureConfig.deviceProfile] 快照。
+     *
+     * - 未装配画像库 ⇒ 原样返回(注入侧「直读两键 / 磁盘兜底」通路依赖来路已带的快照,
+     *   绝不能用空快照把它清掉);
+     * - 未知 id ⇒ 空画像(不伪装),**不回落任何档位**(GAP-02 的静默失效就是反面教材);
+     * - 旧 `spoofOverrides` 原样透传,不映射进画像(其 `ro.*` 键无对应画像字段,
+     *   映射即有损;既有 hooker 仍按该表取值,直至 WP-3/WP-4 逐组接管)。
+     */
+    private fun expandProfile(switch: HookSwitch): HookSwitch {
+        val service = spoofProfiles ?: return switch
+        val feature = switch.feature
+        val profile = service.resolve(feature.spoofProfileId).profileOrEmpty()
+        return if (profile == feature.deviceProfile) {
+            switch
         } else {
-            combine(global, overrides, library.entries) { g, map, _ ->
-                val ovr = map[packageName]
-                withKeywordRules(EffectiveSwitch.resolve(g, ovr), ovr)
-            }
+            switch.copy(feature = feature.copy(deviceProfile = profile))
         }
     }
 

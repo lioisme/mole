@@ -19,7 +19,7 @@ class FeatureConfigMigrationTest {
     fun `v1 flat dialogKeywords migrates into feature section`() {
         val v1Json = """{"configVersion":1,"dialogKeywords":["升级","update"],"uiListen":true,"dialogKeyword":true}"""
         val parsed = HookSwitch.fromJson(gson, v1Json)!!
-        assertEquals(2, parsed.configVersion)
+        assertEquals("V47 T2 起当前版本为 3(画像库主键体系)", 3, parsed.configVersion)
         assertEquals(listOf("升级", "update"), parsed.feature.dialogKeywords)
         val rules = parsed.activeKeywordRules
         assertEquals(2, rules.size)
@@ -34,9 +34,80 @@ class FeatureConfigMigrationTest {
         val parsed = HookSwitch.fromJson(gson, v2Json)!!
         assertEquals(listOf("risk"), parsed.feature.dialogKeywordRules.map { it.text })
         assertEquals(KeywordMatchMode.REGEX, parsed.feature.dialogKeywordRules.first().matchMode)
-        assertEquals("xiaomi13", parsed.feature.spoofProfileId)
+        assertEquals(
+            "旧档位名必须映射到画像库主键(否则升级即静默失效)",
+            BuiltinDeviceProfiles.idFor(BuiltinDeviceProfiles.XIAOMI_13),
+            parsed.feature.spoofProfileId,
+        )
         assertEquals("Mi 14", parsed.feature.spoofOverrides["build.MODEL"])
         assertEquals(listOf("com.evil.su"), parsed.feature.extraRootPackages)
+    }
+
+    // ---- V47 T2:configVersion 3 的画像主键迁移矩阵 ----
+
+    @Test
+    fun `legacy auto profile migrates to unbound plus adaptive masking, never to a fixed device`() {
+        val legacy = """
+            {"configVersion":2,"feature":{"spoofProfileId":"auto"}}
+        """.trimIndent()
+        val parsed = HookSwitch.fromJson(gson, legacy)!!
+        assertEquals("auto 的条件档语义不得升级为固定机型", "", parsed.feature.spoofProfileId)
+        assertTrue("auto 的自适应掩蔽语义必须由 adaptiveMask 承接,不得凭空丢失", parsed.feature.adaptiveMask)
+    }
+
+    @Test
+    fun `legacy pixel profile maps to its builtin counterpart`() {
+        val legacy = """
+            {"configVersion":2,"feature":{"spoofProfileId":"pixel7pro"}}
+        """.trimIndent()
+        val parsed = HookSwitch.fromJson(gson, legacy)!!
+        assertEquals(BuiltinDeviceProfiles.idFor(BuiltinDeviceProfiles.PIXEL_7_PRO), parsed.feature.spoofProfileId)
+        assertTrue("机型档迁移不得顺带打开自适应档", !parsed.feature.adaptiveMask)
+    }
+
+    @Test
+    fun `unknown legacy profile id is preserved so resolve can report it`() {
+        val legacy = """
+            {"configVersion":2,"feature":{"spoofProfileId":"nexus-9"}}
+        """.trimIndent()
+        val parsed = HookSwitch.fromJson(gson, legacy)!!
+        assertEquals(
+            "未知旧值不得被吞成空或猜成某档 —— 必须原样交给 resolve 报 Missing(UI 可见)",
+            "nexus-9",
+            parsed.feature.spoofProfileId,
+        )
+    }
+
+    @Test
+    fun `v3 config is never re-migrated so a bound library id survives round trip`() {
+        val bound = BuiltinDeviceProfiles.idFor(BuiltinDeviceProfiles.GALAXY_S23_ULTRA)
+        val current = """
+            {"configVersion":3,"feature":{"spoofProfileId":"$bound","adaptiveMask":true}}
+        """.trimIndent()
+        val parsed = HookSwitch.fromJson(gson, current)!!
+        assertEquals(bound, parsed.feature.spoofProfileId)
+        assertTrue(parsed.feature.adaptiveMask)
+        assertEquals(3, parsed.configVersion)
+    }
+
+    @Test
+    fun `expanded device profile snapshot round trips through the feature section`() {
+        val profile = ProfileField.BRAND.withText(
+            ProfileField.MODEL.withText(DeviceProfile.EMPTY, "Pixel 7 Pro"),
+            "google",
+        )
+        val written = gson.toJson(HookSwitch.DEFAULT.copy(feature = FeatureConfig(deviceProfile = profile)))
+        val parsed = HookSwitch.fromJson(gson, written)!!
+        assertEquals(profile, parsed.feature.deviceProfile)
+        assertEquals("google", parsed.feature.deviceProfile.brand)
+    }
+
+    @Test
+    fun `empty snapshot deserializes to empty profile and never to null`() {
+        val parsed = HookSwitch.fromJson(gson, """{"configVersion":3}""")!!
+        assertEquals(DeviceProfile.EMPTY, parsed.feature.deviceProfile)
+        assertTrue(parsed.feature.deviceProfile.isEmpty)
+        assertTrue("缺省即不伪装:新字段不得把默认配置变成有偏差", !parsed.feature.adaptiveMask)
     }
 
     @Test

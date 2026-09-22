@@ -39,20 +39,36 @@ class RecordDaoAccessGateTest {
             .filter { it.isFile && it.extension == "kt" }
             .toList()
 
+    /** 去块注释与行注释(与 [PackageBoundaryTest] 同一口径),只留可执行文本。 */
+    private fun codeOnly(raw: String): String {
+        val blockComment = Regex("/\\*[\\s\\S]*?\\*/")
+        val lineComment = Regex("//[^\n]*")
+        return lineComment.replace(blockComment.replace(raw, " "), " ")
+    }
+
     @Test
     fun daoAccessOnlyViaRepositoryLayer() {
-        val allowed = setOf("ModevApp.kt", "LogRepository.kt", "KeywordLibraryRepository.kt", "ModevDatabase.kt")
+        val allowed = setOf(
+            "ModevApp.kt",
+            "LogRepository.kt",
+            "KeywordLibraryRepository.kt",
+            "SpoofProfileRepository.kt",
+            "ModevDatabase.kt",
+        )
+        val accessor = Regex("""cryptoRecordDao\s*\(|keywordLibraryDao\s*\(|spoofProfileDao\s*\(""")
         val violations = sources()
             .filter { it.name !in allowed }
             .flatMap { file ->
-                Regex("""cryptoRecordDao\s*\(|keywordLibraryDao\s*\(""")
-                    .findAll(file.readText())
-                    .map { "${file.path}:${it.value}" }
+                // 去注释后匹配(V47 T2):本门禁扫的是**调用点**,而 KDoc 里写
+                // `spoofProfileDao()` 说明约束会被当成调用而假红
+                // (与 [PackageBoundaryTest] 同一剥离正则,口径统一)。
+                val code = codeOnly(file.readText())
+                accessor.findAll(code).map { it.value }.toList().map { "${file.path}:$it" }
             }
             .toList()
         assertTrue(
             "DAO access outside repository layer is forbidden (route via LogRepository + " +
-                "RecordFilter, AGENTS #9/#14; allowed only in $allowed):\n$violations",
+                "RecordFilter / SpoofProfileService, AGENTS #9/#14/V47; allowed only in $allowed):\n$violations",
             violations.isEmpty(),
         )
     }

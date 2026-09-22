@@ -73,6 +73,12 @@ object EffectiveSwitch {
         override.spoofOverrides?.takeIf { it.isNotEmpty() }?.let {
             result = result.copy(feature = result.feature.copy(spoofOverrides = it))
         }
+        // V47 T2 / 决策 D-12:宿主展开的画像快照覆盖默认快照。
+        // 注入侧只读 feature.deviceProfile,**永不按 spoofProfileId 反查画像库**
+        // (正文在 Room,而直读两键与磁盘兜底两条通路都不经宿主进程)。
+        override.resolvedProfile?.let {
+            result = result.copy(feature = result.feature.copy(deviceProfile = it))
+        }
         override.extraRootPackages?.takeIf { it.isNotEmpty() }?.let {
             result = result.copy(feature = result.feature.copy(extraRootPackages = it))
         }

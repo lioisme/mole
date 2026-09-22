@@ -239,6 +239,14 @@ data class CryptoRecordEntity(
     /** 干预动作标记("BLOCKED"/"DETECTED"/null;V34 审计增强)。 */
     @ColumnInfo(name = "interventionAction") val interventionAction: String? = null,
 
+    /**
+     * 干预后的值(V47 T2):设备画像伪装「把什么改成了什么」的右半侧,
+     * 与承载原值的列配对 = 双侧 oracle(此前 maskedValue 仅存在于内存模型、
+     * 读回恒 null ⇒ 详情页「已隐藏」行永不渲染,伪装无第二证据源)。
+     * 非干预类记录为 null(语义 = 未记录,不等于「干预结果为空」)。
+     */
+    @ColumnInfo(name = "maskedValue") val maskedValue: String? = null,
+
     @ColumnInfo(name = "contextId") val contextId: Long = 0L,
     @ColumnInfo(name = "threadName") val threadName: String,
     @ColumnInfo(name = "stack") val stackJson: String? = null,

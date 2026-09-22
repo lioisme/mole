@@ -68,10 +68,22 @@ data class AppListenOverride(
     /** 弹窗关键字清单偏差(V33;null = 取默认,非空整表替换)。 */
     val dialogKeywords: List<String>? = null,
     // ---- V37 T1.2 功能域数据偏差 ----
-    /** 伪装画像档位偏差(null = 取默认;非空整值替换)。 */
+    /** 伪装画像档位偏差(V47 T2 起 = 画像库主键;null = 取默认,"" = 显式不伪装)。 */
     val spoofProfileId: String? = null,
-    /** 画像字段覆写偏差(null = 取默认;非空整表替换)。 */
+    /**
+     * 画像字段覆写偏差(**只读遗留通道**,见 [FeatureConfig.spoofOverrides] 与
+     * 决策 D-3 修订;无新写入路径,存量值仍生效)。
+     */
     val spoofOverrides: Map<String, String>? = null,
+    /**
+     * 宿主展开后的画像快照偏差(V47 T2 / 决策 D-12):随 [spoofProfileId] 一起写入,
+     * 供注入侧「直读两键 / 磁盘兜底」两条不经宿主的通路消费。
+     *
+     * **派生数据,不是用户意图** ⇒ 恒不计入 [isDefault] 与 [deviationCount]
+     * (否则「绑了画像」会被算成两次偏差,恢复默认行的计数与副标就会分叉);
+     * 但随 FEATURE 域一并清除(它与 spoofProfileId 同生同灭,单留会指向不存在的绑定)。
+     */
+    val resolvedProfile: DeviceProfile? = null,
     /** Root 包名黑名单追加偏差(null = 取默认;非空整表替换)。 */
     val extraRootPackages: List<String>? = null,
     /** Xposed 前缀黑名单追加偏差(null = 取默认;非空整表替换)。 */
@@ -198,6 +210,7 @@ data class AppListenOverride(
             dialogKeywords = if (!listen) null else dialogKeywords,
             spoofProfileId = if (!listen) null else spoofProfileId,
             spoofOverrides = if (!listen) null else spoofOverrides,
+            resolvedProfile = if (!listen) null else resolvedProfile,
             extraRootPackages = if (!listen) null else extraRootPackages,
             extraXposedPrefixes = if (!listen) null else extraXposedPrefixes,
             extraFridaPorts = if (!listen) null else extraFridaPorts,
@@ -292,6 +305,13 @@ data class AppListenOverride(
                     dialogKeywords = stringListOf(obj, FIELD_DIALOG_KEYWORDS),
                     spoofProfileId = stringOf(obj, FIELD_SPOOF_PROFILE),
                     spoofOverrides = stringMapOf(obj, FIELD_SPOOF_OVERRIDES),
+                    resolvedProfile = obj.get(FIELD_RESOLVED_PROFILE)
+                        ?.takeIf { it.isJsonObject }
+                        ?.let {
+                            runCatching {
+                                gson.fromJson(it, DeviceProfile::class.java)
+                            }.getOrNull()
+                        },
                     extraRootPackages = stringListOf(obj, FIELD_EXTRA_ROOT_PACKAGES),
                     extraXposedPrefixes = stringListOf(obj, FIELD_EXTRA_XPOSED_PREFIXES),
                     extraFridaPorts = intListOf(obj, FIELD_EXTRA_FRIDA_PORTS),
@@ -410,6 +430,7 @@ data class AppListenOverride(
         private const val FIELD_DIALOG_KEYWORDS = "dialogKeywords"
         private const val FIELD_SPOOF_PROFILE = "spoofProfileId"
         private const val FIELD_SPOOF_OVERRIDES = "spoofOverrides"
+        private const val FIELD_RESOLVED_PROFILE = "resolvedProfile"
         private const val FIELD_EXTRA_ROOT_PACKAGES = "extraRootPackages"
         private const val FIELD_EXTRA_XPOSED_PREFIXES = "extraXposedPrefixes"
         private const val FIELD_EXTRA_FRIDA_PORTS = "extraFridaPorts"

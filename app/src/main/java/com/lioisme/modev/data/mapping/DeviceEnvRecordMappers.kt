@@ -14,11 +14,14 @@ import com.lioisme.modev.domain.record.RowModel
  * 设备环境监听记录映射(V31 一等公民):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
  * 与 [NetworkRecordMappers] 同构;枚举严格解析(未知返回 null,绝不误标)。
  *
- * 列复用(ADR-1 单表):algorithm=kind.name;path=targetPath;command=targetClass;
- * sql=targetProperty;dbPath=detectionPattern;
- * content 五元组=originalValue/maskedValue;
- * destPath=intervention(0/1);paramsJson=params;
- * processName=processName;threadName=threadName。
+ * 列复用(ADR-1 单表,**本段与下方实现逐行对齐** —— V47 T2 修正此前注释与实现的
+ * 四处漂移,漂移会让读代码的人按错的列去查数据):
+ *   algorithm=targetSummary();path=targetPath;destPath=targetClass;
+ *   command=targetProperty;sql=detectionPattern;
+ *   proxyHost=originalValue(干预前原值);maskedValue=干预后值(V47 T2 新增列,
+ *     两者配对 = 伪装的双侧 oracle);
+ *   vpnActive=intervention(0/1);interventionAction=干预动作;paramsJson=params;
+ *   processName/threadName/timestamp/seq 同名列。
  */
 private const val TAG = "DeviceEnvRecordMappers"
 
@@ -39,6 +42,7 @@ internal fun DeviceEnvRecord.toEntity() = CryptoRecordEntity(
     responseHeadersJson = null,
     peerCertificatesJson = null,
     proxyHost = originalValue,
+    maskedValue = maskedValue?.takeIf { it.isNotEmpty() },
     proxyPort = null,
     vpnActive = if (intervention) 1 else 0,
     interventionAction = interventionAction,
@@ -61,7 +65,7 @@ internal fun CryptoRecordEntity.toDeviceEnvModelOrNull(): DeviceEnvRecord? {
         kind = kind,
         operation = operation,
         originalValue = proxyHost,
-        maskedValue = null,
+        maskedValue = maskedValue,
         intervention = vpnActive?.let { it == 1 } ?: true,
         interventionAction = interventionAction,
         targetPath = path,
