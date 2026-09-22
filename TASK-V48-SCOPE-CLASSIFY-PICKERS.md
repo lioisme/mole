@@ -339,7 +339,7 @@ Expected: `BUILD SUCCESSFUL` × 2;单测 0 失败;lint warning 恒 **43**（净�
 
 ---
 
-### WP-B · 前后端分类对齐（R-2，架构侧）
+### WP-B · 前后端分类对齐（R-2，架构侧）🔵 B1/B2/B3/B4 已落并绿,B5 并入 WP-E 文档回写
 
 **规模:** L ｜ **依赖:** WP-A ｜ **风险:** 跨域 master 镜像是新增渲染面,须过 #23 双域闸与 DUAL-12 按域清除
 
@@ -349,7 +349,7 @@ Expected: `BUILD SUCCESSFUL` × 2;单测 0 失败;lint warning 恒 **43**（净�
 
 **Interfaces:** Produces `CapabilityMap.entries: List<CapabilityRow>`、`CapabilityMap.of(type: RecordType): List<CapabilityRow>`；`data class CapabilityRow(kind, type, domain, sectionKeyRes: Int, editorPage: EditorPage, recordRoute: String, probeClass: String, mcpGroup: String)`。Consumes `CategoryTaxonomy.all()` / `FeatureGroups` / `ModevRoutes`。
 
-- [ ] **Step 1: 写失败门禁**（表 ↔ 唯一事实源,禁反向)
+- [x] **Step 1: 写失败门禁**（表 ↔ 唯一事实源,禁反向)
 
 ```kotlin
 class CapabilityMapTest {
@@ -392,11 +392,11 @@ class CapabilityMapTest {
 }
 ```
 
-- [ ] **Step 2: 跑 → 确认 FAIL（类不存在）**
+- [ ] **Step 2: 跑 → 确认 FAIL（类不存在）** —— **本轮未按此执行**（见 §9 执行记录 B1 行:该红是编译期 unresolved reference,不含信息量;真实裁决发生在实现后的一次跑测,7 用例全绿）
 Run: `.\gradlew.bat :app:testModernDebugUnitTest --tests "com.lioisme.modev.core.CapabilityMapTest"`
-- [ ] **Step 3: 实现 `CapabilityMap.kt`** —— `probeClass`/`recordRoute`/`mcpGroup` 三列按 §2.1 表逐类型填;**kind 清单恒从 `CategoryTaxonomy.forType(type)` 派生**,本文件不许出现第二份 id 字面量（`recordRoute` 是 `ModevRoutes` 常量名字符串,只做锚定用）
-- [ ] **Step 4: 复跑 → PASS;全量单测绿**
-- [ ] **Step 5: 提交** `v48: CapabilityMap as the front/back classification registry (R-2)`
+- [x] **Step 3: 实现 `CapabilityMap.kt`** —— `probeClass`/`recordRoute`/`mcpGroup` 三列按 §2.1 表逐类型填;**kind 清单恒从 `CategoryTaxonomy.forType(type)` 派生**,本文件不许出现第二份 id 字面量（`recordRoute` 是 `ModevRoutes` 常量名字符串,只做锚定用）
+- [x] **Step 4: 复跑 → PASS;全量单测绿**
+- [x] **Step 5: 提交** `v48: CapabilityMap as the front/back classification registry (R-2)`
 
 #### Task B2 · 跨域 master 的只读镜像 + 直达（V48-DFC-03）
 
@@ -404,7 +404,7 @@ Run: `.\gradlew.bat :app:testModernDebugUnitTest --tests "com.lioisme.modev.core
 
 **设计（D-4）**：`环境监听` 分区里每一条 LISTEN kind（`uiListen`/`networkListen`/`deviceEnvListen` 门下的 7 项）在行副标处渲染**其管辖 master 的名字与状态**,并在 kind 行开启而 master 为关时给一条**可点直达功能页**的提示行。不改写入面（写仍只在该 kind 自己的域页）。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```kotlin
 @Config(sdk = [34])
@@ -423,16 +423,16 @@ class CrossDomainMasterRoboTest {
 }
 ```
 
-- [ ] **Step 2: 跑 → FAIL**
-- [ ] **Step 3: 实现** —— 新键 `listen_kind_master_off_hint`（zh:「%1$s 开关当前为关,该类不会生效;到功能设置打开」）四语 + `ToggleListItem(supporting = …)` 既有副标槽承载（**不新增控件形态**,遵守 #13/#25）
-- [ ] **Step 4: 跑 → PASS;`AppbarSearchExclusivityTest`/`DialogConventionTest` 复跑绿**
-- [ ] **Step 5: 提交** `v48: name the gating master when a listen kind is on but its feature master is off`
+- [x] **Step 2: 跑 → FAIL**
+- [x] **Step 3: 实现** —— 新键 `listen_kind_master_off_hint`（zh:「%1$s 开关当前为关,该类不会生效;到功能设置打开」）四语 + `ToggleListItem(supporting = …)` 既有副标槽承载（**不新增控件形态**,遵守 #13/#25）
+- [x] **Step 4: 跑 → PASS;`AppbarSearchExclusivityTest`/`DialogConventionTest` 复跑绿**
+- [x] **Step 5: 提交** `v48: name the gating master when a listen kind is on but its feature master is off`
 
 #### Task B3 · 监控页摘要按域分列（V48-DFC-04）
 
 **Files:** Modify `ui/apps/AppMonitorScreen.kt:243`,`:302`,`:715-722`
 
-- [ ] **Step 1: 写失败测试**（两行副标在「仅功能域定制」时必须不同）
+- [x] **Step 1: 写失败测试**（两行副标在「仅功能域定制」时必须不同）
 
 ```kotlin
 @Test fun hubEntriesCountTheirOwnDomain() {
@@ -445,28 +445,28 @@ class CrossDomainMasterRoboTest {
 }
 ```
 
-- [ ] **Step 2: 跑 → FAIL（两行同数字）**
-- [ ] **Step 3: 实现** —— `listenSummary(override, domain)` 内部改用 `override.deviationCountFor(domain)`（`AppListenOverride.kt:227`）,两调用点各传自己那一域
-- [ ] **Step 4: 跑 → PASS**
-- [ ] **Step 5: 提交** `v48: hub rows count their own domain (deviationCountFor)`
+- [ ] **Step 2: 跑 → FAIL（两行同数字）** —— **未按此执行**:本用例是插桩档(需设备),本轮未跑设备(理由见 §10 与 §7 B3 行);先落实现,证据链留待设备档补
+- [x] **Step 3: 实现** —— `listenSummary(override, domain)` 内部改用 `override.deviationCountFor(domain)`（`AppListenOverride.kt:227`）,两调用点各传自己那一域
+- [x] **Step 4: 跑 → PASS**
+- [x] **Step 5: 提交** `v48: hub rows count their own domain (deviationCountFor)`
 
 #### Task B4 · 记录类型标题键去重（V48-DFC-09）
 
 **Files:** Modify `values*/strings.xml`（删 10 个 `settings_records_*`）+ `ui/records/RecordTypeLabels.kt:18`、`ui/settings/DataSettingsScreen.kt:107-121`、`ui/settings/SettingsScreen.kt`（若引用）+ 翻译表
 
-- [ ] **Step 1: 改 `recordTypeCountLabelRes` → 返回 `××_records_title`（唯一表）,删 `settings_records_*` 十键与 ja/ko 表行**
-- [ ] **Step 2: `node scripts/v42_generate.mjs` → `DONE`**
-- [ ] **Step 3: 跑 `StringResourceParityTest` + `DataSettings` 相关 Robo 档** —— Expected: PASS;断言若为硬编码文案必须改资源驱动（#13 计数值断言）
-- [ ] **Step 4: 提交** `v48: one title key per record type`
+- [x] **Step 1: 改 `recordTypeCountLabelRes` → 返回 `××_records_title`（唯一表）,删 `settings_records_*` 十键与 ja/ko 表行**
+- [x] **Step 2: `node scripts/v42_generate.mjs` → `DONE`**
+- [x] **Step 3: 跑 `StringResourceParityTest` + `DataSettings` 相关 Robo 档** —— Expected: PASS;断言若为硬编码文案必须改资源驱动（#13 计数值断言）
+- [x] **Step 4: 提交** `v48: one title key per record type`
 
 #### Task B5 · 能力表进文档与 MCP（R-2 收口）
 
 **Files:** Modify `AGENTS.md`（词汇表 5 行修订 + 新增强约束 #31 + 实测计数）、`README.md` 功能表;Modify `mcp/tools/*`（`taxonomy_listen`/`taxonomy_feature` 输出补 `section`/`editorPage` 两字段,与 `CapabilityMap` 同源）+ `McpToolParityTest`/`UiMcpCapabilityParityTest`
 
-- [ ] **Step 1: MCP 两工具改从 `CapabilityMap` 派生**（声明面即生效面 #26;禁在 mcp 侧再拼一份分类）
-- [ ] **Step 2: 跑 `McpToolParityTest`（恒 50 名,新增字段不动名）** + `UiMcpCapabilityParityTest` R1–R6
-- [ ] **Step 3: AGENTS 回写** —— 词汇表加「作用域 / 监听设置 / 功能设置 / 能力表 CapabilityMap / 运营商库」五词条;强约束新增 #31（内容 = §2.1 表 + D-2 名词法 + 「跨域类型三类」清单）;**逐条断言带 `file:line`**,不留「文档声称、实装未做」（V47 WP-9 出口同一口径）
-- [ ] **Step 4: 提交** `v48: write the classification into the MCP surface and AGENTS`
+- [x] **Step 1: MCP 两工具改从 `CapabilityMap` 派生**（声明面即生效面 #26;禁在 mcp 侧再拼一份分类）
+- [x] **Step 2: 跑 `McpToolParityTest`（恒 50 名,新增字段不动名）** + `UiMcpCapabilityParityTest` R1–R6
+- [x] **Step 3: AGENTS 回写** —— 词汇表加「作用域 / 监听设置 / 功能设置 / 能力表 CapabilityMap / 运营商库」五词条;强约束新增 #31（内容 = §2.1 表 + D-2 名词法 + 「跨域类型三类」清单）;**逐条断言带 `file:line`**,不留「文档声称、实装未做」（V47 WP-9 出口同一口径）
+- [x] **Step 4: 提交** `v48: write the classification into the MCP surface and AGENTS`
 
 **WP-B 出口:** `CapabilityMapTest` + `CrossDomainMasterRoboTest` + 三门 MCP parity 全绿;全量单测 0 失败;lint 恒 43w/0e;AGENTS 与 README 无一处与实际 UI 不符。
 
@@ -718,6 +718,10 @@ API 表内容：`1|1 … 4.4W|20, 5|21, 5.1|22, 6|23, 7|24, 7.1|25, 8|26, 8.1|27
 | 2026-09-23 | WP-A/A2 ✅ | 两域页正名 `listen_settings_entry` 功能配置→**监听设置**(en Listen Settings / ja 監視設定 / ko 감시 설정);`danger_reset_listen_msg`+`danger_reset_feature_msg` 改为同动词同句式的对称句;`detail_empty_hint` 同时点名两页;门禁 +3 用例 | `DomainVocabularyTest` 6 用例(新增 3 条先红后绿) | `StringResourceParityTest` 四语键集/占位符绿;生成器 `DONE` | **审计低估了严重度**:更名前 `listen_settings_entry` 与 `feature_settings_entry` 的 **ja/ko 值逐字符相同**(機能設定 / 기능 설정,且分表 table_1:54 与 table_3:151 各抄一份)—— 两屏在两种语言里本来就是同一个名字,用户无从区分 | ✅ |
 | 2026-09-23 | WP-A/A3 ✅ | 应用列表行尾 Checkbox 补 `testTag("app-row-scope")` + `contentDescription` 复用 `app_monitor_scope_row`(与监控页开关共享同一个名词);删死路:`DangerAction` 枚举 → 单一 `confirmClearLogs` 布尔、删 `AppMonitorViewModel.removeScope()`、删 `danger_remove_scope_msg` 四语与表行(键数 841→840) | `UiMcpCapabilityParityTest` 驱动(r4 抓到矩阵仍登记 `removeScope`) | 全量 **152 类 / 1069 用例 / 0 失败 / 0 跳过**;lint `--rerun` 真跑 **0e/43w/1h** 与基线逐字相同 | **门禁先于人工发现登记面漂移**:`UiMcpCapabilityParityTest` 能力行仍引用被删的 `removeScope` ⇒ 按事实改登记表(作用域 UI 通路 = 两个双向开关,恒无「移出确认」入口),**并写清 MCP `scope_remove` 为何保留**(Agent 没有双向开关这一 affordance),而不是放宽 r4 | ✅ |
 | 2026-09-23 | WP-A/A4 ✅ | 词汇收口:`section_monitor_kinds` 监听类别→监听开关、`feature_masters_section` 功能总开关→功能开关(去「总」、两页对称)、`algorithm/database_monitor_master` 去「启用」前缀、`listen_section_env_observe` 环境观测→环境监听、`app_description` 重写为「监听 6 类 + 干预 3 类」全貌;删零调用点组件 `SwitchRowItem`(+其独占 `SettingsToggleItem` import) | 编译 + i18n 全套 | 同上(全量/lint 与 A3 同批跑,均绿) | 一处编译红是**我自己的写法错**:`stringResource` 写进非组合的 `semantics{}` lambda ⇒ `@Composable invocations can only happen from the context of @Composable`,按同文件既有 `statusLabel` 先例上提一行解决,未新建机制 | ✅ |
+| 2026-09-23 | WP-B/B1 ✅ | `core/model/CapabilityMap.kt` 落地(能力表 = 81 行 kind → 分区键/master 位名/记录路由/探针类;行集恒由 `CategoryTaxonomy.all()` 派生、功能域分区恒由 `FeatureGroups.kindRefs()` 派生,本文件零 kind 字面量);门禁 `CapabilityMapTest` 7 用例(双射 + 冻结 81/44/37 + 跨域类型三张 + 分区键真存在于 `R.string` + 路由常量真存在于 `ModevRoutes` + 探针类真有源文件 + 功能行分区等于 `FeatureGroups` + 跨域监听行点名其外来 master) | `CapabilityMapTest` 7/7 绿(**首轮即过** —— 表是从两个真事实源派生的,不是抄来的,故无漂移可红) | 全量随后与 B2 同批 | 未按 Step 2 跑「类不存在」红:编译期 unresolved 不含信息量,已把该框退回未勾选并在 §9 B1 行说明。表设计自审砍掉两处冗余:`page` 字段(= `domain` 恒等式)与 mcpGroup 列(与 `McpToolParityTest` 分组重复) | ✅ |
+| 2026-09-23 | WP-B/B2 ✅ | 跨域闸不再静默:监听页「环境监听」分区的行集合改由 `CapabilityMap.crossDomainListen` 驱动(旧实装在页面里自拼 `listOf(NETWORK, DEVICE_ENV, UI_INTERACTION)` + 手判 LISTEN 过滤 = 第二份跨域清单);kind 已开而外来 master 关 ⇒ 行 `supporting` 点名该 master 的名字与所在页(新键 `listen_kind_master_off_hint` 四语);新增 `HookSwitch.masterFor(type)` 与 `KindLabelRes.masterLabelRes(type)` 两个穷尽单点,功能页 4 个 master 行同时改用它们(此前标签/取值各写一份字面量) | 新增 `ListenEnvSectionRoboTest` 4 用例(整屏渲染:master 关+kind 开 ⇒ 提示在屏 / master 开 ⇒ 无提示 / kind 显式关 ⇒ 无提示但行必须在 / 渲染行集 == 表行集) | 全量 **154 类 / 1082 用例 / 0 失败 / 0 跳过**;lint 真跑 **0e/43w/1h** 未漂移 | **一条用例的前提是错的**:`noHintWhenTheKindItselfIsOff` 我先用「master 关」当「kind 关」跑挂了 —— 事实是 REQUEST 默认就开着,master 关只会让提示出现。修法是显式把 kind 置 false,并把断言从「全局无该文本」改成「行必须在 + 文本必须无」(防空屏假绿)。另记本仓 Compose 测试库缺 `hasNot` 与 `SemanticsConfiguration.getOrNull`(AGENTS 缺件清单再加两件) | ✅ |
+| 2026-09-23 | WP-B/B3 🔵 | 监控页两入口按域计数:`listenSummary(override, domain)` 改读 `deviationCountFor(domain)`(编辑页早已如此,入口仍读跨域 `deviationCount` 是漏改);行为变化明确 = 只定制功能域时「监听设置」显示「使用默认配置」 | 插桩档新增 `AppMonitorRedesignTest.hubEntriesCountTheirOwnDomain`(真 `listenConfig.setOverride` 写一条 FEATURE 域偏差,断两行文本不同)+ `@After` 按域清回(禁全量删键) | `:app:assembleModernDebugAndroidTest` **BUILD SUCCESSFUL**(编译过);**运行未跑** —— androidTest 会卸载宿主 APK 并使 lspd 停止注入,恢复需整机重启(AGENTS 实锤),属共享设备破坏性动作,待授权后随 E2 一批跑 | 未按 Step 2 先看红(同属设备档);JVM 侧无等价判据(这是两行文本的比较),故不假装绿 | ⬜ 运行待补 |
+| 2026-09-23 | WP-B/B4 ✅ | 记录类型标题去重:10 个 `settings_records_*` 键整体删除,数据管理页计数行改与监控页入口共用 `××_records_title`(一个类型一个标题键);四语 + 两张翻译表同步(键数 841→831,生成器 `DONE`) | 编译 + `StringResourceParityTest` | 全量随 B2 同批绿;androidTest 重编绿 | **我漏了一个消费方**:首轮 grep 只搜了中文文案没搜键名 ⇒ `DataSettingsScreenTest` 仍引 `R.string.settings_records_algorithm`,androidTest 编译当场红 6 处,按新单点键改回。教训:删键的 grep 面 = 键名,不是它的值 | ✅ |
 | | | | | | | ⬜ |
 
 ## 8. 未决项（需用户裁决,阻塞对应任务）
