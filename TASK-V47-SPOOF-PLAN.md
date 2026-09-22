@@ -298,6 +298,21 @@ public 面 `spoofProfiles: SpoofProfileService` 取自 domain ⇒ G2 闸成立)�
 ### WP-3 · 注入侧第一批(身份与标识)🔵 3a/3b 已绿,3c(kind 登记)待做
 
 **已落地(2026-09-22,零耦合纯逻辑先行)**
+- **3e `ProfileEditorForm`**(WP-5 的表单态脊梁,不认得 Compose/资源/Android):
+  编辑文本 ↔ 模型哨兵双向语义、逐字段校验、脏态与 `commit()` 基线、
+  `rowsBySection()` **直接委派 `ProfileFieldCatalog`**(UI 拿不到第二份字段清单的可能)、
+  `previewGroups()`/`previewConflicts()` 实时预览「这次改动会装哪些钩子」、
+  `randomizeField()` 就近随机(fingerprint 顺带改写 Build ID,与基线同构)、
+  `randomizeAll()` **整组同源派生**(同一机型 + 同一世代 + 同一运营商,杜绝
+  「Pixel 机型配小米 fingerprint」),机型与运营商样本经 **`ProfileRandomSource` 注入**
+  (默认实现从 `BuiltinDeviceProfiles` 派生,不是抄一份;WP-4 换目录实现即可)。
+  三条不变式各由测试锁定:表单**不静默改写**用户输入、非法值 ⇒ `canSave=false`、
+  仓库层 `isValid` 是第二道而非唯一防线。
+  20 用例全绿;全量 **141 类 / 972 用例 / 0 失败 / 0 跳过**;lint 仍 **0e/43w/1h**。
+- **写这节时被抓到的自我不一致**:类 KDoc 原先承诺「快照恒过校验、非法值回落哨兵」,
+  实现却是忠实的 `withText` ⇒ 3 条测试直接红。裁决为**改文档与契约而非改实现去迎合**:
+  静默丢弃非法值正是我在别处批评的「钳制」,会让用户存进一份与自己输入不同的画像;
+  改为「快照忠实 + `canSave` 把关 + 仓库原子拒绝」三道清晰口径。
 - **3a `ProfileHookPlan`**:`activeGroups()`(空画像 = 零组冻结断言 + 逐组「任一字段生效即激活」)、
   互斥裁决 **R-B**(隐藏 Wi-Fi 定位压制 `PROFILE_WIFI`)、**R-C**(隐藏基站定位压制 `PROFILE_CELL`)、
   **R-D** `adaptiveMaskShouldYield()`(Build 族任一字段被显式改写 ⇒ 强制档在场,条件档让位)、
@@ -475,6 +490,7 @@ teardown: feature_settings_reset(FEATURE) + 全局画像回默认
 | 2026-09-22 | WP-1 | `ProfileKind`18 / `ProfileSection`10 / `ProfileField`41(baselineKey 逐字段对齐)/ `ProfileValues` 哨兵 / `DeviceProfile` 41 字段值对象 / `ProfileFieldCatalog` 行为面 / 穷尽 `when` 桥接零反射 | `ProfileFieldCatalogTest` 16 + `DeviceProfilePropertyParityTest` 5 = **21 全绿**(首轮即过) | **134 类 / 877 用例 / 0 失败 / 0 跳过**(基线 +21,零波及) | 编译期自纠 3 处:`ClosedDoubleRange` 为文件私有 ⇒ 改 `ClosedFloatingPointRange<Double>`;`when` 内 NETWORK/SCREENSHOT 槽位 `Int?` 不可 `in` 区间 ⇒ 改先取非空;误留 `LANGUAGE.copy()` 非法表达式与 `SIM_COUNTRY` 复用 PLMN 错误标签 ⇒ 新增 `SIM_COUNTRY_FORMAT` | ✅ |
 | 2026-09-22 | WP-2 ✅(2a–2d) | 存储 v15(`spoof_profile` + `crypto_records.maskedValue`)+ 实体/DAO;领域 `ProfileCodec`/`ProfileResolution` 三态/`BuiltinDeviceProfiles` 三档/传输信封/`SpoofProfileService` 契约 + `SpoofProfileRepository` 账本实现;配置 `FeatureConfig.deviceProfile`+`adaptiveMask`、`AppListenOverride.resolvedProfile`、`EffectiveSwitch` 快照支、**`configVersion 2→3` 迁移矩阵**;装配 `SettingsRepository.resolveFor`+`ModevApp`;计划外收敛 `ALL_MIGRATIONS` 单一事实源 | `ProfileCodecTest` 7 + `SpoofProfileRepositoryTest` 18 + `BuiltinProfileConsistencyTest` 8 + `FeatureConfigMigrationTest` +6 + `SettingsRepositoryProfileExpansionTest` 11(真 Room 无 mock)= **定向 50 全绿** | **138 类 / 929 用例 / 0 失败 / 0 跳过**(基线 +73);lint **0e/43w/1h 与 V46 基线逐字相同**;迁移由 `CryptoRecordDaoTest` 真实跑 v1..v9→v15 全链验证 | **一轮假绿风险**:某轮全量报 4 红 868 完成 + 1 skipped ⇒ 查日志为**守护进程崩溃截断**(`hs_err_pid21476.log`),Robolectric 用例被连带撕掉;`--stop` + `--no-daemon -Xmx2048m` 重跑后 markdown 两类复绿,确认非回归。真红只有 2 条,均为 `configVersion` 抬版后**必须随之更新的冻结期望**(v1→3;v2 夹具旧档名 `xiaomi13`→`builtin:xiaomi-13`),改期望的同时补 6 条迁移断言而非仅调绿。另自纠:`exportJson`/`init` 首版写出幽灵 API ⇒ 整份重写 | ✅ |
 | 2026-09-22 | WP-3a/3b 🔵 | `ProfileHookPlan`(空画像=零组 / R-B / R-C / R-D 裁决 + 三条矛盾自检)、`ProfileGenerators`(Luhn IMEI / 本地管理单播 MAC / hex SSAID / 世代关联 Build ID / fingerprint 骨架派生 / 坐标域,全函数可注入 Random) | `ProfileHookPlanTest` 10 + `ProfileGeneratorsTest` 13 = **23 全绿** | **140 类 / 952 用例 / 0 失败 / 0 跳过**(WP-2 收口 929 ⇒ +23);lint **0e/43w/1h 未漂移** | 测试抓到 **1 处真产品逻辑错**:`OFFSET_WITHOUT_COORDINATES` 用「LOCATION 组未激活」作判据,而抖动位自身属于该组 ⇒ 判据恒假,改为按坐标字段判定。另自纠 4 处:`Char.forDigit` 在 `-no-jdk` 下不可解析(改 `'0' + d'`)、MAC 掩码误写 `inv().inv()` 且 `or/and` 优先级需显式加括号、Build ID 年份回绕断言绕成三层算术(改为枚举允许集)、`sampleFor` 尾随 `let` 把 BOOL/TEXT 混成一谈(改按 `ProfileValueType` 分支) | 🔵 |
+| 2026-09-22 | WP-3e ✅ | `ProfileEditorForm`(表单态/校验/脏态/实时组预览/就近随机/整组同源随机)+ `ProfileRandomSource` 注入式随机源 | `ProfileEditorFormTest` 20 全绿 | **141 类 / 972 用例 / 0 失败 / 0 跳过**;lint 0e/43w/1h | **自我不一致被自己的测试抓住**:KDoc 承诺「快照恒过校验」而实现是忠实 withText ⇒ 3 红。**裁决为改契约不改实现**: 静默丢弃非法值恰是本任务批评过的「钳制」，改为忠实快照 + canSave + 仓库原子拒绝。另把机型/运营商样本从硬编码改为注入式（防 WP-4 出现第二份机型事实源） | ✅ |
 | | WP-3c/3d | | | | | ⬜ |
 | | WP-4 | | | | | ⬜ |
 | | WP-5 | | | | | ⬜ |
