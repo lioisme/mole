@@ -40,7 +40,10 @@ class WebViewEventMapperTest {
 
     @Test
     fun maps_full_encrypt_event() {
-        val record = WebViewEventMapper.toRecord(event(), "com.example.app", "com.example.app:web", switch)
+        // V44 T2.3/D-V44-2:logStack 默认翻转 false(默认配置零栈捕获预算);
+        // 本测试验证「开启栈捕获」路径 —— 显式开启以断言模块帧过滤契约。
+        val stackOn = switch.copy(logStack = true)
+        val record = WebViewEventMapper.toRecord(event(), "com.example.app", "com.example.app:web", stackOn)
         assertNotNull(record)
         assertEquals(WebViewKind.JS_CRYPTO, record!!.kind)
         assertEquals(WebViewOperation.JS_ENCRYPT, record.operation)
@@ -49,7 +52,7 @@ class WebViewEventMapperTest {
         assertEquals("deadbeef", record.input?.hex)
         assertEquals("cafebabe", record.output?.hex)
         assertEquals(mapOf("tagLength" to "128"), record.params)
-        assertTrue("DEFAULT.logStack=true 时须有堆栈帧", record.stack.isNotEmpty())
+        assertTrue("logStack=true 时须有堆栈帧", record.stack.isNotEmpty())
         assertTrue("模块帧须被过滤", record.stack.none { it.contains("WebViewEventMapper") })
         assertTrue(record.stack[0].contains("org.junit"))
     }

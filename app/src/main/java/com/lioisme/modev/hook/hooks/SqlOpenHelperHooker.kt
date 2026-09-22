@@ -2,6 +2,7 @@ package com.lioisme.modev.hook.hooks
 
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
+import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.core.model.SqlOperation
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.ProbeContext
@@ -26,6 +27,9 @@ class SqlOpenHelperHooker(
     }
 
     private fun afterOpen(inv: Invocation, result: Any?) {
+        // V44 T2.2 门控先行:SQLiteOpenHelper 打开归 OPEN 类别(默认关),旧形态
+        // 每次取库都先做 thisObject/result 转换 + 弱表登记 + 反射取 path/databaseName。
+        if (!config().dbEnabled(SqlKind.OPEN)) return
         val helper = inv.thisObject as? SQLiteOpenHelper ?: return
         val db = result as? SQLiteDatabase ?: return
         val ctx = SqlContextTracker.contextFor(db)
@@ -47,6 +51,7 @@ class SqlOpenHelperHooker(
     }
 
     private fun afterClose(inv: Invocation) {
+        if (!config().dbEnabled(SqlKind.OPEN)) return
         val helper = inv.thisObject as? SQLiteOpenHelper ?: return
         emit(
             operation = SqlOperation.CLOSE_HELPER,

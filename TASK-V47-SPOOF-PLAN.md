@@ -1,0 +1,385 @@
+# V47 · 设备画像伪装重建 —— 执行任务书
+
+> 前置阅读:`TASK-V47-SPOOF-AUDIT.md`(基线 40 字段全清单、13 组钩子面、GAP-01..18、DFC-01..10、DEBT-01..09)
+> 本文件是**执行台账**:设计规格(§2)+ 决策(§3)+ 工作包与出口准则(§4)+ 压测体系(§5)+ 门禁变更(§6)+ 需求追溯(§8)+ 执行记录(§9)
+> 自驱动协议见 §10 —— 未明确要求用户确认的条目,由执行方按 §3 已定档决策直接推进
+
+---
+
+## 1. 目标与范围
+
+**一句话**:把 Modev 的「设备环境伪装」从 3 个编译期常量重建为一个**画像库为一等公民**的子系统 —— 逐字段对齐基线 Guise 的 40 项伪装能力(13 组钩子面),内置三套经典画像 + 完整 DIY,并以**靶程序逐字段逐 API 路径期望表 = 硬门禁 100%** 收口。
+
+**范围内**:画像数据模型 / 画像库存储与账本 / 每应用绑定与生效链 / 注入侧 18 组钩子面 / 记录双侧 oracle / 管理端画像库与 DIY 编辑器 / 导入导出 / MCP 工具面 / 四语 i18n / 全量压测体系。
+
+**范围外**(显式排除,防漂移):传感器伪装、蓝牙、`NetworkInterface`/本机 IP/DNS、GNSS 卫星态与 NMEA、系统时钟、显示分辨率与刷新率与刘海、MediaDrm/GAID/MEID/IMSI/ICCID、Root·Magisk·Xposed 掩蔽面改造(既有 12 kind 原样保留)、签名与 `sourceDir`。前三项属基线自认边界(审计 §2.6),后几项属基线缺口,**均不构成新增需求**(R-8)。
+
+---
+
+## 2. 设计规格
+
+### 2.1 分层与单一事实源
+
+```
+core/model/DeviceProfile.kt          41 字段数据模型(纯 Kotlin,零 android import)
+core/model/ProfileFieldCatalog.kt    41 字段元数据唯一事实源  ← 节律的轴心
+core/model/BuiltinProfileCatalog.kt  三内置档画像内容(版本化 seedId + 指纹)
+core/model/SpoofProfiles.kt          【退役】内容迁出,仅留迁移期读取器
+
+domain/config/SpoofProfileService    画像 CRUD 契约(唯一写入口)
+domain/config/FeatureService         +bindProfile(pkg, profileId?)
+
+data/db/…Entity                      Room v15:spoof_profile 表 + crypto_records.maskedValue
+data/repo/SpoofProfileRepository     契约实现(唯一可开表者)
+data/repo/SettingsRepository         resolve 时展开画像 → HookSwitch.feature.deviceProfile
+
+hook/plan/ProfileHookPlan.kt         compile(DeviceProfile) → Set<ProfileGroup> 纯函数
+hook/hooks/profile/*                 18 个画像钩子组(继承 ProfileBaseHooker)
+
+ui/settings/features/                画像库主页 + DIY 编辑器(替换今天的选择器)
+mcp/tools/ProfileTools.kt            画像工具面(9 工具)
+```
+
+**三条不可破的边界**:
+1. **Room 只在宿主进程读**。三条下发通道(wire config / `/data/local/tmp` 磁盘兜底 / `switch_global` 种子)携带的**全是已展开的 `DeviceProfile` 值对象**,注入侧零反查 ⇒ 不破「core 子树零 `android.*`」与注入侧可用性。
+2. **`ProfileFieldCatalog` 是唯一事实源**:UI 表单、MCP 声明面、压测期望表、注入侧门控表**四处全部从它派生**,任何一处手写字段清单即红(对齐 V45「声明面即生效面」与 A10「禁写死,派生自注册表」既有先例)。
+3. **一件事一实装**:画像截图组与既有「解除录屏」共用同一 `Window` 掩蔽引擎;画像应用列表组与 `RootPackageManagerHooker` 共用同一过滤引擎。禁止第二套钩子注册。
+
+### 2.2 `DeviceProfile` = 41 字段(基线 40 + `cpuCores` 超基线)
+
+字段名、类型、缺省哨兵值**逐字对齐基线**(`""` / `-1` / `NET_UNHOOK(0)` / `SCREENSHOTS_UNHOOK(-1)` / `-1.0` = 该项不钩),经既有 Gson 编解码器进 wire(禁引入 kotlinx.serialization 造第二套序列化)。
+
+`ProfileFieldCatalog` 每个字段声明:
+
+| 元数据 | 用途 |
+|---|---|
+| `key` / `kind` / `section` | 归属 18 kind 之一 + 8 分区之一 |
+| `type` | TEXT / INT / LONG / DOUBLE / BOOL / ENUM / CHOICE / SECRET |
+| `sentinel` + `isSet(v)` | 「不钩」判定唯一实现处(UI 空态 / 计划裁剪 / 期望表跳过 三处共用) |
+| `validator(v)` | 校验(如 `simOperator` 5..6 位纯数字、`densityDpi` 72..1000、`batteryLevel` 0..100、坐标域) |
+| `generator()` | 随机形态(Luhn IMEI / 本地管理 MAC / 版本关联 Build ID / fingerprint 骨架 / 16 hex SSAID) |
+| `labelRes` | 四语标签资源键 |
+| `mcpName` / `mcpSchema` | MCP 声明面派生(`additionalProperties=false` 一致性由此保证) |
+| `probeCaseIds` / `readPaths` | 期望表派生源:该字段由哪些靶程序用例、经哪些 API 读取路径观测 |
+
+### 2.3 画像库:Room v15 `spoof_profile`
+
+单表内联账本(基线用两表,本文档**有意偏离**:语义等价、少一次迁移)。
+
+```
+id TEXT PK                       uuidNoDash 或 "builtin:<seedId>"
+name TEXT NOT NULL               summary TEXT
+profileJson TEXT NOT NULL        41 字段全量 blob(ignoreUnknownKeys 前向兼容)
+builtinSeedId TEXT NULL          内置档稳定键
+builtinVersion INT NULL          内容版本
+builtinFingerprint TEXT NULL     SHA-256(零化 id/时间戳后的序列化)
+managed INT NULL / deleted INT NULL   用户改过=false / 删除墓碑
+createTime / updateTime INT
+```
+
+账本算法照基线语义:state 缺失 ⇒ 插入**或收养**(type/参数指纹相同的既有行不重复创建);行消失 ⇒ 写墓碑;`managed ∧ 未被用户改动 ∧ (版本升或内容变)` ⇒ 原地更新并保留用户 id/createTime;删除与墓碑同事务。
+
+**三内置档**(R-2):
+
+| seedId | 机型 | 要点 |
+|---|---|---|
+| `builtin/pixel-7-pro` | Pixel 7 Pro (panther) | AOSP 系:brand=google,board=panther,hardware=oriole,hdpi 350,fingerprint 走 `google/panther/panther:13/AP1A…` |
+| `builtin/xiaomi-13` | Xiaomi 13 (fuxi) | HyperOS/MIUI 系:brand=Xiaomi,manufacturer=Xiaomi,board=fuxi,hardware=qcom,hdpi 440 |
+| `builtin/galaxy-s23-ultra` | Galaxy S23 Ultra (s9180) | OneUI 系:brand=samsung,manufacturer=samsung,board=qcom,hardware=samsungexynos2300/snapdragon 二选一须与 ro 组同源,hdpi 500 |
+
+每档必须**整组自洽**(审计 DFC + 崩溃史实锤:品牌与机型跨厂组合会被高级反篡改冻结):`fingerprint` 前缀 == `brand/product/device` 三元组、`ro.product.*` == `Build.*`、`sdkInt` 与 `androidVersion` 同代、DPI 与机型实际值一致。三档内容由 `ProfileFieldCatalog` 的生成器 + 真机公开参数共同定档,并在 WP-2 加 `BuiltinProfileConsistencyTest` 逐条锁死。
+
+### 2.4 绑定与展开
+
+- 每应用偏差 `AppListenOverride` **仅新增一位** `profileId: String?`(null = 不伪装)。**不做字段级覆写**(决策 D-3)。
+- `feature_global` 持「全局默认画像 id」。
+- 展开点:`SettingsRepository.effectiveSwitch(pkg)` → `SpoofProfileService.resolve(profileId)` → 已展开值对象进 `HookSwitch.feature.deviceProfile`。`configVersion 2 → 3`(读旧写新迁移,`VERSION` 恒 4)。
+- 未知/已删画像 id ⇒ **硬失败**(UI 显示「画像缺失」行 + MCP 返回业务错误),**禁止静默回落**(清偿 GAP-01/GAP-02:今天 `SpoofProfiles.resolve` 在 `BUILTINS` 内查不到就回落 `auto`,任何 DIY 写入即静默失效)。
+
+### 2.5 注入侧:18 组 + `ProfileHookPlan`
+
+**组划分 = 「一个用户可见开关 = 一个 kind」**(比基线 13 组更细:NETWORK→NETWORK/WIFI/SIM,LOCATION→LOCATION/WIFI_HIDE/CELL_HIDE;基线的 BLANK_PASS/APPLICATION_LIST 本已分立)。
+
+| # | kind | 覆盖字段 | 钩子面(照基线移植) |
+|---|---|---|---|
+| 1 | `PROFILE_BUILD` | 11(brand…fingerPrint,androidVersion,sdkInt) | `Build` 9 + `Build.VERSION` 2 静态字段写 |
+| 2 | `PROFILE_DENSITY` | densityDpi | `Resources.getDisplayMetrics/getConfiguration` + `Display.getMetrics/getRealMetrics`(保留 fontScale,反算三 dp) |
+| 3 | `PROFILE_NETWORK` | networkType | `NetworkInfo` 4 + `NetworkCapabilities.hasTransport` + `ConnectivityManager` 3 置空 |
+| 4 | `PROFILE_WIFI` | wifiSSID/BSSID/Mac | `WifiInfo` 3 + `WifiManager.getScanResults` 命中项改 + `getWifiState/isWifiEnabled` |
+| 5 | `PROFILE_SIM` | simOperator/Name/Country | TelephonyManager 16 方法 + 6 类 `CellIdentity` mcc/mnc(+String) + `SubscriptionInfo` |
+| 6 | `PROFILE_UNIQUE_ID` | androidId/imei/phoneNum | `Settings.Secure/System#getStringForUser` 漏斗 + IMEI/TAC/deviceId 全重载 + 号码三族 |
+| 7 | `PROFILE_CELL` | lac/cid | 7 基站类 |
+| 8 | `PROFILE_LOCATION` | longitude/latitude/randomOffset | `Location` getter + 两 Transport `onLocationChanged` 实参递归改 + `getLastKnownLocation` 合成 |
+| 9 | `PROFILE_WIFI_LOC_HIDE` | makeWifiLocationFail | scan/SSID/BSSID/MAC/MLO/IE 归零(**优先于 4**) |
+| 10 | `PROFILE_CELL_LOC_HIDE` | makeCellLocationFail | 同步/异步/回调/旧式 listen + 6 类 identity 归 UNAVAILABLE(**优先于 7**) |
+| 11 | `PROFILE_LOCALE` | language | 进程默认 Locale/LocaleList + `Configuration` + `Resources` + `LocaleManager`(API≥33) |
+| 12 | `PROFILE_TIME_ZONE` | timeZone | **零钩子**:默认时区 + 主 Looper post 二次设定 |
+| 13 | `PROFILE_APP_VERSION` | versionCode/versionName | `getPackageInfo` 四形态,仅命中自身包 |
+| 14 | `PROFILE_BATTERY` | batteryLevel | `BatteryManager.getIntProperty(CAPACITY)` + `Intent.getIntExtra(level/scale)` |
+| 15 | `PROFILE_SCREENSHOT` | screenshotsFlag 三态 | 与既有「解除录屏」**共用** Window 引擎(§2.1 边界 3) |
+| 16 | `PROFILE_BLANK_CONTENT` | passContacts/Photo/Video/Audio | `ContentResolver`/`ContentProviderClient#query` 全重载 → 保留列的空 Cursor |
+| 17 | `PROFILE_APP_LIST` | passApplications | 与 `RootPackageManagerHooker` **共用**过滤引擎,白名单模式(自身+系统+APEX)+ `visiblePackages` 记忆集 |
+| 18 | `PROFILE_CPU` | cpuCores(**超基线**) | `Runtime#availableProcessors` + `/proc/cpuinfo` 经 `ProcScanBroadcaster` |
+
+**`ProfileHookPlan.compile(profile) → List<ProfileGroup>`**:纯 Kotlin 无 android,基线 `activeHookFeatures()` 同族。互斥裁决表(必须 JVM 断言):
+
+| 裁决 | 规则 |
+|---|---|
+| R-A | 全缺省画像 ⇒ **零组**(冻结测试) |
+| R-B | `PROFILE_WIFI_LOC_HIDE` 激活 ⇒ `PROFILE_WIFI` 让位(隐藏优先于伪装) |
+| R-C | `PROFILE_CELL_LOC_HIDE` 激活 ⇒ `PROFILE_CELL` 让位 |
+| R-D | `PROFILE_BUILD` 激活 ⇒ 既有「自适应掩蔽」条件档让位(强制档优先) |
+| R-E | `PROFILE_SCREENSHOT` 的 ALLOW 与既有解除录屏同源 ⇒ 单一注册,禁双写 |
+
+**强制档语义(决策 D-5,本重建最关键的语义变更)**:画像填写 = **无条件按值写入**,不再经 `isEmulatorIndicator`/`isIndicativeValue` 脏值判定 —— 否则「100% 符合预期」物理不可达(今天 `E-EMU-01` 被 SKIP 的根因)。「自适应掩蔽」降级为一枚独立布尔(归 ROOT_XPOSED_HIDE 族),作用域 = **画像未填的字段**。两档分属不同 kind,互不越界。
+
+**既有 kind 退役**:EMULATOR_BUILD / NETWORK / TELEPHONY / BATTERY / CPU 五项由画像组承接 ⇒ 退役;EMULATOR_FILE / SENSOR 无画像对应物 ⇒ 移入模拟器痕迹掩蔽族。`DeviceEnvKind` 21 → **34**,FEATURE 37 → **50**,LISTEN 44 不变。
+
+**必须遵守的既有地雷**(AGENTS V36/V38/V43/V44 实锤集):
+- 禁钩 `Class.forName` 系(D-17);新钩子三问(调用方帧依赖 / 热路径无条件安装 / 关开关后开销)。
+- **热路径门控先行**:回调首条有效语句必须是 `featureOn(` 或廉价早退 ⇒ 18 个新文件手工加入 `HotPathGateConventionTest` 白名单。
+- 一切干预经基类 `featureOn(kind)`;新干预字段全部加入 `InterventionGateConventionTest.gatedFields`。
+- 共享平台方法必须并入单点(`broadcast.subscribe` / `LoadClassWatcher` / `ProcScanBroadcaster`)⇒ 不给 Vector「同方法第二个 hook 不执行」留机会。
+- **契约忠实化**:以异常结束调用者用 `setThrowable`(`NameNotFoundException`/`IOException`/`CNFE`),`setResult(null)` 只用于允许 null 的返回位。
+- **after-setResult 必须二态断言**(V38 空操作事故的验证债,DEBT-02)—— 裸挂钩不算修复。
+- 装配期裁剪后「配置后开需重启进程」为既定语义 ⇒ 压测每档切换必 **force-stop + 冷启动**(WP-8 硬约束)。
+- `Build` 静态字段改写进程内一次性、关开关不复原 ⇒ UI/文档显式声明边界,并走 `ConfigWatcher` 惰性幂等补写。
+
+**记录双侧 oracle**:device_env 记录新增 `maskedValue` 落库(原值已有列)⇒ Modev 自身 DB 成为压测第二证据源,不再只信靶程序 logcat。同时清 `DeviceEnvRecordMappers` 头注释与实现不符(DFC-03)。
+
+### 2.6 管理端 UI
+
+| 屏 | 路由 | 内容 |
+|---|---|---|
+| 画像库 | `settings/profiles`(升级既有屏) | 列表行 = 名称/摘要(已填字段数 + 关键机型三元组)/ 已绑应用数 / 内置徽标;**行内零按钮,动作唯一入口 = trailing「更多」菜单**(编辑 / 复制为 DIY / 导出 / 删除),沿用 V46 令牌页动作菜单化范式 |
+| DIY 编辑器 | `settings/profiles/{id}/edit` | `ProfileFieldCatalog` 驱动的 **41 行「一行一参数」**表单,8 分区;新建/编辑/预览三宿主共用(基线 `ConfigEditorView` 同构);每行点击开底部 sheet |
+| 字段选择器 | 底部 sheet | 机型(8533)/ 运营商(1597)/ 时区(≈600)/ DPI / 网络 / 语言 / Android 版本 |
+| 每应用绑定 | `apps/{pkg}/feature-settings` | 画像行 = 单选画像 + 「不伪装」,副标题显示动态生效摘要;18 个新 kind 行由 `FeatureGroups` 自动驱动 |
+
+**组件阶梯(用户既有纪律:MD3 优先 → 维护中包 → 登记 glue)**:全部复用既有 `ModevSheetScaffold`/`ModevInputSheet`/`ModevChoiceSheet`/`ModevDialogs`/`ToggleListItem`/`SettingsSection` + M3 `ListItem`;**唯一新建组件 = `ModevSearchableChoiceSheet`**(组合既有 `SearchInputField` + `LazyColumn` + M3 `ListItem`),登记理由:MD3 1.4.0 无「大数据量可搜索单选」组件。禁自造控件、禁直写 `AlertDialog`/`ModalBottomSheet`(`DialogConventionTest`)。禁在行容器写魔法半径(`RecordRowContainerContractTest` C2/C3)。
+
+**基线有意不复制的两处**:①**不做 COMMON/EXCLUSIVE 模板二型** —— Modev 的「可复用画像 + 每应用 `profileId` 绑定」已把 EXCLUSIVE(单包专属模板)语义完全吸收,保留二型只会造出两条装配路径(与 D-3 同源);②**加「读本机当前值」入口** —— 基线只有随机/预设/清空,无「取现值再改」,而这是 DIY 画像最高频动作,属基线遗漏而非取舍。
+
+### 2.7 MCP 工具面 45 → **54**
+
+新增 9(**净增 9,既有 2 件重定义**):`spoof_profile_get` / `spoof_profile_create` / `spoof_profile_update` / `spoof_profile_delete` / `spoof_profile_duplicate` / `spoof_profile_apply`(绑/解绑应用,`profileId` 传空 = 不伪装) / `spoof_profile_catalog`(读 `ProfileFieldCatalog` 元数据 ⇒ Agent 可自描述发现字段面) / `spoof_profile_export`(返回信封 JSON) / `spoof_profile_import`(接受信封,`dryRun` 参数支持只校验不落库)。
+重定义既有 2 件(不增量):`spoof_profiles_list` = 画像库列表(不再是 3 常量)、`spoof_global_set` = 只写全局默认画像 id。
+变更:`feature_settings_set` **删 `spoofOverrides` 参数**(改绑 id,决策 D-3 的直接后果),`spoofOverrides` 存量数据迁移见 §7 O-5。
+三门禁同次改快照:`McpToolParityTest.frozen_45` → 54、`UiMcpCapabilityParityTest` R1–R6(画像动作与 VM 动作双向归属)、`McpToolsTest` 子集计数。**令牌值仍恒不进 MCP 输出;画像非秘密,可全量出参。**
+
+### 2.8 数据资产与导入导出(按 R-6「先整体复制跑通」)
+
+引入基线 `assets/devices.json`(26 品牌 / 8533 型号)、`carriers.json`(1597 条)、presets 表(补齐到 Android 15/API 35,超宿主范围项标注不可选原因)+ 两个 `*.NOTICE.txt` 原样随包 + 刷新脚本 `tools/update_*.py` 移植。
+导入导出:JSON 文件(SAF/MediaStore)+ 仅 HTTPS URL(2,000,000 字符/字节双上限)+ 二维码生成/相机+相册扫码(`guise1:` 前缀 → Modev 侧改 `modev1:`,deflate+base64url,EC-L,2 MiB/512 KiB 上限,无分片)。新增 `com.google.zxing:core` + CameraX 直依赖 ⇒ **lint 基线必漂,WP-9 重登记**。
+
+### 2.9 i18n
+
+≈**95 新键** × 四语(41 字段标签 + 18 kind + 8 分区 + 3 画像名与摘要 + ≈20 动作与状态 + ≈8 校验错误)。
+硬规矩:ja/ko 是**生成物** ⇒ 必须回写 `scripts/v42_table_*.mjs` 再跑 `node scripts/v42_generate.mjs` **并看到 `DONE`**;直写 `values-ja/ko` 即 V46 实锤的静默失效根因,禁止。品牌/机型名等专名需登记 `IDENTICAL_ALLOWED`。
+
+---
+
+## 3. 架构决策点(全部已定档,执行方不再询问)
+
+| ID | 决策 | 选定 | 理由 / 代价 |
+|---|---|---|---|
+| **D-1** | 能力范围 | **基线 40 项全量** | 用户定档 R-1。代价:与双域分区/MCP/FeatureGroups 冲突最大 |
+| **D-2** | 事实源形态 | **画像库为唯一实体 + 宿主侧展开快照** | wire `VERSION` 恒 4、注入侧零反查、双域不破。代价:Room v15 + 新契约服务 |
+| **D-3** | 每应用字段覆写 | **不做**(只存 `profileId`) | YAGNI + 避免三态语义;DIY 需求由「另存画像」完整满足。代价:微调需另建画像 |
+| **D-4** | kind 粒度 | **一组一 kind(18),比基线 13 更细** | FeatureGate 红线/UI 行/MCP/期望表四者严格一对一。代价:taxonomy 快照与五处同步清单改动大 |
+| **D-5** | 强制档 vs 条件档 | **画像填写 = 无条件生效**;自适应掩蔽降为独立布尔,只管画像未填字段 | 「100% 符合预期」的前置条件。代价:显式画像在无脏值设备上同样改写 |
+| **D-6** | `Build` 改写不可逆 | **接受并显式声明**(Java 侧无读取期路径,AOSP `Build` 无 getter) | 基线同边界。代价:关开关不复原、生效需冷启动 ⇒ 写进 UI 说明 + AGENTS |
+| **D-7** | `SettingsHooker`/`FridaThread` 无自有 kind | **本轮不拆**(避免 FEATURE 计数二次膨胀),在 AGENTS 登记寄生关系 | 代价:关 `ROOT_PROPERTY` 连带失 adb/开发者选项掩蔽,须写入行副标题 |
+| **D-8** | 基线自身残缺两项 | **补齐**:截图三态可表达「强制禁止」;IMEI 单值 + UI 诚实说明(与基线一致) | 「100% 复刻」中基线欠的部分 |
+| **D-9** | 许可证 | **先复制跑通(用户定档 R-6)**;交付前显式裁决,不静默丢弃 | 基线 GPL-3 + devices.json CC BY-NC-SA(禁商用)。三选:①clean-room 重写实现只留规格 ②保留数据资产 + Modev 以 GPL-3 开源 ③维持现状并声明非商用。见 §7 |
+| **D-10** | 组归属收敛 | **退役 5 个既有 kind**(EMULATOR_BUILD/NETWORK/TELEPHONY/BATTERY/CPU)并入画像组 | 消除「一件事两实装」。代价:动 FeatureGate 名单与历史矩阵,须回归 |
+| **D-11** | 压测门禁层 | **靶程序逐字段期望表 = 100% 硬门禁;三方检测 App = 观测档非门禁** | momo 在 Magisk+Zygisk 宿主上物理不可全绿(已文档化) |
+
+---
+
+## 4. 工作包
+
+状态图例:⬜ 未开始 · 🔵 进行中 · ✅ 已完成(须出口准则全绿 + 证据入 §9)· ⛔ 阻塞
+**纪律:每个 WP 收口必须同次跑「定向 + 全量 + 回归」三类测试并绿,且把新事实回写 AGENTS.md;门禁绿 ≠ 完成,须能复现症状已修。**
+
+### WP-0 · 环境与基线复位(前置,阻塞全链)⬜
+- 目标:设备可验收 + 现状基线实测留档(不信文档口径)。
+- 产出:`docs/test-reports/v47-baseline-<utc>.md` —— `testModernDebugUnitTest` / `lintModernRelease` / `assembleModernDebug` 三组实测计数;`adb devices` 单序列确认;LDPlayer 冷启 + scope 恢复 + `cached_apps_freezer` 禁用。
+- 出口准则:全量单测 BUILD SUCCESSFUL 且 0 失败;lint error=0;设备在线序列数 == 1;`00-env-verify.ps1 -Mode runtime` 非 BLOCKED。
+- 风险:恢复注入需整机重启(`dnconsole quit` + `dnplayer -index 0`);并发工作树(AGENTS.md 正被改)⇒ 每次改码前 `git status` 复核。
+
+### WP-1 · 规格冻结与 catalog 落地 ⬜
+- 产出:`DeviceProfile`(41 字段)+ `ProfileFieldCatalog`(单点)+ 基线字段对照表(41 行逐条)+ 期望表 schema 定义 + JVM 门禁 `ProfileFieldCatalogTest`(分区完备 / kind 归属唯一 / 每字段恰属一 kind / validator 与 sentinel 一致 / MCP 名唯一 / 探针 ID 存在)。
+- 出口:`ProfileFieldCatalogTest` 绿;**派生测试证明「UI 表单 / MCP 声明 / 期望表 / 门控表」四视图字段集完全相同**(这是 D-2 之后防漂移的唯一硬闸)。
+
+### WP-2 · 数据与配置层 ⬜
+- 产出:Room v15(`spoof_profile` + `crypto_records.maskedValue`)+ 实体/DAO(表名走 `TABLE_NAME` 常量)+ `SpoofProfileService` 契约与实现 + 内置三档 catalog 与账本算法 + `AppListenOverride.profileId`(含 `isDefault`/`deviationCountFor`/`clearDomain` 三处同步)+ `EffectiveSwitch` 展开 + `configVersion 2→3` 迁移。
+- 出口:`DbMigrationParityTest` / `FeatureConfigMigrationTest` / `AppListenOverrideDomainTest` / `RecordWriteModelParityTest` / `SingleWriteEntryPointTest` 全绿 + 新增 `BuiltinProfileConsistencyTest`(整组自洽:三元组/fingerprint/ro/SDK/DPI)+ 未知 id 硬失败断言。
+
+### WP-3 · 注入侧第一批(身份与标识)⬜
+- 覆盖 kind:`PROFILE_BUILD / UNIQUE_ID / SIM / CELL / WIFI / NETWORK / DENSITY / CPU`。
+- 产出:`ProfileHookPlan` + `ProfileBaseHooker` + 8 钩子组 + 互斥裁决 R-A..R-D + 值生成器(强制档无条件写)+ DFC-01/02/04/05/08 清偿。
+- 出口:`ProfileHookPlanTest`(空画像=零组 + 四条裁决)+ `InterventionGateConventionTest`/`HotPathGateConventionTest` 名单同步 + **每项二态 JVM/Robolectric 行为测试**(禁自抄实现,直测 internal 本体)。
+
+### WP-4 · 注入侧第二批(环境、定位、隐私)⬜
+- 覆盖 kind:`PROFILE_LOCATION / WIFI_LOC_HIDE / CELL_LOC_HIDE / LOCALE / TIME_ZONE / BATTERY / APP_VERSION / BLANK_CONTENT / APP_LIST / SCREENSHOT` + `ProfileRandomizer`(整体一致随机)+ 数据资产引入。
+- 出口:同 WP-3 口径;`PROFILE_SCREENSHOT` 与解除录屏**共用引擎**由源码扫描锁定;`PROFILE_APP_LIST` 白名单记忆集行为测试。
+
+### WP-5 · 管理端 UI ⬜
+- 产出:画像库主页 + DIY 编辑器 + `ModevSearchableChoiceSheet`(登记 glue)+ 每应用绑定行 + 画像缺失态。
+- 出口:`DialogConventionTest` / `AppbarSearchExclusivityTest` / `RecordRowContainerContractTest` / `SettingsThemeContrastTest` / `HardcodedStringConventionTest` 全绿 + 新增 `ProfileRowActionMenuTest`、`ProfileEditorFieldCountTest`(渲染行数 == catalog 行数,**行为断言而非 grep**)、`ProfileBindTest`(插桩)。
+
+### WP-6 · 导入导出与传输 ⬜
+- 产出:JSON 文件 / HTTPS URL / 二维码生成 + 扫码(相机 + 相册);新信封 `modev1:`。
+- 出口:codec JVM 往返测试(含上限、非前缀回落、超量拒绝、`distinctBy id`)+ 安全:URL 仅 https、大小双闸、无路径拼接。
+
+### WP-7 · MCP 工具面与 parity ⬜
+- 产出:9 新工具 + 2 处语义变更 + 能力行登记。
+- 出口:`McpToolParityTest`(54 快照)/ `UiMcpCapabilityParityTest` R1–R6 / `McpToolsTest` / 双域闸(画像写拒 LISTEN kind)/ **声明面即生效面四条**(未声明参数 -32602、enum 强制、required 缺失与 null 同分型)+ `spoof_profile_*` 写入实例化经 `McpJson` 默认值构造器。
+
+### WP-8 · 全量压测体系(→ §5)⬜
+- 出口:**期望矩阵 0 FAIL / 0 SKIP**,台账记录逐轮轨迹与每条红的归因。
+
+### WP-9 · 契约回写与收尾 ⬜
+- 产出:AGENTS.md(词汇表新增 5 词条 + 新增强约束条目 + 修订 #16/#23 + lint 新基线 + 实测计数复核)、README 功能表、许可证裁决落地(D-9)、`docs/test-reports/v47-final-*.md`。
+- 出口:文档每条断言有 `file:line` 或实测命令支撑;**不留「文档声称、实装未做」的漂移**(本仓历史反复栽过的坑)。
+
+---
+
+## 5. 全量压测体系(R-4 / R-5)
+
+### 5.1 期望矩阵:派生,不手抄
+
+`ProfileFieldCatalog` + 内置三档 ⇒ 生成 `scripts/test-integration/v47-spoof-expectations.json`,一行一条:
+
+```
+{ profileId, fieldKey, kind, apiPath, probeCase, observationKey(TT_* 或 record:column),
+  predicate: EXACT|PREFIX|FORMAT|LUHN|DOMAIN|DERIVED|ABSENT_SAFE, expected, rationale }
+```
+
+- `DERIVED` 专用于跨字段一致式(`fingerprint` 前缀 == `brand/product/device`、`ro.product.*` == `Build.*`、`TAC == imei.take(8)`)。
+- **门禁 `SpoofExpectationParityTest`(JVM)**:矩阵行数 == catalog 声明的 (字段 × API 路径) 笛卡尔闭包;**任一新字段未挂探针用例即红**,把「新增能力无测试」变成编译期之后的第二道硬闸。
+
+### 5.2 靶程序探针扩展(`L-ENV-*` 新域)
+
+现状:`TestCases.kt` 128 用例,`L-DEV-01..21` 仅覆盖 21 个点,**`ANDROID_ID` 无探针、电池探针指向错 API、ro 探针只读 `ro.debuggable/ro.secure`(是 root 集不是画像集)**。
+
+必须新增(每条一 method,一次进程启动产出全部观测 = `L-ENV-DUMP-01`):
+- `Build` 全 13 字段(反射 `getField` **与** 直接静态读双路径)+ `Build.VERSION` 2
+- `SystemProperties.get` 全 14 个 `ro.*` 画像键(反射)
+- `Settings.Secure.getString(ANDROID_ID)`;`Settings.Global/Secure.getInt` × 5(adb/开发选项/OEM 解锁/模拟位置/非市场安装)
+- Telephony:`getDeviceId`/`getImei()`/`getImei(int)`/`getPrimaryImei`/`getTypeAllocationCode`/`getLine1Number`/`getSubscriberId`/`getSimSerialNumber` + 运营商三项 + 网络类型三方法
+- Wi-Fi:`getSSID`/`getBSSID`/`getMacAddress`/`getScanResults`;网络:`NetworkInfo` 4 + `NetworkCapabilities.hasTransport` + `ConnectivityManager` 3
+- 基站:6 类 `CellIdentity` + `GsmCellLocation`/`CdmaCellLocation`
+- 定位:`Location` 经纬度 + `getLastKnownLocation` + `LocationListenerTransport` 回调
+- 密度:`Resources.getDisplayMetrics`(三值)/`getConfiguration`(三 dp)/`Display.getMetrics`/`getRealMetrics`
+- 语言时区:`Locale.getDefault`(含 `Category`)/`LocaleList`/`Configuration.locales`/`Resources.getSystem` + `TimeZone.getDefault`/`ZoneId.systemDefault`/ICU
+- 电池:`BatteryManager.getIntProperty(CAPACITY)`(**非广播路径**)+ `Intent.getIntExtra`
+- 版本:自身 `getPackageInfo`(三形态)
+- 空白通行证:通讯录/图/视/音 四类 URI query(**断言列结构保留 + 0 行**)+ `getInstalledApplications` 计数(白名单态)
+- 截图:窗口 flags 回读(允许态 / 禁止态)
+- 上报:`Tt.result` 机器可读;新增 `L-ENV-DUMP-01` 一次吐全量,压缩进程启动次数与冷启动成本。
+
+### 5.3 `28-run-spoof.ps1`(新矩阵档)
+
+```
+for profile in [三内置档, +2 个 DIY fixture 档(极值/最小), +1 个「不伪装」对照]:
+  MCP spoof_profile_apply(pkg, profileId) → force-stop → 冷启动靶程序
+  → L-ENV-DUMP-01 (+ 逐 kind 定点 case)
+  → 拉 TT_RESULT + 查 host DB(original/masked 双侧)
+  → 双 oracle 交叉对账:TT 观测值 == 记录 maskedValue == 期望值
+  → 逐条 PASS/FAIL 落 ledger
+teardown: feature_settings_reset(FEATURE) + 全局画像回默认
+```
+- **SKIP 清单恒空**:缺前置条件的用例必须自己造前置,不许 SKIP(静默假覆盖是已定性的返工源)。
+- 编排纪律(AGENTS 三坑):子进程 `Start-Process` + `-RedirectStandardOutput` + `WaitForExit`,禁 `Tee-Object`;JSON 数组解除嵌套;透传参禁自动变量名(`$args`/`$pid`);gradle 调用一律 `--no-build-cache`,装机步加 **APK MD5 == 设备 base.apk MD5**。
+- 注册进 `run-acceptance.ps1` 的 `-Stage spoof` 枚举与 inject 序列。
+
+### 5.4 一致性/多应用/跨进程档(`CONSISTENCY-*`)
+1. 同画像两个不同应用进程 ⇒ 可见值恒等(证明非按进程抖动)。
+2. 主进程与 `:sub` 进程 ⇒ 同配置同值(基线键只到包名,Modev 同语义,须实测)。
+3. 跨字段式(DERIVED 全集)。
+4. 画像切换后冷启 ⇒ 新值生效、无残值。
+5. 自适应掩蔽 + 画像并存 ⇒ 裁决 R-D 正确(强制档胜)。
+
+### 5.5 三方检测 App **观测档**(非门禁,D-11)
+清单:momo、NativeTest、以及 2–3 个常见设备信息 App(需用户侧提供 APK 或从既有 `arthub/` 取)。
+流程:force-stop → 启动 → 有界等待 → `uiautomator dump`(+`--compressed` 回落)→ **off-device perl 解析**(宿主 grep 是 ugrep 别名,`-o` 行为不同)→ 判定词提取 → 截图归档 `docs/test-reports/v47-detectors/`。
+**预期红项必须预先登记为期望**:momo 检测 Zygisk pre-specialize 即中止(不可达全绿)。本档产出不计入 100%,但**逐条差异须被解释**(可归因 = 已声明边界;不可归因 = 缺陷,升级为 GAP)。
+
+### 5.6 「100% 符合预期」的定义与循环协议
+- **定义**:§5.1 生成的全矩阵(≈**41 字段 × 平均 2.3 路径 × 6 档画像 ≈ 560 断言**)**0 FAIL、0 SKIP**;`Exit-WithResult` 退出码 0;ledger JSON 全绿。
+- **循环**:每轮红 → 三分类归因(**产品缺陷 / 期望表错 / 环境故障**)。**只有当「期望表与产品契约同时被否证」才允许改期望**,且必须在 §9 留裁决记录。环境故障特征须先排除(daemon 被杀、Kotlin in-process 重跑、ADB reset、双序列踩踏)再归因源码。
+- 二次/三次全量重跑直到 100%;每轮记 PASS/FAIL/SKIP 轨迹。
+
+---
+
+## 6. 门禁与基线变更登记(同次提交)
+
+| 闸 | 现值 → 新值 |
+|---|---|
+| `McpToolParityTest` | 45 → **54** 工具名快照 + 边界扫描 |
+| `CategoryTaxonomyTest` | FEATURE **37 → 50**、LISTEN 44 不变、(type,id) 域完备 |
+| `DeviceEnvKindTest` | 21 → **34** |
+| `FeatureGroupsTest` | 6 组 → **7 组**(新 `DEVICE_PROFILE`),组并集 == FEATURE 域 |
+| `InterventionGateConventionTest` | gatedFields +18 |
+| `HotPathGateConventionTest` | 白名单 26 → +18 手工登记 |
+| `DbMigrationParityTest` | v14 → **v15**,迁移三处同步 |
+| `SingleWriteEntryPointTest` | W1 新表开者白名单 + W2 新可变面 |
+| `StringResourceParityTest` | ≈95 新键四语 + `IDENTICAL_ALLOWED` 专名登记 |
+| lint | 43/1/0 → **实测重定**(zxing+CameraX 各 +1,反射 SuppressLint 若干) |
+| `skip-allowlist.txt` | 画像相关 SKIP 项**全部删除**(伪装的 SKIP 即覆盖真空) |
+
+---
+
+## 7. 未决项
+
+| ID | 事项 | 状态 | 需要谁 |
+|---|---|---|---|
+| **O-1** | D-9 许可证处置:基线 GPL-3 代码 + CC BY-NC-SA 机型库的长期合规形态(R-6 已定「先复制跑通」,交付前须裁决) | ⬜ 未决 | 用户 |
+| **O-2** | 设备与模拟器环境:本轮零在线,WP-0 阻塞 | ⬜ 阻塞 | 环境 |
+| **O-3** | 三方检测 App 的 APK 来源与可安装性(LDPlayer x86_64;部分检测 App 仅 arm) | ⬜ 待确认 | 用户/环境 |
+| **O-4** | 并发工作树:AGENTS.md 与 40+ 文件处于 modified 态,提交前须 `git status` 复核并只提交本任务面文件 | ⬜ 持续 | 执行方 |
+| **O-5** | `spoofOverrides` 扁平覆写表的存量用户数据迁移路径(现存 `feature_global` 用户值) | ⬜ 设计细节 | 执行方(WP-2 定) |
+
+---
+
+## 8. 需求追溯(全表)
+
+| 需求 | 基线能力 | Modev 实现 | WP | 出口证据 |
+|---|---|---|---|---|
+| R-1 | 40 字段 / 13 组 / 30 类 | `DeviceProfile` 41 字段 + `ProfileHookPlan` 18 组 | WP-1..4 | 全矩阵 100% + `ProfileFieldCatalogTest` |
+| R-2 | 基线无对应物 | 三内置档 + 版本化账本 + 墓碑 + 收养 | WP-2 | `BuiltinProfileConsistencyTest` + 压测三档逐字段 |
+| R-3 | G-25..G-34 | 画像库 Room + CRUD + 编辑器 + 复制为 DIY + 导入导出 + MCP 9 工具 | WP-2/5/6/7 | e2e CRUD + R1–R6 + codec 往返 |
+| R-4 | guise-test 探针思想 | `L-ENV-*` 全量快照 + `28-run-spoof` + 三方观测 | WP-8 | ledger 0/0 |
+| R-5 | —— | catalog 派生期望表 + 双 oracle 交叉对账 | WP-8 | `SpoofExpectationParityTest` + 逐轮台账 |
+| R-6 | GPL-3 / CC 资产 | 直接引入 + NOTICE 随包 | WP-4/6 | §7 O-1 在案 |
+| R-8 | 基线缺口清单 | 12 项 ROOT_XPOSED_HIDE 原样保留 + 传感器/file 掩蔽迁组 | WP-3/4 | 既有矩阵不回退 + 强制/条件档共存测试 |
+
+---
+
+## 9. 执行记录台账
+
+| 日期 | WP | 落地内容 | 定向测试 | 全量/回归 | 红项归因与裁决 | 状态 |
+|---|---|---|---|---|---|---|
+| 2026-09-22 | — | 基线全量审计 + 现状审计 + 两份文档落盘 | —— | —— | 见 AUDIT §5/§6 | ✅ |
+| | WP-0 | | | | | ⬜ |
+| | WP-1 | | | | | ⬜ |
+| | WP-2 | | | | | ⬜ |
+| | WP-3 | | | | | ⬜ |
+| | WP-4 | | | | | ⬜ |
+| | WP-5 | | | | | ⬜ |
+| | WP-6 | | | | | ⬜ |
+| | WP-7 | | | | | ⬜ |
+| | WP-8 | | | | | ⬜ |
+| | WP-9 | | | | | ⬜ |
+
+---
+
+## 10. 自驱动协议
+
+1. 按 WP-0 → WP-9 依赖序推进;每包收口即在本文件标记 + 写台账。
+2. 测试三档必做:定向(本包新增)+ 全量(`testModernDebugUnitTest`)+ 回归(lint + 相关设备档);全绿才算 ✅。
+3. 遇红先按 §5.6 三分类归因,**不弱化断言、不扩 SKIP、不改门禁口径来换绿**。
+4. 任何与既有封板契约(计数、快照、词汇、AGENTS 条目)冲突时,**以本任务书需求本体为准**,并在同次提交把新事实写回 AGENTS.md(不留「代码改了文档没改」)。
+5. `file:line` 断言在改码前回访源码复核(子代理报告项见 AUDIT §9);文档口径以本次实测数为准,不信历史数字。

@@ -1,8 +1,6 @@
 package com.lioisme.modev.hook
 
 import com.lioisme.modev.core.util.BytesView
-import java.util.Collections
-import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -10,14 +8,16 @@ import java.util.concurrent.atomic.AtomicLong
  *
  * - 实例标识使用全局自增唯一 ID(替代 identityHashCode,消除跨代碰撞);
  * - 弱引用映射,不阻止 GC,天然防泄漏;
- * - 同一 WeakHashMap 承载 [contextFor]/[identity],一次查表两者复用。
+ * - 同一映射承载 [contextFor]/[identity],一次查表两者复用。
+ * - V44 T2.5:改条带化弱键映射([StripedWeakMap]),旧形态全局单锁下
+ *   MessageDigest/Cipher 每次 update 两次加锁,多线程加解密直接串行化。
  * - 单例:每个注入进程仅有一个跟踪器(HookManager 装配)。
  */
 object CryptoContextTracker {
 
     private class Entry(val id: Long, val context: CryptoContext)
 
-    private val entries = Collections.synchronizedMap(WeakHashMap<Any, Entry>())
+    private val entries = StripedWeakMap<Entry>()
     private val idCounter = AtomicLong(1)
 
     fun contextFor(instance: Any): CryptoContext =

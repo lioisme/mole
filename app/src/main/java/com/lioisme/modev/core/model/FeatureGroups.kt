@@ -95,6 +95,18 @@ object FeatureGroups {
         FeatureGroup.DEVICE_SPOOF -> RecordType.DEVICE_ENV
     }
 
+    /**
+     * 组内类别 (类型,id) 对(V44 R1-6:标签/开关读写统一走限定键路由)。
+     * 组内全部 kind 恒属该组观测记录类型(FeatureGroupsTest 锁完备性),
+     * 观测类型缺失即装配错误。
+     */
+    fun kindRefs(group: FeatureGroup): List<Pair<RecordType, String>> {
+        val type = checkNotNull(recordType(group)) {
+            "Feature group ${group.name} requires an observation record type"
+        }
+        return kindIds(group).map { type to it }
+    }
+
     /** 组所属域的总开关位名(功能页 master 行;与 HookSwitch 字段一一对应)。 */
     val ALL: List<FeatureGroup> = FeatureGroup.entries
 }

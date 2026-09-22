@@ -135,27 +135,67 @@ class EffectiveSwitchTest {
         assertTrue(effective.anyDbEnabled)
     }
 
-    /** 全类别不变量:全部类别按各自默认值取反定制后,解析回读 == 显式偏差(读写映射互逆)。 */
+    /** 全类别不变量(V44 限定键):全部 (type,id) 对按各自默认值取反定制后,解析回读 == 显式偏差。 */
     @Test
     fun `readKind invariant holds for every taxonomy kind`() {
         val flipped = CategoryTaxonomy.all().associate {
-            it.id to !(EffectiveSwitch.readKind(d, it.id) ?: true)
+            AppListenOverride.kindKey(it.type, it.id) to
+                !(EffectiveSwitch.readKind(d, it.type, it.id) ?: true)
         }
         val effective = EffectiveSwitch.resolve(d, AppListenOverride(kinds = flipped))
         for (category in CategoryTaxonomy.all()) {
             org.junit.Assert.assertEquals(
                 "kind=" + category.id,
-                flipped[category.id],
-                EffectiveSwitch.readKind(effective, category.id),
+                flipped[AppListenOverride.kindKey(category.type, category.id)],
+                EffectiveSwitch.readKind(effective, category.type, category.id),
             )
         }
     }
 
+    /**
+     * V44 R1-6 回归:跨类型裸 id 碰撞必须按类型消歧独立读写
+     * (旧字符串 first-wins 下 db OPEN 与 prefs OPEN、crypto SIGNATURE 与
+     * system SIGNATURE 互踩——偏好行实际改写数据库行)。
+     */
+    @Test
+    fun `cross-type colliding kind ids resolve independently`() {
+        val effective = EffectiveSwitch.resolve(
+            d.copy(dbOpen = false, prefsOpen = true, signature = false, signatureMonitor = true),
+            AppListenOverride(
+                kinds = mapOf(
+                    AppListenOverride.kindKey(RecordType.DATABASE, SqlKind.OPEN.name) to true,
+                    AppListenOverride.kindKey(RecordType.PREFS, PrefsKind.OPEN.name) to false,
+                    AppListenOverride.kindKey(RecordType.CRYPTO, CryptoKind.SIGNATURE.name) to true,
+                    AppListenOverride.kindKey(RecordType.SYSTEM, SystemKind.SIGNATURE.name) to false,
+                ),
+            ),
+        )
+        assertTrue(effective.dbOpen)
+        assertFalse(effective.prefsOpen)
+        assertTrue(effective.signature)
+        assertFalse(effective.signatureMonitor)
+    }
+
+    /** V44 遗留兼容:旧存储裸 id 键按 first-wins 序首类型归一(OPEN→DATABASE,SIGNATURE→CRYPTO)。 */
+    @Test
+    fun `bare legacy kind keys keep first-wins interpretation`() {
+        val effective = EffectiveSwitch.resolve(
+            d.copy(dbOpen = false, prefsOpen = false, signature = false, signatureMonitor = false),
+            AppListenOverride(kinds = mapOf("OPEN" to true, "SIGNATURE" to true)),
+        )
+        assertTrue(effective.dbOpen)
+        assertFalse(effective.prefsOpen)
+        assertTrue(effective.signature)
+        assertFalse(effective.signatureMonitor)
+    }
+
     @Test
     fun `readKind returns field values and null for unknown id`() {
-        assertTrue(EffectiveSwitch.readKind(d, CryptoKind.CIPHER.name) == d.cipher)
-        assertTrue(EffectiveSwitch.readKind(d, SqlKind.OPEN.name) == d.dbOpen)
-        assertNull(EffectiveSwitch.readKind(d, "NOT_A_KIND"))
+        assertTrue(EffectiveSwitch.readKind(d, RecordType.CRYPTO, CryptoKind.CIPHER.name) == d.cipher)
+        assertTrue(EffectiveSwitch.readKind(d, RecordType.DATABASE, SqlKind.OPEN.name) == d.dbOpen)
+        assertNull(EffectiveSwitch.readKind(d, RecordType.CRYPTO, "NOT_A_KIND"))
+        assertNull(EffectiveSwitch.readKind(d, RecordType.SYSTEM, "OPEN"))
+        assertNull(EffectiveSwitch.readKind(d, RecordType.DATABASE, "PAGE_LOAD"))
     }
 
     /** V25 采集微调项:非 null 即生效,null 位取默认。 */
@@ -260,9 +300,14 @@ class EffectiveSwitchTest {
                 DeviceEnvKind.DETECT_ROOT -> d.detectRoot
                 DeviceEnvKind.DETECT_EMULATOR -> d.detectEmulator
             }
-            assertEquals("$kind readKind", original, EffectiveSwitch.readKind(d, kind.name))
-            val toggled = EffectiveSwitch.resolve(d, AppListenOverride(kinds = mapOf(kind.name to !original)))
-            assertEquals("$kind applyKinds", !original, EffectiveSwitch.readKind(toggled, kind.name))
+            assertEquals("$kind readKind", original, EffectiveSwitch.readKind(d, RecordType.DEVICE_ENV, kind.name))
+            val toggled = EffectiveSwitch.resolve(
+                d,
+                AppListenOverride(
+                    kinds = mapOf(AppListenOverride.kindKey(RecordType.DEVICE_ENV, kind.name) to !original),
+                ),
+            )
+            assertEquals("$kind applyKinds", !original, EffectiveSwitch.readKind(toggled, RecordType.DEVICE_ENV, kind.name))
         }
     }
 

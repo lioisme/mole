@@ -16,6 +16,20 @@ import com.lioisme.modev.core.model.SqlValueType
 import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
+import com.lioisme.modev.domain.record.BehaviorDetail
+import com.lioisme.modev.domain.record.CryptoDetail
+import com.lioisme.modev.domain.record.CryptoRow
+import com.lioisme.modev.domain.record.DeviceEnvDetail
+import com.lioisme.modev.domain.record.NetworkDetail
+import com.lioisme.modev.domain.record.PrefsDetail
+import com.lioisme.modev.domain.record.ProcessDetail
+import com.lioisme.modev.domain.record.RecordDetailModel
+import com.lioisme.modev.domain.record.RowModel
+import com.lioisme.modev.domain.record.SqlDetail
+import com.lioisme.modev.domain.record.SqlRow
+import com.lioisme.modev.domain.record.SystemDetail
+import com.lioisme.modev.domain.record.UiInteractionDetail
+import com.lioisme.modev.domain.record.WebViewDetail
 
 /**
  * 统一 Gson([Json.gson])实例,映射层确保单例不覆盖。

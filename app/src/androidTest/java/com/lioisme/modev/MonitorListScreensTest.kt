@@ -4,7 +4,6 @@ import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.hasAnyAncestor
 import androidx.compose.ui.test.hasAnyDescendant
-import androidx.compose.ui.test.hasClickAction
 import androidx.compose.ui.test.hasContentDescription
 import androidx.compose.ui.test.hasScrollAction
 import androidx.compose.ui.test.hasSetTextAction
@@ -18,6 +17,7 @@ import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onAllNodesWithContentDescription
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -32,6 +32,8 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
+import com.lioisme.modev.data.db.RecordQueryFactory
+import com.lioisme.modev.domain.record.RecordFilter
 import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.ui.MainActivity
 import kotlinx.coroutines.flow.first
@@ -85,18 +87,8 @@ class MonitorListScreensTest {
                     record(victimPackage, "CIPHER", "DES", "ENCRYPT", now - 5_000),
                 ),
             )
-            val seeded = dao
-                .observeCountByFilter(
-                    // 哨兵绑定(内容无意义,由 typeCount=0 短路),空集合直接绑会生成非法 IN ()。
-                    recordTypes = listOf(EMPTY_IN_SENTINEL),
-                    packages = listOf(EMPTY_IN_SENTINEL),
-                    kinds = listOf(EMPTY_IN_SENTINEL),
-                    typeCount = 0,
-                    packageCount = 0,
-                    kindCount = 0,
-                    query = null,
-                )
-                .first()
+            // clearAll + 种子跨两包 ⇒ 不变量 = 全表恰为我种的四行,计数按全局口径。
+            val seeded = dao.countByQuery(RecordQueryFactory.count(RecordFilter())).first()
             assertEquals("种子写入须在读回中可见", 4L, seeded)
         }
         // 被测应用默认隐藏(自身是 Xposed 模块),开启显隐使行可见。
@@ -271,9 +263,11 @@ class MonitorListScreensTest {
         openList(str(R.string.algorithm_records_title))
 
         // 类别筛选(行为级):点击 Cipher → AES 行现、SHA-256 行隐。
+        // V43 T4 后记录行自身也承载类别词元(「加密」)且整行可点 ⇒ 按文本 + 可点匹配会
+        // 同时命中菜单项与记录行(T3.7 的 kind-filter-* 锚点就是为此而设)。
         rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
         rule.waitForIdle()
-        rule.onNode(hasText(str(R.string.kind_cipher)) and hasClickAction()).performClick()
+        rule.onNodeWithTag("kind-filter-CIPHER").performClick()
         rule.waitForIdle()
         waitForVisible("AES")
         assertEquals(1, rowCount("AES"))
@@ -282,14 +276,16 @@ class MonitorListScreensTest {
         // 复位全部类别:两行回归。
         rule.onNodeWithContentDescription(str(R.string.cd_filter)).performClick()
         rule.waitForIdle()
-        rule.onNode(hasText(str(R.string.record_types_all)) and hasClickAction()).performClick()
+        rule.onNodeWithTag("kind-filter-all").performClick()
         rule.waitForIdle()
         waitForVisible("SHA-256")
         assertEquals(1, rowCount("AES"))
 
         // 搜索词过滤(展开搜索视图输入 → SQL 侧过滤)。
-        rule.onNodeWithText(str(R.string.algorithm_records_search)).performClick()
-        rule.waitForIdle()
+        rule.onAllNodesWithText(str(R.string.algorithm_records_search)).onFirst().performClick()
+        // Dialog 是新窗口:单次 waitForIdle 不保证首帧已组合(高负载机器上随机红),
+        // 改有界等待并让超时消息定位到「展开未生效」。
+        rule.awaitSearchDialogInput("点折叠搜索条应展开全屏搜索视图")
         // V40 T5.1:折叠条(标准 InputField)+ 展开视图双输入域并存 → 取 Dialog 窗口内者。
         rule.onNode(
             hasSetTextAction() and hasAnyAncestor(isDialog()),
@@ -356,9 +352,10 @@ class MonitorListScreensTest {
         ).fetchSemanticsNodes().size
         assertEquals("长按清空槽不得展开搜索视图", 0, expandedInputs)
 
-        // 单击仍走危险确认(V42 门禁不得误伤点击)。
+        // 单击仍走危险确认(V42 门禁不得误伤点击)。确认对话框同为**新窗口**,
+        // 先有界等待其锚点(超时消息 = 「点击被吞」),再断言文案显示性。
         rule.onAllNodesWithTag("records-clear-type").onFirst().performClick()
-        rule.waitForIdle()
+        rule.awaitAnchor("records-clear-confirm", "点清空槽应弹出危险确认")
         rule.onNodeWithText(str(R.string.danger_clear_algorithm_msg)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.cancel)).performClick()
         rule.waitForIdle()
@@ -366,10 +363,6 @@ class MonitorListScreensTest {
         assertEquals(1, rowCount("SHA-256"))
     }
 
-    companion object {
-        /** Room IN 哨兵(与 LogRepository.toBindList 同源:内容无意义,由计数短路)。 */
-        private const val EMPTY_IN_SENTINEL = ""
-    }
 }
 
 /** 主源槽展开宽限(internal 可见,探针等待窗与门禁同源)。 */

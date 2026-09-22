@@ -46,6 +46,11 @@ class FileStreamHooker(
         invocation: Invocation,
         read: Boolean,
     ) {
+        // V44 T2.2 门控先行:FileInputStream/FileOutputStream 构造器是全进程最高频
+        // 的钩子之一(框架启动即数百次),fileRead 默认关时必须首行短路,不得先付
+        // 取参/路径字符串化(File.path 为惰性计算,首次访问即缓存分配)。
+        val kind = if (read) BehaviorKind.FILE_READ else BehaviorKind.FILE_WRITE
+        if (!featureOn(kind)) return
         val path = streamPathOf(invocation)
         val params =
             if (path == null) {
@@ -53,7 +58,6 @@ class FileStreamHooker(
             } else {
                 appendFlag(invocation)?.let { mapOf(PARAM_APPEND to it.toString()) }
             }
-        val kind = if (read) BehaviorKind.FILE_READ else BehaviorKind.FILE_WRITE
         val operation = if (read) BehaviorOperation.OPEN_READ else BehaviorOperation.OPEN_WRITE
         emit(kind = kind, operation = operation, path = path, params = params)
     }

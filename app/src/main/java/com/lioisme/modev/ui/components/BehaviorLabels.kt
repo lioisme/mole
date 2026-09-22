@@ -8,7 +8,7 @@ import androidx.compose.ui.res.stringResource
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.BehaviorKind
 import com.lioisme.modev.core.model.BehaviorOperation
-import com.lioisme.modev.data.mapping.BehaviorRow
+import com.lioisme.modev.domain.record.BehaviorRow
 
 /**
  * 行为监听标签资源(V27):类别/操作显示名单一事实源,

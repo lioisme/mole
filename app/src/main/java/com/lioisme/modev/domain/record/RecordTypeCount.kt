@@ -1,6 +1,5 @@
 package com.lioisme.modev.domain.record
 
-import androidx.room.ColumnInfo
 
 /**
  * 按记录类型的记录计数(V17 R2)。
@@ -8,5 +7,5 @@ import androidx.room.ColumnInfo
  */
 data class RecordTypeCount(
     val recordType: String,
-    @ColumnInfo(name = "recordCount") val count: Long,
+    val count: Long,
 )

@@ -24,4 +24,11 @@ interface ConnectionMonitor {
      * 未绑定(服务未启动/重绑退避中)= null。诊断页展示消费。
      */
     val boundAddress: StateFlow<String?>
+
+    /**
+     * 最近一次绑定失败原因(null = 无错误 / 绑定成功清空)。
+     * V45 ISO-6:原为 wire 独有 + UI 直读 `McpServer` 具体类属性,现入契约由
+     * 双服务共同实现(服务页对称错误行,AGENTS #29)。
+     */
+    val bindError: StateFlow<String?>
 }

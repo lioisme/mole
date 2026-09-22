@@ -78,23 +78,6 @@
     <string name="algorithm_monitor_master">알고리즘 모니터링 사용</string>
     <string name="database_monitor_master">데이터베이스 모니터링 사용</string>
     <string name="section_db_result_limits">결과 제한</string>
-    <string name="switch_cipher">암호(Cipher)</string>
-    <string name="switch_message_digest">메시지 다이제스트(MessageDigest)</string>
-    <string name="switch_mac">MAC(HMAC)</string>
-    <string name="switch_signature">서명(Signature)</string>
-    <string name="switch_key_param">키 파라미터 생성</string>
-    <string name="switch_key_generation">키 생성</string>
-    <string name="switch_key_factory">키 팩토리(KeyFactory)</string>
-    <string name="switch_key_store">키스토어(KeyStore)</string>
-    <string name="switch_key_agreement">키 합의(KeyAgreement)</string>
-    <string name="switch_random">보안 난수(SecureRandom)</string>
-    <string name="switch_base64">Base64 인코딩</string>
-    <string name="switch_webview">WebView JS 암호</string>
-    <string name="switch_db_open">데이터베이스 열기</string>
-    <string name="switch_db_query">데이터베이스 쿼리</string>
-    <string name="switch_db_dml">데이터베이스 변경</string>
-    <string name="switch_db_exec">SQL 실행</string>
-    <string name="switch_db_transaction">트랜잭션</string>
     <string name="db_max_result_rows">최대 결과 행 수</string>
     <string name="db_max_result_rows_hint">쿼리 결과별 수집 행 수(0 = 무제한)</string>
     <string name="db_max_result_rows_dialog_title">최대 결과 행 수</string>
@@ -116,6 +99,7 @@
     <string name="danger_clear_logs_msg">"%1$s"의 모든 기록을 삭제하시겠습니까? 되돌릴 수 없습니다.</string>
     <string name="danger_clear_all_msg">모든 기록을 삭제하시겠습니까? 되돌릴 수 없습니다.</string>
     <string name="cancel">취소</string>
+    <string name="close">닫기</string>
 
     <!-- Record kind / operation labels -->
     <string name="kind_message_digest">다이제스트</string>
@@ -185,6 +169,12 @@
     <string name="meta_cipher_suite">암호 스위트</string>
     <string name="meta_proxy_port">프록시 포트</string>
     <string name="meta_bridge">브리지 이름</string>
+    <string name="record_field_app">앱</string>
+    <string name="meta_exit_code">종료 코드</string>
+    <string name="meta_pid">프로세스 ID</string>
+    <string name="record_action_blocked">차단됨</string>
+    <string name="record_action_detected">감지됨</string>
+    <string name="record_value_no">없음</string>
     <string name="meta_script_size">스크립트 크기</string>
     <string name="meta_context">컨텍스트</string>
     <string name="meta_direction">방향</string>
@@ -451,13 +441,16 @@
     <string name="tokens_status_deny_all">켜짐 · 토큰 없음: 모든 요청 거부</string>
     <string name="tokens_status_off">꺼짐 · 요청에 토큰 불필요</string>
     <string name="token_unnamed">토큰 %1$s</string>
-    <string name="token_revoke">폐기</string>
-    <string name="token_show">표시</string>
-    <string name="token_hide">숨기기</string>
-    <string name="token_revoke_confirm_msg">이 토큰을 폐기하시겠습니까? 사용 중인 클라이언트는 즉시 거부됩니다.</string>
+    <string name="token_delete">삭제</string>
+    <string name="token_delete_confirm_msg">이 토큰을 삭제하시겠습니까? 사용 중인 클라이언트는 즉시 거부됩니다.</string>
     <string name="token_copied">토큰 복사됨</string>
     <string name="token_created">토큰 생성됨</string>
     <string name="token_created_legacy">가져옴</string>
+    <string name="token_rename">이름 변경</string>
+    <string name="token_view">보기</string>
+    <string name="token_more">나머지 작업</string>
+    <string name="token_value_title">토큰 값</string>
+    <string name="token_renamed">이름이 업데이트되었습니다</string>
     <!-- V39 exit confirm -->
     <string name="exit_press_back_again">종료하려면 뒤로 버튼을 한 번 더 누르세요</string>
     <string name="settings_clear_all_records">모든 기록 삭제</string>
@@ -483,6 +476,7 @@
     <string name="diagnostics_detail_copy">복사</string>
     <string name="stats_received">수신됨</string>
     <string name="stats_dropped">버려짐(큐 가득 참)</string>
+    <string name="stats_bytes_dropped">버려짐(페이로드 예산)</string>
     <string name="stats_write_failures">쓰기 실패</string>
     <string name="stats_trimmed">잘림(용량 초과)</string>
     <string name="stats_rejected_hellos">거부됨(핸드셰이크)</string>

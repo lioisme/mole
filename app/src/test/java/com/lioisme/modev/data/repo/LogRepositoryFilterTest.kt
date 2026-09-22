@@ -5,6 +5,7 @@ import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
 import com.lioisme.modev.data.server.ConfigServer
+import com.lioisme.modev.domain.record.RecordFilter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -63,7 +64,7 @@ class LogRepositoryFilterTest {
         db.cryptoRecordDao().insert(entity("pkg.a", "digest", "SHA-256", recordType = "database"))
         db.cryptoRecordDao().insert(entity("pkg.b", "mac", "HmacSHA256"))
 
-        assertEquals(3L, repo.counts(RecordFilter()).first())
+        assertEquals(3L, repo.count(RecordFilter()).first())
     }
 
     @Test
@@ -72,24 +73,24 @@ class LogRepositoryFilterTest {
         db.cryptoRecordDao().insert(entity("pkg.a", "digest", "SHA-256", recordType = "database"))
         db.cryptoRecordDao().insert(entity("pkg.b", "mac", "HmacSHA256"))
 
-        assertEquals(2L, repo.counts(RecordFilter(recordTypes = setOf(RecordTypes.CRYPTO))).first())
+        assertEquals(2L, repo.count(RecordFilter(recordTypes = setOf(RecordTypes.CRYPTO))).first())
         // pkg.a 两行 + pkg.b 一行 = 3
         assertEquals(
             3L,
-            repo.counts(RecordFilter(packages = setOf("pkg.a", "pkg.b"))).first(),
+            repo.count(RecordFilter(packages = setOf("pkg.a", "pkg.b"))).first(),
         )
-        assertEquals(1L, repo.counts(RecordFilter(kinds = setOf("mac"))).first())
-        assertEquals(1L, repo.counts(RecordFilter(query = "SHA-256")).first())
+        assertEquals(1L, repo.count(RecordFilter(kinds = setOf("mac"))).first())
+        assertEquals(1L, repo.count(RecordFilter(query = "SHA-256")).first())
         assertEquals(
             1L,
-            repo.counts(RecordFilter(recordTypes = setOf("database"), packages = setOf("pkg.a"))).first(),
+            repo.count(RecordFilter(recordTypes = setOf("database"), packages = setOf("pkg.a"))).first(),
         )
     }
 
     @Test
     fun `counts with LIKE metacharacters stays literal`() = runBlocking {
         db.cryptoRecordDao().insert(entity("pkg.a", "cipher", "AES_100%"))
-        assertEquals(1L, repo.counts(RecordFilter(query = "AES_100%")).first())
+        assertEquals(1L, repo.count(RecordFilter(query = "AES_100%")).first())
     }
 
     @Test
@@ -97,7 +98,7 @@ class LogRepositoryFilterTest {
         db.cryptoRecordDao().insert(entity("pkg.a", "cipher", "AES"))
         db.cryptoRecordDao().insert(entity("pkg.a", "digest", "SHA-256", recordType = "database"))
 
-        val counts = repo.observeRecordTypeCounts().first()
+        val counts = repo.observeTypeCounts().first()
         assertEquals(
             mapOf(RecordTypes.CRYPTO to 1L, "database" to 1L),
             counts.associate { it.recordType to it.count },

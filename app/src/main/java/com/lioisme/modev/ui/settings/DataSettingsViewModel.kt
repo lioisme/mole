@@ -4,7 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.lioisme.modev.AppContainer
-import com.lioisme.modev.data.repo.LogRepository
+import com.lioisme.modev.domain.record.RecordService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -29,7 +29,7 @@ import kotlinx.coroutines.launch
  * 存储占用为快照读,由 [invalidated] 触发器在清理完成后重取。
  */
 class DataSettingsViewModel(
-    private val logs: LogRepository,
+    private val logs: RecordService,
 ) : ViewModel() {
 
     /** 存储占用重取信号(replay=1 保证订阅即取初值;DROP_OLDEST 防连发堆积)。 */
@@ -43,7 +43,7 @@ class DataSettingsViewModel(
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0L)
 
     /** 按记录类型计数(wire → count;缺失类型 = 0,UI 层按 [RecordType] 取用)。 */
-    val typeCounts: StateFlow<Map<String, Long>> = logs.observeRecordTypeCounts()
+    val typeCounts: StateFlow<Map<String, Long>> = logs.observeTypeCounts()
         .map { list -> list.associate { it.recordType to it.count } }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
@@ -66,6 +66,6 @@ class DataSettingsViewModelFactory(
 ) : ViewModelProvider.Factory {
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        return DataSettingsViewModel(container.logs) as T
+        return DataSettingsViewModel(container.records) as T
     }
 }

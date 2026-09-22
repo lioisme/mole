@@ -8,7 +8,7 @@ import com.lioisme.modev.core.util.StackTraceFilter
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
-import java.io.File
+import com.lioisme.modev.hook.ProcessIdentity
 import java.lang.reflect.Method
 
 /**
@@ -37,15 +37,12 @@ abstract class PrefsBaseHooker(
     /** 会话节流(同键 1s 窗口去重;LRU 容量护栏)。 */
     private val throttle = SessionThrottle()
 
-    /** 目标进程名(/proc/self/cmdline,镜像既有 Hooker 契约)。 */
-    protected val processName: String by lazy {
-        runCatching { File("/proc/self/cmdline").readBytes() }
-            .getOrNull()
-            ?.toString(Charsets.UTF_8)
-            ?.substringBefore(NULL_CHAR)
-            ?.takeIf { it.isNotBlank() }
-            ?: "unknown"
-    }
+    /**
+     * 目标进程名(V44 T2.6):经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
+     * 旧形态每个 Hooker 基类各自 `by lazy` 读一次 `/proc/self/cmdline`,冷启动期
+     * 约 50 个实例 = 50 次文件读 + 字节解码,而进程身份在进程内恒定不变。
+     */
+    protected val processName: String get() = ProcessIdentity.processName
 
     abstract fun install()
 

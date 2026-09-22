@@ -37,60 +37,45 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.annotation.StringRes
+import androidx.paging.compose.LazyPagingItems
 import androidx.paging.compose.collectAsLazyPagingItems
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.R
-import com.lioisme.modev.core.model.BehaviorKind
-import com.lioisme.modev.core.model.CryptoKind
-import com.lioisme.modev.core.model.PrefsKind
+import com.lioisme.modev.core.model.CategoryTaxonomy
 import com.lioisme.modev.core.model.RecordType
-import com.lioisme.modev.core.model.SqlKind
-import com.lioisme.modev.core.model.WebViewKind
-import com.lioisme.modev.core.model.NetworkKind
-import com.lioisme.modev.core.model.DeviceEnvKind
-import com.lioisme.modev.core.model.UiInteractionKind
-import com.lioisme.modev.core.model.SystemKind
-import com.lioisme.modev.core.model.ProcessKind
-import com.lioisme.modev.ui.components.networkKindLabelRes
-import com.lioisme.modev.data.mapping.BehaviorRow
-import com.lioisme.modev.data.mapping.CryptoRow
-import com.lioisme.modev.data.mapping.PrefsRow
-import com.lioisme.modev.data.mapping.RowModel
-import com.lioisme.modev.data.mapping.SqlRow
-import com.lioisme.modev.data.mapping.WebViewRow
-import com.lioisme.modev.data.mapping.NetworkRow
-import com.lioisme.modev.data.mapping.DeviceEnvRow
-import com.lioisme.modev.data.mapping.UiInteractionRow
-import com.lioisme.modev.data.mapping.SystemRow
-import com.lioisme.modev.data.mapping.ProcessRow
+import com.lioisme.modev.domain.record.BehaviorRow
+import com.lioisme.modev.domain.record.CryptoRow
+import com.lioisme.modev.domain.record.PrefsRow
+import com.lioisme.modev.domain.record.RowModel
+import com.lioisme.modev.domain.record.SqlRow
+import com.lioisme.modev.domain.record.WebViewRow
+import com.lioisme.modev.domain.record.NetworkRow
+import com.lioisme.modev.domain.record.DeviceEnvRow
+import com.lioisme.modev.domain.record.UiInteractionRow
+import com.lioisme.modev.domain.record.SystemRow
+import com.lioisme.modev.domain.record.ProcessRow
 import com.lioisme.modev.ui.components.networkSummary
 import com.lioisme.modev.ui.apps.AppCountFormat
+import com.lioisme.modev.ui.apps.KindLabelRes
 import com.lioisme.modev.ui.common.rememberEffectiveLocale
 import com.lioisme.modev.ui.components.KindFilterMenu
 import com.lioisme.modev.ui.components.KindOption
 import com.lioisme.modev.ui.components.ModevConfirmDialog
 import com.lioisme.modev.ui.components.SearchInputField
 import com.lioisme.modev.ui.components.TipIconButton
-import com.lioisme.modev.ui.components.behaviorKindLabelRes
 import com.lioisme.modev.ui.components.behaviorSummary
-import com.lioisme.modev.ui.components.kindLabelRes
-import com.lioisme.modev.ui.components.prefsKindLabelRes
 import com.lioisme.modev.ui.components.prefsSummary
 import com.lioisme.modev.ui.components.rememberSearchController
-import com.lioisme.modev.ui.components.sqlKindLabelRes
 import com.lioisme.modev.ui.components.sqlRowSummary
 import com.lioisme.modev.ui.components.copySummary
-import com.lioisme.modev.ui.components.webviewKindLabelRes
 import com.lioisme.modev.ui.components.webviewSummary
-import com.lioisme.modev.ui.components.deviceEnvKindLabelRes
 import com.lioisme.modev.ui.components.deviceEnvSummary
-import com.lioisme.modev.ui.components.uiInteractionKindLabelRes
 import com.lioisme.modev.ui.components.uiInteractionSummary
-import com.lioisme.modev.ui.components.systemKindLabelRes
 import com.lioisme.modev.ui.components.systemSummary
-import com.lioisme.modev.ui.components.processKindLabelRes
 import com.lioisme.modev.ui.components.processControlSummary
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 
 /**
  * 单应用算法记录列表(V19,需求 R1 之一;V20 单应用语境化;V23 T4.2 薄壳化:
@@ -112,7 +97,7 @@ fun AlgorithmRecordsScreen(
         onBack = onBack,
         onOpenRecord = onOpenRecord,
         placeholder = stringResource(R.string.algorithm_records_search),
-        kinds = CryptoKind.entries.map { KindOption(it.name, kindLabelRes(it)) },
+        kinds = kindOptionsOf(RecordType.CRYPTO),
     )
 }
 
@@ -131,7 +116,7 @@ fun DatabaseRecordsScreen(
         onBack = onBack,
         onOpenRecord = onOpenRecord,
         placeholder = stringResource(R.string.database_records_search),
-        kinds = SqlKind.entries.map { KindOption(it.name, sqlKindLabelRes(it)) },
+        kinds = kindOptionsOf(RecordType.DATABASE),
     )
 }
 
@@ -150,7 +135,7 @@ fun BehaviorRecordsScreen(
         onBack = onBack,
         onOpenRecord = onOpenRecord,
         placeholder = stringResource(R.string.behavior_records_search),
-        kinds = BehaviorKind.entries.map { KindOption(it.name, behaviorKindLabelRes(it)) },
+        kinds = kindOptionsOf(RecordType.BEHAVIOR),
     )
 }
 
@@ -169,7 +154,7 @@ fun PrefsRecordsScreen(
         onBack = onBack,
         onOpenRecord = onOpenRecord,
         placeholder = stringResource(R.string.prefs_records_search),
-        kinds = PrefsKind.entries.map { KindOption(it.name, prefsKindLabelRes(it)) },
+        kinds = kindOptionsOf(RecordType.PREFS),
     )
 }
 
@@ -188,7 +173,7 @@ fun WebViewRecordsScreen(
         onBack = onBack,
         onOpenRecord = onOpenRecord,
         placeholder = stringResource(R.string.webview_records_search),
-        kinds = WebViewKind.entries.map { KindOption(it.name, webviewKindLabelRes(it)) },
+        kinds = kindOptionsOf(RecordType.WEBVIEW),
     )
 }
 
@@ -203,7 +188,7 @@ fun NetworkRecordsScreen(
         onBack = onBack,
         onOpenRecord = onOpenRecord,
         placeholder = stringResource(R.string.network_records_search),
-        kinds = NetworkKind.entries.map { KindOption(it.name, networkKindLabelRes(it)) },
+        kinds = kindOptionsOf(RecordType.NETWORK),
     )
 }
 
@@ -219,7 +204,7 @@ fun DeviceEnvRecordsScreen(
         onBack = onBack,
         onOpenRecord = onOpenRecord,
         placeholder = stringResource(R.string.device_records_search),
-        kinds = DeviceEnvKind.entries.map { KindOption(it.name, deviceEnvKindLabelRes(it)) },
+        kinds = kindOptionsOf(RecordType.DEVICE_ENV),
     )
 }
 
@@ -235,7 +220,7 @@ fun UiInteractionRecordsScreen(
         onBack = onBack,
         onOpenRecord = onOpenRecord,
         placeholder = stringResource(R.string.ui_interaction_records_search),
-        kinds = UiInteractionKind.entries.map { KindOption(it.name, uiInteractionKindLabelRes(it)) },
+        kinds = kindOptionsOf(RecordType.UI_INTERACTION),
     )
 }
 
@@ -251,7 +236,7 @@ fun SystemRecordsScreen(
         onBack = onBack,
         onOpenRecord = onOpenRecord,
         placeholder = stringResource(R.string.system_records_search),
-        kinds = SystemKind.entries.map { KindOption(it.name, systemKindLabelRes(it)) },
+        kinds = kindOptionsOf(RecordType.SYSTEM),
     )
 }
 
@@ -267,7 +252,7 @@ fun ProcessControlRecordsScreen(
         onBack = onBack,
         onOpenRecord = onOpenRecord,
         placeholder = stringResource(R.string.process_control_records_search),
-        kinds = ProcessKind.entries.map { KindOption(it.name, processKindLabelRes(it)) },
+        kinds = kindOptionsOf(RecordType.PROCESS_CONTROL),
     )
 }
 
@@ -402,18 +387,9 @@ private fun MonitorRecordsContent(
     ) { innerPadding ->
         Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
             Column {
-                if (records.itemCount > 0 && !search.searchActive) {
-                    Text(
-                        text =
-                            stringResource(
-                                R.string.records_count_subtitle,
-                                AppCountFormat.grouped(records.itemCount.toLong(), locale),
-                            ),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 2.dp),
-                    )
-                }
+                // V43 T5 + V44 D1:计数读取下沉独立最小子组合器(SQL COUNT 口径)——
+                // 表写入/页增长不再重进本函数主体(连带 RecordTimelineList 参数面失效)的旧放大面。
+                RecordsCountSubtitle(totalCount = viewModel.totalCount, locale = locale, show = !search.searchActive)
                 RecordTimelineList(
                     records = records,
                     listState = viewModel.listState,
@@ -513,16 +489,40 @@ private fun ClearTypeAction(onClick: () -> Unit) {
     }
 }
 
-/** 类别选项表(V40 T4:记录类型 → 类别单选,D6 单类型语境;单应用/全局列表共用)。 */
-internal fun kindOptionsOf(type: RecordType): List<KindOption> = when (type) {
-    RecordType.CRYPTO -> CryptoKind.entries.map { KindOption(it.name, kindLabelRes(it)) }
-    RecordType.DATABASE -> SqlKind.entries.map { KindOption(it.name, sqlKindLabelRes(it)) }
-    RecordType.BEHAVIOR -> BehaviorKind.entries.map { KindOption(it.name, behaviorKindLabelRes(it)) }
-    RecordType.PREFS -> PrefsKind.entries.map { KindOption(it.name, prefsKindLabelRes(it)) }
-    RecordType.WEBVIEW -> WebViewKind.entries.map { KindOption(it.name, webviewKindLabelRes(it)) }
-    RecordType.NETWORK -> NetworkKind.entries.map { KindOption(it.name, networkKindLabelRes(it)) }
-    RecordType.DEVICE_ENV -> DeviceEnvKind.entries.map { KindOption(it.name, deviceEnvKindLabelRes(it)) }
-    RecordType.UI_INTERACTION -> UiInteractionKind.entries.map { KindOption(it.name, uiInteractionKindLabelRes(it)) }
-    RecordType.SYSTEM -> SystemKind.entries.map { KindOption(it.name, systemKindLabelRes(it)) }
-    RecordType.PROCESS_CONTROL -> ProcessKind.entries.map { KindOption(it.name, processKindLabelRes(it)) }
+/**
+ * 类别选项表(V44 D2:由 [CategoryTaxonomy.forType] 驱动——菜单项恒为 taxonomy 已登记类别、
+ * 顺序 = taxonomy.order、标签 = [KindLabelRes] (type,id) 唯一表;取代旧裸枚举遍历,
+ * 新枚举漏登记 taxonomy 不再可能渲染出「恒零结果」幽灵项,菜单序与设置页行序合一)。
+ */
+internal fun kindOptionsOf(type: RecordType): List<KindOption> =
+    CategoryTaxonomy.forType(type).map { category ->
+        KindOption(category.id, KindLabelRes.resolve(type, category.id))
+    }
+
+/**
+ * 记录计数副标(V43 T5 最小子组合器;V44 D1 口径回归底层数据):
+ * 读取 SQL `COUNT(*)`(WHERE_FILTER 单源,与 records_count/MCP 同口径)而非
+ * Paging 已加载窗口数——旧 itemCount 形态「展示数≠匹配数」随滚动增长、封顶 2 万。
+ * 订阅收敛于本叶组合器(WhileSubscribed StateFlow):表写入失效仅重组本槽位,
+ * 分页 append 与页面主体零连带(V43 T5 隔离契约保持)。
+ */
+@Composable
+private fun RecordsCountSubtitle(
+    totalCount: StateFlow<Long?>,
+    locale: java.util.Locale,
+    show: Boolean,
+) {
+    val count = totalCount.collectAsStateWithLifecycle().value
+    if (count != null && count > 0 && show) {
+        Text(
+            text =
+                stringResource(
+                    R.string.records_count_subtitle,
+                    AppCountFormat.grouped(count, locale),
+                ),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 2.dp),
+        )
+    }
 }

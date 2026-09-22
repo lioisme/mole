@@ -15,8 +15,10 @@ import java.util.Locale
  * - [groupLabelOrNull]:邻行比较决策——同秒非组起始;prev==null(分页边界)不渲染,
  *   数据补齐后由邻行比较自然补出;跨秒跨日带日期前缀,同日仅秒级时间。
  *
- * SimpleDateFormat 非线程安全:固定模式格式化器经 ThreadLocal 承载
- * (列表逐行调用);locale/is24h 变化模式由调用方在组合侧 remember。
+ * SimpleDateFormat 非线程安全:格式化器按「模式@locale」键经 ThreadLocal 缓存复用
+ * (V43 T5:列表邻行比较每索引至多 4 次格式化,旧实现每次新建格式化器,
+ * 分页 append 全列表重组时构成主线程分配风暴;locale/is24h 变化模式由调用方
+ * 在组合侧 remember,缓存仅线程内单调增长至少量模式,无界风险不存在)。
  */
 private val secondKeyFormat: ThreadLocal<SimpleDateFormat> =
     ThreadLocal.withInitial { SimpleDateFormat("yyyyMMddHHmmss", Locale.US) }
@@ -30,13 +32,23 @@ fun secondKey(timestamp: Long): String = secondKeyFormat.get().format(Date(times
 /** 日键(跨日/跨月判定)。 */
 fun dayKey(timestamp: Long): String = dayKeyFormat.get().format(Date(timestamp))
 
+/** 展示格式化器线程内缓存(键 = 模式 + locale 标签;locale 语言集有限,无界不可能)。 */
+private val displayFormats: ThreadLocal<HashMap<String, SimpleDateFormat>> =
+    ThreadLocal.withInitial { HashMap<String, SimpleDateFormat>() }
+
+private fun displayFormat(
+    pattern: String,
+    locale: Locale,
+): SimpleDateFormat = displayFormats.get().getOrPut("$pattern@${locale.toLanguageTag()}") {
+    SimpleDateFormat(pattern, locale)
+}
+
 /** 秒级时间文案(HH:mm:ss / h:mm:ss a,遵循 12/24h 时制)。 */
 fun formatSecond(
     timestamp: Long,
     locale: Locale,
     is24h: Boolean,
-): String =
-    SimpleDateFormat(if (is24h) "HH:mm:ss" else "h:mm:ss a", locale).format(Date(timestamp))
+): String = displayFormat(if (is24h) "HH:mm:ss" else "h:mm:ss a", locale).format(Date(timestamp))
 
 /**
  * 日文案(en "Aug 19" / zh·ja「8月19日」/ ko「8월 19일」)。
@@ -47,15 +59,15 @@ fun formatSecond(
 fun formatDay(
     timestamp: Long,
     locale: Locale,
-): String =
-    SimpleDateFormat(
+): String {
+    val pattern =
         when (locale.language) {
             "zh", "ja" -> "M\u6708d\u65e5"
             "ko" -> "M\uC6D4 d\uC77C"
             else -> "MMM d"
-        },
-        locale,
-    ).format(Date(timestamp))
+        }
+    return displayFormat(pattern, locale).format(Date(timestamp))
+}
 
 /** 完整组头文案:日期前缀 + 秒级时间(列表首项恒为组起始)。 */
 fun timelineLabel(

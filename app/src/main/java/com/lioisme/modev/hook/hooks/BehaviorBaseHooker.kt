@@ -9,7 +9,7 @@ import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.RecordSink
-import java.io.File
+import com.lioisme.modev.hook.ProcessIdentity
 import java.lang.reflect.Method
 
 /**
@@ -33,15 +33,12 @@ abstract class BehaviorBaseHooker(
     /** 会话节流(同键 1s 窗口去重;LRU 容量护栏)。 */
     private val throttle = SessionThrottle()
 
-    /** 目标进程名(/proc/self/cmdline,镜像 SqlBaseHooker)。 */
-    protected val processName: String by lazy {
-        runCatching { File("/proc/self/cmdline").readBytes() }
-            .getOrNull()
-            ?.toString(Charsets.UTF_8)
-            ?.substringBefore('\u0000')
-            ?.takeIf { it.isNotBlank() }
-            ?: "unknown"
-    }
+    /**
+     * 目标进程名(V44 T2.6):经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
+     * 旧形态每个 Hooker 基类各自 `by lazy` 读一次 `/proc/self/cmdline`,冷启动期
+     * 约 50 个实例 = 50 次文件读 + 字节解码,而进程身份在进程内恒定不变。
+     */
+    protected val processName: String get() = ProcessIdentity.processName
 
     abstract fun install()
 
@@ -52,6 +49,13 @@ abstract class BehaviorBaseHooker(
         if (max <= 0) return BytesView.of(bytes)
         return BytesView.of(bytes, maxHexChars = max * 2, maxTextChars = max)
     }
+
+    /**
+     * 热路径门控先行(V44 T2.2,与 [NetworkBaseHooker.featureOn] 同构):
+     * 回调首条有效语句即可判定,禁止把取参/整文件拼接/字节物化排在门控之前
+     * (fileRead 默认关时旧形态每次调用白造整文件字符串)。
+     */
+    protected fun featureOn(kind: BehaviorKind): Boolean = config().behaviorEnabled(kind)
 
     /**
      * 组装并发送一条行为记录。闸门序见类注释;fileSize 仅在调用即可得时由

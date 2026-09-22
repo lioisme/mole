@@ -8,6 +8,8 @@ import com.lioisme.modev.core.model.UiInteractionOperation
 import com.lioisme.modev.core.model.UiInteractionRecord
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
+import com.lioisme.modev.domain.record.UiInteractionRow
+import com.lioisme.modev.domain.record.RowModel
 
 /**
  * UI 交互记录映射(V33):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,

@@ -1,5 +1,6 @@
 package com.lioisme.modev.hook.probes
 
+import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.hook.InterventionProbeMarker
 import com.lioisme.modev.hook.Probe
@@ -20,6 +21,9 @@ import com.lioisme.modev.hook.hooks.SurfaceBypassHooker
 class ProcessControlProbe : Probe, InterventionProbeMarker {
 
     override val recordType: String = RecordTypes.PROCESS_CONTROL
+
+    /** V44 T2.4 冷启动裁剪:进程控制域经 `processControlListen` master ∧ kind 双门控。 */
+    override fun enabledIn(switch: HookSwitch): Boolean = switch.processControlListen
 
     override fun install(context: ProbeContext) {
         val hookers: List<ProcessControlBaseHooker> =

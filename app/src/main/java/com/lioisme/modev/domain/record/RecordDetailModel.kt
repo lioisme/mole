@@ -1,4 +1,4 @@
-package com.lioisme.modev.data.mapping
+package com.lioisme.modev.domain.record
 
 import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.CryptoRecord

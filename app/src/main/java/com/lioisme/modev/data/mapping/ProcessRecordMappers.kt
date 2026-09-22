@@ -7,6 +7,8 @@ import com.lioisme.modev.core.model.ProcessOperation
 import com.lioisme.modev.core.model.ProcessRecord
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
+import com.lioisme.modev.domain.record.ProcessRow
+import com.lioisme.modev.domain.record.RowModel
 
 /**
  * 进程控制记录映射(V33):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,

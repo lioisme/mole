@@ -35,18 +35,16 @@ class NetworkRequestHooker(
     // OkHttp:loadClass 监视器 + 首次加载惰性安装(D-9)
     // ------------------------------------------------------------------
 
+    /**
+     * OkHttp 惰性安装:经类加载单一监视器订阅(V43 T2/D-4,替代自持 loadClass 钩子;
+     * 与 Xposed 隐藏/SSL 惰性安装共享同一注册点,消 Vector 首注册遮蔽与回调倍增)。
+     */
     private fun armLazyOkHttpHooks() {
-        val loadClass = runCatching {
-            ClassLoader::class.java.getMethod("loadClass", String::class.java)
-        }.getOrNull() ?: return
-        engine.hook(loadClass, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                val name = invocation.getArg(0) as? String ?: return
-                when (name) {
-                    OKHTTP_CLIENT -> installOkHttpCallHook()
-                }
+        contextRef.loadClassWatcher.observeAfter { name, _ ->
+            when (name) {
+                OKHTTP_CLIENT -> installOkHttpCallHook()
             }
-        })
+        }
     }
 
     @Synchronized
@@ -55,34 +53,46 @@ class NetworkRequestHooker(
         val clazz = runCatching { Class.forName(OKHTTP_CLIENT) }.getOrNull() ?: return
         val requestClass = runCatching { Class.forName(OKHTTP_REQUEST) }.getOrNull() ?: return
         val method = runCatching { clazz.getMethod("newCall", requestClass) }.getOrNull() ?: return
+        // V44 T2.5 反射句柄一次性解析:旧形态每请求 getMethod×4 + 每 header×2
+        // (networkRequest 默认开 = 每个 OkHttp 请求都白付一遍解析)。
+        val urlMethod = runCatching { requestClass.getMethod("url") }.getOrNull()
+        val httpMethod = runCatching { requestClass.getMethod("method") }.getOrNull()
+        val headersMethod = runCatching { requestClass.getMethod("headers") }.getOrNull()
+        val headersClass = headersMethod?.returnType
+        val headerSize = headersClass?.let { runCatching { it.getMethod("size") }.getOrNull() }
+        val headerName = headersClass?.let {
+            runCatching { it.getMethod("name", Int::class.javaPrimitiveType) }.getOrNull()
+        }
+        val headerValue = headersClass?.let {
+            runCatching { it.getMethod("value", Int::class.javaPrimitiveType) }.getOrNull()
+        }
         installed += "newCall"
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
                 if (!featureOn(NetworkKind.REQUEST)) return
                 val request = invocation.getArg(0) ?: return
-                val url = runCatching {
-                    requestClass.getMethod("url").invoke(request).toString()
-                }.getOrNull()
-                val httpMethod = runCatching {
-                    requestClass.getMethod("method").invoke(request) as? String
-                }.getOrNull()
-                val headers = runCatching {
-                    val headerMap = HashMap<String, String>()
-                    val headersObj = requestClass.getMethod("headers").invoke(request)
-                    val headersClass = headersObj?.javaClass ?: return@runCatching headerMap
-                    val size = headersClass.getMethod("size").invoke(headersObj) as? Int ?: 0
-                    for (i in 0 until size) {
-                        val hName = headersClass.getMethod("name", Int::class.javaPrimitiveType).invoke(headersObj, i) as? String ?: continue
-                        val hValue = headersClass.getMethod("value", Int::class.javaPrimitiveType).invoke(headersObj, i) as? String ?: continue
-                        headerMap[hName] = hValue
-                    }
-                    headerMap
-                }.getOrNull()
+                val url = urlMethod?.let { m -> runCatching { m.invoke(request).toString() }.getOrNull() }
+                val http = httpMethod?.let { m -> runCatching { m.invoke(request) as? String }.getOrNull() }
+                val headers = if (headersMethod == null || headerSize == null || headerName == null || headerValue == null) {
+                    null
+                } else {
+                    runCatching {
+                        val headersObj = headersMethod.invoke(request) ?: return@runCatching null
+                        val size = headerSize.invoke(headersObj) as? Int ?: 0
+                        val map = HashMap<String, String>(size)
+                        for (i in 0 until size) {
+                            val hName = headerName.invoke(headersObj, i) as? String ?: continue
+                            val hValue = headerValue.invoke(headersObj, i) as? String ?: continue
+                            map[hName] = hValue
+                        }
+                        map
+                    }.getOrNull()
+                }
                 emit(
                     kind = NetworkKind.REQUEST,
                     operation = NetworkOperation.REQUEST_START,
                     url = url,
-                    method = httpMethod,
+                    method = http,
                     requestHeaders = headers,
                 )
             }
@@ -110,14 +120,18 @@ class NetworkRequestHooker(
     private fun hookHucMethods(clazz: Class<*>) {
         if (clazz.name in installed) return
         installed += clazz.name
+        // V44 T2.5:连接属性反射句柄一次性解析(旧形态每请求/每响应 2 次 getMethod)。
+        val getUrl = runCatching { clazz.getMethod("getURL") }.getOrNull()
+        val getRequestMethod = runCatching { clazz.getMethod("getRequestMethod") }.getOrNull()
+        val getResponseCode = runCatching { clazz.getMethod("getResponseCode") }.getOrNull()
         val getOutputStream = runCatching { clazz.getMethod("getOutputStream") }.getOrNull()
         if (getOutputStream != null) {
             engine.hook(getOutputStream, object : MethodHook() {
                 override fun before(invocation: Invocation) {
                     if (!featureOn(NetworkKind.REQUEST)) return
                     val conn = invocation.thisObject ?: return
-                    val url = runCatching { conn.javaClass.getMethod("getURL").invoke(conn).toString() }.getOrNull()
-                    val method = runCatching { conn.javaClass.getMethod("getRequestMethod").invoke(conn) as? String }.getOrNull()
+                    val url = getUrl?.let { m -> runCatching { m.invoke(conn).toString() }.getOrNull() }
+                    val method = getRequestMethod?.let { m -> runCatching { m.invoke(conn) as? String }.getOrNull() }
                     emit(
                         kind = NetworkKind.REQUEST,
                         operation = NetworkOperation.REQUEST_START,
@@ -133,10 +147,8 @@ class NetworkRequestHooker(
                 override fun after(invocation: Invocation) {
                     if (!featureOn(NetworkKind.REQUEST)) return
                     val conn = invocation.thisObject ?: return
-                    val url = runCatching { conn.javaClass.getMethod("getURL").invoke(conn).toString() }.getOrNull()
-                    val statusCode = runCatching {
-                        conn.javaClass.getMethod("getResponseCode").invoke(conn) as? Int
-                    }.getOrNull()
+                    val url = getUrl?.let { m -> runCatching { m.invoke(conn).toString() }.getOrNull() }
+                    val statusCode = getResponseCode?.let { m -> runCatching { m.invoke(conn) as? Int }.getOrNull() }
                     emit(
                         kind = NetworkKind.REQUEST,
                         operation = NetworkOperation.REQUEST_END,

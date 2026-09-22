@@ -5,8 +5,9 @@ param(
     [string]$Package = "com.ucheuhuo.app.apex"
 )
 
-$ADB = "D:\leidian\LDPlayer14\adb.exe"
-$DEVICE = "127.0.0.1:5555"
+. "$PSScriptRoot\tt-env.ps1"
+$ADB = $script:ADB
+$DEVICE = $script:DEVICE
 
 Write-Host "`n=== Modev Spool 状态检查 ===" -ForegroundColor Cyan
 Write-Host "  目标包: $Package" -ForegroundColor Gray

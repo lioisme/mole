@@ -7,6 +7,8 @@ import com.lioisme.modev.core.model.PrefsOperation
 import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
+import com.lioisme.modev.domain.record.PrefsRow
+import com.lioisme.modev.domain.record.RowModel
 
 /**
  * 偏好记录映射(V28):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,

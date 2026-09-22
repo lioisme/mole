@@ -250,6 +250,8 @@ fun AppMonitorScreen(
                     title = stringResource(R.string.algorithm_records_title),
                     value = countText(cryptoCount),
                     onClick = onOpenAlgorithm,
+                    // V45 T3.7:与其余 8 个入口行同构(此前只有这两行无 tag,插桩只能按文本反查)
+                    modifier = Modifier.testTag("monitor-entry-algorithm"),
                 )
                 HorizontalDivider16()
                 EntryRow(
@@ -257,6 +259,7 @@ fun AppMonitorScreen(
                     title = stringResource(R.string.database_records_title),
                     value = countText(dbCount),
                     onClick = onOpenDatabase,
+                    modifier = Modifier.testTag("monitor-entry-database"),
                 )
                 HorizontalDivider16()
                 EntryRow(

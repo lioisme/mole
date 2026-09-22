@@ -5,12 +5,15 @@ import com.lioisme.modev.core.model.DeviceEnvOperation
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
+import java.io.IOException
 
 /**
  * Root 命令执行干预 Hooker(V31,V34 审计修复):拦截 Runtime.exec(String[]) 和 ProcessBuilder.start(),
  * 当命令包含 su 时阻止执行,防止应用通过命令执行检测 root。
  *
- * 干预机制:before() 中 setResult(null) 阻止 su 命令执行。
+ * 干预机制(V43 T3):before() 中经 setThrowable(IOException) 以契约内异常拦截 su/getenforce/
+ * setenforce/getprop/which su 等命令执行——Runtime.exec 与 ProcessBuilder.start 的失败契约
+ * 本就是 IOException,宿主既有 catch 分支正常消化(V2.5:旧 setResult(null) 致 waitFor NPE)。
  * 干预结果通过 [DeviceEnvRecord.interventionAction] 记录("BLOCKED"|"DETECTED"|null)。
  */
 class RootExecHooker(
@@ -29,7 +32,7 @@ class RootExecHooker(
         val stringArrayClass = Array<String>::class.java
         val methodStringArray = runCatching { clazz.getMethod("exec", stringArrayClass) }.getOrNull()
         if (methodStringArray != null) {
-            engine.hook(methodStringArray, object : MethodHook() {
+            engine.hookThrowing(methodStringArray, object : MethodHook() {
                 override fun before(invocation: Invocation) {
                     if (!featureOn(DeviceEnvKind.ROOT_EXEC)) return
                     val command = invocation.getArg(0) as? Array<*> ?: return
@@ -73,7 +76,7 @@ class RootExecHooker(
             clazz.getMethod("exec", Array<String>::class.java, Array<String>::class.java)
         }.getOrNull()
         if (methodStringArrayStringArray != null) {
-            engine.hook(methodStringArrayStringArray, object : MethodHook() {
+            engine.hookThrowing(methodStringArrayStringArray, object : MethodHook() {
                 override fun before(invocation: Invocation) {
                     if (!featureOn(DeviceEnvKind.ROOT_EXEC)) return
                     val command = invocation.getArg(0) as? Array<*> ?: return
@@ -96,7 +99,7 @@ class RootExecHooker(
             )
         }.getOrNull()
         if (methodWithDir != null) {
-            engine.hook(methodWithDir, object : MethodHook() {
+            engine.hookThrowing(methodWithDir, object : MethodHook() {
                 override fun before(invocation: Invocation) {
                     if (!featureOn(DeviceEnvKind.ROOT_EXEC)) return
                     val command = invocation.getArg(0) as? Array<*> ?: return
@@ -117,7 +120,7 @@ class RootExecHooker(
                                 dir?.let { put("workdir", it) }
                             },
                         )
-                        invocation.setResult(null)
+                        invocation.setThrowable(IOException("Command blocked by Modev: root-exec"))
                     }
                 }
             })
@@ -148,14 +151,16 @@ class RootExecHooker(
             detectionPattern = pattern,
             interventionAction = ACTION_BLOCKED,
         )
-        invocation.setResult(null)
+        // V43 T3 契约忠实化(V2.5):exec 失败契约 = IOException(宿主 catch 分支);
+        // 旧 setResult(null) 令宿主 `.waitFor()`/流读取直接 NPE = 模块引入的宿主崩溃
+        invocation.setThrowable(IOException("Command blocked by Modev: $pattern"))
     }
 
     private fun hookProcessBuilderStart() {
         val clazz = runCatching { Class.forName("java.lang.ProcessBuilder") }.getOrNull() ?: return
         val method = runCatching { clazz.getMethod("start") }.getOrNull() ?: return
 
-        engine.hook(method, object : MethodHook() {
+        engine.hookThrowing(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
                 if (!featureOn(DeviceEnvKind.ROOT_EXEC)) return
                 val builder = invocation.thisObject as? ProcessBuilder ?: return
@@ -172,12 +177,12 @@ class RootExecHooker(
                         targetClass = "java.lang.ProcessBuilder",
                         detectionPattern = ROOT_EXEC_PATTERN,
                         interventionAction = ACTION_BLOCKED,
-                        params = buildMap {
-                            put("api", "process-builder")
-                            dir?.let { put("workdir", it) }
-                        },
-                    )
-                    invocation.setResult(null)
+                            params = buildMap {
+                                put("api", "process-builder")
+                                dir?.let { put("workdir", it) }
+                            },
+                        )
+                        invocation.setThrowable(IOException("Command blocked by Modev: root-exec"))
                 }
             }
         })

@@ -1,6 +1,8 @@
 ﻿package com.lioisme.modev.data.repo
 
 import androidx.paging.PagingSource
+import com.lioisme.modev.data.db.RecordQueryFactory
+import com.lioisme.modev.domain.record.RecordFilter
 import androidx.room.Room
 import com.lioisme.modev.data.db.CryptoRecordDao
 import com.lioisme.modev.data.db.CryptoRecordEntity
@@ -66,14 +68,13 @@ class RecordPagingProbeTest {
 
     @Test
     fun pagingSource_refreshThenAppend_loadsAllPages() = runBlocking {
-        val source: PagingSource<Int, CryptoRecordRow> = dao.observePagedRows(
-            recordType = "crypto",
-            packageName = PKG,
-            kind = null,
-            query = null,
-            previewChars = 32,
-            limit = WINDOW_CAP,
-            offset = 0,
+        val source: PagingSource<Int, CryptoRecordRow> = dao.pagedRows(
+            RecordQueryFactory.rows(
+                filter = RecordFilter(recordTypes = setOf("crypto"), packages = setOf(PKG)),
+                limit = WINDOW_CAP,
+                offset = 0,
+                previewChars = 32,
+            ),
         )
 
         val refresh = source.load(
@@ -104,14 +105,13 @@ class RecordPagingProbeTest {
 
     @Test
     fun pagingSource_fixedSmallLimit_deadlocksAfterFirstPage() = runBlocking {
-        val source: PagingSource<Int, CryptoRecordRow> = dao.observePagedRows(
-            recordType = "crypto",
-            packageName = PKG,
-            kind = null,
-            query = null,
-            previewChars = 32,
-            limit = 60,
-            offset = 0,
+        val source: PagingSource<Int, CryptoRecordRow> = dao.pagedRows(
+            RecordQueryFactory.rows(
+                filter = RecordFilter(recordTypes = setOf("crypto"), packages = setOf(PKG)),
+                limit = 60,
+                offset = 0,
+                previewChars = 32,
+            ),
         )
         val refresh = source.load(
             PagingSource.LoadParams.Refresh<Int>(key = null, loadSize = 60, placeholdersEnabled = false),
@@ -126,14 +126,8 @@ class RecordPagingProbeTest {
 
     @Test
     fun pagingSource_refreshCountMatchesTotal() = runBlocking {
-        val count = dao.observeCountByFilter(
-            recordTypes = listOf(""),
-            packages = listOf(PKG),
-            kinds = listOf(""),
-            typeCount = 0,
-            packageCount = 1,
-            kindCount = 0,
-            query = null,
+        val count = dao.countByQuery(
+            RecordQueryFactory.count(RecordFilter(packages = setOf(PKG))),
         ).first()
         assertEquals(120L, count)
     }

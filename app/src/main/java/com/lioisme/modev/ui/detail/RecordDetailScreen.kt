@@ -39,6 +39,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,17 +51,17 @@ import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.model.SqlRecord
 import com.lioisme.modev.core.model.WebViewRecord
-import com.lioisme.modev.data.mapping.BehaviorDetail
-import com.lioisme.modev.data.mapping.CryptoDetail
-import com.lioisme.modev.data.mapping.PrefsDetail
-import com.lioisme.modev.data.mapping.RecordDetailModel
-import com.lioisme.modev.data.mapping.WebViewDetail
-import com.lioisme.modev.data.mapping.NetworkDetail
+import com.lioisme.modev.domain.record.BehaviorDetail
+import com.lioisme.modev.domain.record.CryptoDetail
+import com.lioisme.modev.domain.record.PrefsDetail
+import com.lioisme.modev.domain.record.RecordDetailModel
+import com.lioisme.modev.domain.record.WebViewDetail
+import com.lioisme.modev.domain.record.NetworkDetail
 import com.lioisme.modev.core.model.NetworkRecord
-import com.lioisme.modev.data.mapping.DeviceEnvDetail
-import com.lioisme.modev.data.mapping.UiInteractionDetail
-import com.lioisme.modev.data.mapping.SystemDetail
-import com.lioisme.modev.data.mapping.ProcessDetail
+import com.lioisme.modev.domain.record.DeviceEnvDetail
+import com.lioisme.modev.domain.record.UiInteractionDetail
+import com.lioisme.modev.domain.record.SystemDetail
+import com.lioisme.modev.domain.record.ProcessDetail
 import com.lioisme.modev.ui.components.uiInteractionKindLabelRes
 import com.lioisme.modev.ui.components.uiInteractionOperationLabelRes
 import com.lioisme.modev.ui.components.systemKindLabelRes
@@ -76,8 +77,7 @@ import com.lioisme.modev.ui.components.networkOperationLabelRes
 import com.lioisme.modev.ui.components.deviceEnvKindLabelRes
 import com.lioisme.modev.ui.components.deviceEnvOperationLabelRes
 import com.lioisme.modev.ui.detail.detail.networkAnchors
-import com.lioisme.modev.data.mapping.SqlDetail
-import com.lioisme.modev.data.mapping.toJson
+import com.lioisme.modev.domain.record.SqlDetail
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.components.behaviorKindLabelRes
@@ -211,20 +211,7 @@ fun RecordDetailScreen(
         scope.launch {
             val json =
                 runCatching {
-                    withContext(Dispatchers.Default) {
-                        when (current) {
-                            is CryptoDetail -> current.record.toJson()
-                            is SqlDetail -> current.record.toJson()
-                            is BehaviorDetail -> current.record.toJson()
-                            is PrefsDetail -> current.record.toJson()
-                            is WebViewDetail -> current.record.toJson()
-                            is NetworkDetail -> current.record.toJson()
-                            is DeviceEnvDetail -> current.record.toJson()
-                            is UiInteractionDetail -> current.record.toJson()
-                            is SystemDetail -> current.record.toJson()
-                            is ProcessDetail -> current.record.toJson()
-                        }
-                    }
+                    withContext(Dispatchers.Default) { viewModel.exportJson(current) }
                 }
             json.onSuccess { text ->
                 if (text.length > EXPORT_MAX_CHARS) {
@@ -250,6 +237,7 @@ fun RecordDetailScreen(
                         tooltip = stringResource(R.string.record_prev),
                         onClick = viewModel::goOlder,
                         enabled = state.record != null && state.canOlder,
+                        modifier = Modifier.testTag("detail-prev"),
                     ) {
                         Icon(Icons.Filled.KeyboardArrowUp, contentDescription = stringResource(R.string.record_prev))
                     }
@@ -257,6 +245,7 @@ fun RecordDetailScreen(
                         tooltip = stringResource(R.string.record_next),
                         onClick = viewModel::goNewer,
                         enabled = state.record != null && state.canNewer,
+                        modifier = Modifier.testTag("detail-next"),
                     ) {
                         Icon(Icons.Filled.KeyboardArrowDown, contentDescription = stringResource(R.string.record_next))
                     }
@@ -268,6 +257,7 @@ fun RecordDetailScreen(
                             tooltip = stringResource(R.string.record_more),
                             onClick = { moreMenuOpen = true },
                             enabled = current != null,
+                            modifier = Modifier.testTag("detail-more"),
                         ) {
                             Icon(Icons.Filled.MoreVert, contentDescription = stringResource(R.string.record_more))
                         }
@@ -287,6 +277,7 @@ fun RecordDetailScreen(
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 },
+                                modifier = Modifier.testTag("detail-export"),
                                 onClick = {
                                     moreMenuOpen = false
                                     current?.let { startExport(it) }
@@ -388,7 +379,10 @@ private fun FailedState(innerPadding: PaddingValues, onRetry: () -> Unit) {
                 color = MaterialTheme.colorScheme.error,
             )
             Spacer(Modifier.height(12.dp))
-            Button(onClick = onRetry) {
+            Button(
+                onClick = onRetry,
+                modifier = Modifier.testTag("detail-retry"),
+            ) {
                 Text(stringResource(R.string.retry))
             }
         }

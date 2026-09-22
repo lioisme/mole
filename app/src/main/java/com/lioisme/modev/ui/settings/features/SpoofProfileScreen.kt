@@ -53,11 +53,11 @@ import kotlinx.coroutines.launch
 /** 全局伪装画像 VM:档位选择 + 字段覆写(写全局 feature 种子,V37 T3.5)。 */
 class SpoofProfileViewModel(private val container: AppContainer) : ViewModel() {
 
-    val feature = container.settings.globalFeature
+    val feature = container.featureConfig.globalFeature
 
     fun setProfile(id: String) {
         viewModelScope.launch {
-            container.settings.setGlobalFeature(feature.value.copy(spoofProfileId = id))
+            container.featureConfig.setGlobalFeature(feature.value.copy(spoofProfileId = id))
         }
     }
 
@@ -65,7 +65,7 @@ class SpoofProfileViewModel(private val container: AppContainer) : ViewModel() {
         val trimmedKey = key.trim()
         if (trimmedKey.isEmpty()) return
         viewModelScope.launch {
-            container.settings.setGlobalFeature(
+            container.featureConfig.setGlobalFeature(
                 feature.value.copy(spoofOverrides = feature.value.spoofOverrides + (trimmedKey to value)),
             )
         }
@@ -73,7 +73,7 @@ class SpoofProfileViewModel(private val container: AppContainer) : ViewModel() {
 
     fun removeOverride(key: String) {
         viewModelScope.launch {
-            container.settings.setGlobalFeature(
+            container.featureConfig.setGlobalFeature(
                 feature.value.copy(spoofOverrides = feature.value.spoofOverrides - key),
             )
         }

@@ -27,6 +27,9 @@ class ActivityTransitionHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun after(invocation: Invocation) {
+                    // V43 T2:反射查找/resolveActivity Binder IPC/Bundle 全量反序列化均为
+                    // 主线程重成本,必须门控先行(V2.3);emit 内部门控太晚,不作为首行保护
+                    if (!featureOn(UiInteractionKind.ACTIVITY_START)) return
                     val intent = invocation.getArg(0) as? android.content.Intent ?: return
                     val callerActivity = invocation.thisObject
                     val callerName = callerActivity?.javaClass?.name
@@ -69,6 +72,7 @@ class ActivityTransitionHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun after(invocation: Invocation) {
+                    if (!featureOn(UiInteractionKind.ACTIVITY_RESUME)) return // V43 T2
                     val activity = invocation.thisObject ?: return
                     val activityName = activity.javaClass.name
                     emit(

@@ -9,8 +9,13 @@ import com.google.gson.JsonObject
  *
  * - 字段语义:null/缺条目 = 取默认配置对应位;非 null = 显式生效;
  *   有效配置 = 默认配置 ⊕ 本类偏差(见 [EffectiveSwitch.resolve]),无第三态;
- * - 键 = 类别 id([CryptoKind.name]/[SqlKind.name],同 [CategoryTaxonomy]);
+ * - 键 = **限定类别键** [`RecordType.wire` + ":" + kind id]([kindKey],V44 R1-6;
+ *   跨类型裸 id 碰撞 OPEN/SIGNATURE 曾在遗留 first-wins 映射下互踩——限定形态为唯一写入格式,
+ *   合法性由 [CategoryTaxonomy] 裁决,取代旧枚举并集白名单);
  * - 解析容错:未知 kind 名一律忽略(防存储漂移注入垃圾键),非法值回落「取默认」;
+ *   遗留裸 id 键(限定化之前落盘的存储 + 外部直投 JSON)按
+ *   [CategoryTaxonomy.typesWithId] 序首归一为限定键(OPEN→DATABASE,SIGNATURE→CRYPTO,
+ *   与历史 first-wins 解析逐位一致);
  * - 兼容 V23 三态遗留存储(`"ON"/"OFF"/"INHERIT"` + `kindOverrides` 键名):
  *   解析时无损映射("ON"→true、"OFF"→false、INHERIT/未知→取默认),写入恒为新格式;
  * - 存储 = 每包一键 `override_{pkg}`([ConfigKeys.OVERRIDE_PREFIX]),
@@ -38,7 +43,7 @@ data class AppListenOverride(
     val systemListen: Boolean? = null,
     /** 进程控制总开关偏差(V33 一等公民;null = 取默认)。 */
     val processControlListen: Boolean? = null,
-    /** 类别级偏差(kind id → 显式开关;仅存偏差条目,缺条目 = 取默认)。 */
+    /** 类别级偏差(限定类别键 → 显式开关;仅存偏差条目,缺条目 = 取默认)。 */
     val kinds: Map<String, Boolean> = emptyMap(),
     /** 记录调用栈偏差(null = 取默认)。 */
     val logStack: Boolean? = null,
@@ -119,7 +124,7 @@ data class AppListenOverride(
 
     /**
      * 自定义偏差计数(V37 C8 单一事实源:入口页摘要与恢复默认行共用;
-     * 清单类偏差整表计 1)。
+     * 清单类偏差整表计 1)。跨域总数 —— 单域计数见 [deviationCountFor]。
      */
     val deviationCount: Int
         get() =
@@ -151,12 +156,109 @@ data class AppListenOverride(
             (if (!keywordIds.isNullOrEmpty()) 1 else 0) +
             (if (keywordFollowGlobal != null) 1 else 0)
 
+    /**
+     * 只清除 [domain] 一侧的偏差,另一侧原样保留(V45 T3.5 / DUAL-12)。
+     *
+     * 为什么必须有:监听页与功能页各有一行「恢复默认配置」,过去两面都调全量
+     * [removeOverride] 语义的清除 —— 在监听页点恢复会把用户的功能域定制(画像、
+     * 黑名单追加、关键词子集)一起抹掉,反之亦然。双域契约(AGENTS #23)在写侧
+     * 有闸、在清侧没有,是同一状态机上的口径分叉。
+     */
+    fun clearDomain(domain: CapabilityDomain): AppListenOverride {
+        val listen = domain == CapabilityDomain.LISTEN
+        /**
+         * master 的域归属 = 该记录类型是否承载 FEATURE 域类别
+         * (与两页总开关的实际分区一致:功能页 ui/network/device_env/process_control,
+         * 监听页 crypto/db/behavior/prefs/webview/system)。
+         */
+        fun master(type: RecordType, value: Boolean?): Boolean? =
+            if (masterDomainOf(type) == domain) null else value
+        return copy(
+            cryptoListen = master(RecordType.CRYPTO, cryptoListen),
+            dbListen = master(RecordType.DATABASE, dbListen),
+            behaviorListen = master(RecordType.BEHAVIOR, behaviorListen),
+            prefsListen = master(RecordType.PREFS, prefsListen),
+            webviewListen = master(RecordType.WEBVIEW, webviewListen),
+            networkListen = master(RecordType.NETWORK, networkListen),
+            deviceEnvListen = master(RecordType.DEVICE_ENV, deviceEnvListen),
+            uiListen = master(RecordType.UI_INTERACTION, uiListen),
+            systemListen = master(RecordType.SYSTEM, systemListen),
+            processControlListen = master(RecordType.PROCESS_CONTROL, processControlListen),
+            // 清本域 = 留对侧:监听域清除时保留 FEATURE 类别,反之亦然
+            kinds = kinds.filterKeys { CategoryTaxonomy.isFeatureKindKey(it) == listen },
+            logStack = if (listen) null else logStack,
+            maxBytesPerField = if (listen) null else maxBytesPerField,
+            ignoreStackPrefixes = if (listen) null else ignoreStackPrefixes,
+            maxResultRows = if (listen) null else maxResultRows,
+            maxResultChars = if (listen) null else maxResultChars,
+            fileContentCapture = if (listen) null else fileContentCapture,
+            ignorePathPrefixes = if (listen) null else ignorePathPrefixes,
+            // V33 遗留整表词表 = 弹窗关键词**拦截**定制(V37 后由关键词库 + keywordIds 承接),
+            // 归属与 UI_INTERACTION:DIALOG_KEYWORD 类别一致 = 功能域
+            dialogKeywords = if (!listen) null else dialogKeywords,
+            spoofProfileId = if (!listen) null else spoofProfileId,
+            spoofOverrides = if (!listen) null else spoofOverrides,
+            extraRootPackages = if (!listen) null else extraRootPackages,
+            extraXposedPrefixes = if (!listen) null else extraXposedPrefixes,
+            extraFridaPorts = if (!listen) null else extraFridaPorts,
+            extraMaskKeywords = if (!listen) null else extraMaskKeywords,
+            keywordIds = if (!listen) null else keywordIds,
+            keywordFollowGlobal = if (!listen) null else keywordFollowGlobal,
+        )
+    }
+
+    /**
+     * 单域偏差计数(每应用两页的「恢复默认配置」行可见性与计数用本值,
+     * 恒等式 `countFor(LISTEN) + countFor(FEATURE) == deviationCount` 由测试锁定)。
+     */
+    fun deviationCountFor(domain: CapabilityDomain): Int =
+        clearDomain(domain.opposite).deviationCount
+
     /** Gson 序列化(null 位由 Gson 默认省略,存储紧凑;构造路径保证无冗余条目)。 */
     fun toJson(gson: Gson): String = gson.toJson(this)
 
     companion object {
 
         val DEFAULT = AppListenOverride()
+
+        /**
+         * master 的记录类型 → 域归属(V45 T3.5 / DUAL-12):
+         * 承载 FEATURE 域类别的类型(ui/network/device_env/process_control)其总开关归功能页,
+         * 其余归监听页 —— 与两页实际渲染的总开关集合同源派生,不是第二张手工清单。
+         */
+        fun masterDomainOf(type: RecordType): CapabilityDomain =
+            if (type in FEATURE_MASTER_TYPES) CapabilityDomain.FEATURE else CapabilityDomain.LISTEN
+
+        private val FEATURE_MASTER_TYPES: Set<RecordType> =
+            CategoryTaxonomy.forDomain(CapabilityDomain.FEATURE).map { it.type }.toSet()
+
+        /**
+         * 限定类别键 = `RecordType.wire + ":" + kind id`(kinds 映射唯一写入格式)。
+         * 合法性由 [CategoryTaxonomy] 裁决;UI/MCP 写路径一律经本函数构键。
+         */
+        fun kindKey(type: RecordType, id: String): String = "${type.wire}:$id"
+
+        /**
+         * 解析任意 kinds 键为 (类型, id):
+         * - 限定形态 `wire:ID`:必须为 taxonomy 已登记类别,否则 null;
+         * - 裸形态 `ID`(V44 前遗留存储 / 外部直投 JSON):按
+         *   [CategoryTaxonomy.typesWithId] 序首解析(歧义 id 恒归 DATABASE/CRYPTO,
+         *   与旧 first-wins 字符串分支逐位一致);无登记类型返回 null。
+         */
+        fun parseKindKey(raw: String): Pair<RecordType, String>? {
+            val idx = raw.indexOf(':')
+            if (idx >= 0) {
+                val type = RecordType.fromWire(raw.substring(0, idx)) ?: return null
+                val id = raw.substring(idx + 1)
+                return if (CategoryTaxonomy.byId(type, id) != null) type to id else null
+            }
+            val type = CategoryTaxonomy.typesWithId(raw).firstOrNull() ?: return null
+            return type to raw
+        }
+
+        /** 键归一:任意合法键 → 限定形态;非法键 null(调用方丢弃)。 */
+        fun normalizeKindKey(raw: String): String? =
+            parseKindKey(raw)?.let { kindKey(it.first, it.second) }
 
         /**
          * 反序列化 + 全量容错:
@@ -273,16 +375,17 @@ data class AppListenOverride(
         }
 
         /**
-         * 类别偏差解析:新键名 [FIELD_KINDS] 优先,V23 遗留键名
-         * [LEGACY_FIELD_KINDS] 平滑读取;白名单过滤 + 双格式兼容。
+         * 类别偏差解析(V44 限定键模型):新键名 [FIELD_KINDS] 优先,V23 遗留键名
+         * [LEGACY_FIELD_KINDS] 平滑读取;键经 [parseKindKey] 归一为限定形态,
+         * 未知/歧义无法解析的键忽略,双格式(限定/遗留裸)兼容。
          */
         private fun kindsOf(obj: JsonObject): Map<String, Boolean> {
             val kinds = obj.getAsJsonObject(FIELD_KINDS)
                 ?: obj.getAsJsonObject(LEGACY_FIELD_KINDS)
                 ?: return emptyMap()
             return kinds.entrySet().mapNotNull { (name, value) ->
-                if (!VALID_KINDS.contains(name)) return@mapNotNull null
-                boolValueOf(value)?.let { name to it }
+                val key = parseKindKey(name) ?: return@mapNotNull null
+                boolValueOf(value)?.let { kindKey(key.first, key.second) to it }
             }.toMap()
         }
 
@@ -318,18 +421,5 @@ data class AppListenOverride(
         private const val LEGACY_FIELD_KINDS = "kindOverrides"
         private const val LEGACY_ON = "ON"
         private const val LEGACY_OFF = "OFF"
-
-        /** 合法类别 id 白名单(CryptoKind ∪ SqlKind ∪ BehaviorKind ∪ PrefsKind ∪ WebViewKind ∪ NetworkKind ∪ DeviceEnvKind ∪ UiInteractionKind ∪ SystemKind ∪ ProcessKind),防存储漂移注入垃圾键。 */
-        private val VALID_KINDS: Set<String> =
-            CryptoKind.entries.mapTo(mutableSetOf()) { it.name } +
-                SqlKind.entries.map { it.name } +
-                BehaviorKind.entries.map { it.name } +
-                PrefsKind.entries.map { it.name } +
-                WebViewKind.entries.map { it.name } +
-                NetworkKind.entries.map { it.name } +
-                DeviceEnvKind.entries.map { it.name } +
-                UiInteractionKind.entries.map { it.name } +
-                SystemKind.entries.map { it.name } +
-                ProcessKind.entries.map { it.name }
     }
 }

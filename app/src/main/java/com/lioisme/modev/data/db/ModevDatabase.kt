@@ -1,6 +1,7 @@
 package com.lioisme.modev.data.db
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -57,6 +58,93 @@ abstract class ModevDatabase : RoomDatabase() {
     abstract fun cryptoRecordDao(): CryptoRecordDao
 
     abstract fun keywordLibraryDao(): KeywordLibraryDao
+
+    // ---- 治理面 PRAGMA 出口(V45 T1.7 / ST-8·ST-9) ----
+    //
+    // 唯一出口在本类:仓库不各自拼 PRAGMA(过去无任何治理语句 —— 并发写撞 SQLITE_BUSY
+    // 直接抛、clearAll 后文件只增不减、损坏无观测无自愈)。
+
+    /**
+     * 执行 PRAGMA。
+     *
+     * **必须走 `query()` 而不是 `execSQL()`**:Android `SQLiteDatabase.execSQL` 只接受
+     * DML/DDL,`PRAGMA …` 会抛 `Queries can be performed using SQLiteDatabase query or
+     * rawQuery methods only`(V45 T1.7 首版在此踩实);而 SQLite 的赋值型 PRAGMA 本就
+     * 回一行结果,用 query 消费即可。
+     */
+    private fun SupportSQLiteDatabase.pragma(sql: String): String? =
+        query(sql).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
+
+    /** 执行返回单列的 PRAGMA;失败(不可读/只读挂载)降级 null,治理面绝不把异常抛上业务路径。 */
+    private fun pragma(sql: String): String? = runCatching {
+        openHelper.writableDatabase.pragma(sql)
+    }.getOrNull()
+
+    /**
+     * 首开体检结果(T1.7),三态而非布尔:
+     *  - [Healthy] 探针跑通且报 `ok`;
+     *  - [Suspect] 探针跑通但 verdict ≠ `ok`(**只有这一态允许删库重建**);
+     *  - [Unknown] 探针本身跑不通(平台差异 / PRAGMA 被拒 / 无结果行)。
+     *
+     * 为什么必须三态:删库是不可逆的数据销毁。若把「探针跑不了」当成「库已坏」,
+     * 在一个 query 通道不接受 PRAGMA 的 ROM 上就会每次冷启清空全部记录
+     * (V45 设备轮实锤教训:Robolectric 与 FrameworkSQLite 对 PRAGMA 的接受度不同)。
+     */
+    enum class IntegrityVerdict { Healthy, Suspect, Unknown }
+
+    /** 首开体检(T1.7)。 */
+    fun quickCheck(): IntegrityVerdict = verdictOf(
+        runCatching {
+            openHelper.writableDatabase.query("PRAGMA quick_check").use { c ->
+                if (c.moveToFirst()) c.getString(0) else null
+            }
+        },
+    )
+
+    /** 兼容读法:探针跑不通一律按「健康」处理(绝不为误判删数据)。 */
+    fun quickCheckOk(): Boolean = quickCheck() != IntegrityVerdict.Suspect
+
+    /** 文件总页数(存储占用诊断用)。 */
+    fun pageCount(): Long = pragmaLong("PRAGMA page_count") ?: 0L
+
+    /** freelist 页数(= 已删除但未归还文件的空间)。 */
+    fun freePageCount(): Long = pragmaLong("PRAGMA freelist_count") ?: 0L
+
+    /**
+     * 存活内容回收(T1.7 / ST-8):**只在便宜时** VACUUM。
+     *
+     * VACUUM 的耗时代价 = 存活页数(`page_count - freelist_count`),不是文件页数 ——
+     * 所以「刚被清空」的大库回收是毫秒级,而「只裁掉几千行」的百万行库必须跳过
+     * (宁可暂不收缩,也不给热路径加锁)。
+     *
+     * 为什么不用 `auto_vacuum=INCREMENTAL`:SQLite 的档位转换本身就得靠一次 VACUUM,
+     * 而 Room 的 `onCreate` 回调在建表后、**事务内**(VACUUM 不能在事务里跑);
+     * 实测 Room 2.7.2 + FrameworkSQLite 下改档不落地(读回恒 0,V45 T1.7 三轮取证)。
+     * 既然回收动作与档位转换用的是同一条 VACUUM,直连 VACUUM + 有界判据就是最短路径,
+     * 不留一个永远不生效的配置面(另注:`PRAGMA`/`VACUUM` 都必须走 `query()` 通道,
+     * Android 的 `execSQL` 按语句类型白名单直接拒绝)。
+     */
+    fun reclaimIfCheap(): Boolean {
+        val inUse = pageCount() - freePageCount()
+        if (inUse > RECLAIM_MAX_INUSE_PAGES) return false
+        return runCatching { pragma("VACUUM") }.isSuccess
+    }
+
+    /**
+     * 大批量删除后的统一收缩出口(T1.7):先按有界判据回收存活页,再收敛 wal。
+     * 返回是否做了 VACUUM(wal 检查点恒做)。
+     */
+    fun shrinkStorage(): Boolean {
+        val reclaimed = reclaimIfCheap()
+        checkpointWal()
+        return reclaimed
+    }
+
+    /** WAL 主动检查点(TRUNCATE):抑制 wal 文件无限增长(热进程长跑后的存储占用主因)。 */
+    fun checkpointWal(): Boolean = pragma("PRAGMA wal_checkpoint(TRUNCATE)") != null
+
+    /** 数值型 PRAGMA 读取(page_count 等)。 */
+    private fun pragmaLong(sql: String): Long? = pragma(sql)?.toLongOrNull()
 
     companion object {
         /** v1 → v2:纯新增可空列,ALTER TABLE ADD COLUMN 即可,不触碰存量数据。 */
@@ -288,31 +376,161 @@ abstract class ModevDatabase : RoomDatabase() {
             }
         }
 
+        /** 数据库文件名(存储占用统计/测试同源)。 */
+        const val NAME = "modev.db"
+
+        /**
+         * 体检判定表(T1.7,纯函数 = 删库这一不可逆动作的唯一裁决点):
+         * 只有「探针跑通且读到非 `ok` 结论」才是 Suspect;探针自身失败或无结果行
+         * 一律 Unknown(调用方必须放行,不得删数据)。
+         */
+        internal fun verdictOf(result: Result<String?>): IntegrityVerdict = when {
+            result.isFailure -> IntegrityVerdict.Unknown
+            result.getOrNull() == null -> IntegrityVerdict.Unknown
+            result.getOrNull() == "ok" -> IntegrityVerdict.Healthy
+            else -> IntegrityVerdict.Suspect
+        }
+
+        /**
+         * 存活内容回收上限(T1.7):4KiB × 2000 ≈ 8MiB 存活内容 —— 这个量级的 VACUUM
+         * 是毫秒级;超过就不强收(见 [ModevDatabase.reclaimIfCheap])。
+         */
+        private const val RECLAIM_MAX_INUSE_PAGES = 2_000L
+
+        /**
+         * PRAGMA 治理唯一出口(V45 T1.7 / ST-8):`onOpen` 每次打开定档 ——
+         * `busy_timeout` 让注入侧批量写与 UI 分页读并发时由 SQLite 自行退避重试
+         * (默认 0 等待 = 直接抛 `SQLITE_BUSY`,表现为「写入失败」计数上涨);
+         * `wal_autocheckpoint` 收敛到 200 页,防单次检查点在大 wal 上造成长停顿。
+         *
+         * 无 `onCreate` 覆盖:收缩策略是「有界直连 VACUUM」而非 `auto_vacuum` 档位
+         * (档位转换在本栈上不可靠,原因见 [ModevDatabase.reclaimIfCheap] 的 KDoc)。
+         */
+        internal val GOVERNANCE = object : RoomDatabase.Callback() {
+            override fun onOpen(db: SupportSQLiteDatabase) {
+                db.applyPragma("PRAGMA busy_timeout = 5000")
+                db.applyPragma("PRAGMA wal_autocheckpoint = 200")
+            }
+        }
+
+        /** 见 [ModevDatabase.pragma]:PRAGMA 一律 query 消费,禁 `execSQL`(Android 侧直接抛)。 */
+        private fun SupportSQLiteDatabase.applyPragma(sql: String) {
+            runCatching { query(sql).use { it.moveToFirst() } }
+                .onFailure { Log.w(TAG, "pragma $sql failed: $it") }
+        }
+
         @Volatile
         private var instance: ModevDatabase? = null
 
+        /**
+         * 损坏自愈标记(V45 T1.7):写路径抛出损坏类异常时由 [noteSqliteError] 置位,
+         * 下次 [get] 直接重建文件(不等 quick_check)。运行中不换实例 ——
+         * 仓库/DAO 持有的是构造期快照,进程内换实例会让旧引用打到已关闭的库上
+         * (V38「注入早于 Application」同型教训:定档必须在路径可见时做)。
+         */
+        @Volatile
+        private var recoveryPending = false
+
+        /** 观测面:是否已检测到损坏并排期重建(Diagnostics/MCP diagnostics 消费)。 */
+        fun isRecoveryPending(): Boolean = recoveryPending
+
+        /** 测试/复位口:清除排期标记。 */
+        internal fun clearRecoveryPendingForTest() {
+            recoveryPending = false
+        }
+
+        /**
+         * 测试口:释放单例(下次 [get] 重新建库 + 重跑首开体检)。
+         * 生产路径永不调用 —— 仓库/DAO 持的是构造期快照,进程内换实例等于给旧引用一把
+         * 已关闭的库(V38 同源教训),因此「运行中自愈」被刻意设计成「下次打开自愈」。
+         */
+        internal fun resetInstanceForTest() {
+            synchronized(this) {
+                runCatching { instance?.close() }
+                instance = null
+            }
+        }
+
         fun get(context: Context): ModevDatabase =
             instance ?: synchronized(this) {
-                instance ?: Room.databaseBuilder(
-                    context.applicationContext,
-                    ModevDatabase::class.java,
-                    NAME,
-                )
-                    // V23 T6.1:显式 WAL(写并发读、批量落库 fsync 摊薄;
-                    // AUTOMATIC 在 API 16+ 实际同为 WAL,显式化表达意图并防 OEM 差异)
-                    .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
-                    .addMigrations(
-                        MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
-                        MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
-                        MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
-                        MIGRATION_12_13, MIGRATION_13_14,
-                    )
-                    .fallbackToDestructiveMigration(false)
-                    .build()
-                    .also { instance = it }
+                instance ?: open(context.applicationContext).also { instance = it }
             }
 
-        /** 数据库文件名(存储占用统计/测试同源)。 */
-        const val NAME = "modev.db"
+        /**
+         * 建库 + 首开体检(T1.7):`recoveryPending` 或 `quick_check` 不过 → 删文件重建一次。
+         *
+         * 为什么只重建一次:损坏多因于进程被强杀/磁盘满,首开即修好;若重建后仍不可读,
+         * 说明是环境级故障(权限/只读挂载),反复删库只会静默丢数据,故第二次失败直接放行,
+         * 让 Room 的异常把问题顶到崩溃日志与诊断面上(可归因 > 自动掩盖)。
+         */
+        private fun open(appContext: Context): ModevDatabase {
+            if (recoveryPending) rebuild(appContext)
+            val first = builder(appContext).build()
+            return when (first.quickCheck()) {
+                IntegrityVerdict.Suspect -> {
+                    Log.w(TAG, "quick_check reports corruption; rebuilding database once")
+                    first.close()
+                    rebuild(appContext)
+                    builder(appContext).build()
+                }
+                // Unknown = 探针在本机跑不通:绝不据此删数据(只放行,异常留给业务路径暴露)
+                IntegrityVerdict.Unknown -> {
+                    Log.i(TAG, "quick_check unavailable on this platform; skipping auto-recovery")
+                    first
+                }
+                IntegrityVerdict.Healthy -> first
+            }
+        }
+
+        /**
+         * 损坏观测接线(T1.7 / ST-9)。
+         *
+         * **Room 2.7.2 无 `DatabaseErrorListener`**(该 API 不在本版本 aar 内 ——
+         * 已核对 classes.jar,勿再按新版文档写接线)。SQLite 的 corruption 只能从
+         * 抛出的异常里分类得到,故观测面 = 业务路径捕获异常时交进来判定:
+         * 命中损坏特征 → 置 [recoveryPending](下次 [get] 重建)+ 落一次 `Log.ERROR`。
+         * 返回是否判定为损坏,调用方可据此把该次失败单独计数(不再混进 writeFailures)。
+         */
+        fun noteSqliteError(error: Throwable): Boolean {
+            if (!isCorruptionMessage(error.message)) return false
+            val first = !recoveryPending
+            recoveryPending = true
+            if (first) {
+                Log.e(TAG, "database corruption detected; rebuild scheduled for next open: ${error.message}")
+            }
+            return true
+        }
+
+        /** SQLite 损坏特征串(3.x 的三种措辞;大小写不敏感)。 */
+        internal fun isCorruptionMessage(message: String?): Boolean {
+            val m = message?.lowercase() ?: return false
+            return "database disk image is malformed" in m ||
+                "file is not a database" in m ||
+                "sqlite_corrupt" in m ||
+                "database file is encrypted" in m
+        }
+
+        private const val TAG = "ModevDb"
+
+        private fun rebuild(appContext: Context) {
+            appContext.deleteDatabase(NAME)
+            // 一并清掉旁路文件(Room 删库不保证 wal/shm 同步消失)
+            listOf("$NAME-wal", "$NAME-shm").forEach { appContext.deleteFile(it) }
+            recoveryPending = false
+        }
+
+        private fun builder(appContext: Context): RoomDatabase.Builder<ModevDatabase> =
+            Room.databaseBuilder(appContext, ModevDatabase::class.java, NAME)
+                // V23 T6.1:显式 WAL(写并发读、批量落库 fsync 摊薄;
+                // AUTOMATIC 在 API 16+ 实际同为 WAL,显式化表达意图并防 OEM 差异)
+                .setJournalMode(RoomDatabase.JournalMode.WRITE_AHEAD_LOGGING)
+                .addMigrations(
+                    MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5,
+                    MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8, MIGRATION_8_9,
+                    MIGRATION_9_10, MIGRATION_10_11, MIGRATION_11_12,
+                    MIGRATION_12_13, MIGRATION_13_14,
+                )
+                .addCallback(GOVERNANCE)
+                .fallbackToDestructiveMigration(false)
     }
 }

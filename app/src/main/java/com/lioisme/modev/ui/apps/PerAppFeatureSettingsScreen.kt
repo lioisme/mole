@@ -41,6 +41,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.AppListenOverride
+import com.lioisme.modev.core.model.CapabilityDomain
 import com.lioisme.modev.core.model.CategoryTaxonomy
 import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.FeatureGroup
@@ -49,8 +50,8 @@ import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.KeywordEntry
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.SpoofProfiles
-import com.lioisme.modev.data.repo.KeywordLibraryRepository
-import com.lioisme.modev.data.repo.SettingsRepository
+import com.lioisme.modev.domain.asset.KeywordLibraryService
+import com.lioisme.modev.domain.config.ListenConfigService
 import com.lioisme.modev.ui.components.ChoiceOption
 import com.lioisme.modev.ui.components.HorizontalDivider16
 import com.lioisme.modev.ui.components.ModevChoiceSheet
@@ -72,8 +73,8 @@ import kotlinx.coroutines.launch
  */
 class PerAppFeatureSettingsViewModel(
     val packageName: String,
-    private val settings: SettingsRepository,
-    private val keywordLibrary: KeywordLibraryRepository,
+    private val settings: ListenConfigService,
+    private val keywordLibrary: KeywordLibraryService,
 ) : ViewModel() {
 
     val effective: StateFlow<HookSwitch> =
@@ -98,8 +99,9 @@ class PerAppFeatureSettingsViewModel(
     fun setDeviceEnvMaster(value: Boolean) = update { it.copy(deviceEnvListen = value) }
     fun setProcessControlMaster(value: Boolean) = update { it.copy(processControlListen = value) }
 
-    fun setKind(kindId: String, value: Boolean) {
-        update { it.copy(kinds = it.kinds + (kindId to value)) }
+    /** 类别定制(V44 限定键;类型 = 组观测记录类型,读写经 taxonomy (type,id) 消歧)。 */
+    fun setKind(type: RecordType, kindId: String, value: Boolean) {
+        update { it.copy(kinds = it.kinds + (AppListenOverride.kindKey(type, kindId) to value)) }
     }
 
     /** 关键词跟随全局开关:关闭时物化当前全局启用集为显式子集。 */
@@ -136,8 +138,12 @@ class PerAppFeatureSettingsViewModel(
         update { it.copy(spoofProfileId = profileId) }
     }
 
+    /**
+     * 一键恢复默认配置(V45 T3.5 / DUAL-12:**只清功能域**)。
+     * 旧形态走全量删键,在功能页点恢复会连带抹掉监听页定制。
+     */
     fun reset() {
-        viewModelScope.launch { settings.removeOverride(packageName) }
+        viewModelScope.launch { settings.resetOverride(packageName, CapabilityDomain.FEATURE) }
     }
 
     private fun update(transform: (AppListenOverride) -> AppListenOverride) {
@@ -155,7 +161,7 @@ class PerAppFeatureSettingsViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return PerAppFeatureSettingsViewModel(
             packageName = packageName,
-            settings = container.settings,
+            settings = container.listenConfig,
             keywordLibrary = container.keywordLibrary,
         ) as T
     }
@@ -248,12 +254,12 @@ fun PerAppFeatureSettingsScreen(
                     title = stringResource(featureGroupLabelRes(group)),
                     modifier = Modifier.testTag("feature-group-header-${group.name}"),
                 ) {
-                    FeatureGroups.kindIds(group).forEachIndexed { index, kindId ->
+                    FeatureGroups.kindRefs(group).forEachIndexed { index, (kindType, kindId) ->
                         if (index > 0) HorizontalDivider16()
                         ToggleListItem(
-                            label = res.getString(KindLabelRes.resolve(kindId)),
-                            checked = EffectiveSwitch.readKind(effective, kindId) == true,
-                            onCheckedChange = { viewModel.setKind(kindId, it) },
+                            label = res.getString(KindLabelRes.resolve(kindType, kindId)),
+                            checked = EffectiveSwitch.readKind(effective, kindType, kindId) == true,
+                            onCheckedChange = { viewModel.setKind(kindType, kindId, it) },
                             testTag = "feature-row-$kindId",
                         )
                     }
@@ -306,7 +312,8 @@ fun PerAppFeatureSettingsScreen(
                 Spacer(Modifier.height(Dimens.sectionGapDense))
             }
 
-            if (!override.isDefault) {
+            // V45 T3.5 / DUAL-12:恢复默认行按本域偏差出现(旧形态读跨域总数)
+            if (override.deviationCountFor(CapabilityDomain.FEATURE) > 0) {
                 SettingsSection(stringResource(R.string.app_monitor_actions_section)) {
                     ListItem(
                         colors = ListItemDefaults.colors(
@@ -320,12 +327,10 @@ fun PerAppFeatureSettingsScreen(
                             )
                         },
                         supportingContent = {
+                            // V45 T3.5:本页只数功能域偏差
+                            val n = override.deviationCountFor(CapabilityDomain.FEATURE)
                             Text(
-                                pluralStringResource(
-                                    R.plurals.listen_settings_custom_n,
-                                    override.deviationCount,
-                                    override.deviationCount,
-                                ),
+                                pluralStringResource(R.plurals.listen_settings_custom_n, n, n),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -493,7 +498,7 @@ internal fun featureGroupRecordType(group: FeatureGroup): RecordType? = FeatureG
 
 /** 功能组启用类别数(入口页摘要「N/M 已启用」)。 */
 internal fun featureGroupEnabledCount(effective: HookSwitch, group: FeatureGroup): Int =
-    FeatureGroups.kindIds(group).count { EffectiveSwitch.readKind(effective, it) == true }
+    FeatureGroups.kindRefs(group).count { (type, id) -> EffectiveSwitch.readKind(effective, type, id) == true }
 
 /** 功能组类别总数。 */
-internal fun featureGroupTotalCount(group: FeatureGroup): Int = FeatureGroups.kindIds(group).size
+internal fun featureGroupTotalCount(group: FeatureGroup): Int = FeatureGroups.kindRefs(group).size

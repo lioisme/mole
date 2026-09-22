@@ -39,6 +39,8 @@ class SqlDatabaseHooker(
             inv, result -> afterOpen(inv, result)
         }
         hookAfter(db.named("close")) { inv, _ ->
+            // V44 T2.2 门控先行:close 默认关(dbOpen=false),上下文组装/emit 全部后置。
+            if (!config().dbEnabled(SqlKind.OPEN)) return@hookAfter
             val instance = inv.thisObject ?: return@hookAfter
             val ctx = SqlContextTracker.contextFor(instance)
             emitOpenish(SqlOperation.CLOSE_DATABASE, ctx, contextId = SqlContextTracker.identity(instance))
@@ -78,6 +80,9 @@ class SqlDatabaseHooker(
     }
 
     private fun afterOpen(inv: Invocation, result: Any?) {
+        // V44 T2.2 门控先行:open 族默认关(dbOpen=false),旧形态每次开库先付
+        // 反射取参 + 弱表登记,再在 emit 内部门控丢弃。
+        if (!config().dbEnabled(SqlKind.OPEN)) return
         val db = result ?: return
         val path = runCatching { inv.getArg(0) as? String }.getOrNull()
         val ctx = SqlContextTracker.contextFor(db)
@@ -102,6 +107,9 @@ class SqlDatabaseHooker(
     }
 
     private fun afterQuery(inv: Invocation, result: Any?) {
+        // V43 T2:columnNames 反射/mCountOf/参数组装全部先于 emit 门控执行——
+        // QUERY kind 关闭时必须首行短路(V2.4)
+        if (!config().dbEnabled(com.lioisme.modev.core.model.SqlKind.QUERY)) return
         val instance = inv.thisObject ?: return
         val cursor = result as? Cursor ?: return
         val sql = extractQuerySql(inv)
@@ -174,6 +182,9 @@ class SqlDatabaseHooker(
     }
 
     private fun afterDml(inv: Invocation, result: Any?, operation: SqlOperation) {
+        // V44 T2.2 门控先行:旧形态在 DML 门控之前先做 ContentValues 迭代 +
+        // buildString 组装 SQL + 绑定序列化(每次 insert/update/delete 白付)。
+        if (!config().dbEnabled(SqlKind.DML)) return
         val instance = inv.thisObject ?: return
         val ctx = SqlContextTracker.contextFor(instance)
         val table = inv.getArg(0) as? String
@@ -240,6 +251,8 @@ class SqlDatabaseHooker(
     }
 
     private fun afterExec(inv: Invocation, result: Any?) {
+        // V44 T2.2 门控先行:绑定参数序列化(argsToBinds)成本随参数规模增长。
+        if (!config().dbEnabled(SqlKind.EXEC)) return
         val instance = inv.thisObject ?: return
         val ctx = SqlContextTracker.contextFor(instance)
         emit(
@@ -254,6 +267,9 @@ class SqlDatabaseHooker(
     }
 
     private fun afterCompileStatement(inv: Invocation, result: Any?) {
+        // V44 T2.2 门控先行:预编译入口归 EXEC 类别,旧形态每次 compileStatement
+        // 都做弱表登记(statement→db / statement→sql)后才在 execute 处丢弃。
+        if (!config().dbEnabled(SqlKind.EXEC)) return
         val instance = inv.thisObject ?: return
         val statement = result ?: return
         SqlContextTracker.linkStatement(statement, instance)
@@ -261,6 +277,7 @@ class SqlDatabaseHooker(
     }
 
     private fun afterAttach(inv: Invocation, result: Any?) {
+        if (!config().dbEnabled(SqlKind.EXEC)) return
         val instance = inv.thisObject ?: return
         val ctx = SqlContextTracker.contextFor(instance)
         val params = buildMap {
@@ -284,6 +301,9 @@ class SqlDatabaseHooker(
     }
 
     private fun beforeBegin(inv: Invocation) {
+        // V44 T2.2 门控先行:事务默认关(dbTransaction=false),旧形态每次
+        // beginTransaction 都先做弱表登记 + 深度自增。
+        if (!config().dbEnabled(SqlKind.TRANSACTION)) return
         val instance = inv.thisObject ?: return
         val ctx = SqlContextTracker.contextFor(instance)
         ctx.transactionDepth++
@@ -303,6 +323,7 @@ class SqlDatabaseHooker(
     }
 
     private fun afterSetSuccessful(inv: Invocation) {
+        if (!config().dbEnabled(SqlKind.TRANSACTION)) return
         val instance = inv.thisObject ?: return
         val ctx = SqlContextTracker.contextFor(instance)
         ctx.transactionSuccess = true
@@ -317,6 +338,7 @@ class SqlDatabaseHooker(
     }
 
     private fun afterEndTransaction(inv: Invocation) {
+        if (!config().dbEnabled(SqlKind.TRANSACTION)) return
         val instance = inv.thisObject ?: return
         val ctx = SqlContextTracker.contextFor(instance)
         emit(
@@ -347,6 +369,9 @@ class SqlDatabaseHooker(
     }
 
     private fun afterCursorMove(inv: Invocation, result: Any?) {
+        // V44 T2.2 门控先行:游标移动是查询迭代热路径(每行一次),旧形态先做
+        // 类型转换/位置解析/缓冲查表,再在收集分支内判门控。
+        if (!config().dbEnabled(SqlKind.QUERY)) return
         val cursor = inv.thisObject as? Cursor ?: return
         // moveToPosition(-1):回到未定位态,重置缓冲防重复行
         val position = (inv.getArg(0) as? Int) ?: -2
@@ -357,7 +382,6 @@ class SqlDatabaseHooker(
         if (result != true) return
         val buffer = SqlContextTracker.cursorBuffer(cursor)
         if (!buffer.collecting) return
-        if (!config().dbEnabled(SqlKind.QUERY)) return
         val row = collectRow(cursor, buffer) ?: return
         if (!buffer.addRow(row)) {
             flushQueryResult(cursor, buffer)
@@ -365,11 +389,13 @@ class SqlDatabaseHooker(
     }
 
     private fun afterCursorRequery(inv: Invocation) {
+        if (!config().dbEnabled(SqlKind.QUERY)) return
         val cursor = inv.thisObject as? Cursor ?: return
         SqlContextTracker.cursorBuffer(cursor).reset()
     }
 
     private fun afterCursorClose(inv: Invocation) {
+        if (!config().dbEnabled(SqlKind.QUERY)) return
         val cursor = inv.thisObject as? Cursor ?: return
         val buffer = SqlContextTracker.cursorBuffer(cursor)
         flushQueryResult(cursor, buffer)
@@ -425,11 +451,20 @@ class SqlDatabaseHooker(
         )
     }
 
+    /**
+     * `mCount` 私有字段句柄按类缓存(V44 T2.5):旧形态每次游标行数探测
+     * `getDeclaredField` + `setAccessible`(反射解析 + 权限检查),而该探测在
+     * 查询注册与结果补发两处都调用。[com.lioisme.modev.hook.ClassValueCache] =
+     * 每类一份、随类卸载回收(`null` 也缓存,缺失字段不反复付异常构造)。
+     */
+    private val mCountFields = com.lioisme.modev.hook.ClassValueCache<java.lang.reflect.Field?> { type ->
+        runCatching { type.getDeclaredField("mCount").also { it.isAccessible = true } }.getOrNull()
+    }
+
     /** 行数被动反射(mCount 私有字段;-1/失败置 null,不影响行数据采集)。 */
     private fun mCountOf(cursor: Cursor): Int? =
         runCatching {
-            val f = cursor.javaClass.getDeclaredField("mCount")
-            f.isAccessible = true
+            val f = mCountFields.get(cursor.javaClass) ?: return null
             val count = f.getInt(cursor)
             if (count < 0) null else count
         }.getOrNull()

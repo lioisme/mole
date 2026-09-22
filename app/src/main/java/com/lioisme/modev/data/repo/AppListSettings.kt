@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * (ModevApp.onCreate)调用一次,此后各 setX 同步写双份。
  * 应用列表排序(名称 Collator / 已作用域置顶)与设置页共享本单一事实源。
  */
-object AppListSettings {
+object AppListSettings : com.lioisme.modev.domain.app.AppListPreferences {
     private const val PREF_NAME = "modev_applist"
     private const val KEY_PIN_SCOPED = "pin_scoped_on_top"
     private const val KEY_SHOW_SYSTEM = "show_system"
@@ -27,17 +27,17 @@ object AppListSettings {
     private val _pinScoped = MutableStateFlow(true)
 
     /** 已作用域应用置顶(默认开,V22 R2 筛选菜单入口)。 */
-    val pinScoped: StateFlow<Boolean> = _pinScoped.asStateFlow()
+    override val pinScoped: StateFlow<Boolean> = _pinScoped.asStateFlow()
 
     private val _showSystem = MutableStateFlow(true)
 
     /** 显示系统应用(V14 R8 持久化)。 */
-    val showSystem: StateFlow<Boolean> = _showSystem.asStateFlow()
+    override val showSystem: StateFlow<Boolean> = _showSystem.asStateFlow()
 
     private val _showModules = MutableStateFlow(false)
 
     /** 显示 Xposed 模块应用(V17 R1 默认隐藏,设置项可显示)。 */
-    val showModules: StateFlow<Boolean> = _showModules.asStateFlow()
+    override val showModules: StateFlow<Boolean> = _showModules.asStateFlow()
 
     fun init(context: Context) {
         appContext = context.applicationContext
@@ -47,17 +47,17 @@ object AppListSettings {
         _showModules.value = prefs.getBoolean(KEY_SHOW_MODULES, false)
     }
 
-    fun setPinScoped(value: Boolean) {
+    override fun setPinScoped(value: Boolean) {
         persist(KEY_PIN_SCOPED, value)
         _pinScoped.value = value
     }
 
-    fun setShowSystem(value: Boolean) {
+    override fun setShowSystem(value: Boolean) {
         persist(KEY_SHOW_SYSTEM, value)
         _showSystem.value = value
     }
 
-    fun setShowModules(value: Boolean) {
+    override fun setShowModules(value: Boolean) {
         persist(KEY_SHOW_MODULES, value)
         _showModules.value = value
     }

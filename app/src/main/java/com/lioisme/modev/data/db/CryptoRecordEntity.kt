@@ -11,7 +11,7 @@ import com.lioisme.modev.core.model.RecordTypes
  * 枚举以名称字符串存储,堆栈以 JSON 存储。
  */
 @Entity(
-    tableName = "crypto_records",
+    tableName = CryptoRecordEntity.TABLE_NAME,
     indices = [
         Index(value = ["packageName", "timestamp"]),
         Index(value = ["packageName", "kind"]),
@@ -246,4 +246,13 @@ data class CryptoRecordEntity(
 
     /** 注入侧进程级单调序号(重放幂等键的一部分);v2 及更早的行无此列,迁移后为 NULL。 */
     @ColumnInfo(name = "seq") val seq: Long? = null,
-)
+) {
+    companion object {
+        /**
+         * 统一记录表名唯一事实源(V45 ST-11):`@Entity`、[CryptoRecordDao] 语句与
+         * [RecordQueryFactory] 一律引用本常量。表承载全部 10 类记录(ADR-1 单表扩展),
+         * 名称为 v1 历史遗留,文档义 = 「统一记录表」。
+         */
+        const val TABLE_NAME = "crypto_records"
+    }
+}

@@ -48,7 +48,7 @@ class PerAppListenSettingsTest {
 
     private fun settings(): SettingsRepository {
         val app = ctx.applicationContext as com.lioisme.modev.ModevApp
-        return app.container.settings
+        return app.container.settingsRepo
     }
 
     @Before
@@ -108,18 +108,18 @@ class PerAppListenSettingsTest {
     fun switchRows_renderEffectiveValue_andPersistToggle() {
         openListenSettings()
 
-        // CIPHER 默认配置为启用:初始行呈开态。
-        val rowTag = "listen-row-CIPHER"
+        // CIPHER 默认配置为启用:初始行呈开态(V44 限定键:testTag 带类型线名)。
+        val rowTag = "listen-row-crypto-CIPHER"
         rule.onNodeWithTag(rowTag).performScrollTo().assertIsDisplayed().assertIsOn()
 
         // 单击整行 → 显式停用偏差持久化 + 行值即时翻转。
         rule.onNodeWithTag(rowTag).performClick()
-        awaitPersisted { it.kinds["CIPHER"] == false }
+        awaitPersisted { it.kinds["crypto:CIPHER"] == false }
         rule.onNodeWithTag(rowTag).assertIsOff()
 
         // 再单击 → 回到启用(显式 true 偏差仍存在,非删键)。
         rule.onNodeWithTag(rowTag).performClick()
-        awaitPersisted { it.kinds["CIPHER"] == true }
+        awaitPersisted { it.kinds["crypto:CIPHER"] == true }
         rule.onNodeWithTag(rowTag).assertIsOn()
     }
 

@@ -6,6 +6,8 @@ import android.content.Context
 import android.os.Bundle
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import androidx.compose.ui.test.onAllNodesWithText
+import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -126,6 +128,9 @@ class LanguageHotSwitchTest {
             }
         app.registerActivityLifecycleCallbacks(callback)
         try {
+            // 本例断言的是**设置页**顶栏标题,必须先导航(与 en/zh 例同构;缺前置时整例
+            // 停在应用列表 ⇒ 「component is not displayed」,V45 前端轮实锤)。
+            rule.openSettings(str(R.string.cd_settings))
             // ja 切换:设置页标题即时渲染日文。
             LocaleManager.setLanguage(ctx, LocaleManager.TAG_JA)
             rule.waitForIdle()
@@ -138,11 +143,12 @@ class LanguageHotSwitchTest {
             assertEquals(0, destroyed)
             rule.onNodeWithText(LocaleManager.wrap(ctx).getString(R.string.settings_title)).assertIsDisplayed()
 
-            // 语言选择面板出现 ja/ko 自名选项(选择器完备性)。
-            rule.onNodeWithText(str(R.string.language)).performClick()
+            // 语言面板出现 ja/ko 自名选项(选择器完备性)。
+            // 自名同时充当「选项标签」与「该语言下的自身显示名」→ 多节点安全形态(AGENTS #17)。
+            rule.onAllNodesWithText(LocaleManager.wrap(ctx).getString(R.string.language)).onFirst().performClick()
             rule.waitForIdle()
-            rule.onNodeWithText("日本語").assertIsDisplayed()
-            rule.onNodeWithText("한국어").assertIsDisplayed()
+            rule.onAllNodesWithText("日本語").onFirst().assertIsDisplayed()
+            rule.onAllNodesWithText("한국어").onFirst().assertIsDisplayed()
             // 关闭面板(点选当前语言外的取消路径:直接按返回)。
             InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
             rule.waitForIdle()

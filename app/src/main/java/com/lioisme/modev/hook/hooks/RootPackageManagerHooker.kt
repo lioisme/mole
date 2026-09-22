@@ -6,6 +6,7 @@ import com.lioisme.modev.core.model.DeviceEnvOperation
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
+import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
  * Root 包管理器查询干预 Hooker(V31):拦截 PackageManager 的包列表查询方法,
@@ -25,6 +26,33 @@ class RootPackageManagerHooker(
         hookGetPackageInfo()
     }
 
+    /**
+     * `packageName` 字段句柄按类缓存(V44 T2.5):旧形态在逐包 filter 里对每个元素
+     * 做 `javaClass.getField("packageName")`——列表 300+ 项时每调用一次 getPackageInfo/
+     * getInstalledPackages 就是 300+ 次反射解析(外加首次 miss 的异常构造)。
+     * [com.lioisme.modev.hook.ClassValueCache] = 每类一份、随类卸载回收;
+     * 类内同步 map 允许 null 值(缺失同样缓存)。
+     */
+    private val packageNameFields = com.lioisme.modev.hook.ClassValueCache {
+        java.util.Collections.synchronizedMap(HashMap<String, java.lang.reflect.Field?>())
+    }
+
+    /** 元素包名(逐包反射句柄缓存;非 PackageInfo 形态返回 null)。 */
+    private fun packageNameOf(element: Any?): String? {
+        val e = element ?: return null
+        val perClass = packageNameFields.get(e.javaClass)
+        val field = synchronized(perClass) {
+            if (perClass.containsKey(FIELD_PACKAGE_NAME)) {
+                perClass[FIELD_PACKAGE_NAME]
+            } else {
+                runCatching { e.javaClass.getField(FIELD_PACKAGE_NAME) }
+                    .getOrNull()
+                    .also { perClass[FIELD_PACKAGE_NAME] = it }
+            }
+        } ?: return null
+        return runCatching { field.get(e) as? String }.getOrNull()
+    }
+
     @SuppressLint("DiscouragedPrivateApi")
     private fun hookGetInstalledPackages() {
         val clazz = runCatching { Class.forName("android.app.ApplicationPackageManager") }.getOrNull()
@@ -39,9 +67,7 @@ class RootPackageManagerHooker(
                 if (!featureOn(DeviceEnvKind.ROOT_PACKAGE_MANAGER)) return
                 val packages = invocation.result as? List<*> ?: return
                 val filtered = packages.filter { pkg ->
-                    val name = runCatching {
-                        pkg?.javaClass?.getField("packageName")?.get(pkg) as? String
-                    }.getOrNull()
+                    val name = packageNameOf(pkg)
                     name == null || !isRootPackage(name)
                 }
                 if (filtered.size != packages.size) {
@@ -152,28 +178,39 @@ class RootPackageManagerHooker(
             clazz.getMethod("getPackageInfo", String::class.java, Int::class.javaPrimitiveType)
         }.getOrNull() ?: return
 
-        engine.hook(method, object : MethodHook() {
-            override fun before(invocation: Invocation) {
-                if (!featureOn(DeviceEnvKind.ROOT_PACKAGE_MANAGER)) return
-                val packageName = invocation.getArg(0) as? String ?: return
-                if (!isRootPackage(packageName)) return
-                emit(
-                    kind = DeviceEnvKind.ROOT_PACKAGE_MANAGER,
-                    operation = DeviceEnvOperation.GET_INSTALLED_PACKAGES,
-                    originalValue = packageName,
-                    maskedValue = null,
-                    targetClass = clazz.name,
-                    detectionPattern = ROOT_PACKAGE_PATTERN,
-                    params = mapOf("api" to "getPackageInfo"),
-                )
-                invocation.setResult(null)
-            }
-        })
+        // V43 T3/D-4:与 AppInfoHooker(观测)共享单一广播注册点;契约忠实化(V2.5):
+        // setResult(null) 会让未判空的宿主 NPE——getPackageInfo 的「查无此包」契约是
+        // 抛 NameNotFoundException,经 setThrowable 干预型注册抵达调用方 catch 分支。
+        broadcast.subscribe(
+            method,
+            object : SharedMethodBroadcast.Sub {
+                override fun before(invocation: Invocation) {
+                    if (!featureOn(DeviceEnvKind.ROOT_PACKAGE_MANAGER)) return
+                    val packageName = invocation.getArg(0) as? String ?: return
+                    if (!isRootPackage(packageName)) return
+                    emit(
+                        kind = DeviceEnvKind.ROOT_PACKAGE_MANAGER,
+                        operation = DeviceEnvOperation.GET_INSTALLED_PACKAGES,
+                        originalValue = packageName,
+                        maskedValue = null,
+                        targetClass = clazz.name,
+                        detectionPattern = ROOT_PACKAGE_PATTERN,
+                        params = mapOf("api" to "getPackageInfo"),
+                    )
+                    invocation.setThrowable(
+                        android.content.pm.PackageManager.NameNotFoundException(packageName),
+                    )
+                }
+            },
+        )
     }
 
     companion object {
 
         private const val ROOT_PACKAGE_PATTERN = "root-package"
+
+        /** PackageInfo/ActivityInfo/ApplicationInfo 的公开包名字段(V44 T2.5 缓存键)。 */
+        private const val FIELD_PACKAGE_NAME = "packageName"
 
         private val ROOT_PACKAGES = listOf(
             "com.topjohnwu.magisk",

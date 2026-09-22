@@ -68,6 +68,17 @@ class ConfigChannel(
         private set
 
     private val writerLock = Object()
+
+    /**
+     * 测试 seam(V43 T1 背压回归):连接端口 / 写判死超时 / 心跳间隔。
+     * 生产路径恒为伴生对象默认值;仅单测缩短看门狗窗口以秒级验证「阻塞写被解阻」。
+     */
+    internal var port = WireProtocol.PORT
+    internal var writeTimeoutMs = WRITE_TIMEOUT_MS
+    internal var heartbeatMs = HEARTBEAT_MS
+
+    /** watchdog 无锁读取判定「连接对象是否仍为 s」,故必须 volatile(V43 T1)。 */
+    @Volatile
     private var socket: Socket? = null
     private var writer: BufferedWriter? = null
 
@@ -110,7 +121,7 @@ class ConfigChannel(
     private fun heartbeatLoop() {
         while (running) {
             try {
-                Thread.sleep(HEARTBEAT_MS)
+                Thread.sleep(heartbeatMs)
             } catch (ie: InterruptedException) {
                 break
             }
@@ -156,27 +167,25 @@ class ConfigChannel(
     }
 
     /**
-     * 每连接单共享 watchdog:仅当**写操作在途**且静止超过 [WRITE_TIMEOUT_MS] 时关闭 socket,
-     * 令阻塞中的 write 抛异常退出,避免记录发送线程被卡死。
-     * 空闲连接(无在途写入)不触发,杜绝误杀健康连接引发的重连抖动。
-     * 单线程循环按连接生命周期运行,随 closeSocket 中断退出。
+     * 每连接单共享 watchdog:仅当**写操作在途**且静止超过 [writeTimeoutMs] 时**直接关闭 socket**
+     * (V43 T1:关锁——`Socket.close` 线程安全,阻塞中的 write 随即抛 SocketException 退出;
+     * 旧实现取 writerLock 判死,而阻塞的 writer 正持该锁,看门狗永远进不了临界区,超时机制
+     * 形同虚设并可与写侧构成背压死锁链)。空闲连接(无在途写入)不触发,杜绝误杀健康连接。
+     * 单线程循环按连接生命周期运行:代元失效(socket 已替换)即自退出,不随重连累积。
      */
     private fun startWatchdog(s: Socket) {
         val w = Thread(
             {
                 while (running) {
                     try {
-                        Thread.sleep(WRITE_TIMEOUT_MS)
+                        Thread.sleep(writeTimeoutMs)
                     } catch (ie: InterruptedException) {
                         break
                     }
-                    synchronized(writerLock) {
-                        if (socket === s &&
-                            writeInFlight &&
-                            System.currentTimeMillis() - lastWriteMs > WRITE_TIMEOUT_MS
-                        ) {
-                            runCatching { s.close() }
-                        }
+                    // 无锁判定:volatile socket/writeInFlight/lastWriteMs
+                    if (socket !== s) break // 代元失效:连接已被替换/关闭,本 watchdog 退役
+                    if (writeInFlight && System.currentTimeMillis() - lastWriteMs > writeTimeoutMs) {
+                        runCatching { s.close() }
                     }
                 }
             },
@@ -191,7 +200,7 @@ class ConfigChannel(
         while (running) {
             try {
                 val s = Socket()
-                s.connect(InetSocketAddress("127.0.0.1", WireProtocol.PORT), CONNECT_TIMEOUT_MS)
+                s.connect(InetSocketAddress("127.0.0.1", port), CONNECT_TIMEOUT_MS)
                 s.soTimeout = READ_TIMEOUT_MS
                 s.tcpNoDelay = true
                 val r = BufferedReader(InputStreamReader(s.getInputStream(), StandardCharsets.UTF_8))

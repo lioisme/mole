@@ -1,6 +1,5 @@
 package com.lioisme.modev.domain.record
 
-import com.lioisme.modev.data.mapping.RowModel
 
 /**
  * 同步切片结果([RecordService.queryPage] 返回值):与流式分页互补,供 transport 无关消费者。

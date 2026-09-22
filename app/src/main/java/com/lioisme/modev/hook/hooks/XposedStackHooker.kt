@@ -5,6 +5,7 @@ import com.lioisme.modev.core.model.DeviceEnvOperation
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
+import com.lioisme.modev.hook.SharedMethodBroadcast
 
 class XposedStackHooker(
     context: ProbeContext,
@@ -19,29 +20,33 @@ class XposedStackHooker(
         val method = runCatching {
             Throwable::class.java.getMethod("getStackTrace")
         }.getOrNull() ?: return
-        engine.hook(method, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                if (!featureOn(DeviceEnvKind.XPOSED_STACK)) return
-                if (IN_HOOK.get() == true) return
-                IN_HOOK.set(true)
-                try {
-                    val original = invocation.result as? Array<StackTraceElement> ?: return
-                    val filtered = original.filter { !isXposedFrame(it) }
-                    if (filtered.size != original.size) {
-                        invocation.setResult(filtered.toTypedArray())
-                        emit(
-                            kind = DeviceEnvKind.XPOSED_STACK,
-                            operation = DeviceEnvOperation.GET_STACK_TRACE,
-                            params = mapOf(
-                                "removed" to (original.size - filtered.size).toString(),
-                            ),
-                        )
+        // V44 T2.1:Throwable.getStackTrace 与 DetectionMonitor 监控共享单一广播注册
+        broadcast.subscribe(
+            method,
+            object : SharedMethodBroadcast.Sub {
+                override fun after(invocation: Invocation, result: Any?) {
+                    if (!featureOn(DeviceEnvKind.XPOSED_STACK)) return
+                    if (IN_HOOK.get() == true) return
+                    IN_HOOK.set(true)
+                    try {
+                        val original = result as? Array<StackTraceElement> ?: return
+                        val filtered = original.filter { !isXposedFrame(it) }
+                        if (filtered.size != original.size) {
+                            invocation.setResult(filtered.toTypedArray())
+                            emit(
+                                kind = DeviceEnvKind.XPOSED_STACK,
+                                operation = DeviceEnvOperation.GET_STACK_TRACE,
+                                params = mapOf(
+                                    "removed" to (original.size - filtered.size).toString(),
+                                ),
+                            )
+                        }
+                    } finally {
+                        IN_HOOK.set(false)
                     }
-                } finally {
-                    IN_HOOK.set(false)
                 }
-            }
-        })
+            },
+        )
     }
 
     private fun hookThreadGetStackTrace() {

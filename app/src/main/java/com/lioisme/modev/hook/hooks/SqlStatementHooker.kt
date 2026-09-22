@@ -22,10 +22,16 @@ class SqlStatementHooker(
     override fun install() {
         val stmt = DatabaseMethodRegistry.forName("android.database.sqlite.SQLiteStatement") ?: return
         hookAfter(stmt.namedAny("bindLong", "bindDouble", "bindString", "bindBlob", "bindNull")) {
-            inv, _ -> afterBind(inv)
+            inv, _ ->
+            if (!config().dbListen) return@hookAfter // V43 T2:Room 批量插入热路径,全关零工作
+            afterBind(inv)
         }
-        hookAfter(stmt.named("bindAllArgsAsStrings")) { inv, _ -> afterBindAll(inv) }
+        hookAfter(stmt.named("bindAllArgsAsStrings")) { inv, _ ->
+            if (!config().dbListen) return@hookAfter
+            afterBindAll(inv)
+        }
         hookAfter(stmt.named("clearBindings")) { inv, _ ->
+            if (!config().dbListen) return@hookAfter
             inv.thisObject?.let { SqlContextTracker.clearBinds(it) }
         }
         hookAfter(
@@ -33,7 +39,10 @@ class SqlStatementHooker(
                 "execute", "executeInsert", "executeUpdateDelete",
                 "simpleQueryForLong", "simpleQueryForString",
             ),
-        ) { inv, result -> afterExecute(inv, result) }
+        ) { inv, result ->
+            if (!config().dbListen) return@hookAfter
+            afterExecute(inv, result)
+        }
     }
 
     private fun afterBind(inv: Invocation) {

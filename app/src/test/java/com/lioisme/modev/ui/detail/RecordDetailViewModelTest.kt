@@ -6,7 +6,7 @@ import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
-import com.lioisme.modev.data.mapping.CryptoDetail
+import com.lioisme.modev.domain.record.CryptoDetail
 import com.lioisme.modev.data.repo.LogRepository
 import com.lioisme.modev.data.server.ConfigServer
 import kotlinx.coroutines.runBlocking

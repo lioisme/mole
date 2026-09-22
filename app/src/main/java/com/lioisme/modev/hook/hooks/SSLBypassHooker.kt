@@ -44,6 +44,15 @@ class SSLBypassHooker(
     /** SSL 目标类惰性安装幂等集(D-9 同模式:安装期未加载的类经 loadClass 监视器首装)。 */
     private val installedClasses = HashSet<String>()
 
+    /**
+     * 类解析失败负缓存(V44 T2.2):`SSLContext.init` 是 app dex 类(okhttp/conscrypt)
+     * 的补装触发点,每次 init 都会重试全表 `forName`;目标类在部分进程中永不存在
+     * (无 okhttp 的 App),旧形态每次 init 白付 10 次 forName + 异常构造
+     * (fillInStackTrace)。负缓存按类记退避窗口,窗口内不再重试,窗口过后允许
+     * 再探(类可能因动态加载/插件化稍后出现),既不丢补装能力也不重复付代价。
+     */
+    private val missRetryAfter = HashMap<String, Long>()
+
     override fun install() {
         // SSLContext 为启动即载的 boot 类,直接安装。
         hookSSLContext()
@@ -53,23 +62,28 @@ class SSLBypassHooker(
         armLazySslHooks()
     }
 
-    /** 单一 loadClass 监视器:任一 SSL 目标类首次被加载即惰性安装(V38 收敛,替代逐类监视器)。 */
+    /** 类加载单一监视器订阅(V43 T2/D-4):任一 SSL 目标类首次被加载即惰性安装——
+     * 不再自持 loadClass 钩子(Xposed 隐藏/okhttp 惰性安装共用同一监视器,消三重注册)。
+     */
     private fun armLazySslHooks() {
-        val loadClass = runCatching {
-            ClassLoader::class.java.getMethod("loadClass", String::class.java)
-        }.getOrNull() ?: return
-        engine.hook(loadClass, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                val name = invocation.getArg(0) as? String ?: return
-                if (name in SSL_LAZY_CLASSES) installSslHooksFor(name)
-            }
-        })
+        contextRef.loadClassWatcher.observeAfter { name, _ ->
+            if (name in SSL_LAZY_CLASSES) installSslHooksFor(name)
+        }
     }
 
-    /** 类名 → 安装动作分派(幂等,已装即跳过)。 */
+    /**
+     * 任一 SSL 干预类别开启(V44 T2.2):惰性补装与 init 路径的共同粗门。
+     * 默认配置 6 类全关 → 每次 SSLContext.init 零补装成本(仅一次 config 快照)。
+     */
+    private fun anySslFeatureOn(): Boolean = SSL_KINDS.any { featureOn(it) }
+
+    /** 类名 → 安装动作分派(幂等,已装即跳过;解析失败按 [MISS_RETRY_MS] 负缓存)。 */
     @Synchronized
     private fun installSslHooksFor(className: String) {
         if (className in installedClasses) return
+        val now = android.os.SystemClock.elapsedRealtime()
+        val retryAt = missRetryAfter[className]
+        if (retryAt != null && now < retryAt) return
         // V38:okhttp 等 app dex 类不经过 java 层 loadClass(ART 同 loader 引用解析
         // 走 native fast path,监视器不可见),且模块委派链 forName 不可见——必须经
         // app classloader 显式装载(initialize=false 零副作用);失败(类尚不存在)
@@ -80,7 +94,12 @@ class SSLBypassHooker(
         } else {
             null
         }
-        val clazz = viaAppLoader ?: runCatching { Class.forName(className) }.getOrNull() ?: return
+        val clazz = viaAppLoader ?: runCatching { Class.forName(className) }.getOrNull()
+        if (clazz == null) {
+            missRetryAfter[className] = now + MISS_RETRY_MS
+            return
+        }
+        missRetryAfter.remove(className)
         installedClasses += className
         android.util.Log.i("HookInstaller", "SSL class installed: $className via=${if (viaAppLoader != null) "app-loader" else "boot"}")
         when (className) {
@@ -124,8 +143,13 @@ class SSLBypassHooker(
 
         engine.hook(methods, object : MethodHook() {
             override fun before(invocation: Invocation) {
+                // V44 T2.2 门控先行:SSL 干预默认全关(6 类 ssl* 全 false),旧形态
+                // 每次 SSLContext.init 先做全表惰性补装(10 次 @Synchronized + 类缺失
+                // 时 20 次 forName 抛吞 CNFE)后才判开关——全关态下每次 init 白付锁与
+                // 异常构造。先判「是否有任一 SSL 干预开启」,再补装,最后判本 kind。
+                if (!anySslFeatureOn()) return
                 // V38:okhttp 等 app dex 类此刻必然已加载(握手前调用方已构造),
-                // 以 init 为补装触发点;幂等,已装即跳过。
+                // 以 init 为补装触发点;幂等,已装/已知缺失即跳过。
                 SSL_LAZY_CLASSES.forEach { installSslHooksFor(it) }
                 if (!featureOn(NetworkKind.SSL_CONTEXT)) return
                 // V38 修复:原 after 反射改写 impl.trustManager 字段在 Android 14
@@ -447,6 +471,19 @@ class SSLBypassHooker(
     }
 
     companion object {
+        /** 惰性补装类解析失败负缓存窗口(V44 T2.2):窗口内不重试,窗口后再探。 */
+        private const val MISS_RETRY_MS = 5_000L
+
+        /** 本 Hooker 覆盖的全部干预类别(粗门用;新增类别必须登记,否则被粗门静默屏蔽)。 */
+        private val SSL_KINDS = listOf(
+            NetworkKind.SSL_CONTEXT,
+            NetworkKind.SSL_TRUST_MANAGER,
+            NetworkKind.SSL_OKHTTP_PINNER,
+            NetworkKind.SSL_OKHTTP_VERIFIER,
+            NetworkKind.SSL_WEBVIEW,
+            NetworkKind.SSL_NETWORK_CONFIG,
+        )
+
         private const val CONSCRYPT_TMI = "com.android.org.conscrypt.TrustManagerImpl"
         private const val CONSCRYPT_PLATFORM = "com.android.org.conscrypt.Platform"
         private const val CONSCRYPT_SOCKET_FACTORY = "com.android.org.conscrypt.OpenSSLSocketFactoryImpl"

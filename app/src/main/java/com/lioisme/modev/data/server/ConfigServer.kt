@@ -5,6 +5,7 @@ import com.lioisme.modev.core.codec.WireMessage
 import com.lioisme.modev.core.codec.WireProtocol
 import com.lioisme.modev.core.codec.WireRecord
 import com.lioisme.modev.core.model.HookSwitch
+import com.lioisme.modev.domain.server.ChannelStats
 import com.lioisme.modev.domain.server.ConnectionMonitor
 import java.io.BufferedReader
 import java.io.BufferedWriter
@@ -59,8 +60,7 @@ class ConfigServer(
      * (服务页错误行消费,与 MCP 行形态对称)。
      */
     private val _bindError = MutableStateFlow<String?>(null)
-    val bindError: StateFlow<String?> = _bindError
-
+    override val bindError: StateFlow<String?> = _bindError
 
     /**
      * 类型化记录回调(ADR-1,由 LogRepository 接线,可热替换):
@@ -414,14 +414,3 @@ class ConfigServer(
     }
 }
 
-/**
- * 通道统计:拒绝/丢弃计数,供宿主设置页展示。
- */
-data class ChannelStats(
-    val rejectedHellos: Long = 0L,
-    val droppedRecords: Long = 0L,
-    val rejectedRecords: Long = 0L,
-
-    /** 未携带令牌但被放行的握手数(LSPosed legacy / Vector 注入路径)。 */
-    val trustedNoToken: Long = 0L,
-)

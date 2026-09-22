@@ -1,8 +1,9 @@
 package com.lioisme.modev.mcp.tools
 
 import com.google.gson.JsonObject
+import com.lioisme.modev.core.model.CategoryTaxonomy
+import com.lioisme.modev.core.model.MonitoredRecord
 import com.lioisme.modev.core.model.RecordType
-import com.lioisme.modev.domain.record.RecordDraft
 import com.lioisme.modev.domain.record.RecordFilter
 import com.lioisme.modev.domain.record.RecordService
 import com.lioisme.modev.domain.record.SortOrder
@@ -12,6 +13,9 @@ import kotlinx.coroutines.flow.first
 /**
  * 记录组工具(V38,14 个):查询/统计/详情/邻接/写路径/清理/存储。
  * 全部仅经 [RecordService] 上游(与 UI ViewModels 同源,R4/D5)。
+ * 写入面载荷 = 类型化记录族 [MonitoredRecord](V45 T2.5):与 `record_get` 输出的
+ * `record` 对象同形,故「读 → 改 → 写回」闭环成立(旧平铺列名形态与读侧不同形,
+ * 往返必失真)。
  */
 class RecordTools(private val logs: RecordService) {
 
@@ -42,7 +46,7 @@ class RecordTools(private val logs: RecordService) {
             val end = McpJson.long(args, "timeEnd")
             if (start != null || end != null) LongRange(start ?: 0L, end ?: Long.MAX_VALUE) else null
         },
-        sort = if (McpJson.str(args, "sort")?.equals("asc", ignoreCase = true) == true) SortOrder.ASC else SortOrder.DESC,
+        sort = if (McpJson.str(args, "sort") == SORT_ASC) SortOrder.ASC else SortOrder.DESC,
     )
 
     // ---- 工具 ----
@@ -50,12 +54,13 @@ class RecordTools(private val logs: RecordService) {
     private fun recordsQuery() = schemaTool(
         name = "records_query",
         description = "Query captured records with filters (paged). Returns items, total, page, pageSize. " +
-            "recordType is one of: crypto, db, behavior, prefs, webview, network, device_env, ui, system, process. " +
+            "recordType is one of: ${RecordType.entries.joinToString(", ") { it.wire }}. " +
             "kind is a category id within that type (see taxonomy_listen). query does SQL-LIKE substring match.",
         schema = filterSchema(pageable = true),
     ) { args ->
         val page = (McpJson.int(args, "page") ?: 0).coerceAtLeast(0)
-        val pageSize = (McpJson.int(args, "pageSize") ?: 50).coerceIn(1, 200)
+        // V44 Q4:默认页大小双端单源 = RecordService.DEFAULT_PAGE_SIZE(旧 50 账面漂移已归一)
+        val pageSize = (McpJson.int(args, "pageSize") ?: RecordService.DEFAULT_PAGE_SIZE).coerceIn(1, 200)
         val result = logs.queryPage(parseFilter(args), page, pageSize)
         McpJson.obj(
             "items" to McpJson.arr(result.items.map { McpDtos.row(it) }),
@@ -95,8 +100,9 @@ class RecordTools(private val logs: RecordService) {
 
     private fun recordGet() = schemaTool(
         name = "record_get",
-        description = "Full record detail by id (all fields incl. content; strings over 1MiB are truncated " +
-            "with a top-level truncated flag). Use records_query first to discover ids.",
+        description = "Full record detail by id (all fields incl. content; strings over " +
+            "${McpDtos.MAX_FIELD_CHARS} chars are truncated and the response carries truncated=true). " +
+            "Use records_query first to discover ids.",
         schema = objSchema(required = listOf("id")) { long("id", "Record id (from records_query)") },
     ) { args ->
         val id = McpJson.long(args, "id") ?: throw McpTool.McpToolException("id is required")
@@ -119,27 +125,31 @@ class RecordTools(private val logs: RecordService) {
 
     private fun recordCreate() = schemaTool(
         name = "record_create",
-        description = "Create (import) a record. Requires packageName, kind, operation (valid enum names " +
-            "per taxonomy; e.g. crypto CIPHER/ENCRYPT). Unknown fields are rejected; see RecordDraft contract.",
-        schema = draftSchema(required = listOf("packageName", "kind", "operation")),
+        description = "Create (import) a record. Payload keys are the typed record fields " +
+            "(identical shape to record_get's `record` object); keys outside the chosen recordType are " +
+            "rejected. Omitted optional keys take the model defaults (timestamp = now). " +
+            "kind/operation must be registered ids (see taxonomy_listen / taxonomy_feature).",
+        schema = recordSchema(required = WRITE_REQUIRED_COMMON),
     ) { args ->
-        val draft = draftFromArgs(args)
-        McpJson.obj("id" to com.google.gson.JsonPrimitive(logs.create(draft)))
+        val record = recordFromArgs(args)
+        McpJson.obj("id" to logs.create(record))
     }
 
     private fun recordUpdate() = schemaTool(
         name = "record_update",
         description = "Full replacement update by id (upsert semantics). Fetch with record_get first and " +
-            "send the complete modified draft; missing optional fields fall back to defaults.",
+            "send the complete modified record object (its `record` payload); missing optional fields " +
+            "fall back to defaults. The top-level id argument wins over any id inside the payload.",
         schema = objSchema(required = listOf("id")) {
             long("id", "Record id to overwrite")
-            draft("draft", "Full record draft (same fields as record_create)")
+            recordObject("record", "Full typed record (same shape as record_create / record_get record)")
         },
     ) { args ->
         val id = McpJson.long(args, "id") ?: throw McpTool.McpToolException("id is required")
-        val delta = args.getAsJsonObject("draft") ?: throw McpTool.McpToolException("draft object is required")
-        val draft = draftFromArgs(delta)
-        if (!logs.update(id, draft)) throw McpTool.McpToolException("Record $id not found")
+        val payload = args.getAsJsonObject("record") ?: throw McpTool.McpToolException("record object is required")
+        if (!logs.update(id, recordFromArgs(payload))) {
+            throw McpTool.McpToolException("Record $id not found")
+        }
         McpJson.obj("ok" to com.google.gson.JsonPrimitive(true), "id" to com.google.gson.JsonPrimitive(id))
     }
 
@@ -168,20 +178,34 @@ class RecordTools(private val logs: RecordService) {
 
     private fun recordsClearPackage() = schemaTool(
         name = "records_clear_package",
-        description = "Clear all records of one package (AppMonitor clear action).",
-        schema = objSchema(required = listOf("packageName")) { str("packageName", "Target package name") },
+        description = "DANGER: clear all records of one package (AppMonitor clear action). Requires confirm=true.",
+        schema = objSchema(required = listOf("packageName", "confirm")) {
+            str("packageName", "Target package name")
+            bool("confirm", "Must be true to execute this destructive action")
+        },
     ) { args ->
         val pkg = McpJson.str(args, "packageName") ?: throw McpTool.McpToolException("packageName is required")
+        // V44 Q4 门槛对称:UI「清空本类」恒有确认框,MCP 破坏性清理同需 confirm
+        if (McpJson.bool(args, "confirm") != true) {
+            throw McpTool.McpToolException("confirm=true is required for destructive clear")
+        }
         logs.clearPackage(pkg)
         McpJson.obj("ok" to com.google.gson.JsonPrimitive(true))
     }
 
     private fun recordsClearType() = schemaTool(
         name = "records_clear_type",
-        description = "Clear all records of one record type across packages (data management).",
-        schema = objSchema(required = listOf("recordType")) { str("recordType", "Record type wire name") },
+        description = "DANGER: clear all records of one record type across packages (data management). " +
+            "Requires confirm=true.",
+        schema = objSchema(required = listOf("recordType", "confirm")) {
+            str("recordType", "Record type wire name")
+            bool("confirm", "Must be true to execute this destructive action")
+        },
     ) { args ->
         val type = parseRecordType(args) ?: throw McpTool.McpToolException("recordType is required")
+        if (McpJson.bool(args, "confirm") != true) {
+            throw McpTool.McpToolException("confirm=true is required for destructive clear")
+        }
         logs.clearByType(type.wire)
         McpJson.obj("ok" to com.google.gson.JsonPrimitive(true))
     }
@@ -208,98 +232,87 @@ class RecordTools(private val logs: RecordService) {
         McpJson.obj("bytes" to com.google.gson.JsonPrimitive(logs.storageUsage()))
     }
 
-    // ---- draft 构造与校验 ----
+    // ---- 类型化写入载荷解析与校验(V45 T2.5 / ISO-1;T3.2 起 schema 由模型派生) ----
 
-    /** RecordDraft 全字段名(以空 draft 的 serializeNulls 序列化键集为单一事实源,零双维护)。 */
-    private val draftFields: Set<String> by lazy {
-        McpJson.gson.toJsonTree(RecordDraft(packageName = "", kind = "", operation = "")).asJsonObject.keySet()
+    /**
+     * 该记录类型的合法载荷键集(以空对象过一遍 Gson 的字段集为单一事实源,零手写清单;
+     * 与 [RecordPayloadSchema.keysOf] 由 [McpToolParityTest] 做镜像对账)。
+     */
+    private fun payloadFields(type: RecordType): Set<String> {
+        val clazz = RecordPayloadSchema.modelClassOf(type)
+        val empty = McpJson.gson.fromJson<MonitoredRecord>("{}", clazz)
+            ?: throw McpTool.McpToolException("Cannot probe payload schema for ${type.wire}")
+        return McpJson.gson.toJsonTree(empty).asJsonObject.keySet() + "recordType"
     }
 
-    private fun draftFromArgs(args: JsonObject): RecordDraft {
-        val unknown = args.keySet().filterNot { it in draftFields }
+    /**
+     * 参数 → 类型化记录。三道闸:
+     * ① 未知键拒(该类型独有字段出现在他型载荷里即错,不再「整表一份平铺列」全收);
+     * ② kind/operation 原始串先验(Gson 对非法枚举名静默置 null,会绕过 Kotlin 非空约束);
+     * ③ taxonomy 登记校验(V44 D7 写侧第一性,禁幽灵记录入库后被读侧永久隐藏)。
+     */
+    private fun recordFromArgs(args: JsonObject): MonitoredRecord {
+        val wire = McpJson.str(args, "recordType")
+        val type = RecordType.fromWire(wire ?: "") ?: throw McpTool.McpToolException(
+            "Unknown recordType '${wire ?: "missing"}'; valid: ${RecordType.entries.joinToString(",") { it.wire }}",
+        )
+        val unknown = args.keySet().filterNot { it in payloadFields(type) }
         if (unknown.isNotEmpty()) {
-            throw McpTool.McpToolException("Unknown draft fields: $unknown")
+            throw McpTool.McpToolException("Unknown fields for recordType '${type.wire}': $unknown")
         }
-        val draft = McpJson.gson.fromJson(args, RecordDraft::class.java)
-        if (draft.packageName.isBlank() || draft.kind.isBlank() || draft.operation.isBlank()) {
-            throw McpTool.McpToolException("packageName, kind and operation must be non-blank")
+        // 上方缺值检查已保证非空;此处 orEmpty 只为把可空形态收敛到类型化路径
+        val kind = McpJson.str(args, "kind").orEmpty()
+        val operation = McpJson.str(args, "operation").orEmpty()
+        // V45 T3.2:类型面的「无默认值非空字段」必须显式给值。Kotlin 默认值优先实例化
+        // (见 McpJson)已能吃掉可选字段,剩下这几个是**存储 NOT NULL 列**的载体:
+        // 缺席时与其让 Room 抛 SQLITE_CONSTRAINT,不如在此点名缺哪个键。
+        val requiredKeys = WRITE_REQUIRED_COMMON + WRITE_REQUIRED_BY_TYPE[type].orEmpty()
+        val missing = requiredKeys.filter {
+            args.get(it)?.takeIf { e -> e.isJsonPrimitive }?.asString.isNullOrBlank()
         }
-        return draft
+        if (missing.isNotEmpty()) {
+            throw McpTool.McpToolException(
+                "recordType '${type.wire}' requires non-blank: ${missing.sorted().joinToString(",")}",
+            )
+        }
+        if (CategoryTaxonomy.byId(type, kind) == null) {
+            throw McpTool.McpToolException(
+                "Unknown kind '$kind' for recordType '${type.wire}' " +
+                    "(see taxonomy_listen / taxonomy_feature)",
+            )
+        }
+        if (CategoryTaxonomy.validateOperations(type.wire, setOf(operation))
+                ?.contains(operation) != true
+        ) {
+            throw McpTool.McpToolException(
+                "Unknown operation '$operation' for recordType '${type.wire}'",
+            )
+        }
+        return McpJson.gson.fromJson(args, RecordPayloadSchema.modelClassOf(type))
+            ?: throw McpTool.McpToolException("Malformed ${type.wire} record payload")
     }
 
-    /** filterSchema:过滤参数全集(pageable 追加分页参数)。 */
+    /**
+     * records_query / records_count / records_delete_by_filter 的过滤参数面
+     * (V45 T3.2:分页参数**只**随 records_query 出现 —— 旧形态三张表共用同一份
+     * 60 键平铺清单,于是 `records_count` 广告 page/pageSize 却不生效、
+     * `record_create` 广告 query/sort 却把它们当未知字段拒绝,声明面与生效面分叉)。
+     */
     private fun filterSchema(pageable: Boolean): SchemaBuilder.() -> Unit = {
-        if (pageable) required(emptyList())
-        props()
+        filterProperties()
+        if (pageable) {
+            int("page", "Zero-based page number")
+            int("pageSize", "Page size 1..200, default ${RecordService.DEFAULT_PAGE_SIZE}")
+        }
+        required(emptyList())
     }
 
-    /** draftSchema:RecordDraft 全字段(经 draftFields 反射式单一事实源,零手写枚举)。 */
-    private fun draftSchema(required: List<String>): SchemaBuilder.() -> Unit = {
+    /** recordSchema:写入载荷面(键/类型由模型反射派生,见 [RecordPayloadSchema])。 */
+    private fun recordSchema(required: List<String>): SchemaBuilder.() -> Unit = {
+        payloadProperties()
         required(required)
-        props()
     }
 
-    private fun SchemaBuilder.props() {
-        str("recordType", "Record type wire name", RecordType.entries.map { it.wire })
-        str("packageName", "Source package name")
-        str("kind", "Category id (see taxonomy_listen)")
-        str("operation", "Operation id (see taxonomy_listen)")
-        str("algorithm", "Algorithm description, e.g. AES/CBC/PKCS5Padding")
-        str("processName", "Target process name (multi-process apps)")
-        str("threadName", "Calling thread name")
-        long("timestamp", "Epoch millis (default now)")
-        str("sql", "SQL text (db records)")
-        str("dbPath", "Database file path (db records)")
-        str("bindArgsJson", "Bind args JSON (db records)")
-        str("rowsJson", "Query result rows JSON (db records)")
-        int("rowCount", "Result row count (db records)")
-        int("affectedCount", "DML affected count (db records)")
-        long("rowId", "Inserted rowId (db records)")
-        str("resultText", "Scalar query result (db records)")
-        str("path", "Subject path (behavior records)")
-        str("destPath", "Rename/move destination (behavior records)")
-        str("command", "Shell argv JSON array (behavior records)")
-        long("fileSize", "File size bytes (behavior records)")
-        str("contentHex", "Captured content hex (behavior records)")
-        str("contentB64", "Captured content base64 (behavior records)")
-        str("contentText", "Captured content text (behavior records)")
-        str("prefKey", "Preference key (prefs records)")
-        str("url", "Target URL (webview/network records)")
-        str("httpMethod", "HTTP method (network records)")
-        int("statusCode", "HTTP status code (network records)")
-        str("proxyHost", "Proxy host (network PROXY records)")
-        int("proxyPort", "Proxy port (network PROXY records)")
-        str("dialogTitle", "Dialog title (ui records)")
-        str("dialogMessage", "Dialog message (ui records)")
-        str("widgetText", "Widget text (ui records)")
-        str("activityName", "Activity class name (ui records)")
-        str("logcatTag", "Logcat tag (system records)")
-        str("logcatLevel", "Logcat level (system records)")
-        str("logcatMessage", "Logcat message (system records)")
-        str("signatureHash", "Signature SHA-256 (system records)")
-        int("exitCode", "System.exit argument (process records)")
-        int("processPid", "killProcess pid (process records)")
-        str("crashType", "Crash exception class (process records)")
-        str("interventionAction", "Intervention marker BLOCKED/DETECTED (feature records)")
-        str("keyHex", "Key material hex (crypto records)")
-        str("keyB64", "Key material base64 (crypto records)")
-        str("keyText", "Key material text (crypto records)")
-        int("keyLength", "Key length bits (crypto records)")
-        str("ivHex", "IV hex (crypto records)")
-        str("inputHex", "Input hex (crypto records)")
-        str("outputHex", "Output hex (crypto records)")
-        str("saltHex", "Salt hex (crypto records)")
-        str("aadHex", "AAD hex (crypto records)")
-        str("publicKeyHex", "Public key hex (crypto records)")
-        str("paramsJson", "Scalar params JSON (crypto records)")
-        bool("verifyResult", "Signature verify result (crypto records)")
-        str("query", "SQL-LIKE substring query")
-        str("sort", "Sort order: desc (default) or asc")
-        long("timeStart", "Timestamp range start (inclusive, epoch millis)")
-        long("timeEnd", "Timestamp range end (inclusive, epoch millis)")
-        int("page", "Zero-based page number (records_query)")
-        int("pageSize", "Page size 1..200, default 50 (records_query)")
-    }
 }
 
 // ---- schema 构建助手(全部工具共享;放在本文件便于同包复用) ----
@@ -360,11 +373,47 @@ internal class SchemaBuilder {
         }
     }
 
+    /** 元素类型混合的数组(值类型由 handler 按上下文裁决,如黑名单 fridaPorts=整数/其余=字符串)。 */
+    fun arrayRaw(name: String, desc: String) {
+        props[name] = JsonObject().apply {
+            addProperty("type", "array")
+            addProperty("description", desc)
+        }
+    }
+
     fun obj(name: String, desc: String) {
         props[name] = JsonObject().apply {
             addProperty("type", "object")
             addProperty("description", desc)
         }
+    }
+
+    /** 带嵌套属性表的对象属性(record_update 的 `record` = 派生载荷面)。 */
+    fun obj(name: String, desc: String, properties: JsonObject) {
+        props[name] = JsonObject().apply {
+            addProperty("type", "object")
+            addProperty("description", desc)
+            add("properties", properties)
+        }
+    }
+
+    /**
+     * 登记派生片段([RecordPayloadSchema] 产出的属性),并补描述。
+     * 描述是纯注释面:键集真值恒由模型派生,说明表不得扩/缩键集(镜像对账测试锁定)。
+     */
+    fun addRaw(name: String, fragment: JsonObject, desc: String?) {
+        if (desc != null) fragment.addProperty("description", desc)
+        if (!fragment.has("description")) {
+            fragment.addProperty("description", "Typed payload field (see record_get output for the shape)")
+        }
+        props[name] = fragment
+    }
+
+    /** 已登记属性的原始对象(供嵌套进对象 schema)。 */
+    fun rawProperties(): JsonObject {
+        val out = JsonObject()
+        props.forEach { (k, v) -> out.add(k, v) }
+        return out
     }
 
     fun required(names: List<String>) {
@@ -377,6 +426,9 @@ internal class SchemaBuilder {
         val properties = JsonObject()
         props.forEach { (k, v) -> properties.add(k, v) }
         schema.add("properties", properties)
+        // V45 T3.2:未声明参数一律由注册表硬拒(-32602)。「广告了但不生效」与
+        // 「生效了但没广告」两种漂移自此在同一条款上被消除:参数面 = 属性表。
+        schema.addProperty("additionalProperties", false)
         if (requiredList.isNotEmpty()) {
             schema.add("required", McpJson.arr(requiredList.map { com.google.gson.JsonPrimitive(it) }))
         }
@@ -393,9 +445,110 @@ internal fun objSchema(
     required(required)
 }
 
-/** draft 对象属性注册(record_update 用)。 */
-internal fun SchemaBuilder.draft(name: String, desc: String) {
-    obj(name, desc)
+/** 类型化记录对象属性注册(record_update 用;V45 T2.5 起替代旧 `draft` 平铺形态)。 */
+internal fun SchemaBuilder.recordObject(name: String, desc: String) {
+    // V45 T3.2:`record` 不再是无结构的 `type: object`——嵌套属性表与 record_create
+    // 同源派生,Agent 从 tools/list 就能写出合法载荷(键集仍由 handler 按 recordType 收窄)。
+    val inner = SchemaBuilder().apply { payloadProperties() }
+    obj(name, "$desc Unknown keys for the chosen recordType are rejected.", inner.rawProperties())
 }
 
 internal fun emptySchema(): SchemaBuilder.() -> Unit = {}
+
+/**
+ * 过滤参数面(V45 T3.2):与 [RecordTools] 的 `parseFilter` 逐参数镜像——
+ * 这里声明的每一项都真被读,`parseFilter` 读的每一项都在这里声明
+ * (注册表 `additionalProperties=false` ⇒ 未声明键 = -32602,不存在「静默忽略」)。
+ */
+internal fun SchemaBuilder.filterProperties() {
+    str("recordType", "Record type wire name; omit = all types", RecordType.entries.map { it.wire })
+    str("packageName", "Filter by source package name")
+    str("kind", "Filter by category id (see taxonomy_listen / taxonomy_feature)")
+    str("operation", "Filter by operation id (see taxonomy_listen / taxonomy_feature)")
+    str("query", "SQL-LIKE substring query over captured text columns")
+    str("sort", "Timestamp sort order (default desc)", listOf(SORT_DESC, SORT_ASC))
+    long("timeStart", "Timestamp range start (inclusive, epoch millis)")
+    long("timeEnd", "Timestamp range end (inclusive, epoch millis)")
+}
+
+/**
+ * 写入载荷面(V45 T3.2):键集与类型全部由 [RecordPayloadSchema] 从模型族派生,
+ * 注释性说明走 [FIELD_NOTES](说明**不能**扩键集——镜像对账测试会红)。
+ */
+internal fun SchemaBuilder.payloadProperties() {
+    RecordPayloadSchema.mergedProperties().entrySet().forEach { (name, value) ->
+        addRaw(name, (value as? JsonObject) ?: JsonObject(), FIELD_NOTES[name])
+    }
+}
+
+/** sort 参数取值(schema enum 与 parseFilter 常量同源;V45 T3.2 大小写敏感)。 */
+internal const val SORT_DESC = "desc"
+internal const val SORT_ASC = "asc"
+
+/**
+ * 写入面**任何**记录类型都必须给的键(V45 T3.2)。
+ * schema `required` 与 handler 缺值检查共用本表 —— 声明面要求什么,生效面就要求什么。
+ */
+internal val WRITE_REQUIRED_COMMON = listOf("recordType", "packageName", "kind", "operation", "threadName")
+
+/**
+ * 分型追加项:模型里**无默认值的非空字段**(= 存储 NOT NULL 列的载体)。
+ * 派生 schema 能给出键集与类型,但 Kotlin 可空性不在 JVM 反射面里(@NotNull 是 BINARY 保留),
+ * 故此处显式登记;`McpToolsTest.record_write_matrix_covers_every_type` 逐类型真写一遍,
+ * 少登记一项即红(Room NOT NULL 约束抛错)。
+ */
+internal val WRITE_REQUIRED_BY_TYPE: Map<RecordType, List<String>> = mapOf(
+    RecordType.CRYPTO to listOf("algorithm"),
+    RecordType.DATABASE to listOf("databaseName"),
+    RecordType.WEBVIEW to listOf("processName"),
+)
+
+/**
+ * 载荷键的补充说明(V45 T3.2):只解释语义,**不**承载键集真值(键集派生自模型族)。
+ * `McpToolsTest.field_notes_never_advertise_unknown_keys` 断言本表每个键都存在于
+ * 派生键集 —— 模型改名而说明未同步即红(旧手抄表的「contentHex/prefKey 之类的虚构键」
+ * 由此不可能再现)。
+ */
+internal val FIELD_NOTES: Map<String, String> = mapOf(
+    "recordType" to "Record type discriminator (required) - selects the payload shape",
+    "packageName" to "Source package name (required)",
+    "kind" to "Category id within recordType (required; see taxonomy_listen / taxonomy_feature)",
+    "operation" to "Operation id within recordType (required; see taxonomy_listen / taxonomy_feature)",
+    "id" to "Row id - ignored on create, preserved on update round-trip",
+    "seq" to "Inject-side process sequence number - storage managed, ignored on write",
+    "algorithm" to "Cipher transformation, e.g. AES/CBC/PKCS5Padding",
+    "provider" to "Security provider name",
+    "keyAlias" to "KeyStore alias (crypto records)",
+    "databaseName" to "Database name (db records)",
+    "dbPath" to "Database file path (db records)",
+    "sql" to "SQL text (db records)",
+    "bindArgs" to "Bound statement arguments (db records)",
+    "rows" to "Captured result rows, collected passively after the app iterated (db records)",
+    "rowCount" to "Result row count (db records)",
+    "affectedCount" to "DML affected count (db records)",
+    "rowId" to "Inserted rowId (db records)",
+    "resultText" to "Scalar query result (db records)",
+    "path" to "Subject path (behavior) or SharedPreferences file path (prefs/webview)",
+    "destPath" to "Rename/move destination (behavior records)",
+    "command" to "Shell argv (behavior records)",
+    "fileSize" to "File size in bytes (behavior records)",
+    "content" to "Captured content, multi-representation object {hex,base64,text,totalLength,truncated}",
+    "key" to "Crypto key material as BytesView; preference key as plain string (prefs records)",
+    "value" to "Preference value as BytesView (prefs records)",
+    "url" to "Target URL (webview / network records)",
+    "method" to "HTTP method (network records)",
+    "statusCode" to "HTTP status code (network records)",
+    "requestHeaders" to "Request header map (network records)",
+    "responseHeaders" to "Response header map (network records)",
+    "requestBody" to "Request body as BytesView (network records)",
+    "responseBody" to "Response body as BytesView (network records)",
+    "stack" to "Captured call stack frames",
+    "params" to "Scalar parameter map (kind-specific extras)",
+    "timestamp" to "Epoch millis (UTC wall clock at capture time; defaults to now on create)",
+    "threadName" to "Calling thread name",
+    "processName" to "Target process name (multi-process apps)",
+    "logcatTag" to "Logcat tag (system records)",
+    "logcatLevel" to "Logcat level letter (system records)",
+    "logcatMessage" to "Logcat message text (system records)",
+    "interventionAction" to "Intervention marker: BLOCKED / DETECTED",
+)

@@ -5,10 +5,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
-import com.lioisme.modev.data.repo.AppCatalogRepository
-import com.lioisme.modev.data.repo.AppCatalogSource
-import com.lioisme.modev.data.repo.AppListSettings
-import com.lioisme.modev.data.repo.LogRepository
+import com.lioisme.modev.domain.app.AppCatalogService
+import com.lioisme.modev.domain.app.AppInfo
+import com.lioisme.modev.domain.app.AppListPreferences
+import com.lioisme.modev.domain.app.AppSort
+import com.lioisme.modev.domain.record.RecordService
 import com.lioisme.modev.domain.scope.ScopeChangeResult
 import com.lioisme.modev.domain.scope.ScopeRepository
 import com.lioisme.modev.domain.scope.ScopeState
@@ -31,17 +32,20 @@ import kotlinx.coroutines.launch
  * 应用列表:全量已安装应用 × 作用域(LSPosed,单一事实源)× 连接状态 × 记录数。
  * 勾选/取消勾选 = 框架作用域变更,与 LSPosed 管理器同根同源。
  * 排序(2026-08-17 V7):终态排序唯一在本层——名称 Locale Collator(社区规范),
- * 设置页「已作用域应用置顶」开启时已作用域优先(AppListSettings 单一事实源)。
+ * 设置页「已作用域应用置顶」开启时已作用域优先。
+ * V45 T2.2:依赖面全为方法层契约([AppCatalogService]/[AppListPreferences]/
+ * [RecordService]/[ConnectionMonitor]),列表偏好经注入实例读写,不再点名持久化单例。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class AppsViewModel(
-    private val catalog: AppCatalogSource,
-    private val logs: LogRepository,
+    private val catalog: AppCatalogService,
+    private val listPrefs: AppListPreferences,
+    private val logs: RecordService,
     server: ConnectionMonitor,
     private val scopeRepository: ScopeRepository,
 ) : ViewModel() {
 
-data class AppRow(
+    data class AppRow(
         val packageName: String,
         val label: String,
         val system: Boolean,
@@ -64,8 +68,8 @@ data class AppRow(
         val showModules: Boolean = false,
     )
 
-private data class CatalogBase(
-        val apps: List<AppCatalogRepository.AppInfo>,
+    private data class CatalogBase(
+        val apps: List<AppInfo>,
         val scopeState: ScopeState,
     )
 
@@ -104,7 +108,7 @@ private data class CatalogBase(
         val loading: Boolean,
     )
 
-private val query = MutableStateFlow("")
+    private val query = MutableStateFlow("")
     private val pending = MutableStateFlow<Set<String>>(emptySet())
     private val refreshing = MutableStateFlow(false)
 
@@ -115,17 +119,17 @@ private val query = MutableStateFlow("")
      * 排序流水线(S2):目录 × 作用域 × UI 偏好 × 置顶开关 × 语言。
      * 计数与连接态不在本流内——记录数每 200ms 落库变化不再触发全量过滤 + 排序。
      * 置顶 = 稳定分区(O(n) 无比较器,组内保持名称序)。
-     * 筛选/置顶偏好 V14 R7/R8 起统一取自 AppListSettings(单一事实源 + 持久化)。
+     * 筛选/置顶偏好 V14 R7/R8 起为持久化单一事实源(注入 [AppListPreferences] 读取)。
      */
     val sortedRows: StateFlow<List<SortedRow>> = combine(
         combine(catalog.apps, scopeRepository.state, ::CatalogBase),
         combine(
             combine(
                 query,
-                AppListSettings.showSystem,
-                AppListSettings.showModules,
+                listPrefs.showSystem,
+                listPrefs.showModules,
             ) { q, system, modules -> Triple(q, system, modules) },
-            AppListSettings.pinScoped,
+            listPrefs.pinScoped,
             LocaleManager.localeFlow,
         ) { prefs3, pin, locale ->
             SortPrefs(prefs3.first, prefs3.second, prefs3.third, pin, locale)
@@ -160,9 +164,9 @@ private val query = MutableStateFlow("")
         combine(
             combine(
                 query,
-                AppListSettings.pinScoped,
-                AppListSettings.showSystem,
-                AppListSettings.showModules,
+                listPrefs.pinScoped,
+                listPrefs.showSystem,
+                listPrefs.showModules,
             ) { q, pin, system, modules ->
                 UiFilterPrefs(q, pin, system, modules)
             },
@@ -208,19 +212,19 @@ private val query = MutableStateFlow("")
     }
 
     /**
-     * 列表偏好变更(V23 R4 解耦契约):UI 不直触持久化单例([AppListSettings]),
-     * 读经 [uiState] 投影、写统一经本组方法下发。
+     * 列表偏好变更(V23 R4 解耦契约):UI 不直触持久化实现,
+     * 读经 [uiState] 投影、写统一经本组方法下发到注入的 [AppListPreferences]。
      */
     fun setPinScoped(value: Boolean) {
-        AppListSettings.setPinScoped(value)
+        listPrefs.setPinScoped(value)
     }
 
     fun setShowSystem(value: Boolean) {
-        AppListSettings.setShowSystem(value)
+        listPrefs.setShowSystem(value)
     }
 
     fun setShowModules(value: Boolean) {
-        AppListSettings.setShowModules(value)
+        listPrefs.setShowModules(value)
     }
 
     /** 下拉刷新:重扫应用列表 + 重读框架作用域(无论成败均复位刷新态)。 */
@@ -259,8 +263,9 @@ class AppsViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return AppsViewModel(
             catalog = container.catalog,
-            logs = container.logs,
-            server = container.server,
+            listPrefs = container.appListPrefs,
+            logs = container.records,
+            server = container.wireStatus,
             scopeRepository = container.scopeRepository,
         ) as T
     }

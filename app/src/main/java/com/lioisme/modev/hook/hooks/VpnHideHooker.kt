@@ -19,7 +19,9 @@ class VpnHideHooker(
 ) : NetworkBaseHooker(context) {
 
     private val vpnPrefixes = listOf("tun", "wg", "ppp", "tap", "ipsec", "utun", "pptp", "l2tp")
-    private val renamedInterfaces = HashMap<String, String>()
+
+    /** 伪装名缓存(V43 T3/V4.6):多网络线程并发访问,必须并发安全且 getOrPut 原子。 */
+    private val renamedInterfaces = java.util.concurrent.ConcurrentHashMap<String, String>()
 
     override fun install() {
         hookNetworkCapabilities()
@@ -53,9 +55,10 @@ class VpnHideHooker(
                     if (!featureOn(NetworkKind.VPN_CAPABILITIES)) return
                     val result = invocation.result as? IntArray ?: return
                     if (18 !in result) {
+                        // V43 T3(V4.6):仅真实追加时申报;已含 VPN 能力零记录(V2.10 同族噪音)
                         invocation.setResult(result + 18)
+                        emit(kind = NetworkKind.VPN_CAPABILITIES, operation = NetworkOperation.VPN_GET_CAPS)
                     }
-                    emit(kind = NetworkKind.VPN_CAPABILITIES, operation = NetworkOperation.VPN_GET_CAPS)
                 }
             })
         }
@@ -264,11 +267,10 @@ class VpnHideHooker(
         return vpnPrefixes.any { lower.startsWith(it) }
     }
 
-    private fun getFakeName(original: String): String {
-        return renamedInterfaces.getOrPut(original) {
+    private fun getFakeName(original: String): String =
+        renamedInterfaces.computeIfAbsent(original) {
             val allowed = ('a'..'z') + ('0'..'9')
             val length = original.length.coerceAtLeast(3)
             (1..length).map { allowed.random() }.joinToString("")
         }
-    }
 }

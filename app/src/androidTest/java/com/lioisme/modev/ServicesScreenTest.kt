@@ -54,10 +54,10 @@ class ServicesScreenTest {
 
     private fun setContent() {
         val container = (ctx.applicationContext as ModevApp).container
-        settings = container.settings
+        settings = container.settingsRepo
         // wire 真源观测(V41:VM 不再暴露监听地址流,绑地址观测归诊断页;
         // 测试经 ConnectionMonitor 抽象轮询实际 bind 态)。
-        server = container.server
+        server = container.wireServer
         runBlocking {
             settings.setExternalAccess(false)
             settings.setMcpTokenAuth(false)
@@ -277,8 +277,15 @@ class ServicesScreenTest {
     @Test
     fun wireBindError_rowRendersOnFailure_andClearsOnRecovery() {
         setContent()
-        // bind 失败注入序列:①wire 先迁空闲端口(重启后释放 1511)→ ②测试进程
-        // 占位 1511 → ③改回 1511 触发重启 → bind EADDRINUSE → bindError 置位。
+        // V45 T2.4 契约后果:端口写路径现在**先过 PortWriteGuard 硬闸**,
+        // 「写入一个必败端口」在方法层就被拒(偏好零写入) ⇒ bindError 观测面
+        // 不能再经仓库写路径制造。真实世界里 bind 失败的来源是「写后端口被他人抢占」,
+        // 即绑定层的最终裁决,故本例改由**服务端 seam** 注入失败(行的数据源本就是
+        // ConnectionMonitor.bindError,与谁改端口无关)。
+        //
+        // 序列:①迁到空闲端口(合法写)→ ②占位 1511 → ③seam 改端口 + restart →
+        // bind EADDRINUSE → bindError 置位 → 行渲染;④撤占 + restart → 行清空;
+        // ⑤seam 先退回空闲端口(释放 1511)→ ⑥再经**合法写路径**把持久偏好改回 1511。
         val staging = java.net.ServerSocket(0).use { it.localPort }
         runBlocking { settings.setServerPort(staging) }
         // 空闲端口绑定即时完成;固定 settle 等重启落定(boundAddress 无端口观测面)。
@@ -287,7 +294,7 @@ class ServicesScreenTest {
         val squatter = java.net.ServerSocket().also { it.reuseAddress = true }
         squatter.bind(java.net.InetSocketAddress(ConnectionMonitor.BIND_LOOPBACK, DEFAULT_WIRE_PORT))
         try {
-            runBlocking { settings.setServerPort(DEFAULT_WIRE_PORT) }
+            rebindWireServer(DEFAULT_WIRE_PORT)
             val deadline = System.currentTimeMillis() + 20_000
             var errored = false
             while (System.currentTimeMillis() < deadline) {
@@ -304,7 +311,7 @@ class ServicesScreenTest {
             squatter.close()
         }
         // 恢复:再触发一次重启(1511 已释放)→ 绑定成功 → bindError 清空 → 行消失。
-        runBlocking { settings.setServerPort(DEFAULT_WIRE_PORT) }
+        rebindWireServer(DEFAULT_WIRE_PORT)
         val recoveryDeadline = System.currentTimeMillis() + 20_000
         while (System.currentTimeMillis() < recoveryDeadline) {
             rule.waitForIdle()
@@ -312,7 +319,18 @@ class ServicesScreenTest {
             Thread.sleep(200)
         }
         rule.onAllNodes(hasTestTag("wire-bind-error-row")).assertCountEquals(0)
+        // 持久偏好复位:先让服务端退回空闲端口(释放 1511),再走合法写路径改回默认。
+        rebindWireServer(staging)
+        runBlocking { settings.setServerPort(DEFAULT_WIRE_PORT) }
         assertEquals("恢复后端口保持", DEFAULT_WIRE_PORT, settings.serverPort.value)
+    }
+
+    /** 服务端 seam 改端口并重启(仅测试注入绑定失败用;用户面写路径恒带硬闸)。 */
+    private fun rebindWireServer(port: Int) {
+        val wire = server as com.lioisme.modev.data.server.ConfigServer
+        wire.port = port
+        kotlinx.coroutines.runBlocking { wire.restart() }
+        Thread.sleep(1_500)
     }
 
     private companion object {

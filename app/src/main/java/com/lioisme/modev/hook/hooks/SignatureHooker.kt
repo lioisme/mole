@@ -42,7 +42,7 @@ class SignatureHooker(
         hookAfter(f.find(SIG, "setParameter", AlgorithmParameterSpec::class.java)) { inv, _ -> afterSetParameter(inv) }
         hookAfter(f.find(SIG, "update", ByteArray::class.java)) { inv, _ -> afterUpdate(inv) }
         hookAfter(f.find(SIG, "update", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, _ -> afterUpdate(inv) }
-        hookBefore(f.find(SIG, "update", ByteBuffer::class.java)) { inv -> HookerSupport.stash(inv.getArg(0)) }
+        hookBefore(f.find(SIG, "update", ByteBuffer::class.java)) { inv -> HookerSupport.stash(inv, inv.getArg(0)) }
         hookAfter(f.find(SIG, "update", ByteBuffer::class.java)) { inv, _ -> afterUpdate(inv) }
         hookAfter(f.find(SIG, "sign")) { inv, result -> afterSign(inv, result) }
         hookAfter(f.find(SIG, "sign", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, result -> afterSign(inv, result) }
@@ -142,7 +142,7 @@ class SignatureHooker(
                 val len = invocation.getArg(2) as? Int
                 if (off != null && len != null) HookerSupport.slice(arg, off, len) else arg
             }
-            else -> HookerSupport.take()
+            else -> HookerSupport.take(invocation)
         }
         ctx.inputTotal += input?.size ?: 0
         if (input != null) {

@@ -1,9 +1,10 @@
 ﻿# run-all.ps1 - Full regression test for Modev x Twilight Toolbox
 # Usage: powershell -ExecutionPolicy Bypass -File run-all.ps1
 
-$ADB = "D:\leidian\LDPlayer14\adb.exe"
-$SQLITE = "D:\Android\platform-tools\sqlite3.exe"
-$DEVICE = "127.0.0.1:5555"
+. "$PSScriptRoot\tt-env.ps1"
+$ADB = $script:ADB
+$SQLITE = $script:SQLITE
+$DEVICE = $script:DEVICE
 $TARGET_PKG = "com.ucheuhuo.app.apex"
 $MODEV_PKG = "com.lioisme.modev"
 $PASS = 0; $FAIL = 0; $WARN = 0
@@ -42,7 +43,7 @@ function QueryDB($dbPath, $sql) {
 Write-Host "--- Section 1: Environment ---" -ForegroundColor Cyan
 
 $d = & $ADB devices 2>&1
-Assert "LDPlayer connected" ($d -match "127.0.0.1:5555")
+Assert "LDPlayer connected" ($d -match [regex]::Escape($DEVICE))
 
 $t = & $ADB -s $DEVICE shell "pm list packages $TARGET_PKG" 2>$null
 Assert "Twilight installed" ($t -match $TARGET_PKG)

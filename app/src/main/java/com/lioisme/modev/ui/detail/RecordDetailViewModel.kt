@@ -4,8 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.lioisme.modev.AppContainer
-import com.lioisme.modev.data.mapping.RecordDetailModel
-import com.lioisme.modev.data.repo.LogRepository
+import com.lioisme.modev.domain.record.RecordDetailModel
+import com.lioisme.modev.domain.record.RecordService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,7 +14,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 
 /**
- * 记录详情(2026-08-15 UI 重构 Phase 5,2026-08-17 V6 邻接投影;V11 L6 状态收敛):
+ * 记录详情(2026-08-15 UI 重构 Phase 5,2026-08-17 V6 邻接投影;V11 L6 状态收敛;
+ * V44 Q6:依赖收敛 RecordService 接口——与 MCP record_get/record_neighbor 同一契约面):
  * 按 id 订阅单条记录;邻接导航仅查询邻居 id(投影),不再物化邻居大字段。
  * 三态契约由单一 [DetailUiState] 承载:loaded 仅在首次真实查询结果到达后置 true;
  * Failed(loaded && record == null)提供 retry()。
@@ -22,7 +23,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalCoroutinesApi::class)
 class RecordDetailViewModel(
     recordId: Long,
-    private val logs: LogRepository,
+    private val logs: RecordService,
 ) : ViewModel() {
 
     private val recordIdFlow = MutableStateFlow(recordId)
@@ -33,7 +34,7 @@ class RecordDetailViewModel(
      * 因此这里直接收集 upstream,只把真实查询结果算作"已加载")。
      */
     private val query = combine(recordIdFlow, retryTick) { id, _ -> id }
-        .flatMapLatest { id -> logs.observeById(id) }
+        .flatMapLatest { id -> logs.get(id) }
 
     private val _uiState = MutableStateFlow(DetailUiState())
 
@@ -46,10 +47,8 @@ class RecordDetailViewModel(
                 _uiState.value = DetailUiState(
                     record = current,
                     loaded = true,
-                    canOlder = current != null &&
-                        logs.neighborIdOf(current.recordType, current.packageName, current.timestamp, current.id, newer = false) != null,
-                    canNewer = current != null &&
-                        logs.neighborIdOf(current.recordType, current.packageName, current.timestamp, current.id, newer = true) != null,
+                    canOlder = current != null && logs.neighbor(current.id, newer = false) != null,
+                    canNewer = current != null && logs.neighbor(current.id, newer = true) != null,
                 )
             }
         }
@@ -58,6 +57,9 @@ class RecordDetailViewModel(
     fun retry() {
         retryTick.value++
     }
+
+    /** 记录原始 JSON 导出(经 [RecordService.exportJson] 方法层出口,V45 ISO-2)。 */
+    fun exportJson(record: RecordDetailModel): String = logs.exportJson(record)
 
     fun goOlder() {
         viewModelScope.launch { move(newer = false) }
@@ -69,8 +71,7 @@ class RecordDetailViewModel(
 
     private suspend fun move(newer: Boolean) {
         val current = _uiState.value.record ?: return
-        logs.neighborIdOf(current.recordType, current.packageName, current.timestamp, current.id, newer)
-            ?.let { recordIdFlow.value = it }
+        logs.neighbor(current.id, newer)?.let { recordIdFlow.value = it }
     }
 }
 
@@ -97,7 +98,7 @@ class RecordDetailViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return RecordDetailViewModel(
             recordId = recordId,
-            logs = container.logs,
+            logs = container.records,
         ) as T
     }
 }

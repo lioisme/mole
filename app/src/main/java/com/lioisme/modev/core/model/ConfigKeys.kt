@@ -31,8 +31,17 @@ object ConfigKeys {
      */
     const val SERVER_EXTERNAL_ACCESS = "server_external_access"
 
-    /** 服务监听端口键(V29):宿主本地 SharedPreferences 专用,默认 1511(V39:1510 让位 MCP)。 */
+    /** 服务监听端口键(V29):宿主本地 SharedPreferences 专用,默认 [WIRE_DEFAULT_PORT]。 */
     const val SERVER_PORT = "server_port"
+
+    /**
+     * wire ConfigServer 默认端口(V43 T7/V5.13:端口默认值单点——此前以散文
+     * 散布多注释,V39 改端口即逐点改文案;引用面一律经本常量)。
+     */
+    const val WIRE_DEFAULT_PORT = 1511
+
+    /** MCP 服务默认端口(V39 起 1510;V43 T7 单点化,见 [WIRE_DEFAULT_PORT] 同注)。 */
+    const val MCP_DEFAULT_PORT = 1510
 
     /**
      * 全局功能配置键(V37 T3.5):宿主本地 SharedPreferences 专用,

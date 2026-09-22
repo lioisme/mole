@@ -128,6 +128,10 @@ class HookInstaller(
 
     private var installed = false
 
+    /** ActivityThread 类引用单点缓存(V43 T1;provider 轮询路径复用)。 */
+    @Volatile
+    private var activityThreadClass: Class<*>? = null
+
     /**
      * 幂等装配:每个注入进程仅一次;后续调用直接返回。
      * 装配失败不影响宿主(引擎 PROTECTIVE 模式逐点兜底)。
@@ -136,6 +140,8 @@ class HookInstaller(
     fun install() {
         if (installed) return
         installed = true
+        // V43 T7/V5.1:core 日志出口注入(干预启用安全警告;core 保持纯 JVM)
+        EffectiveSwitch.interventionWarn = { msg -> Log.w("EffectiveSwitch", msg) }
 
         // M3-1/M3-4: 现代变体默认配置兜底 = RemotePreferences 直读(无宿主也可用),
         // 并注册变更监听即时生效;TCP 推送仍可用(与远程值一致,且是 legacy 唯一路径)。
@@ -167,19 +173,26 @@ class HookInstaller(
 
         // V36 D-1 修复:磁盘兜底偏差进入通道持久偏差层(localDeviation),
         // 宿主 TCP 推送仅更新全局层,有效配置恒为「推送全局 ⊕ 磁盘偏差」,不再被覆盖。
-        runCatching {
-            val file = java.io.File("/data/local/tmp/modev_config_$packageName.json")
-            if (file.exists() && file.canRead()) {
-                val json = file.readText(Charsets.UTF_8).trim()
-                if (json.isNotEmpty()) {
-                    val override = AppListenOverride.fromJson(Json.gson, json)
-                    if (!override.isDefault) {
-                        channel.localDeviation = override
-                        Log.i(TAG, "V35 兜底:从磁盘加载 $packageName override 成功(偏差层)")
+        // V43 T1:读盘/解析移出宿主 attach 关键路径(daemon 一次性线程),偏差就绪即置位
+        // volatile 生效;文件不存在(常态)线程立即退出,零驻留。
+        Thread(
+            {
+                runCatching {
+                    val file = java.io.File("/data/local/tmp/modev_config_$packageName.json")
+                    if (file.exists() && file.canRead()) {
+                        val json = file.readText(Charsets.UTF_8).trim()
+                        if (json.isNotEmpty()) {
+                            val override = AppListenOverride.fromJson(Json.gson, json)
+                            if (!override.isDefault) {
+                                channel.localDeviation = override
+                                Log.i(TAG, "V35 兜底:从磁盘加载 $packageName override 成功(偏差层)")
+                            }
+                        }
                     }
                 }
-            }
-        }
+            },
+            "modev-config-fallback",
+        ).apply { isDaemon = true }.start()
 
         channel.start()
         sink.start()
@@ -191,12 +204,26 @@ class HookInstaller(
             tracker = CryptoContextTracker,
             sink = sink,
             packageName = packageName,
-            // V38:app dex 类(okhttp 等)显式装载用(注入早于 Application 时惰性重试)
+            // V38:app dex 类(okhttp 等)显式加载用(注入早于 Application 时惰性重试)
             appClassLoader = { applicationContext()?.classLoader },
         )
+        // V44 T2.4 冷启动裁剪(D-V44-1 稳健档):master 全关的监听域**整组装钩跳过**——
+        // 旧形态无论开关如何都同步串行装配 10 个 Probe(约 376 注册点、按重载展开数百
+        // 个方法钩 + 每个被钩方法永久退出 JIT 内联),全关态下这是纯粹的宿主启动税。
+        // 判定用装配期已知的有效配置(现代变体上方已直读 RemotePreferences;legacy 由
+        // TCP 推送先行抵达);配置后开需进程重启生效——不做监听域异步安装,零新竞态面。
+        val effective = channel.currentConfig
+        var installedCount = 0
+        var skippedCount = 0
         for (probe in probes) {
+            if (!probe.enabledIn(effective)) {
+                skippedCount++
+                Log.i(TAG, "冷启动裁剪:跳过探针 ${probe.javaClass.simpleName}(master 全关)")
+                continue
+            }
             try {
                 probe.install(context)
+                installedCount++
                 // V34 审计增强:干预型探针安装时输出日志,便于调试和审计
                 if (probe is InterventionProbeMarker) {
                     Log.i(TAG, "干预型探针已安装: ${probe.javaClass.simpleName}")
@@ -205,14 +232,22 @@ class HookInstaller(
                 Log.e(TAG, "探针安装失败: ${probe.javaClass.simpleName}", e)
             }
         }
+        Log.i(TAG, "装配完成:安装 $installedCount / 裁剪 $skippedCount / 清单 ${probes.size}")
     }
 
-    /** 注入进程取目标应用 Context(供 Spool 落盘);失败返回 null(不启用 Spool)。 */
-    private fun applicationContext(): Context? = runCatching {
-        Class.forName("android.app.ActivityThread")
-            .getMethod("currentApplication")
-            .invoke(null) as? Context
-    }.getOrNull()
+    /**
+     * 注入进程取目标应用 Context(供 Spool 落盘);失败返回 null(不启用 Spool)。
+     * V43 T1:ActivityThread 类引用单点缓存(spool 就绪前的轮询路径反复调用,避免
+     * 每调用一次 `Class.forName`)。
+     */
+    private fun applicationContext(): Context? {
+        val clazz = activityThreadClass ?: runCatching {
+            Class.forName("android.app.ActivityThread")
+        }.getOrNull()?.also { activityThreadClass = it } ?: return null
+        return runCatching {
+            clazz.getMethod("currentApplication").invoke(null) as? Context
+        }.getOrNull()
+    }
 
     private fun parseSwitch(json: String?): HookSwitch? =
         json?.let { HookSwitch.fromJson(Json.gson, it) }

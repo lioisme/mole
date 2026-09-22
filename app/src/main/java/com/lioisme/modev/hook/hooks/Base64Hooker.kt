@@ -48,13 +48,13 @@ class Base64Hooker(
         val enc = "java.util.Base64\$Encoder"
         hook(f.find(enc, "encode", ByteArray::class.java)) { inv, result -> afterEncode(inv, result, null) }
         hook(f.find(enc, "encodeToString", ByteArray::class.java)) { inv, result -> afterEncode(inv, result, null) }
-        hookBefore(f.find(enc, "encode", ByteBuffer::class.java)) { inv -> HookerSupport.stash(inv.getArg(0)) }
+        hookBefore(f.find(enc, "encode", ByteBuffer::class.java)) { inv -> HookerSupport.stash(inv, inv.getArg(0)) }
         hook(f.find(enc, "encode", ByteBuffer::class.java)) { inv, result -> afterEncode(inv, result, null) }
 
         val dec = "java.util.Base64\$Decoder"
         hook(f.find(dec, "decode", ByteArray::class.java)) { inv, result -> afterDecode(inv, result, null) }
         hook(f.find(dec, "decode", String::class.java)) { inv, result -> afterDecode(inv, result, null) }
-        hookBefore(f.find(dec, "decode", ByteBuffer::class.java)) { inv -> HookerSupport.stash(inv.getArg(0)) }
+        hookBefore(f.find(dec, "decode", ByteBuffer::class.java)) { inv -> HookerSupport.stash(inv, inv.getArg(0)) }
         hook(f.find(dec, "decode", ByteBuffer::class.java)) { inv, result -> afterDecode(inv, result, null) }
     }
 
@@ -92,7 +92,7 @@ class Base64Hooker(
                 val len = invocation.getArg(2) as? Int
                 if (off != null && len != null) HookerSupport.slice(arg, off, len) else arg
             }
-            else -> HookerSupport.take()
+            else -> HookerSupport.take(invocation)
         }
         val output = when (result) {
             is String -> result.toByteArray(Charsets.US_ASCII)
@@ -119,7 +119,7 @@ class Base64Hooker(
                 val len = invocation.getArg(2) as? Int
                 if (off != null && len != null) HookerSupport.slice(arg, off, len) else arg
             }
-            else -> HookerSupport.take()
+            else -> HookerSupport.take(invocation)
         }
         val output = when (result) {
             is ByteArray -> result

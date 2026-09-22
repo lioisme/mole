@@ -77,17 +77,51 @@ object LegacyPlatform : Platform {
         return args
     }
 
+    /**
+     * 运行期 `returnEarly` 字段句柄(V44 T2.6):一次性解析,缺失即 null。
+     * 不缓存「已解析失败」之外的状态——句柄本身线程安全(Field.get 无状态)。
+     */
+    private val returnEarlyField: java.lang.reflect.Field? by lazy {
+        runCatching {
+            XC_MethodHook.MethodHookParam::class.java
+                .getDeclaredField("returnEarly")
+                .also { it.isAccessible = true }
+        }.getOrNull()
+    }
+
+    private fun isReturnEarly(param: XC_MethodHook.MethodHookParam): Boolean {
+        val field = returnEarlyField ?: return false
+        return runCatching { field.getBoolean(param) }.getOrDefault(false)
+    }
+
     /** 调用视图:legacy 参数数组越界安全取值。[setResult] 通过 MethodHookParam.setResult 实现。 */
     private class LegacyInvocation(
         private val param: XC_MethodHook.MethodHookParam,
-        override val result: Any?,
+        @Suppress("UNUSED_PARAMETER") initialResult: Any?,
     ) : Invocation() {
+
+        /**
+         * 现读 param 结果(V43 T3 广播链一致性):before 阶段恒 null(未执行),
+         * after 阶段反映前序订阅者的 setResult 替换(与 ModernInvocation currentResult 对齐)。
+         */
+        override val result: Any? get() = runCatching { param.result }.getOrNull()
 
         override val executable: Executable?
             get() = param.method as? Executable
 
         override val thisObject: Any?
             get() = param.thisObject
+
+        override val token: Any? get() = param
+
+        override val consumed: Boolean
+            // V44 T2.6(审计 P14):API 82 的 MethodHookParam 无 hasResult(),旧形态以
+            // `result != null` 近似短路判定 —— 对 `setResult(null)`(吞行/清空结果类
+            // 干预)完全失明,后续订阅者会覆写前者的 null 短路。运行期实现
+            // (LSPosed/EdXposed 的 XposedBridge)持有 `returnEarly` 布尔字段
+            // (setResult 置位、setThrowable 不置位),经反射读取;字段缺失
+            // (非常规实现/单测桩 jar)退回旧近似语义。
+            get() = isReturnEarly(param) || param.result != null || param.hasThrowable()
 
         override val argCount: Int
             get() = param.args?.size ?: 0
@@ -100,6 +134,14 @@ object LegacyPlatform : Platform {
 
         override fun setResult(value: Any?) {
             param.result = value
+        }
+
+        /**
+         * V43 T3/D-5:legacy 的 MethodHookParam.setThrowable 天然抵达调用方
+         * (before 阶段设置即跳过原方法),故干预型注册无需特殊模式,仅需本方法可用。
+         */
+        override fun setThrowable(t: Throwable) {
+            param.setThrowable(t)
         }
     }
 }

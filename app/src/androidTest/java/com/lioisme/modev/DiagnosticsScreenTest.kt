@@ -50,7 +50,7 @@ class DiagnosticsScreenTest {
 
     private fun setContent() {
         val container = (ctx.applicationContext as ModevApp).container
-        settings = container.settings
+        settings = container.settingsRepo
         runBlocking { settings.setExternalAccess(false) }
         vm = DiagnosticsViewModelFactory(container).create(DiagnosticsViewModel::class.java)
         // 等回环改绑落定(上一用例可能遗留 0.0.0.0 重启窗口),杜绝跨用例地址污染。

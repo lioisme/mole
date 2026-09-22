@@ -3,8 +3,8 @@ package com.lioisme.modev.hook.hooks
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.DeviceEnvOperation
 import com.lioisme.modev.hook.Invocation
-import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
+import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
  * Root 系统属性检测干预 Hooker(V31):拦截 System.getProperty 读取 root 指示属性,
@@ -28,28 +28,33 @@ class RootPropertyHooker(
             clazz.getMethod("getProperty", String::class.java)
         }.getOrNull() ?: return
 
-        engine.hook(method, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                if (!featureOn(DeviceEnvKind.ROOT_PROPERTY)) return
-                val key = invocation.getArg(0) as? String ?: return
-                val replacement = PROPERTY_REPLACEMENTS[key] ?: return
-                val original = invocation.result as? String
-                if (original == null || original == replacement) return
-                // 仅在原始值确实是 root 指示值时才干预,
-                // 避免修改非 root 环境的合法值导致 App 初始化路径断裂。
-                if (!isRootIndicativeValue(key, original)) return
-                invocation.setResult(replacement)
-                emit(
-                    kind = DeviceEnvKind.ROOT_PROPERTY,
-                    operation = DeviceEnvOperation.GET_PROPERTY,
-                    originalValue = original,
-                    maskedValue = replacement,
-                    targetClass = "java.lang.System",
-                    targetProperty = key,
-                    detectionPattern = ROOT_PROPERTY_PATTERN,
-                )
-            }
-        })
+        // V43 T3/D-4:System.getProperty 与 ProxyHide/DeviceSysProp 三 hooker 共享,
+        // 经单一广播注册点分派(Vector 首注册静默遮蔽 / LSPosed 回调倍增双防)
+        broadcast.subscribe(
+            method,
+            object : SharedMethodBroadcast.Sub {
+                override fun after(invocation: Invocation, result: Any?) {
+                    if (!featureOn(DeviceEnvKind.ROOT_PROPERTY)) return
+                    val key = invocation.getArg(0) as? String ?: return
+                    val replacement = PROPERTY_REPLACEMENTS[key] ?: return
+                    val original = result as? String
+                    if (original == null || original == replacement) return
+                    // 仅在原始值确实是 root 指示值时才干预,
+                    // 避免修改非 root 环境的合法值导致 App 初始化路径断裂。
+                    if (!isRootIndicativeValue(key, original)) return
+                    invocation.setResult(replacement)
+                    emit(
+                        kind = DeviceEnvKind.ROOT_PROPERTY,
+                        operation = DeviceEnvOperation.GET_PROPERTY,
+                        originalValue = original,
+                        maskedValue = replacement,
+                        targetClass = "java.lang.System",
+                        targetProperty = key,
+                        detectionPattern = ROOT_PROPERTY_PATTERN,
+                    )
+                }
+            },
+        )
     }
 
     companion object {

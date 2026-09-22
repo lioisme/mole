@@ -6,6 +6,8 @@ import com.lioisme.modev.core.model.PrefsRecord
 import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
+import com.lioisme.modev.domain.record.PrefsDetail
+import com.lioisme.modev.domain.record.PrefsRow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull

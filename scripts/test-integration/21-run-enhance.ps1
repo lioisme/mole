@@ -190,12 +190,25 @@ Write-Host "`n--- E-ROOT / E-XPP ---" -ForegroundColor Magenta
 ApplyProfile "default"
 foreach ($c in @("E-ROOT-01","E-ROOT-02","E-ROOT-03","E-ROOT-04","E-XPP-01","E-XPP-02","E-XPP-03")) { RunCase "enhance-root" $c 5 }
 $ttMaps = GetTt "E-XPP-03"
+# V43 T3 二态基线:隐藏关闭时 loadClass 路径应可见(found);
+# 环境(ifw 不向 App 注入 API 类)双路径皆 cnfe 时基线不可区分 → 条件 SKIP。
+$ttXppOff = GetTt "E-XPP-01"
+if ($ttXppOff -match "forNamePath=found") {
+    Assert "E-XPP-01 OFF loadClass visible" ($ttXppOff -match "loadClassPath=found") "tt=$ttXppOff"
+} else {
+    Skip "E-XPP-01 OFF baseline" "环境不向 App 注入 Xposed API 类(found/cnfe 基线不可区分)"
+}
 Skip "E-ROOT delta" "Magisk 默认 denylist 已对 App 隐藏 su,OFF 基线不可区分;记录面断言见 L-DEV"
 ApplyProfile "xposed-on"
 ClearDb
 foreach ($c in @("E-XPP-01","E-XPP-02","E-XPP-03")) { RunCase "enhance-xposed" $c 5 }
 $tt = GetTt "E-XPP-03"
 Assert "E-XPP-03 ON maps clean" ($tt -match "dirtyLines=0") "tt=$tt"
+# V43 T3/D-5 核心断言:loadClass 干预经 setThrowable(PASSTHROUGH/param.setThrowable)
+# 抵达调用方 = 真实 CNFE(旧「回调内 throw」在双框架被吞,该断言即假修复的照妖镜);
+# forName 路径为已声明覆盖缺口(D-17 回滚,不据此判失败)。
+$ttXppOn = GetTt "E-XPP-01"
+Assert "E-XPP-01 ON loadClass hidden via setThrowable (V43)" ($ttXppOn -match "loadClassPath=cnfe") "tt=$ttXppOn"
 WaitSpoolDrain | Out-Null
 $n = KindCount "device_env" "XPOSED_MAPS"
 Assert "E-XPP-03 ON record" ($n -gt 0) "count=$n"
@@ -248,3 +261,4 @@ AdbShell "am force-stop $script:TARGET_PKG" | Out-Null
 
 RemoveConfig
 DumpResults (Join-Path $script:TMP "enhance-round.json")
+Exit-WithResult

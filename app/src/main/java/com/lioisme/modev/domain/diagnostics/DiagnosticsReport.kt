@@ -1,6 +1,5 @@
 package com.lioisme.modev.domain.diagnostics
 
-import com.lioisme.modev.data.repo.PipelineStats
 import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.domain.server.ConnectionMonitor
 
@@ -38,6 +37,8 @@ object DiagnosticsReport {
         val stateOff: String,
         val statsReceived: String,
         val statsDropped: String,
+        /** 载荷预算丢弃(V45 T1.6,与条数丢弃分型;禁与 [statsDropped] 合并)。 */
+        val statsBytesDropped: String,
         val statsWriteFailures: String,
         val statsTrimmed: String,
         val statsRejectedHellos: String,
@@ -100,6 +101,7 @@ object DiagnosticsReport {
         val stats = snapshot.pipelineStats
         line(labels.statsReceived, formatCount(stats.received))
         line(labels.statsDropped, formatCount(stats.dropped))
+        line(labels.statsBytesDropped, formatCount(stats.bytesDropped))
         line(labels.statsWriteFailures, formatCount(stats.writeFailures))
         line(labels.statsTrimmed, formatCount(stats.trimmed))
         line(labels.statsRejectedHellos, formatCount(stats.channel.rejectedHellos))

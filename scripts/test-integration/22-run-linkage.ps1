@@ -88,3 +88,4 @@ $listen = SuShell "netstat -tln 2>/dev/null | grep 1510"
 Assert "C-EXT-01 default loopback bind" ($listen -match "127\.0\.0\.1:1510") "netstat=$listen"
 
 DumpResults (Join-Path $script:TMP "linkage-round.json")
+Exit-WithResult

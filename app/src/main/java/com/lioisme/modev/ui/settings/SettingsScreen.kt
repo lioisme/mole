@@ -143,6 +143,8 @@ fun SettingsScreen(
             Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                // V45 T3.7 同规:屏级锚点(插桩导航链的「到哪一屏」判定,禁按文案反查)。
+                .testTag("settings-page")
                 .padding(horizontal = 16.dp)
                 .verticalScroll(rememberScrollState()),
         ) {
@@ -457,11 +459,16 @@ private fun ColorSheet(
             // 对比安全选中标记,任意 seed 下清晰可见);V39 FilterChip + hex 文本
             // 标签形态退役(禁用旧词)。20 色固定数量 → 非惰性 chunked(5) × Row
             // (ModevSheet 纯 Column 容器,禁嵌套惰性布局)。
-            Column(Modifier.padding(horizontal = 24.dp)) {
+            // V46 R2/D7:横纵步长共用 [ColorSwatchGap] 单点 —— 旧实装只有 Row 的横向
+            // spacedBy,Column 无 verticalArrangement ⇒ 四行色点上下相切。
+            Column(
+                modifier = Modifier.padding(horizontal = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(ColorSwatchGap),
+            ) {
                 colorOptions.chunked(5).forEach { rowColors ->
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(ColorSwatchGap),
                     ) {
                         rowColors.forEach { argb ->
                             val color = Color(argb)
@@ -509,3 +516,6 @@ private fun ColorSheet(
         }
     }
 }
+
+/** 色板网格步长(横 = 纵;V46 R2/D7 单点,[ColorSheet] 两向 spacedBy 共用)。 */
+private val ColorSwatchGap = 12.dp

@@ -42,7 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -257,10 +257,13 @@ private fun KeywordRow(
         },
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
+                // U4〔P3〕只读 Switch affordance 错位修复:Switch 视觉=可拨但
+                // onCheckedChange=null + clearAndSetSemantics 隐藏语义 → TalkBack 读不出、
+                // 用户误以为可拨。改为语义拆分:Switch 真正切换启用态(onToggle),
+                // 行点击=编辑;两者职责清晰,Switch 对辅助技术可读。
                 Switch(
                     checked = entry.enabled,
-                    onCheckedChange = null,
-                    modifier = Modifier.clearAndSetSemantics {},
+                    onCheckedChange = onToggle,
                 )
                 TipIconButton(
                     tooltip = res.getString(R.string.keywords_delete_action),

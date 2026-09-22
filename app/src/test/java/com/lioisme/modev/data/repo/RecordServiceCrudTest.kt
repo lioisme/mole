@@ -4,9 +4,16 @@ import androidx.room.Room
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.data.db.ModevDatabase
-import com.lioisme.modev.data.mapping.CryptoDetail
+import com.lioisme.modev.domain.record.CryptoDetail
 import com.lioisme.modev.data.server.ConfigServer
-import com.lioisme.modev.domain.record.RecordDraft
+import com.lioisme.modev.core.model.CryptoKind
+import com.lioisme.modev.core.model.CryptoOperation
+import com.lioisme.modev.core.model.CryptoRecord
+import com.lioisme.modev.core.model.MonitoredRecord
+import com.lioisme.modev.core.model.SqlKind
+import com.lioisme.modev.core.model.SqlOperation
+import com.lioisme.modev.core.model.SqlRecord
+import com.lioisme.modev.domain.record.RecordFilter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -26,7 +33,8 @@ import org.robolectric.annotation.Config
  * RecordService 契约(T5 专业门面):增→查→改→删闭环、deleteByFilter 删除数 == 前置
  * count(共享 WHERE)、queryPage 与 observe 计数一致、categoryCounts 与 count 一致、
  * 空 kind/operation 交集短路为零、时间范围与 operation 过滤穿透。
- * V38 D1:写入面改经纯 Kotlin RecordDraft(domain 零 data.db 依赖)。
+ * V38 D1 → V45 T2.5:写入面 = 类型化记录族 MonitoredRecord(domain 零 data.db 依赖,
+ * 且不再另立逐列镜像实体的第三份平铺副本)。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -53,19 +61,30 @@ class RecordServiceCrudTest {
         packageName: String,
         kind: String,
         operation: String,
-        algorithm: String,
+        algorithmOrDbName: String,
         timestamp: Long,
         recordType: String = RecordTypes.CRYPTO,
-    ) = RecordDraft(
-        packageName = packageName,
-        kind = kind,
-        operation = operation,
-        algorithm = algorithm,
-        threadName = "main",
-        processName = "proc-$packageName-$kind-$timestamp",
-        timestamp = timestamp,
-        recordType = recordType,
-    )
+    ): MonitoredRecord = if (recordType == RecordTypes.DATABASE) {
+        SqlRecord(
+            packageName = packageName,
+            kind = SqlKind.valueOf(kind),
+            operation = SqlOperation.valueOf(operation),
+            databaseName = algorithmOrDbName,
+            threadName = "main",
+            processName = "proc-$packageName-$kind-$timestamp",
+            timestamp = timestamp,
+        )
+    } else {
+        CryptoRecord(
+            packageName = packageName,
+            kind = CryptoKind.valueOf(kind),
+            operation = CryptoOperation.valueOf(operation),
+            algorithm = algorithmOrDbName,
+            threadName = "main",
+            processName = "proc-$packageName-$kind-$timestamp",
+            timestamp = timestamp,
+        )
+    }
 
     @Test
     fun create_get_update_delete_lifecycle() = runBlocking {
@@ -88,7 +107,16 @@ class RecordServiceCrudTest {
     fun deleteByFilter_matches_count() = runBlocking {
         repo.create(entity("pkg.a", "CIPHER", "ENCRYPT", "AES", 100))
         repo.create(entity("pkg.a", "MESSAGE_DIGEST", "DIGEST", "SHA-256", 200))
-        repo.create(entity("pkg.b", "MAC", "MAC", "HmacSHA256", 300, recordType = RecordTypes.DATABASE))
+        repo.create(
+            entity(
+                "pkg.b",
+                SqlKind.OPEN.name,
+                SqlOperation.OPEN_DATABASE.name,
+                "db-b",
+                300,
+                recordType = RecordTypes.DATABASE,
+            ),
+        )
 
         assertEquals(3L, repo.count(RecordFilter()).first())
         // 仅删 crypto 类型:删除数 == 前置 crypto 计数
@@ -137,7 +165,7 @@ class RecordServiceCrudTest {
         // kind 列恒为 CryptoKind.name;MCP 导入面同样应遵守该契约)。
         repo.create(entity("pkg.a", "CIPHER", "ENCRYPT", "AES", 100))
         repo.create(entity("pkg.a", "CIPHER", "ENCRYPT", "AES2", 200))
-        repo.create(entity("pkg.a", "MAC", "MAC", "HmacSHA256", 300))
+        repo.create(entity("pkg.a", "MAC", "SIGN", "HmacSHA256", 300))
         val counts = repo.categoryCounts(RecordType.CRYPTO)
         assertEquals(2L, counts["CIPHER"])
         assertEquals(1L, counts["MAC"])

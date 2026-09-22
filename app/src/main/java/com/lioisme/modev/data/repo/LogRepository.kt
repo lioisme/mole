@@ -10,18 +10,9 @@ import com.lioisme.modev.core.codec.CryptoRecordCodec
 import com.lioisme.modev.core.codec.RecordCodecRegistry
 import com.lioisme.modev.core.codec.SqlRecordCodec
 import com.lioisme.modev.core.codec.WireRecord
-import com.lioisme.modev.core.model.CryptoRecord
-import com.lioisme.modev.core.model.BehaviorRecord
-import com.lioisme.modev.core.model.PrefsRecord
-import com.lioisme.modev.core.model.ProcessRecord
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.RecordTypes
-import com.lioisme.modev.core.model.SqlRecord
-import com.lioisme.modev.core.model.SystemRecord
-import com.lioisme.modev.core.model.UiInteractionRecord
-import com.lioisme.modev.core.model.WebViewRecord
-import com.lioisme.modev.core.model.NetworkRecord
-import com.lioisme.modev.core.model.DeviceEnvRecord
+import com.lioisme.modev.core.model.MonitoredRecord
 import com.lioisme.modev.core.codec.BehaviorRecordCodec
 import com.lioisme.modev.core.codec.PrefsRecordCodec
 import com.lioisme.modev.core.codec.WebViewRecordCodec
@@ -33,18 +24,21 @@ import com.lioisme.modev.core.codec.ProcessRecordCodec
 import com.lioisme.modev.data.db.CryptoRecordDao
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
-import com.lioisme.modev.data.mapping.RecordDetailModel
-import com.lioisme.modev.data.mapping.RowModel
-import com.lioisme.modev.data.mapping.toEntity
+import com.lioisme.modev.data.db.RecordQueryFactory
+import com.lioisme.modev.data.mapping.rawJson
 import com.lioisme.modev.data.mapping.toRecordDetailOrNull
 import com.lioisme.modev.data.mapping.toRowModelOrNull
-import com.lioisme.modev.domain.record.RecordDraft
+import com.lioisme.modev.data.mapping.writeEntity
+import com.lioisme.modev.domain.record.RecordDetailModel
 import com.lioisme.modev.domain.record.RecordFilter
+import com.lioisme.modev.domain.record.hasConstraint
 import com.lioisme.modev.domain.record.RecordPage
 import com.lioisme.modev.domain.record.RecordService
 import com.lioisme.modev.domain.record.RecordTypeCount
+import com.lioisme.modev.domain.record.RowModel
 
-import com.lioisme.modev.data.server.ChannelStats
+import com.lioisme.modev.domain.server.ChannelStats
+import com.lioisme.modev.domain.diagnostics.PipelineStats
 import com.lioisme.modev.data.server.ConfigServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -86,15 +80,46 @@ class LogRepository(
     private val server: ConfigServer,
     private val registry: RecordCodecRegistry = cryptoRegistry(),
     private val maxRecords: Int = MAX_RECORDS,
+    /**
+     * 在途载荷预算(V45 T1.6;可注入以便单测以小预算验证闸门语义,
+     * 生产装配恒取 [PENDING_MAX_PAYLOAD_CHARS])。
+     */
+    private val maxPendingPayloadChars: Int = PENDING_MAX_PAYLOAD_CHARS,
     /** 主库文件提供者(V23 存储占用统计;未装配时 [storageUsage] 返回 0)。 */
     private val databaseFile: (() -> java.io.File)? = null,
+    /**
+     * 库文件治理出口(V45 T1.7 / ST-8):大批量删除后回收 freelist 页 + 收敛 wal。
+     * 由装配层注入 `ModevDatabase` 上的 PRAGMA 出口(仓库不拼 PRAGMA、不直触库单例);
+     * null = 测试/未装配(内存库无文件可收缩)。
+     */
+    private val maintenance: (() -> Unit)? = null,
+    /**
+     * 落库异常治理判定(V45 T1.7 / ST-9):返回 true = 该错误属库损坏,写路径早停
+     * 并由治理面排期下次打开重建。装配层注入 `ModevDatabase::noteSqliteError`;
+     * 默认恒 false = 纯测试/未装配形态(重试语义与 V44 一致)。
+     */
+    private val onDbError: (Throwable) -> Boolean = { false },
 ) : RecordService {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val writeMutex = Mutex()
 
-    /** 待入库记录通道:信封 + 其所属会话的 ACK 回调。 */
-    private val pending = Channel<Pair<WireRecord, (Long) -> Unit>>(PENDING_CAPACITY)
+    /** 待入库记录通道项:信封 + 其所属会话的 ACK 回调 + 入队时定档的在途载荷字符数。 */
+    private data class Pending(
+        val wire: WireRecord,
+        val ack: (Long) -> Unit,
+        val chars: Int,
+    )
+
+    private val pending = Channel<Pending>(PENDING_CAPACITY)
+
+    /**
+     * 在途载荷字符计(V45 T1.6 / ST-5):通道仅有**条数**上限时,8192 槽 ×
+     * wire 单行上限 4M 字符 = 数 GB 级驻留(宿主 GC 风暴/OOM 的直接来源,
+     * 与注入侧 V44 T2.3 出口字节预算同口径治理)。入队即定档、出队即释放,
+     * 超预算的记录当场拒收并计 [PipelineStats.bytesDropped]。
+     */
+    private val pendingChars = java.util.concurrent.atomic.AtomicLong(0L)
 
     /**
      * 背压信号量:与通道容量相等,满时在 [ACQUIRE_TIMEOUT_MS] 窗口内
@@ -108,7 +133,9 @@ class LogRepository(
     private var started = false
 
     private val _stats = MutableStateFlow(PipelineStats())
-    val statsFlow: StateFlow<PipelineStats> = _stats
+
+    /** 捕获管线统计契约成员(V45 ML-2:原契约外 `statsFlow`,UI 与 MCP 曾为此注入本具体类)。 */
+    override val stats: StateFlow<PipelineStats> = _stats
 
     private fun bumpStats(transform: (PipelineStats) -> PipelineStats) {
         _stats.update { transform(it) }
@@ -142,16 +169,49 @@ class LogRepository(
             bumpStats { it.copy(dropped = it.dropped + 1) }
             return
         }
-        val sent = pending.trySend(record to ack)
+        // 载荷预算闸门(V45 T1.6):两类拒绝语义不同 ——
+        // ① 结构性超大(单条即超整条预算):永不可容,必须回执,
+        //    否则注入侧 WAL 从该游标永久重放(死循环 + 记录永不到达);
+        // ② 在途占满(本条可容,只是当下排队已满):不回执,让 WAL 稍后重放,
+        //    与条数闸门同一「反压可恢复」语义。
+        val chars = payloadChars(record)
+        if (chars > maxPendingPayloadChars) {
+            pendingSlots.release()
+            Log.w("Modev", "record exceeds payload budget, dropped for good seq=${record.seq} type=${record.recordType} chars=$chars budget=$maxPendingPayloadChars")
+            bumpStats { it.copy(bytesDropped = it.bytesDropped + 1) }
+            runCatching { ack(record.seq) }
+            return
+        }
+        if (!reserveChars(chars)) {
+            pendingSlots.release()
+            Log.w("Modev", "pending payload budget full, dropped seq=${record.seq} type=${record.recordType} chars=$chars")
+            bumpStats { it.copy(bytesDropped = it.bytesDropped + 1) }
+            return
+        }
+        val sent = pending.trySend(Pending(record, ack, chars))
         if (sent.isFailure) {
             pendingSlots.release()
+            pendingChars.addAndGet(-chars.toLong())
             bumpStats { it.copy(dropped = it.dropped + 1) }
+        }
+    }
+
+    /** 在途载荷度量:已解析信封的 JSON 字符数(与记录实际驻留规模同阶,UTF-16 ×2 字节)。 */
+    private fun payloadChars(record: WireRecord): Int =
+        record.payload.toString().length.coerceAtLeast(1)
+
+    /** 预算内则占用并返回 true;超预算零占用。 */
+    private fun reserveChars(chars: Int): Boolean {
+        while (true) {
+            val current = pendingChars.get()
+            if (current + chars > maxPendingPayloadChars) return false
+            if (pendingChars.compareAndSet(current, current + chars)) return true
         }
     }
 
     /** 批量写入循环:收到首条后攒批(32 条或 200ms 窗口),Mutex 内批量落库 + ACK。 */
     private suspend fun writerLoop() {
-        val batch = ArrayList<Pair<WireRecord, (Long) -> Unit>>(BATCH_SIZE)
+        val batch = ArrayList<Pending>(BATCH_SIZE)
         while (true) {
             batch.clear()
             batch.add(pending.receive())
@@ -163,6 +223,8 @@ class LogRepository(
                 pendingSlots.release()
                 batch.add(item)
             }
+            // 出队即释放在途载荷预算(通道不再持有该记录)
+            batch.forEach { item -> pendingChars.addAndGet(-item.chars.toLong()) }
             bumpStats { it.copy(received = it.received + batch.size) }
             writeMutex.withLock {
                 writeBatch(batch)
@@ -171,59 +233,25 @@ class LogRepository(
         }
     }
 
-    private suspend fun writeBatch(batch: List<Pair<WireRecord, (Long) -> Unit>>) {
+    private suspend fun writeBatch(batch: List<Pending>) {
         val toPersist = ArrayList<CryptoRecordEntity>(batch.size)
         val decodableAcks = ArrayList<Pair<Long, (Long) -> Unit>>(batch.size)
         val undecodableAcks = ArrayList<Pair<Long, (Long) -> Unit>>(batch.size)
-        for ((wire, ack) in batch) {
-            when (val decoded = registry.decode(wire)) {
-                is CryptoRecord -> {
-                    decodableAcks.add(wire.seq to ack)
-                    toPersist.add(decoded.toEntity())
-                }
-                is SqlRecord -> {
-                    decodableAcks.add(wire.seq to ack)
-                    toPersist.add(decoded.toEntity())
-                }
-                is BehaviorRecord -> {
-                    decodableAcks.add(wire.seq to ack)
-                    toPersist.add(decoded.toEntity())
-                }
-                is PrefsRecord -> {
-                    decodableAcks.add(wire.seq to ack)
-                    toPersist.add(decoded.toEntity())
-                }
-                is WebViewRecord -> {
-                    decodableAcks.add(wire.seq to ack)
-                    toPersist.add(decoded.toEntity())
-                }
-                is NetworkRecord -> {
-                    decodableAcks.add(wire.seq to ack)
-                    toPersist.add(decoded.toEntity())
-                }
-                is DeviceEnvRecord -> {
-                    decodableAcks.add(wire.seq to ack)
-                    toPersist.add(decoded.toEntity())
-                }
-                is UiInteractionRecord -> {
-                    decodableAcks.add(wire.seq to ack)
-                    toPersist.add(decoded.toEntity())
-                }
-                is SystemRecord -> {
-                    decodableAcks.add(wire.seq to ack)
-                    toPersist.add(decoded.toEntity())
-                }
-                is ProcessRecord -> {
-                    decodableAcks.add(wire.seq to ack)
-                    toPersist.add(decoded.toEntity())
-                }
-                else -> {
-                    // 未知记录类型/畸形载荷:计数丢弃;ACK 单独回执(防注入侧 WAL 永久重放)
-                    undecodableAcks.add(wire.seq to ack)
-                    Log.w("Modev", "dropped undecodable record type=${wire.recordType} seq=${wire.seq}")
-                    bumpStats { it.copy(dropped = it.dropped + 1) }
-                }
+        for (item in batch) {
+            val wire = item.wire
+            val ack = item.ack
+            // 解码 → 落库一条分派(V45 T2.5:registry 值类型收口 MonitoredRecord 后,
+            // 原 10 臂 when 仅做同一件事的重复登记,漏臂 = 静默丢档)
+            val decoded = registry.decode(wire)
+            if (decoded == null) {
+                // 未知记录类型/畸形载荷:计数丢弃;ACK 单独回执(防注入侧 WAL 永久重放)
+                undecodableAcks.add(wire.seq to ack)
+                Log.w("Modev", "dropped undecodable record type=${wire.recordType} seq=${wire.seq}")
+                bumpStats { it.copy(dropped = it.dropped + 1) }
+                continue
             }
+            decodableAcks.add(wire.seq to ack)
+            toPersist.add(decoded.writeEntity())
         }
         val persisted = toPersist.isEmpty() || persistBatch(toPersist)
         if (persisted) {
@@ -249,6 +277,12 @@ class LogRepository(
                 return true
             } catch (t: Throwable) {
                 lastError = t
+                // V45 T1.7 / ST-9:损坏类错误交治理面判定(重放同一把坏库无意义,
+                // 早停并把排期信号传出去),其余错误按原语义重试。
+                if (onDbError(t)) {
+                    Log.w("Modev", "persist aborted: database corruption reported")
+                    return false
+                }
             }
         }
         Log.w("Modev", "persist batch failed: $lastError")
@@ -263,61 +297,58 @@ class LogRepository(
         if (insertedSinceTrim < TRIM_EVERY) return
         insertedSinceTrim = 0
         try {
-            // V17:跨类型计数(recordType=null = 全部),每包上限与全局上限均按全类型治理。
-            val counts = dao.counts(null)
+            // V45 T1.6(ST-7):旧形态 `counts(null)` 每周期全库聚合 + `trim` 的
+            // `id NOT IN (SELECT …)` 物化命中集;现改为「越限包探针 + keyset 截断点 +
+            // 索引范围删除」——三步全部走 (packageName,timestamp) / (timestamp) 索引,
+            // 全局侧更连「总数」都不必算(第 keep+1 行不存在即未超限)。
             var trimmedNow = 0L
-            var total = 0L
-            for (c in counts) {
-                total += c.count
-                if (c.count > PER_PACKAGE_MAX) {
-                    trimmedNow += dao.trimPackage(c.packageName, PER_PACKAGE_MAX)
-                }
+            for (c in dao.packagesOver(PER_PACKAGE_MAX)) {
+                val cutoff = dao.packageTrimCutoff(c.packageName, PER_PACKAGE_MAX) ?: continue
+                trimmedNow += dao.deletePackageBefore(c.packageName, cutoff.timestamp, cutoff.id)
             }
-            if (total > maxRecords) {
-                trimmedNow += dao.trim(maxRecords)
+            dao.globalTrimCutoff(maxRecords)?.let { cutoff ->
+                trimmedNow += dao.deleteBefore(cutoff.timestamp, cutoff.id)
             }
             if (trimmedNow > 0) {
                 bumpStats { it.copy(trimmed = it.trimmed + trimmedNow) }
+                // V45 T1.7:裁剪释放的是「页数」而不是文件长度 —— 不收缩则存储占用恒高
+                shrink()
             }
         } catch (t: Throwable) {
             Log.w("Modev", "trim failed: $t")
         }
     }
 
+    /**
+     * 大批量删除后的库文件治理(V45 T1.7 / ST-8):freelist 回收 + wal 检查点。
+     * 失败静默(治理是尽力而为,绝不能让一次清理因为收缩失败而报错)。
+     */
+    private fun shrink() = runCatching { maintenance?.invoke() }
+
     // ----------------------------------------------------------------
     // RecordService 实现(读 / 写 / 删 / 清理 / 统计)
     // ----------------------------------------------------------------
 
     /**
-     * 流式分页记录(Paging3):时间倒序,支持记录类型/类别/操作/关键字/时间范围过滤。
-     * 关键字在 SQL 侧匹配(算法/操作/hex/文本/线程/SQL/路径),不在内存过滤;
-     * 列表走投影查询 [CryptoRecordDao.observePagedRowsByFilter],仅物化展示列 + SQL 侧预览,
-     * 零大字段加载;枚举未知的行返回 null 丢弃(计数在 DAO 层不感知,防 Schema 漂移兜底)。
-     * V17 R2:recordType 参数为 null = 全部类型,跨监听类别「整体」语义。
-     * V22:kind/operation 经 [RecordFilter.normalize] 作用域收敛,空交集短路为零结果。
+     * 流式分页记录(Paging3):记录类型/类别/操作/关键字/时间范围过滤,排序方向随
+     * [RecordFilter.sort]。V45 T1.1(ST-1):谓词由 [RecordQueryFactory] 派生
+     * (缺省维度不出列 → SQLite 可选索引),取代旧 `@Query + WHERE_FILTER` 哨兵形态;
+     * `limit` 仍取 [PAGING_WINDOW_CAP](AGENTS #14:Room 生成式计数会钳制 itemCount)。
+     * 关键字在 SQL 侧匹配,不在内存过滤;列表走投影查询,仅物化展示列 + SQL 侧预览。
+     * 枚举未知的行返回 null 丢弃(计数在 DAO 层不感知,防 Schema 漂移兜底)。
      */
     override fun observe(filter: RecordFilter): Flow<PagingData<RowModel>> {
-        val r = resolve(filter)
-        if (r.noMatch) return flowOf(PagingData.empty())
-        val like = r.query
+        if (RecordQueryFactory.predicate(filter).noMatch) return flowOf(PagingData.empty())
         return Pager(
             config = PagingConfig(pageSize = PAGE_SIZE, enablePlaceholders = false),
             pagingSourceFactory = {
-                dao.observePagedRowsByFilter(
-                    recordTypes = r.recordTypes,
-                    packages = r.packages,
-                    kinds = r.kinds,
-                    operations = r.operations,
-                    typeCount = r.typeCount,
-                    packageCount = r.packageCount,
-                    kindCount = r.kindCount,
-                    opCount = r.opCount,
-                    timeStart = r.timeStart,
-                    timeEnd = r.timeEnd,
-                    query = like,
-                    previewChars = ROW_PREVIEW_CHARS,
-                    limit = PAGING_WINDOW_CAP,
-                    offset = 0,
+                dao.pagedRows(
+                    RecordQueryFactory.rows(
+                        filter = filter,
+                        limit = PAGING_WINDOW_CAP,
+                        offset = 0,
+                        previewChars = ROW_PREVIEW_CHARS,
+                    ),
                 )
             },
         ).flow.map { pagingData ->
@@ -329,29 +360,21 @@ class LogRepository(
 
     /** 同步切片查询(供 MCP / 导出):返回当页 + 总量,不入 Paging 冷流。 */
     override suspend fun queryPage(filter: RecordFilter, page: Int, pageSize: Int): RecordPage {
-        val r = resolve(filter)
-        if (r.noMatch) return RecordPage(emptyList(), 0, page, pageSize)
+        if (RecordQueryFactory.predicate(filter).noMatch) return RecordPage(emptyList(), 0, page, pageSize)
         val total = count(filter).first()
         if (total == 0L) return RecordPage(emptyList(), 0, page, pageSize)
         val safePage = page.coerceAtLeast(0)
         val safeSize = pageSize.coerceAtLeast(1)
         val offset = safePage * safeSize
         val rows: List<CryptoRecordRow> = withContext(Dispatchers.IO) {
-            if (filter.sort == SortOrder.ASC) {
-                dao.sliceByFilterAsc(
-                    recordTypes = r.recordTypes, packages = r.packages, kinds = r.kinds,
-                    operations = r.operations, typeCount = r.typeCount, packageCount = r.packageCount,
-                    kindCount = r.kindCount, opCount = r.opCount, timeStart = r.timeStart, timeEnd = r.timeEnd,
-                    query = r.query, previewChars = ROW_PREVIEW_CHARS, limit = safeSize, offset = offset,
-                )
-            } else {
-                dao.sliceByFilterDesc(
-                    recordTypes = r.recordTypes, packages = r.packages, kinds = r.kinds,
-                    operations = r.operations, typeCount = r.typeCount, packageCount = r.packageCount,
-                    kindCount = r.kindCount, opCount = r.opCount, timeStart = r.timeStart, timeEnd = r.timeEnd,
-                    query = r.query, previewChars = ROW_PREVIEW_CHARS, limit = safeSize, offset = offset,
-                )
-            }
+            dao.sliceRows(
+                RecordQueryFactory.rows(
+                    filter = filter,
+                    limit = safeSize,
+                    offset = offset,
+                    previewChars = ROW_PREVIEW_CHARS,
+                ),
+            )
         }
         val items = rows.mapNotNull { it.toRowModelOrNull() }
         return RecordPage(items = items, total = total, page = safePage, pageSize = safeSize)
@@ -359,45 +382,40 @@ class LogRepository(
 
     /** 统一查询契约计数入口(V17 R2;REST/MCP 唯一依赖口)。 */
     override fun count(filter: RecordFilter): Flow<Long> {
-        val r = resolve(filter)
-        if (r.noMatch) return flowOf(0L)
-        return dao.observeCountByFilter(
-            recordTypes = r.recordTypes,
-            packages = r.packages,
-            kinds = r.kinds,
-            operations = r.operations,
-            typeCount = r.typeCount,
-            packageCount = r.packageCount,
-            kindCount = r.kindCount,
-            opCount = r.opCount,
-            timeStart = r.timeStart,
-            timeEnd = r.timeEnd,
-            query = r.query,
-        )
+        if (RecordQueryFactory.predicate(filter).noMatch) return flowOf(0L)
+        return dao.countByQuery(RecordQueryFactory.count(filter))
     }
 
     /** 单条记录(记录详情源),记录被清理或不可解码后返回 null。 */
     override fun get(id: Long): Flow<RecordDetailModel?> =
         dao.observeById(id).map { it?.toRecordDetailOrNull() }
 
-    /** 相邻记录 id(详情「上一条/下一条」),仅投影 id,不物化邻居大字段。 */
+    /** 记录原始 JSON 导出(V45 ISO-2:序列化住在数据层,消费方经契约取用)。 */
+    override fun exportJson(record: RecordDetailModel): String = record.rawJson()
+
+    /**
+     * 相邻记录 id(详情「上一条/下一条」),仅投影 id,不物化邻居大字段。
+     * V45 ST-2:keyset 翻页谓词 = 同类型 + 同包 + `(timestamp, id)` 严格比较,
+     * 与列表共享 [RecordQueryFactory] 生成器(旧形态另写一份哨兵 SQL,恒全表扫描)。
+     */
     override suspend fun neighbor(id: Long, newer: Boolean): Long? {
         val rec = dao.observeById(id).first() ?: return null
+        val filter = RecordFilter(
+            recordTypes = setOf(rec.recordType),
+            packages = setOf(rec.packageName),
+        )
         return withContext(Dispatchers.IO) {
-            if (newer) {
-                dao.neighborIdNewerThan(rec.recordType, rec.packageName, rec.timestamp, id)
-            } else {
-                dao.neighborIdOlderThan(rec.recordType, rec.packageName, rec.timestamp, id)
-            }
+            dao.neighborIdByQuery(RecordQueryFactory.neighborId(filter, rec.timestamp, id, newer))
         }
     }
 
-    /** 新增单条(MCP 导入 / 手动补录),Draft→实体映射后落库,返回自增 id。 */
-    override suspend fun create(record: RecordDraft): Long = dao.insertReturningId(record.toEntity())
+    /** 新增单条(MCP 导入 / 手动补录),类型化记录 → 实体唯一分派后落库,返回自增 id。 */
+    override suspend fun create(record: MonitoredRecord): Long =
+        dao.insertReturningId(record.writeEntity())
 
     /** 更新单条(按主键整行覆盖,MCP 编辑),id 不存在时 upsert 以 0 插入视为失败。 */
-    override suspend fun update(id: Long, record: RecordDraft): Boolean {
-        val entity = record.toEntity().copy(id = id)
+    override suspend fun update(id: Long, record: MonitoredRecord): Boolean {
+        val entity = record.writeEntity().copy(id = id)
         dao.upsert(entity)
         // upsert 无返回值:回读主键确认目标行存在(不存在则以新 id 插入,删除语义下判失败)
         return dao.observeById(id).first() != null
@@ -406,33 +424,41 @@ class LogRepository(
     /** 按 id 删除单条。 */
     override suspend fun delete(id: Long): Boolean = dao.deleteById(id) > 0
 
-    /** 按 [RecordFilter] 批量删除(共享 [CryptoRecordDao.WHERE_FILTER],保证口径单一)。 */
+    /**
+     * 按 [RecordFilter] 批量删除(候选 id 与 [count] 走同一 [RecordQueryFactory] 谓词
+     * → 「删 = 筛」口径单一;V45 T1.1 起 `@RawQuery` 不做 DML,故先取 id 再按主键分片删)。
+     * 全字段空 = 无约束,拒绝整表误删(显式整清请用 [clearAll])。
+     */
     override suspend fun deleteByFilter(filter: RecordFilter): Long {
-        val r = resolve(filter)
-        if (r.noMatch) return 0L
-        // 全字段空 = 无约束,拒绝整表误删(显式整清请用 [clearAll])。
+        if (RecordQueryFactory.predicate(filter).noMatch) return 0L
         if (!filter.hasConstraint) return 0L
-        return dao.deleteByFilter(
-            recordTypes = r.recordTypes,
-            packages = r.packages,
-            kinds = r.kinds,
-            operations = r.operations,
-            typeCount = r.typeCount,
-            packageCount = r.packageCount,
-            kindCount = r.kindCount,
-            opCount = r.opCount,
-            timeStart = r.timeStart,
-            timeEnd = r.timeEnd,
-            query = r.query,
-        ).toLong()
+        val ids = withContext(Dispatchers.IO) { dao.idsByQuery(RecordQueryFactory.ids(filter)) }
+        if (ids.isEmpty()) return 0L
+        var deleted = 0L
+        // 主键批删分片(SQLite 变量数上限;命中集本身 ≤ 库容量,恒有界)
+        ids.chunked(DELETE_ID_CHUNK).forEach { shard ->
+            deleted += dao.deleteByIds(shard)
+        }
+        shrink()
+        return deleted
     }
 
-    override suspend fun clearPackage(packageName: String) = dao.clearPackage(packageName)
+    /** 按包清理(V45 T3.5 后为「按包清空」唯一入口,MCP 与 UI 同上游)。 */
+    override suspend fun clearPackage(packageName: String) {
+        dao.clearPackage(packageName)
+        shrink()
+    }
 
     /** 按记录类型清理(V19 T7 数据管理按类型清空)。 */
-    override suspend fun clearByType(recordType: String) = dao.clearByType(recordType)
+    override suspend fun clearByType(recordType: String) {
+        dao.clearByType(recordType)
+        shrink()
+    }
 
-    override suspend fun clearAll() = dao.clearAll()
+    override suspend fun clearAll() {
+        dao.clearAll()
+        shrink()
+    }
 
     /**
      * 存储占用(V23):主库 + `-wal` + `-shm` 三文件字节和,单一出口供
@@ -450,123 +476,36 @@ class LogRepository(
         }
     }
 
-    // V27 修复:原硬编码 RecordTypes.CRYPTO 只统计算法包;null = 全类型(应用列表徽标跨类型对账)。
-    override fun observePackages(): Flow<List<String>> = dao.observePackages(null)
-
     /** 按记录类型分组计数(V17 R2,全类型总览基础)。 */
     override fun observeTypeCounts(): Flow<List<RecordTypeCount>> = dao.observeRecordTypeCounts()
 
-    /** 兼容别名([DataSettingsViewModel] 既有调用)。 */
-    fun observeRecordTypeCounts(): Flow<List<RecordTypeCount>> = observeTypeCounts()
+    /**
+     * 单包按类型分组计数(V45 ST-6):与 [count] 同一 [RecordQueryFactory] 谓词,
+     * 一次 `GROUP BY` 出全部类型(旧形态 = 监控页/MCP 各发 10 次 `observeRecordCounts`)。
+     */
+    override fun observeTypeCountsForPackage(packageName: String): Flow<Map<String, Long>> =
+        dao.typeCountsByQuery(
+            RecordQueryFactory.typeCounts(RecordFilter(packages = setOf(packageName))),
+        ).map { list -> list.associate { it.recordType to it.count } }
 
-    /** 相邻记录 id(详情"上一条/下一条")兼容入口([RecordDetailScreen] 既有调用)。 */
-    suspend fun neighborIdOf(
-        recordType: String,
-        packageName: String,
-        timestamp: Long,
-        id: Long,
-        newer: Boolean,
-    ): Long? = withContext(Dispatchers.IO) {
-        if (newer) {
-            dao.neighborIdNewerThan(recordType, packageName, timestamp, id)
-        } else {
-            dao.neighborIdOlderThan(recordType, packageName, timestamp, id)
-        }
-    }
-
-    /** 兼容别名([RecordDetailScreen] 既有调用),返回详情模型流。 */
-    fun observeById(id: Long): Flow<RecordDetailModel?> = get(id)
-
-    /** 兼容别名([AppMonitorScreen] 既有调用)。 */
-    suspend fun clear(packageName: String) = clearPackage(packageName)
+    /** 按记录类型分组的每应用记录计数(V44 契约成员:应用徽标 / 监控类型计数 / MCP 共用;null=全类型)。 */
+    override fun observeRecordCounts(recordType: String?): Flow<Map<String, Long>> =
+        dao.observeRecordCounts(recordType).map { list -> list.associate { it.packageName to it.count } }
 
     /** 指定类型每类别计数(筛选菜单徽标)。 */
     override suspend fun categoryCounts(type: RecordType): Map<String, Long> =
         dao.observeCategoryCounts(type.wire).first().associate { it.kind to it.count }
 
     // ----------------------------------------------------------------
-    // 兼容便捷方法(UI 既有调用)
+    // V44 死面清理:兼容别名(paged/counts/observeById/observeRecordTypeCounts/
+    // clear/neighborIdOf/pagedRecords/observePackages)已全部删除——UI/MCP 一律经
+    // RecordService 契约方法(observe/count/get/neighbor/observeTypeCounts/
+    // observeRecordCounts/clearPackage);消灭「一功能两名」漂移面。
     // ----------------------------------------------------------------
 
-    /**
-     * 按包/类别/关键字/记录类型分页(便捷封装,委托 [observe])。
-     * kindName 为单类别 id(CryptoKind.name / SqlKind.name),经 [RecordFilter] 作用域收敛。
-     */
-    fun pagedRecords(
-        packageName: String? = null,
-        kindName: String? = null,
-        query: String = "",
-        recordType: String? = null,
-    ): Flow<PagingData<RowModel>> {
-        val filter = RecordFilter(
-            recordTypes = recordType?.let { setOf(it) },
-            packages = packageName?.let { setOf(it) },
-            kinds = kindName?.let { setOf(it) },
-            query = query,
-        )
-        return observe(filter)
-    }
-
-    /** 统一查询契约分页入口(V17 R2;REST/MCP 唯一依赖口)。 */
-    fun paged(filter: RecordFilter): Flow<PagingData<RowModel>> = observe(filter)
-
-    /** 兼容别名:统计(委托 [count])。 */
-    fun counts(filter: RecordFilter): Flow<Long> = count(filter)
-
-    fun observeRecordCounts(recordType: String? = null): Flow<Map<String, Long>> =
-        dao.observeRecordCounts(recordType).map { list -> list.associate { it.packageName to it.count } }
-
-    /** SQL LIKE 模式转义(% / _ / \)。 */
-    private fun likePattern(raw: String): String =
-        "%" + raw.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-
-    /**
-     * RecordFilter 集合 → Room IN 绑定列表:null/空集绑定哨兵单例(内容无意义,
-     * 由 DAO 的 `:xCount = 0 OR` 短路为不过滤);非空集合原样绑定。
-     */
-    private fun Set<String>?.toBindList(): List<String> =
-        this?.toList()?.takeIf { it.isNotEmpty() } ?: listOf(EMPTY_IN_SENTINEL)
-
-    /**
-     * 将 [RecordFilter] 解析为共享 WHERE 绑定参数 + 空交集短路标记。
-     * - [noMatch]:kinds/operations 经 [RecordFilter.normalize] 收敛后为空集(显式无匹配),调用方短路为零结果;
-     * - 其余参数恒可安全绑定(哨兵语义由 DAO WHERE 处理)。
-     */
-    private data class Resolved(
-        val noMatch: Boolean,
-        val recordTypes: List<String>,
-        val packages: List<String>,
-        val kinds: List<String>,
-        val operations: List<String>,
-        val typeCount: Int,
-        val packageCount: Int,
-        val kindCount: Int,
-        val opCount: Int,
-        val timeStart: Long?,
-        val timeEnd: Long?,
-        val query: String?,
-    )
-
-    private fun resolve(filter: RecordFilter): Resolved {
-        val norm = filter.normalize()
-        val kindsEmpty = filter.kinds != null && norm.kinds?.isEmpty() == true
-        val opsEmpty = filter.operations != null && norm.operations?.isEmpty() == true
-        val query = norm.query?.takeIf { it.isNotBlank() }?.let(::likePattern)
-        return Resolved(
-            noMatch = kindsEmpty || opsEmpty,
-            recordTypes = norm.recordTypes.toBindList(),
-            packages = norm.packages.toBindList(),
-            kinds = norm.kinds.toBindList(),
-            operations = norm.operations.toBindList(),
-            typeCount = norm.recordTypes?.size ?: 0,
-            packageCount = norm.packages?.size ?: 0,
-            kindCount = norm.kinds?.size ?: 0,
-            opCount = norm.operations?.size ?: 0,
-            timeStart = norm.timeRange?.start,
-            timeEnd = norm.timeRange?.endInclusive,
-            query = query,
-        )
-    }
+    // V45 T1.1(ST-1):旧 `likePattern` / `toBindList`(哨兵集合绑定)/ `Resolved` +
+    // `resolve(...)`(WHERE_FILTER 绑定参数装配)四件套已随 RecordQueryFactory 落地删除——
+    // 谓词、转义、空交集短路、绑定顺序全部收归生成器单一事实源,仓库不再感知 SQL 形态。
 
     companion object {
         private fun cryptoRegistry(): RecordCodecRegistry =
@@ -584,7 +523,8 @@ class LogRepository(
             }
 
         private const val MAX_RECORDS = 20_000
-        private const val PAGE_SIZE = 60
+        /** 页大小 = [RecordService.DEFAULT_PAGE_SIZE] 契约单源(V44 Q4,禁再写字面量)。 */
+        private const val PAGE_SIZE = RecordService.DEFAULT_PAGE_SIZE
 
         /**
          * DAO paging 查询的 LIMIT 窗口上限(Room 2.7.2 LimitOffsetPagingSource
@@ -608,6 +548,16 @@ class LogRepository(
         /** 待入库通道容量,溢出丢弃并计数。 */
         private const val PENDING_CAPACITY = 8192
 
+        /**
+         * 在途载荷预算(V45 T1.6 / ST-5,单位 = JSON 字符数,UTF-16 下 ×2 字节):
+         * 条数闸门单独不构成内存上界 —— [PENDING_CAPACITY] × wire 单行硬上限
+         * [RecordLimits.WIRE_MAX_LINE_CHARS](4M 字符)最坏可达数十 GB。
+         * 取值口径:常态记录(1–4K 字符)满载 8192 槽 ≈ 8–32M 字符,故 32M
+         * (≈64 MiB 驻留)在正常压力下**从不 binding**(闸门不改既有吞吐语义),
+         * 只在「大字段洪峰」时先于 OOM 生效并计入 `bytesDropped`。
+         */
+        private const val PENDING_MAX_PAYLOAD_CHARS = 32 * 1024 * 1024
+
         /** 背压阻塞窗口:超时丢弃并计数,绝不无限挂起客户端线程。 */
         private const val ACQUIRE_TIMEOUT_MS = 10_000L
 
@@ -617,18 +567,11 @@ class LogRepository(
         /** 每插入这么多条执行一次双层容量治理。 */
         private const val TRIM_EVERY = 500L
 
-        /** Room IN 绑定哨兵(Room 不支持空集合绑定;哨兵内容不被求值)。 */
-        private const val EMPTY_IN_SENTINEL = ""
+        /**
+         * 主键批删分片大小(V45 T1.1:`@RawQuery` 不做 DML,删除走「同谓词取 id →
+         * `id IN (:ids)` 分片删」;分片上限保守取 500,兼容 SQLite 旧版 999 变量数限制)。
+         */
+        private const val DELETE_ID_CHUNK = 500
     }
 }
 
-/**
- * 宿主管道统计:收到/丢弃/写失败/裁剪 + 通道拒绝计数,供设置页展示。
- */
-data class PipelineStats(
-    val received: Long = 0L,
-    val dropped: Long = 0L,
-    val writeFailures: Long = 0L,
-    val trimmed: Long = 0L,
-    val channel: ChannelStats = ChannelStats(),
-)

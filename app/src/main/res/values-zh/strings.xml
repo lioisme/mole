@@ -73,23 +73,6 @@
     <string name="algorithm_monitor_master">启用算法监听</string>
     <string name="database_monitor_master">启用数据库监听</string>
     <string name="section_db_result_limits">结果闸门</string>
-    <string name="switch_cipher">加解密 Cipher</string>
-    <string name="switch_message_digest">摘要 MessageDigest</string>
-    <string name="switch_mac">MAC (HMAC)</string>
-    <string name="switch_signature">签名 Signature</string>
-    <string name="switch_key_param">密钥参数构造</string>
-    <string name="switch_key_generation">密钥生成</string>
-    <string name="switch_key_factory">密钥还原</string>
-    <string name="switch_key_store">密钥库 KeyStore</string>
-    <string name="switch_key_agreement">密钥协商</string>
-    <string name="switch_random">安全随机数</string>
-    <string name="switch_base64">Base64 编码</string>
-    <string name="switch_webview">网页加解密 WebView</string>
-    <string name="switch_db_open">数据库打开</string>
-    <string name="switch_db_query">数据库查询</string>
-    <string name="switch_db_dml">数据库增删改</string>
-    <string name="switch_db_exec">SQL 执行</string>
-    <string name="switch_db_transaction">事务</string>
     <string name="db_max_result_rows">结果行数上限</string>
     <string name="db_max_result_rows_hint">每个查询结果采集的行数(0 = 不限制)</string>
     <string name="db_max_result_rows_dialog_title">结果行数上限</string>
@@ -111,6 +94,7 @@
     <string name="danger_clear_logs_msg">清空「%1$s」的全部记录?此操作不可撤销。</string>
     <string name="danger_clear_all_msg">清空全部记录?此操作不可撤销。</string>
     <string name="cancel">取消</string>
+    <string name="close">关闭</string>
 
     <!-- 记录类别 / 操作标签 -->
     <string name="kind_message_digest">摘要</string>
@@ -180,6 +164,12 @@
     <string name="meta_cipher_suite">密码套件</string>
     <string name="meta_proxy_port">代理端口</string>
     <string name="meta_bridge">桥名称</string>
+    <string name="record_field_app">应用</string>
+    <string name="meta_exit_code">退出码</string>
+    <string name="meta_pid">进程号</string>
+    <string name="record_action_blocked">已拦截</string>
+    <string name="record_action_detected">已检测</string>
+    <string name="record_value_no">无</string>
     <string name="meta_script_size">脚本大小</string>
     <string name="meta_context">上下文</string>
     <string name="meta_direction">方向</string>
@@ -447,13 +437,16 @@
     <string name="tokens_status_deny_all">已启用 · 零令牌,全部请求被拒</string>
     <string name="tokens_status_off">已停用 · 请求无需令牌</string>
     <string name="token_unnamed">令牌 %1$s</string>
-    <string name="token_revoke">撤销</string>
-    <string name="token_show">显示</string>
-    <string name="token_hide">隐藏</string>
-    <string name="token_revoke_confirm_msg">撤销此令牌?正在使用它的客户端将立即被拒绝。</string>
+    <string name="token_delete">删除</string>
+    <string name="token_delete_confirm_msg">删除此令牌?正在使用它的客户端将立即被拒绝。</string>
     <string name="token_copied">令牌已复制</string>
     <string name="token_created">令牌已创建</string>
     <string name="token_created_legacy">导入</string>
+    <string name="token_rename">重命名</string>
+    <string name="token_view">查看</string>
+    <string name="token_more">更多操作</string>
+    <string name="token_value_title">令牌值</string>
+    <string name="token_renamed">名称已更新</string>
     <!-- V39 返回键退出确认 -->
     <string name="exit_press_back_again">再按一次退出程序</string>
     <string name="settings_clear_all_records">清空全部记录</string>
@@ -479,6 +472,7 @@
     <string name="diagnostics_detail_copy">复制</string>
     <string name="stats_received">已接收</string>
     <string name="stats_dropped">队列已满丢弃</string>
+    <string name="stats_bytes_dropped">载荷预算超限丢弃</string>
     <string name="stats_write_failures">写库失败</string>
     <string name="stats_trimmed">超容量裁剪</string>
     <string name="stats_rejected_hellos">握手被拒</string>

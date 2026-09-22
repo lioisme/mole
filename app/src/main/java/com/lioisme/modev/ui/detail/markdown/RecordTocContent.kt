@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -39,10 +40,14 @@ fun RecordTocContent(
                     lineHeight = MaterialTheme.typography.bodyMedium.lineHeight,
                 ),
                 maxLines = 1,
+                // U2〔P2〕TOC 行:加 Role.Button 语义(TalkBack 正确朗读为按钮),
+                // 触控高度提到 ≥48dp(裸 clickable + 6dp padding 仅 ~32dp 可见区,
+                // 低于 M3 48dp 最小触控);clickable 默认已扩 48dp 触摸目标,
+                // 此处把可见内边距提到 14dp 使视觉高度也达 48dp。
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable(onClick = { onAnchorClick(entry.key) })
-                    .padding(vertical = 6.dp)
+                    .clickable(role = Role.Button, onClick = { onAnchorClick(entry.key) })
+                    .padding(vertical = 14.dp)
                     .testTag("toc-${entry.key}"),
             )
         }

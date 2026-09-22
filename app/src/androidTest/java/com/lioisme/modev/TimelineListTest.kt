@@ -20,6 +20,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.lioisme.modev.R
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
+import com.lioisme.modev.data.db.RecordQueryFactory
+import com.lioisme.modev.domain.record.RecordFilter
 import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.i18n.LocaleManager
 import com.lioisme.modev.ui.MainActivity
@@ -85,17 +87,7 @@ class TimelineListTest {
                 ),
             )
             // 写回读验:与 UI 同一 DB 单例,必须即刻可见(哨兵计数语义同 DAO 契约)。
-            val seeded = dao
-                .observeCountByFilter(
-                    recordTypes = emptyList(),
-                    packages = listOf(packageName),
-                    kinds = emptyList(),
-                    typeCount = 0,
-                    packageCount = 1,
-                    kindCount = 0,
-                    query = null,
-                )
-                .first()
+            val seeded = dao.countByQuery(RecordQueryFactory.count(RecordFilter(packages = setOf(packageName)))).first()
             assertEquals("种子写入须在读回中可见", 6L, seeded)
         }
         // 被测应用默认隐藏(自身是 Xposed 模块),开启显隐使行可见。
@@ -133,21 +125,22 @@ class TimelineListTest {
         }
         assertTrue("等待「显示 Xposed 模块」生效后被测包行应出现", rowFound)
         rule.onNodeWithText(packageName).performClick()
-        rule.waitForIdle()
+        rule.awaitAnchor("monitor-entry-algorithm", "点应用行应进监控页")
     }
 
     /** 进入单应用算法记录列表(入口页 → 算法记录)。 */
     private fun openAlgorithmList() {
         openMonitorEntry()
-        rule.onNodeWithText(ctx.getString(R.string.algorithm_records_title)).performClick()
-        rule.waitForIdle()
+        // 入口行常落在视口外(performClick 坐标窗外 = 触摸静默丢弃,DEF-V45-009 同坑)。
+        rule.clickScrolledIntoView(hasText(ctx.getString(R.string.algorithm_records_title)))
+        rule.awaitAnchor("records-filter", "点「算法记录」入口行应进算法记录列表")
     }
 
     /** 进入单应用数据库记录列表(入口页 → 数据库记录)。 */
     private fun openDatabaseList() {
         openMonitorEntry()
-        rule.onNodeWithText(ctx.getString(R.string.database_records_title)).performClick()
-        rule.waitForIdle()
+        rule.clickScrolledIntoView(hasText(ctx.getString(R.string.database_records_title)))
+        rule.awaitAnchor("records-filter", "点「数据库记录」入口行应进数据库记录列表")
     }
 
     private fun record(ts: Long, kind: String, algorithm: String, operation: String) =

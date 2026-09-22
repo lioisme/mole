@@ -41,9 +41,32 @@ class BehaviorMethodRegistry private constructor(
 
     companion object {
 
-        /** 解析系统类并构造注册表;失败/类缺失返回 null。 */
-        fun forName(className: String): BehaviorMethodRegistry? =
-            classForName(className)?.let(::BehaviorMethodRegistry)
+        /**
+         * 类名 → 注册表缓存(V44 T2.4):枚举结果按类复用。
+         * 旧形态 10+ 调用点各自 `forName` → 每次都做「`methods` ∪ 整条父类链
+         * `declaredMethods`」全量反射 + 去重(Activity/TextView 等宽类链上有数百个
+         * 方法),同一类在冷启动期被反复枚举;缓存后每类仅枚举一次。
+         * 进程内类解析结果稳定(注入进程单一 classloader 拓扑),无失效语义。
+         */
+        private val cache = java.util.concurrent.ConcurrentHashMap<String, BehaviorMethodRegistry>()
+
+        /** 解析失败类名集合(类缺失:API < 26 的 java.nio.file.Files 等)——避免反复 forName 抛异常。 */
+        private val missing = java.util.Collections.newSetFromMap(
+            java.util.concurrent.ConcurrentHashMap<String, Boolean>(),
+        )
+
+        /** 解析系统类并构造注册表(带缓存);失败/类缺失返回 null。 */
+        fun forName(className: String): BehaviorMethodRegistry? {
+            cache[className]?.let { return it }
+            if (className in missing) return null
+            val created = classForName(className)?.let(::BehaviorMethodRegistry)
+            if (created == null) {
+                missing += className
+                return null
+            }
+            cache[className] = created
+            return created
+        }
 
         /**
          * boot classloader 优先的类解析(hide 类构造器 hook 场景复用;

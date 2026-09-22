@@ -18,6 +18,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
+import com.lioisme.modev.data.db.RecordQueryFactory
+import com.lioisme.modev.domain.record.RecordFilter
 import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.ui.MainActivity
 import kotlinx.coroutines.flow.first
@@ -92,17 +94,7 @@ class CryptoDetailZonesTest {
                     ),
                 ),
             )
-            val seeded = dao
-                .observeCountByFilter(
-                    recordTypes = listOf(""),
-                    packages = listOf(ownPackage),
-                    kinds = listOf(""),
-                    typeCount = 0,
-                    packageCount = 1,
-                    kindCount = 0,
-                    query = null,
-                )
-                .first()
+            val seeded = dao.countByQuery(RecordQueryFactory.count(RecordFilter(packages = setOf(ownPackage)))).first()
             assertEquals("种子写入须在读回中可见", 2L, seeded)
         }
         AppListSettings.setShowModules(true)
@@ -140,9 +132,10 @@ class CryptoDetailZonesTest {
         }
         assertTrue("等待「显示 Xposed 模块」生效后被测包行应出现", rowFound)
         rule.onNodeWithText(ownPackage).performClick()
-        rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.algorithm_records_title)).performClick()
-        rule.waitForIdle()
+        rule.awaitAnchor("monitor-entry-algorithm", "点应用行应进监控页")
+        // 监控页入口行在视口外时 performClick 坐标落窗外被静默丢弃(DEF-V45-009 同坑)。
+        rule.clickScrolledIntoView(hasText(str(R.string.algorithm_records_title)))
+        rule.awaitAnchor("records-filter", "点「算法记录」入口行应进算法记录列表")
     }
 
     /** 等待详情页出现(顶栏更多按钮 = 详情页标志)。 */
@@ -167,10 +160,13 @@ class CryptoDetailZonesTest {
         rule.waitForIdle()
         waitForDetail()
 
-        // V28:算法名由顶栏 + 身份区(markdown H2)双处承载(原生 Hero 卡已退役)。
-        assertTrue(
-            "算法名应至少两处出现(顶栏 + 身份区)",
-            rule.onAllNodesWithText(cipherAlgorithm).fetchSemanticsNodes().size >= 2,
+        // V29 起详情顶栏标题恒为静态资源「记录详情」(ModevTopBar title = record_title),
+        // 算法名的唯一承载处 = 身份区 markdown H2(V28「双处」口径已随之作废)。
+        rule.onNodeWithText(str(R.string.record_title)).assertIsDisplayed()
+        assertEquals(
+            "算法名应由身份区唯一承载",
+            1,
+            rule.onAllNodesWithText(cipherAlgorithm).fetchSemanticsNodes().size,
         )
 
         // 数据流分区:H2 节根 + 输入(明文) + 流向箭头段 + 输出(密文)。
@@ -218,7 +214,7 @@ class CryptoDetailZonesTest {
         rule.onNodeWithText(str(R.string.role_output_key)).assertIsDisplayed()
         // 无密钥材料分区(该记录无 key/iv 等)。
         rule.onNodeWithText(str(R.string.section_zone_key_material)).assertDoesNotExist()
-        // 记录行仍有锚点(详情页顶栏标题 = 算法名)。
-        rule.onAllNodesWithText(generateAlgorithm).assertCountEquals(2)
+        // 记录身份锚点 = 身份区 H2(V29 起顶栏为静态「记录详情」标题)。
+        rule.onAllNodesWithText(generateAlgorithm).assertCountEquals(1)
     }
 }

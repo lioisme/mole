@@ -1,0 +1,18 @@
+# V45 验收轮 SKIP 豁免表 —— 与 TASK-V45-ACCEPTANCE.md §4.3 同源(T4.4 假绿防线)
+#
+# 一行一个「可机械匹配的 SKIP 标识」:
+#   · 矩阵脚本步(`00/10-27-*.ps1` 台账)= 断言名(Assert / SkipResult 的 Name 字段)
+#   · 插桩轮(androidTest JUnit XML)= 全限定类名#方法名
+# 表外 SKIP 一律按等量 FAIL 计入(`run-acceptance.ps1` 末段 + 报告「SKIP 台账」小节)。
+# 新增条目必须同批补 §4.3 豁免表并在行尾写明豁免条件 —— 不允许靠「SKIP 不算失败」过关。
+
+# EX-06 空机防御:FourScreensNavTest 的数据依赖断言以 assumeTrue 让「零应用行」不判红
+# (靶机装包数随环境而变;结构性断言在有行时才成立)。有行的机器上恒不触发。
+com.lioisme.modev.FourScreensNavTest#appRow_hasNoRunButton
+com.lioisme.modev.FourScreensNavTest#appRowOpensAppMonitor_andDangerMenu_andAlgorithmListNavigates
+com.lioisme.modev.FourScreensNavTest#appMonitorHeader_hasStatusDotsBesidePackageName
+com.lioisme.modev.FourScreensNavTest#recordRowOpensRecordDetail_andMoreMenuHasSingleExport_andBackReturns
+
+# EX-03 复位步:数据库文件本就不存在(上一轮已删/首装前)时无从验证「下次打开会重建」,
+# 该断言按 SKIP 记录而非 FAIL(复位目标已达成)。
+record db rebuilt on next launch

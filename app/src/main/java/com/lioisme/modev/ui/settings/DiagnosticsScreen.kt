@@ -133,6 +133,7 @@ fun DiagnosticsScreen(
             stateOff = context.getString(R.string.mcp_state_off),
             statsReceived = context.getString(R.string.stats_received),
             statsDropped = context.getString(R.string.stats_dropped),
+            statsBytesDropped = context.getString(R.string.stats_bytes_dropped),
             statsWriteFailures = context.getString(R.string.stats_write_failures),
             statsTrimmed = context.getString(R.string.stats_trimmed),
             statsRejectedHellos = context.getString(R.string.stats_rejected_hellos),
@@ -270,6 +271,13 @@ fun DiagnosticsScreen(
                     title = stringResource(R.string.stats_dropped),
                     value = stat(pipelineStats.dropped),
                     modifier = Modifier.testTag("diagnostics-stat-dropped"),
+                )
+                // 载荷预算丢弃(V45 T1.6):与条数丢弃分列(成因不同,合并即失真)
+                SettingsInfoItem(
+                    icon = Icons.Default.Warning,
+                    title = stringResource(R.string.stats_bytes_dropped),
+                    value = stat(pipelineStats.bytesDropped),
+                    modifier = Modifier.testTag("diagnostics-stat-bytes-dropped"),
                 )
                 SettingsInfoItem(
                     icon = Icons.Default.Warning,

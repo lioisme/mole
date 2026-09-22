@@ -59,9 +59,36 @@ RunCase "smoke" "L-SMOKE-01" 6
 $tt = GetTt "L-SMOKE-01"
 Assert "smoke/L-SMOKE-01 forName caller-loader intact" ($tt -match "forNameSingle=ok.*forNameExplicit=ok.*instantiate=ok") "tt=$tt"
 
+# ---------- V43 T6 热路径「全关零工作」预算(L-PERF-01,D-8) ----------
+# 全关档案下 File.exists/getAll/getProperty/loadClass 单次均摊须停留在微秒级:
+# 门控倒挂(V2.1–V2.4 类)会把序列化/IPC/全局锁写拉进每调用,预算即红线。
+$ALL_OFF = '{"cryptoListen":false,"dbListen":false,"behaviorListen":false,"prefsListen":false,"webviewListen":false,"networkListen":false,"deviceEnvListen":false,"uiListen":false,"systemListen":false,"processControlListen":false}'
+$localOff = Join-Path $script:TMP "cfg_off.json"
+[IO.File]::WriteAllText($localOff, $ALL_OFF, (New-Object System.Text.UTF8Encoding($false)))
+& $script:ADB -s $script:DEVICE push $localOff $script:CFG_PATH 2>&1 | Out-Null
+SuShell "chmod 666 $script:CFG_PATH" | Out-Null
+AdbShell "am force-stop $script:TARGET_PKG" | Out-Null
+Start-Sleep -Seconds 2
+RunCase "smoke" "L-PERF-01" 10
+$ttPerf = WaitTt "L-PERF-01" 30
+function GetPerfUs([string]$text, [string]$key) {
+    if ("$text" -match "$key=(\d+)us") { return [int]$Matches[1] }
+    return -1
+}
+$PERF_BUDGET = @{ exists = 50; getAll = 500; getProperty = 50; loadClass = 30 }
+foreach ($phase in $PERF_BUDGET.Keys) {
+    $us = GetPerfUs $ttPerf $phase
+    $budget = $PERF_BUDGET[$phase]
+    Assert "smoke/L-PERF-01 $phase under budget ($budget us)" ($us -ge 0 -and $us -le $budget) "actual=${us}us"
+}
+# 恢复 testtarget 全开档案(保留供后续矩阵)
+& $script:ADB -s $script:DEVICE push $local $script:CFG_PATH 2>&1 | Out-Null
+SuShell "chmod 666 $script:CFG_PATH" | Out-Null
+
 # 清理他 App 全开档案(保留 testtarget 供后续矩阵)
 foreach ($pkg in ($APPS | Where-Object { $_ -ne $script:TARGET_PKG })) {
     SuShell "rm -f /data/local/tmp/modev_config_$pkg.json" | Out-Null
 }
 
 DumpResults (Join-Path $script:TMP "smoke-round.json")
+Exit-WithResult

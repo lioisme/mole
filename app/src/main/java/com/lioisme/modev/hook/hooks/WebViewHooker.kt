@@ -44,14 +44,12 @@ class WebViewHooker(
     protected val sink = context.sink
     protected val packageName = context.packageName
 
-    protected val processName: String by lazy {
-        runCatching { java.io.File("/proc/self/cmdline").readBytes() }
-            .getOrNull()
-            ?.toString(Charsets.UTF_8)
-            ?.substringBefore('\u0000')
-            ?.takeIf { it.isNotBlank() }
-            ?: "unknown"
-    }
+    /**
+     * 目标进程名(V44 T2.6):经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
+     * 旧形态每个 Hooker 基类各自 `by lazy` 读一次 `/proc/self/cmdline`,冷启动期
+     * 约 50 个实例 = 50 次文件读 + 字节解码,而进程身份在进程内恒定不变。
+     */
+    protected val processName: String get() = com.lioisme.modev.hook.ProcessIdentity.processName
 
     private val bridge by lazy {
         WebViewJsBridge(
@@ -132,8 +130,15 @@ class WebViewHooker(
         }
     }
 
-    /** 注册 JS 桥:弱引用幂等,失败静默降级——页面仍可正常使用。 */
+    /**
+     * 注册 JS 桥:弱引用幂等,失败静默降级——页面仍可正常使用。
+     * V43 T2:JS_BRIDGE kind 门控前置——开关关闭 = 宿主 WebView 命名空间零污染
+     * (旧实现每个页面永远携带 `window.modevJsBridge`,既可被反检测方枚举,
+     * 又构成对宿主的功能副作用)。
+     */
     private fun ensureBridge(view: WebView) {
+        // 桥是 JS_CRYPTO 探针与 JS_BRIDGE 记录的共同载体:任一开启才注入,全关零污染
+        if (!enabled(WebViewKind.JS_BRIDGE) && !enabled(WebViewKind.JS_CRYPTO)) return
         if (bridgedViews.contains(view)) return
         runCatching { view.addJavascriptInterface(bridge, WebviewProbe.BRIDGE_NAME) }
         bridgedViews.add(view)

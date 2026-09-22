@@ -16,14 +16,16 @@ param(
     [switch]$ExportCsv
 )
 
-$ADB = "D:\leidian\LDPlayer14\adb.exe"
-$SQLITE = "D:\Android\platform-tools\sqlite3.exe"
-$DEVICE_DB = "/data/user/0/com.lioisme.modev/databases/modev.db"
+. "$PSScriptRoot\tt-env.ps1"
+$ADB = $script:ADB
+$SQLITE = $script:SQLITE
+$DEVICE = $script:DEVICE
+$DEVICE_DB = "/data/user/0/$($script:MODEV_PKG)/databases/modev.db"
 $LOCAL_DB = "$env:TEMP\modev_query.db"
 
 # --- 拉取最新数据库 ---
-& $ADB -s 127.0.0.1:5555 shell "su -c 'cp $DEVICE_DB /sdcard/modev_query.db'" 2>$null
-& $ADB -s 127.0.0.1:5555 pull /sdcard/modev_query.db $LOCAL_DB 2>$null | Out-Null
+& $ADB -s $DEVICE shell "su -c 'cp $DEVICE_DB /sdcard/modev_query.db'" 2>$null
+& $ADB -s $DEVICE pull /sdcard/modev_query.db $LOCAL_DB 2>$null | Out-Null
 
 if (-not (Test-Path $LOCAL_DB)) {
     Write-Host "[ERROR] 无法拉取 Modev 数据库" -ForegroundColor Red
@@ -94,7 +96,7 @@ if ($results) {
 
 # --- CSV 导出 ---
 if ($ExportCsv -and $results) {
-    $csvPath = "D:\Temp\opencode\modev_records_$RecordType.csv"
+    $csvPath = Join-Path $script:EXPORT_DIR "modev_records_$RecordType.csv"
     $header = "id,recordType,kind,operation,algorithm,timestamp"
     $csvLines = @($header)
     foreach ($line in $results) {

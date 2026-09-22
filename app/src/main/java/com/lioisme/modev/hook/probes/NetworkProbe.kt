@@ -1,5 +1,6 @@
 package com.lioisme.modev.hook.probes
 
+import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.hook.InterventionProbeMarker
 import com.lioisme.modev.hook.Probe
@@ -17,6 +18,13 @@ import com.lioisme.modev.hook.hooks.VpnHideHooker
 class NetworkProbe : Probe, InterventionProbeMarker {
 
     override val recordType: String = RecordTypes.NETWORK
+
+    /**
+     * V44 T2.4 冷启动裁剪:网络域(含 SSL 绕过 / 代理·VPN 隐藏等干预型 kind)
+     * 全部经 `networkListen` master ∧ kind 双门控——master 关 = 零能力可生效,
+     * 整组数百个方法钩的装配代价可省。
+     */
+    override fun enabledIn(switch: HookSwitch): Boolean = switch.networkListen
 
     override fun install(context: ProbeContext) {
         val hookers = listOf(

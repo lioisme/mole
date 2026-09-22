@@ -19,7 +19,8 @@ import java.io.FileOutputStream
  * - [onAck] 推进 ackedSeq 并原子重写文件(临时文件 fsync 后 rename),删除已确认前缀;
  * - 超 [maxBytes] 轮转:当前文件先 fsync 再改名 `.old`,旧文件删除(丢最老数据,计数上报);
  * - 损坏/超长行跳过并计数(仅当发现损坏行时重写清理,避免计数膨胀);
- * - 仅由 [RecordSink] 工作线程与 [ConfigChannel] ACK 回调调用,方法同步防重入。
+ * - 仅由 [RecordSink] 工作线程与 [ConfigChannel] ACK 回调调用;游标/文件操作同步,
+ *   drain 网络发送在锁外(V43 T1,防背压锁链)。
  */
 class RecordSpool(
     private val dir: File,
@@ -87,51 +88,53 @@ class RecordSpool(
         sentSeq = ackedSeq
     }
 
-    /** 按序发送 `seq > sentSeq` 的未发送行;命中在途行即停,失败保留待下次。 */
-    @Synchronized
+    /**
+     * 按序发送全部未确认行(`seq > ackedSeq`),失败保留待下次。
+     * **V43 T1 两段式**:锁内仅做行快照(`readLines` 读盘),网络 `send` 在锁外执行——
+     * 旧实现 `@Synchronized drain` 把 socket 写包进监视器,队列满降级路径的
+     * [append](同锁)会被网络阻塞无限期拖住,宿主 hook 线程随之卡死(背压锁链根因之一)。
+     * 快照后新落盘的行留待下一轮 drain——乱序文件(队列满直落盘与工作线程消费交错)中
+     * 低 seq 行可能位于高 seq 行之后,故统一按 ackedSeq 判定仅跳已确认行,其余重发
+     * (宿主唯一索引幂等吸收,重复量受 ACK 裁剪收敛),重放正确性与顺序无关。
+     */
     fun drain(send: (String) -> Boolean) {
-        if (!drainFile(oldFile, send)) return
-        drainFile(spoolFile, send)
+        val batch = snapshotPending()
+        for ((seq, line) in batch) {
+            // 发送纯 JSON 部分(剥掉 seq 前缀;无前缀旧行原样发送)
+            val json = line.substringAfter('\t')
+            if (!send(json)) return
+            markSent(seq)
+        }
     }
 
-    private fun drainFile(f: File, send: (String) -> Boolean): Boolean {
-        if (!f.exists()) return true
-        var ok = true
+    private fun markSent(seq: Long) {
+        synchronized(this) { sentSeq = seq }
+    }
+
+    /** 锁内快照未确认行(有界 [MAX_DRAIN_BATCH],余量下轮重放);损坏行就地计数并清理。 */
+    @Synchronized
+    internal fun snapshotPending(): List<Pair<Long, String>> {
+        val out = ArrayList<Pair<Long, String>>(MAX_DRAIN_BATCH)
+        collectPending(oldFile, out)
+        if (out.size < MAX_DRAIN_BATCH) collectPending(spoolFile, out)
+        return out
+    }
+
+    private fun collectPending(f: File, into: MutableList<Pair<Long, String>>) {
+        if (!f.exists()) return
         var sawCorrupt = false
-        try {
-            readLines(f).forEach { (seq, line) ->
-                if (!ok) return@forEach
-                when {
-                    seq == Long.MIN_VALUE -> Unit // 未识别的行(理论上不出现)
-                    seq <= ackedSeq -> Unit // 已确认,等待 trim
-                    else -> {
-                        // 乱序文件(队列满时直落盘与工作线程消费交错)中,低 seq 行可能位于
-                        // 已发送高 seq 行之后,不能按 sentSeq 跳过——未发送行会永久滞留。
-                        // 统一按 ackedSeq 判定:仅确认行跳过,其余重发(宿主唯一索引幂等吸收);
-                        // 重复轰炸由 ACK 驱动的文件裁剪自然收敛(仅重发 ACK 滞后窗口内的行)。
-                        if (line.length > MAX_LINE_CHARS) {
-                            corruptLines++
-                            sawCorrupt = true
-                        } else {
-                            // 发送纯 JSON 部分(剥掉 seq 前缀;无前缀旧行原样发送)
-                            val json = line.substringAfter('\t')
-                            if (!send(json)) {
-                                ok = false
-                            } else {
-                                sentSeq = seq
-                            }
-                        }
-                    }
-                }
+        readLines(f).forEach { (seq, line) ->
+            when {
+                seq <= ackedSeq || line.length > MAX_LINE_CHARS ->
+                    if (line.length > MAX_LINE_CHARS) sawCorrupt = true
+                into.size < MAX_DRAIN_BATCH -> into.add(seq to line)
             }
-        } catch (t: Throwable) {
-            return false
         }
         if (sawCorrupt) {
+            corruptLines++
             // 清理损坏行,避免重复计数与永久滞留
-            rewriteFile(f, readLines(f).filter { (seq, line) -> line.length <= MAX_LINE_CHARS }.map { it.second })
+            rewriteFile(f, readLines(f).filter { (s, line) -> line.length <= MAX_LINE_CHARS }.map { it.second })
         }
-        return ok
     }
 
     /**
@@ -211,6 +214,30 @@ class RecordSpool(
         runCatching { out?.fd?.sync() }
     }
 
+    /**
+     * spool(含 `.old`)内已见最大 seq —— V45 T1.4:seq 检查点文件读不出时的**续号下界**。
+     * 流式扫描行前缀,不物化行内容(仅启动期一次性调用)。
+     */
+    fun maxSeqSeen(): Long = maxOf(scanMaxSeq(spoolFile), scanMaxSeq(oldFile))
+
+    private fun scanMaxSeq(f: File): Long {
+        var max = 0L
+        runCatching {
+            FileInputStream(f).bufferedReader(Charsets.UTF_8).use { reader ->
+                var line = reader.readLine()
+                while (line != null) {
+                    val tab = line.indexOf('\t')
+                    if (tab > 0) {
+                        val seq = line.substring(0, tab).toLongOrNull()
+                        if (seq != null && seq > max) max = seq
+                    }
+                    line = reader.readLine()
+                }
+            }
+        }
+        return max
+    }
+
     /** 按行读取并解析 seq 前缀;缺前缀/非法(旧格式)的行按 seq=0 处理(发送后随 ACK(0) 清理)。 */
     private fun readLines(f: File): List<Pair<Long, String>> {
         val lines = ArrayList<Pair<Long, String>>()
@@ -258,5 +285,8 @@ class RecordSpool(
 
         /** 批量 fsync checkpoint:时间窗口。 */
         const val FSYNC_INTERVAL_MS = 500L
+
+        /** 单次 drain 快照行上限(有界内存,V43 T1;余量下一轮重放)。 */
+        const val MAX_DRAIN_BATCH = 2048
     }
 }

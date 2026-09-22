@@ -166,4 +166,60 @@ class SettingsRepositoryMcpTokenTest {
         assertTrue(r.mcpTokenAuth.value)
         assertTrue(r.mcpTokens.value.isEmpty())
     }
+
+    // ---- V46 R3 重命名(setMcpTokenLabel)----
+
+    @Test
+    fun `rename updates label only and keeps value order intact`() {
+        val r = repo()
+        val sets = mutableListOf<Set<String>>()
+        r.mcpTokenSetUpdater = { sets += it }
+
+        val first = runBlocking { r.addMcpToken("alpha") }
+        val second = runBlocking { r.addMcpToken("beta") }
+        runBlocking { r.setMcpTokenLabel(first.id, "  改名后  ") }
+
+        val tokens = r.mcpTokens.value
+        assertEquals("条目数与顺序不变", listOf(first.id, second.id), tokens.map { it.id })
+        assertEquals("label 两端空白被裁", "改名后", tokens[0].label)
+        assertEquals("beta", tokens[1].label)
+        assertEquals(
+            "值集合内容不变(原地生效、不重启不踢会话)",
+            setOf(first.value, second.value),
+            sets.last(),
+        )
+    }
+
+    @Test
+    fun `rename to blank falls back to unnamed rendering form`() {
+        val r = repo()
+        val entry = runBlocking { r.addMcpToken("tmp") }
+        runBlocking { r.setMcpTokenLabel(entry.id, "") }
+        assertEquals("", r.mcpTokens.value.single().label)
+    }
+
+    @Test
+    fun `rename unknown id is an idempotent no-op`() {
+        val r = repo()
+        runBlocking { r.addMcpToken("keep") }
+        val before = r.mcpTokens.value
+        val sets = mutableListOf<Set<String>>()
+        r.mcpTokenSetUpdater = { sets += it }
+
+        runBlocking { r.setMcpTokenLabel("no-such-id", "x") }
+
+        assertEquals(before, r.mcpTokens.value)
+        assertTrue("未知 id 不得触发持久化与校验集回调", sets.isEmpty())
+    }
+
+    @Test
+    fun `rename persists across repository instances`() {
+        val r = repo()
+        val entry = runBlocking { r.addMcpToken("before") }
+        runBlocking { r.setMcpTokenLabel(entry.id, "after") }
+
+        val replayed = repo().mcpTokens.value.single()
+        assertEquals("after", replayed.label)
+        assertEquals("值不受改名影响", entry.value, replayed.value)
+    }
 }

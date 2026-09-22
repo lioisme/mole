@@ -8,10 +8,10 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.lioisme.modev.AppContainer
 import com.lioisme.modev.core.model.RecordType
-import com.lioisme.modev.data.mapping.RowModel
-import com.lioisme.modev.data.repo.AppCatalogSource
-import com.lioisme.modev.data.repo.LogRepository
+import com.lioisme.modev.domain.record.RowModel
+import com.lioisme.modev.domain.app.AppCatalogService
 import com.lioisme.modev.domain.record.RecordFilter
+import com.lioisme.modev.domain.record.RecordService
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,12 +36,12 @@ import kotlinx.coroutines.launch
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RecordsViewModel(
-    private val logs: LogRepository,
+    private val logs: RecordService,
     /** 预置锁定记录类型(wire 值;非空)。 */
     private val presetTypes: Set<String>,
     /** 预置锁定包名(非空 = 单应用;null = 按类型全局/全部应用)。 */
     private val presetPackages: Set<String>?,
-    catalog: AppCatalogSource? = null,
+    catalog: AppCatalogService? = null,
 ) : ViewModel() {
 
     private val query = MutableStateFlow("")
@@ -61,10 +61,16 @@ class RecordsViewModel(
 
     /** 分页记录流(时间倒序;多播缓存防二次收集)。 */
     val records: Flow<PagingData<RowModel>> =
-        filterFlow.flatMapLatest { logs.paged(it) }.cachedIn(viewModelScope)
+        filterFlow.flatMapLatest { logs.observe(it) }.cachedIn(viewModelScope)
 
-    /** 匹配总数(过滤语义对账面;列表页统计行预留)。 */
-    val totalCount: Flow<Long> = filterFlow.flatMapLatest { logs.count(it) }
+    /**
+     * 匹配总数(V44 D1:列表计数副标唯一口径 = SQL COUNT,与 records_count 同源;
+     * WhileSubscribed:仅列表页在前台时随表失效重查;null = 首帧未达。
+     * 订阅面收敛于 RecordsCountSubtitle 叶组合器,页主体零连带)。
+     */
+    val totalCount: StateFlow<Long?> = filterFlow
+        .flatMapLatest { logs.count(it) }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     /** 包名 → 应用名映射(全局列表行内上下文;目录未接入 = 恒空映射)。 */
     val packageLabels: StateFlow<Map<String, String>> =
@@ -105,7 +111,7 @@ class RecordsViewModelFactory(
     @Suppress("UNCHECKED_CAST")
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return RecordsViewModel(
-            logs = container.logs,
+            logs = container.records,
             presetTypes = setOf(recordType.wire),
             presetPackages = packageName?.let { setOf(it) },
             catalog = if (packageName == null) container.catalog else null,

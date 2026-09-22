@@ -26,6 +26,8 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
+import com.lioisme.modev.data.db.RecordQueryFactory
+import com.lioisme.modev.domain.record.RecordFilter
 import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.ui.MainActivity
 import kotlinx.coroutines.flow.first
@@ -85,17 +87,9 @@ class GlobalTypeRecordsTest {
                     record(victimPackage, "CIPHER", "DES", "ENCRYPT", now - 30_000),
                 ),
             )
-            val seeded = dao
-                .observeCountByFilter(
-                    recordTypes = listOf(EMPTY_IN_SENTINEL),
-                    packages = listOf(EMPTY_IN_SENTINEL),
-                    kinds = listOf(EMPTY_IN_SENTINEL),
-                    typeCount = 0,
-                    packageCount = 0,
-                    kindCount = 0,
-                    query = null,
-                )
-                .first()
+            // 本例先 clearAll() 且种子跨两包(全局列表聚合语境)⇒ 不变量 = 「全表恰为我种的这些行」,
+            // 计数必须按全局口径(仅 clearPackage 的用例才按包scoped)。
+            val seeded = dao.countByQuery(RecordQueryFactory.count(RecordFilter())).first()
             assertEquals("种子写入须在读回中可见", 2L, seeded)
         }
         AppListSettings.setShowModules(true)
@@ -222,10 +216,5 @@ class GlobalTypeRecordsTest {
             Thread.sleep(100)
         }
         rule.onAllNodes(hasTestTag("record-row")).assertCountEquals(0)
-    }
-
-    private companion object {
-        /** 哨兵绑定(内容无意义,由 typeCount=0 短路),空集合直接绑会生成非法 IN ()。 */
-        private const val EMPTY_IN_SENTINEL = ""
     }
 }

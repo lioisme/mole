@@ -75,23 +75,6 @@
     <string name="algorithm_monitor_master">Enable Algorithm Listen</string>
     <string name="database_monitor_master">Enable Database Listen</string>
     <string name="section_db_result_limits">Result Limits</string>
-    <string name="switch_cipher">Cipher</string>
-    <string name="switch_message_digest">MessageDigest</string>
-    <string name="switch_mac">MAC</string>
-    <string name="switch_signature">Signature</string>
-    <string name="switch_key_param">Key Parameter Construction</string>
-    <string name="switch_key_generation">Key Generation</string>
-    <string name="switch_key_factory">Key Factory</string>
-    <string name="switch_key_store">KeyStore</string>
-    <string name="switch_key_agreement">Key Agreement</string>
-    <string name="switch_random">SecureRandom</string>
-    <string name="switch_base64">Base64</string>
-    <string name="switch_webview">WebView JS Crypto</string>
-    <string name="switch_db_open">Database Open</string>
-    <string name="switch_db_query">Database Query</string>
-    <string name="switch_db_dml">Database Change</string>
-    <string name="switch_db_exec">SQL Exec</string>
-    <string name="switch_db_transaction">Transaction</string>
     <string name="db_max_result_rows">Max result rows</string>
     <string name="db_max_result_rows_hint">Rows collected per query result (0 = unlimited)</string>
     <string name="db_max_result_rows_dialog_title">Max result rows</string>
@@ -113,6 +96,7 @@
     <string name="danger_clear_logs_msg">Clear all records of "%1$s"? This cannot be undone.</string>
     <string name="danger_clear_all_msg">Clear ALL records? This cannot be undone.</string>
     <string name="cancel">Cancel</string>
+    <string name="close">Close</string>
 
     <!-- Record kind / operation labels -->
     <string name="kind_message_digest">Digest</string>
@@ -182,6 +166,12 @@
     <string name="meta_cipher_suite">Cipher Suite</string>
     <string name="meta_proxy_port">Proxy Port</string>
     <string name="meta_bridge">Bridge</string>
+    <string name="record_field_app">App</string>
+    <string name="meta_exit_code">Exit code</string>
+    <string name="meta_pid">Process ID</string>
+    <string name="record_action_blocked">Blocked</string>
+    <string name="record_action_detected">Detected</string>
+    <string name="record_value_no">No</string>
     <string name="meta_script_size">Script size</string>
     <string name="meta_context">Context</string>
     <string name="meta_direction">Direction</string>
@@ -455,13 +445,16 @@
     <string name="tokens_status_deny_all">On · no tokens: all requests rejected</string>
     <string name="tokens_status_off">Off · requests need no token</string>
     <string name="token_unnamed">Token %1$s</string>
-    <string name="token_revoke">Revoke</string>
-    <string name="token_show">Show</string>
-    <string name="token_hide">Hide</string>
-    <string name="token_revoke_confirm_msg">Revoke this token? Clients using it will be rejected immediately.</string>
+    <string name="token_delete">Delete</string>
+    <string name="token_delete_confirm_msg">Delete this token? Clients using it will be rejected immediately.</string>
     <string name="token_copied">Token copied</string>
     <string name="token_created">Token created</string>
     <string name="token_created_legacy">Imported</string>
+    <string name="token_rename">Rename</string>
+    <string name="token_view">View</string>
+    <string name="token_more">More actions</string>
+    <string name="token_value_title">Token value</string>
+    <string name="token_renamed">Name updated</string>
     <!-- V39 exit confirm -->
     <string name="exit_press_back_again">Press back again to exit</string>
     <string name="settings_clear_all_records">Clear all records</string>
@@ -487,6 +480,7 @@
     <string name="diagnostics_detail_copy">Copy</string>
     <string name="stats_received">Received</string>
     <string name="stats_dropped">Dropped (queue full)</string>
+    <string name="stats_bytes_dropped">Dropped (payload budget)</string>
     <string name="stats_write_failures">Write failures</string>
     <string name="stats_trimmed">Trimmed (capacity limit)</string>
     <string name="stats_rejected_hellos">Rejected (handshake)</string>

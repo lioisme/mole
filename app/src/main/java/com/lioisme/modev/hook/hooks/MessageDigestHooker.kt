@@ -24,6 +24,9 @@ class MessageDigestHooker(
     context: ProbeContext,
 ) : BaseHooker(context, CryptoKind.MESSAGE_DIGEST) {
 
+    /** UPDATE 记录节流(V43 T3,V2.10):大文件按块 update 风暴,同实例 1s 窗口一条。 */
+    private val updateThrottle = SessionThrottle()
+
     override fun install() {
         val f = MethodFinder
         hookAfter(f.find(DIGEST, "getInstance", String::class.java)) { inv, result -> afterGetInstance(inv, result) }
@@ -31,12 +34,12 @@ class MessageDigestHooker(
         hookAfter(f.find(DIGEST, "getInstance", String::class.java, Provider::class.java)) { inv, result -> afterGetInstance(inv, result) }
         hookAfter(f.find(DIGEST, "update", ByteArray::class.java)) { inv, _ -> afterUpdate(inv) }
         hookAfter(f.find(DIGEST, "update", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, _ -> afterUpdate(inv) }
-        hookBefore(f.find(DIGEST, "update", ByteBuffer::class.java)) { inv -> HookerSupport.stash(inv.getArg(0)) }
+        hookBefore(f.find(DIGEST, "update", ByteBuffer::class.java)) { inv -> HookerSupport.stash(inv, inv.getArg(0)) }
         hookAfter(f.find(DIGEST, "update", ByteBuffer::class.java)) { inv, _ -> afterUpdate(inv) }
         hookAfter(f.find(DIGEST, "digest")) { inv, result -> afterDigest(inv, result) }
         hookAfter(f.find(DIGEST, "digest", ByteArray::class.java)) { inv, result -> afterDigest(inv, result) }
         hookAfter(f.find(DIGEST, "digest", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, result -> afterDigest(inv, result) }
-        hookBefore(f.find(DIGEST, "digest", ByteBuffer::class.java)) { inv -> HookerSupport.stash(inv.getArg(0)) }
+        hookBefore(f.find(DIGEST, "digest", ByteBuffer::class.java)) { inv -> HookerSupport.stash(inv, inv.getArg(0)) }
         hookAfter(f.find(DIGEST, "digest", ByteBuffer::class.java)) { inv, result -> afterDigest(inv, result) }
         hookAfter(f.find(DIGEST, "clone")) { inv, result -> afterClone(inv, result) }
         hookAfter(f.find(DIGEST, "reset")) { inv, _ -> afterReset(inv) }
@@ -91,14 +94,19 @@ class MessageDigestHooker(
                 val len = invocation.getArg(2) as? Int
                 if (off != null && len != null) HookerSupport.slice(arg, off, len) else arg
             }
-            else -> HookerSupport.take()
+            else -> HookerSupport.take(invocation)
         }
         ctx.inputTotal += input?.size ?: 0
-        if (input != null) {
+        val contextId = CryptoContextTracker.identity(instance)
+        if (input != null &&
+            // 同实例 1s 窗口节流:统计累计(inputTotal)不受影响,记录风暴受控
+            // (V44 T2.5:数值键重载,免 "UPDATE|"+id 每次调用的字符串分配)
+            !updateThrottle.shouldSkip(contextId)
+        ) {
             emit(
                 operation = CryptoOperation.UPDATE,
                 algorithm = ctx.algorithm,
-                contextId = CryptoContextTracker.identity(instance),
+                contextId = contextId,
                 context = ctx,
                 input = viewOf(input),
             )
@@ -114,7 +122,7 @@ class MessageDigestHooker(
                 val len = invocation.getArg(2) as? Int
                 if (off != null && len != null) HookerSupport.slice(arg, off, len) else arg
             }
-            else -> HookerSupport.take()
+            else -> HookerSupport.take(invocation)
         }
         ctx.inputTotal += input?.size ?: 0
         // digest(byte[],int,int):result 为写入字节数,摘要落在 arg0[off, off+result)

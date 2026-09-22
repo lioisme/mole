@@ -33,6 +33,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -53,19 +54,21 @@ import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.model.WebViewKind
 import com.lioisme.modev.core.model.WebViewOperation
-import com.lioisme.modev.data.mapping.BehaviorRow
-import com.lioisme.modev.data.mapping.CryptoRow
-import com.lioisme.modev.data.mapping.PrefsRow
-import com.lioisme.modev.data.mapping.RowModel
-import com.lioisme.modev.data.mapping.SqlRow
-import com.lioisme.modev.data.mapping.WebViewRow
-import com.lioisme.modev.data.mapping.NetworkRow
-import com.lioisme.modev.data.mapping.DeviceEnvRow
-import com.lioisme.modev.data.mapping.UiInteractionRow
-import com.lioisme.modev.data.mapping.SystemRow
-import com.lioisme.modev.data.mapping.ProcessRow
+import com.lioisme.modev.domain.record.BehaviorRow
+import com.lioisme.modev.domain.record.CryptoRow
+import com.lioisme.modev.domain.record.PrefsRow
+import com.lioisme.modev.domain.record.RowModel
+import com.lioisme.modev.domain.record.SqlRow
+import com.lioisme.modev.domain.record.WebViewRow
+import com.lioisme.modev.domain.record.NetworkRow
+import com.lioisme.modev.domain.record.DeviceEnvRow
+import com.lioisme.modev.domain.record.UiInteractionRow
+import com.lioisme.modev.domain.record.SystemRow
+import com.lioisme.modev.domain.record.ProcessRow
 import com.lioisme.modev.core.model.NetworkKind
 import com.lioisme.modev.core.model.NetworkOperation
+import com.lioisme.modev.ui.common.formatSecond
+import com.lioisme.modev.ui.settings.StorageFormat
 import com.lioisme.modev.ui.theme.behaviorKindColor
 import com.lioisme.modev.ui.theme.kindColor
 import com.lioisme.modev.ui.theme.prefsKindColor
@@ -89,17 +92,25 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 记录行(V27 M1-T3 重构;V40 T4 行内上下文标签;V40 T5.3 ListItem 化):
- * 标准 M3 [ListItem] 承载(RecordListCard 手搭 Row 脚手架退役),信息架构四级:
- * - leading 类别图标(36dp 圆角方 tonal 底,类别色@13% + 类别色图标 20dp,CIPHER 按方向换锁形);
- * - headline 算法名 / SQL 首行(bodyLarge Medium mono,超长尾省略);
- * - supporting 元行 labelMedium:类别词元(类别色)+ 操作名(+库名/行数后缀)
- *   ([contextLabel] 非空时前缀「应用名 · 」——按类型全局列表的来源语境)
- *   + 预览行 bodySmall mono(最有价值数据段 / SQL 预览);
- * - trailing:秒级时间 + 方向微徽章(labelSmall 紧凑胶囊);
- * - 行容器 surfaceContainerLow(列表页卡片间距由 [RecordTimelineList] padding 承担);
- * - 单击进详情、长按复制摘要(回调由宿主接线)。
- * `record-row` testTag、[RowPresentation] 单一数据出口、单击/长按/时间契约均不变。
+ * 记录行(V27 M1-T3 重构;V40 T4 行内上下文标签;V40 T5.3 ListItem 化;
+ * V43 T4 一行一参数重构,决策 D-1/D-2/D-3;**V46 R1/D1 容器化 + 尾栏退役**):
+ *
+ * **V46 R1/D1 版式**:容器 = `Box`(`clip(MaterialTheme.shapes.medium)` +
+ * `background(surfaceContainerLow)` + `combinedClickable`),`ListItem` 转透明
+ * (`containerColor = Color.Transparent`)仅承载内容布局 —— MD3 内边距/字阶/leading
+ * 槽契约不破,圆角与可见波纹由容器层单点保证。信息架构槽位:
+ * - leading 类别图标(36dp 圆角方 tonal 底,类别色@13% + 类别色图标 20dp);
+ * - headline = **身份行**([IdentityLine],testTag `record-row-identity`):
+ *   身份文本(weight 1f)+ 右上方秒级时间与方向微徽章;
+ * - supporting = **字段行列表**([FieldLines]/[RowField]),每个逻辑参数各占一行,
+ *   行内恒 ≤1 参数;路径/命令/URL 行启用 [MiddleEllipsisText] 保头掐腰中缀省略(D-2);
+ *   全部标签走资源四语(D-3);
+ * - **`trailingContent` 恒不传**:M3 ListItem 的文本列宽 = 行宽 − leading − trailing,
+ *   尾栏一旦存在即永久削掉正文可用宽度(尾栏只有两行内容、顶部对齐,其下方是死空间),
+ *   这就是「底部参数行右侧明明还有位置却被提前截断」的根因;时间与徽章下钻进身份行,
+ *   预留只作用于首行,参数行因此通栏。
+ *
+ * `record-row` testTag、presentation 单一数据出口、单击/长按/时间契约均不变。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -125,85 +136,126 @@ fun RecordRow(
             is SystemRow -> systemPresentation(record)
             is ProcessRow -> processPresentation(record)
         }
-    ListItem(
-        colors = ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    // 容器层只管「形状 + 底色 + 最小高度」;手势、合并语义与 record-row 锚点恒落在
+    // ListItem 节点上 —— V46 实测 M3 1.4.0 的 ListItem 自身就是 mergeDescendants 节点
+    // (行内全部文本收在它身上)。把锚点放到外层 Box 会让 rowCount 的标准形态
+    // `hasTestTag("record-row") and hasText(...)` 整体归零(三个记录列表测试类全红)。
+    Box(
         modifier =
             modifier
                 .fillMaxWidth()
                 .defaultMinSize(minHeight = MIN_ROW_HEIGHT)
-                .semantics { role = Role.Button }
-                .combinedClickable(
-                    onClick = onClick,
-                    onLongClick = {
-                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                        onLongClick()
-                    },
-                ),
-        leadingContent = {
-            LeadingIcon(icon = presentation.icon, tint = presentation.accent)
-        },
-        headlineContent = {
-            Text(
-                text = presentation.headline,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium,
-                fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        supportingContent = {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                val meta =
-                    if (contextLabel != null) {
-                        buildAnnotatedString {
-                            append(contextLabel)
-                            append(SEPARATOR)
-                            append(presentation.meta)
-                        }
-                    } else {
-                        presentation.meta
-                    }
-                Text(
-                    text = meta,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                presentation.preview?.takeIf { it.isNotEmpty() }?.let { preview ->
-                    Text(
-                        text = preview,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontFamily = FontFamily.Monospace,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
+                .clip(MaterialTheme.shapes.medium)
+                .background(MaterialTheme.colorScheme.surfaceContainerLow),
+    ) {
+        ListItem(
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .semantics(mergeDescendants = true) { role = Role.Button }
+                    .combinedClickable(
+                        onClick = onClick,
+                        onLongClick = {
+                            haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onLongClick()
+                        },
                     )
-                }
-            }
-        },
-        trailingContent = {
-            // 尾栏恒渲染(时间必在;徽章可选)——V20「时间恒在行内右栏」契约。
-            Column(
-                horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                TimeText(timestamp = presentation.timestamp)
-                presentation.badges.forEach { badge -> MicroBadge(badge) }
-            }
-        },
-    )
+                    .testTag(ROW_TEST_TAG),
+            leadingContent = {
+                LeadingIcon(icon = presentation.icon, tint = presentation.accent)
+            },
+            headlineContent = {
+                IdentityLine(
+                    headline = presentation.headline,
+                    timestamp = presentation.timestamp,
+                    badges = presentation.badges,
+                )
+            },
+            supportingContent = {
+                FieldLines(contextLabel = contextLabel, fields = presentation.fields)
+            },
+        )
+    }
 }
 
-/** 统一行展示规格(presentation 单一数据出口,三族同构)。 */
+/**
+ * 身份行(V46 R1/D1):headline 与「秒级时间 + 语义徽章」同排。
+ *
+ * 时间与徽章由本行承载而非 ListItem `trailingContent` —— 尾栏预留宽度只作用于这一行,
+ * 参数行因此通栏。垂直对齐取 Top:时间/徽章列自上方起排,徽章落定在 headline 之下,
+ * 与时间线组头(按秒分组)在竖向上呼应。
+ */
+@Composable
+private fun IdentityLine(
+    headline: String,
+    timestamp: Long,
+    badges: List<RowBadge>,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().testTag("record-row-identity"),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(
+            text = headline,
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Medium,
+            fontFamily = FontFamily.Monospace,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+        Column(
+            horizontalAlignment = Alignment.End,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            TimeText(timestamp = timestamp)
+            badges.forEach { badge -> MicroBadge(badge) }
+        }
+    }
+}
+
+/** 参数行列表(V43 T4 一行一参数契约不变;V46 起自 RecordRow 内联抽出,恒通栏)。 */
+@Composable
+private fun FieldLines(contextLabel: String?, fields: List<RowField>) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        // V43 T4/D-1:应用语境独立成行(全局列表形态;不再与类别词元拼行)
+        if (contextLabel != null && contextLabel.isNotBlank()) {
+            FieldText(
+                RowField(
+                    labelRes = R.string.record_field_app,
+                    value = contextLabel,
+                ),
+            )
+        }
+        fields.forEach { field -> FieldText(field) }
+    }
+}
+
+/**
+ * 行字段(V43 T4/D-1):一行恒承载一个逻辑参数。
+ *
+ * - [labelRes] null → 纯值行(类别词元/自描述值);非 null → 「标签 值」合并单 Text;
+ * - [mono] 值走等宽字体(数据段/路径/SQL);
+ * - [valueColor] 非 null = 前景色(类别词元用 accent);
+ * - [middleEllipsis] 长值行启用保头掐腰中缀省略(D-2:路径/命令/URL/预览)。
+ */
+private data class RowField(
+    @StringRes val labelRes: Int? = null,
+    val value: String,
+    val mono: Boolean = false,
+    val valueColor: Color? = null,
+    val middleEllipsis: Boolean = false,
+)
+
+/** 统一行展示规格(presentation 单一数据出口;V43 T4 起 supporting = 字段行列表)。 */
 private data class RowPresentation(
     val icon: ImageVector,
     val accent: Color,
     val headline: String,
-    val meta: AnnotatedString,
-    val preview: String?,
+    val fields: List<RowField>,
     val badges: List<RowBadge>,
     /** 尾栏秒级时间(V27 契约保留:与组头同源口径,由行装配层格式化)。 */
     val timestamp: Long,
@@ -214,6 +266,53 @@ private data class RowBadge(
     val text: String,
     val accent: Color? = null,
 )
+
+/** 字段行渲染(V43 T4:单一 Text 节点 = 单参数;标签与值经 SpanStyle 分层)。 */
+@Composable
+private fun FieldText(field: RowField) {
+    val body = MaterialTheme.colorScheme.onSurfaceVariant
+    val monoFamily = FontFamily.Monospace
+    when {
+        field.middleEllipsis -> MiddleEllipsisText(
+            text = field.value,
+            color = body,
+            style =
+                MaterialTheme.typography.bodySmall.copy(
+                    fontFamily = if (field.mono) monoFamily else FontFamily.Default,
+                ),
+        )
+
+        field.labelRes == null -> Text(
+            text = field.value,
+            style =
+                MaterialTheme.typography.labelMedium.copy(
+                    fontFamily = if (field.mono) monoFamily else FontFamily.Default,
+                ),
+            color = field.valueColor ?: body,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+
+        else -> {
+            val label = stringResource(field.labelRes)
+            Text(
+                text = buildAnnotatedString {
+                    withStyle(SpanStyle(color = body)) { append("$label ") }
+                    withStyle(
+                        SpanStyle(
+                            fontFamily = if (field.mono) monoFamily else FontFamily.Default,
+                            color = body,
+                        ),
+                    ) { append(field.value) }
+                },
+                style = MaterialTheme.typography.labelMedium,
+                color = body,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
 
 /**
  * leading 类别图标(V40 T5.3 内联,原 LeadingBadge 私有件):
@@ -240,21 +339,17 @@ private fun LeadingIcon(icon: ImageVector, tint: Color) {
 
 /**
  * 尾栏秒级时间(labelSmall onSurfaceVariant;12/24h 时制尊重系统设置,
- * 与时间线组头 [com.lioisme.modev.ui.common.TimelineGroup] 同口径)。
+ * 与时间线组头 [com.lioisme.modev.ui.common.TimelineGroup] 同口径同源实现)。
  * V27 回归修复:重构脚手架时误删,V20 契约「时间恒在行内右栏」恢复。
+ * V43 T5:经 [com.lioisme.modev.ui.common.formatSecond] 共享格式化器
+ * (旧实现每行槽位各持一个 SimpleDateFormat,深滚组合分配高)。
  */
 @Composable
 private fun TimeText(timestamp: Long) {
     val context = LocalContext.current
-    val format =
-        remember(context) {
-            SimpleDateFormat(
-                if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
-                Locale.getDefault(),
-            )
-        }
+    val is24h = remember(context) { DateFormat.is24HourFormat(context) }
     Text(
-        text = remember(timestamp, format) { format.format(Date(timestamp)) },
+        text = remember(timestamp, is24h) { formatSecond(timestamp, Locale.getDefault(), is24h) },
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
     )
@@ -279,73 +374,72 @@ private fun MicroBadge(badge: RowBadge) {
     }
 }
 
+/** 干预动作标记本地化(V43 T4/D-3:协议值 BLOCKED/DETECTED 不再以英文原样上屏)。 */
+@Composable
+private fun interventionActionLabel(action: String?): String? =
+    when (action?.uppercase(Locale.ROOT)) {
+        "BLOCKED" -> stringResource(R.string.record_action_blocked)
+        "DETECTED" -> stringResource(R.string.record_action_detected)
+        null -> null
+        else -> action
+    }
+
 // ---------------------------------------------------------------------------
-// 族形态:每族产出统一 [RowPresentation](组合期构建,remember 化防滚动重组)。
+// 族形态:每族产出统一 [RowPresentation](一行一参数字段列表,V43 T4)。
 // ---------------------------------------------------------------------------
 
-/** 算法形态。 */
+/** 算法形态(V43 T4):类别行 / 操作行 / 数据段行(密钥>别名>输出>输入,恒单段)。 */
 @Composable
 private fun cryptoPresentation(record: CryptoRow): RowPresentation {
     val r = record.record
     val accent = kindColor(r.kind)
     val kindText = stringResource(kindLabelRes(r.kind))
     val operationText = stringResource(operationLabelRes(r.operation))
-    val meta =
-        remember(r.kind, r.operation, kindText, operationText, accent) {
-            buildAnnotatedString {
-                withStyle(SpanStyle(color = accent)) { append(kindText) }
-                append(" · ")
-                append(operationText)
-            }
+    val dataPair = r.valuableDataPair()
+    val fields = buildList {
+        add(RowField(value = kindText, valueColor = accent))
+        add(RowField(labelRes = R.string.meta_operation, value = operationText))
+        dataPair?.let { (labelRes, value) ->
+            add(RowField(labelRes = labelRes, value = value, mono = true))
         }
+    }
     return RowPresentation(
         icon = KindIcons.crypto(r.kind, r.direction),
         accent = accent,
         headline = r.displayAlgorithm(),
-        meta = meta,
-        preview = r.valuableDataSnippet(),
+        fields = fields,
         badges = r.direction?.let { dir -> listOf(RowBadge(directionLabel(dir))) } ?: emptyList(),
         timestamp = r.timestamp,
     )
 }
 
-/** 数据库形态。 */
+/** 数据库形态(V43 T4):类别 / 操作 / 库名 / 行数 / 影响行各成行,SQL 预览中缀省略。 */
 @Composable
 private fun sqlPresentation(record: SqlRow): RowPresentation {
     val accent = sqlKindColor(record.kind)
-    val rowCountText =
-        record.rowCount?.let { pluralStringResource(R.plurals.record_data_rows_short, it, it) }
-    val affectedText =
-        record.affectedCount?.let { pluralStringResource(R.plurals.record_data_affected_short, it, it) }
-    val suffix =
-        when {
-            rowCountText != null && affectedText != null -> " ($rowCountText, $affectedText)"
-            rowCountText != null -> " ($rowCountText)"
-            affectedText != null -> " ($affectedText)"
-            else -> ""
-        }
-    val dbName = record.databaseName.orEmpty().takeIf { it.isNotBlank() }
     val kindText = stringResource(sqlKindLabelRes(record.kind))
     val operationText = stringResource(sqlOperationLabelRes(record.operation))
-    val meta =
-        remember(record.kind, record.operation, dbName, kindText, operationText, suffix, accent) {
-            buildAnnotatedString {
-                dbName?.let {
-                    append(it)
-                    append(" · ")
-                }
-                withStyle(SpanStyle(color = accent)) { append(kindText) }
-                append(" · ")
-                append(operationText)
-                append(suffix)
-            }
+    val fields = buildList {
+        add(RowField(value = kindText, valueColor = accent))
+        add(RowField(labelRes = R.string.meta_operation, value = operationText))
+        record.databaseName.orEmpty().takeIf { it.isNotBlank() }?.let {
+            add(RowField(labelRes = R.string.record_data_db, value = it, mono = true, middleEllipsis = true))
         }
+        record.rowCount?.let {
+            add(RowField(value = pluralStringResource(R.plurals.record_data_rows_short, it, it)))
+        }
+        record.affectedCount?.let {
+            add(RowField(value = pluralStringResource(R.plurals.record_data_affected_short, it, it)))
+        }
+        record.sqlPreview?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            add(RowField(value = it, mono = true, middleEllipsis = true))
+        }
+    }
     return RowPresentation(
         icon = KindIcons.sql(record.kind),
         accent = accent,
         headline = record.sqlHeadlineText(),
-        meta = meta,
-        preview = record.sqlPreview?.trim()?.takeIf { it.isNotEmpty() },
+        fields = fields,
         badges = emptyList(),
         timestamp = record.recordTimestamp,
     )
@@ -361,8 +455,8 @@ private fun SqlRow.sqlHeadlineText(): String {
 }
 
 /**
- * 行为形态(V27):headline = 文件 basename / 命令首段(空回退操作名,恒非空);
- * 元行 = 类别词元 · 操作 · 目标路径中缀省略;预览行 = 完整路径/命令。
+ * 行为形态(V27;V43 T4 拆行):类别 / 操作 / 主体(path 或 argv 中缀省略)/
+ * 重命名目标 / 文件大小各成行。
  */
 @Composable
 private fun behaviorPresentation(record: BehaviorRow): RowPresentation {
@@ -375,28 +469,31 @@ private fun behaviorPresentation(record: BehaviorRow): RowPresentation {
             record.command?.joinToString(" ")?.takeIf { it.isNotBlank() }
                 ?: record.path?.takeIf { it.isNotBlank() }
         }
-    val meta =
-        remember(record.kind, record.operation, kindText, operationText, accent) {
-            buildAnnotatedString {
-                withStyle(SpanStyle(color = accent)) { append(kindText) }
-                append(" · ")
-                append(operationText)
-            }
+    val fields = buildList {
+        add(RowField(value = kindText, valueColor = accent))
+        add(RowField(labelRes = R.string.meta_operation, value = operationText))
+        subject?.let {
+            add(RowField(value = it, mono = true, middleEllipsis = true))
         }
+        record.destPath?.takeIf { it.isNotBlank() }?.let {
+            add(RowField(labelRes = R.string.meta_dest_path, value = it, mono = true, middleEllipsis = true))
+        }
+        record.fileSize?.let {
+            add(RowField(labelRes = R.string.meta_file_size, value = StorageFormat.formatBytes(it)))
+        }
+    }
     return RowPresentation(
         icon = KindIcons.behavior(record.kind),
         accent = accent,
         headline = headline,
-        meta = meta,
-        preview = subject,
+        fields = fields,
         badges = emptyList(),
         timestamp = record.recordTimestamp,
     )
 }
 
 /**
- * 偏好形态(V28):headline = 配置键 / 文件 basename(空回退操作名,恒非空);
- * 元行 = 类别词元 · 操作;预览行 = 文件路径。
+ * 偏好形态(V28;V43 T4 拆行):类别 / 操作 / 配置文件路径各成行。
  */
 @Composable
 private fun prefsPresentation(record: PrefsRow): RowPresentation {
@@ -404,28 +501,26 @@ private fun prefsPresentation(record: PrefsRow): RowPresentation {
     val kindText = stringResource(prefsKindLabelRes(record.kind))
     val operationText = stringResource(prefsOperationLabelRes(record.operation))
     val headline = record.headlineText() ?: operationText
-    val meta =
-        remember(record.kind, record.operation, kindText, operationText, accent) {
-            buildAnnotatedString {
-                withStyle(SpanStyle(color = accent)) { append(kindText) }
-                append(" · ")
-                append(operationText)
-            }
+    val fields = buildList {
+        add(RowField(value = kindText, valueColor = accent))
+        add(RowField(labelRes = R.string.meta_operation, value = operationText))
+        record.path?.takeIf { it.isNotBlank() }?.let {
+            add(RowField(value = it, mono = true, middleEllipsis = true))
         }
+    }
     return RowPresentation(
         icon = KindIcons.prefs(record.kind),
         accent = accent,
         headline = headline,
-        meta = meta,
-        preview = record.path?.takeIf { it.isNotBlank() },
+        fields = fields,
         badges = emptyList(),
         timestamp = record.recordTimestamp,
     )
 }
 
 /**
- * WebView 形态(V29 一等公民):headline = 域名 / 操作名(空回退操作名,恒非空);
- * 元行 = 类别词元 · 操作;预览行 = URL/桥名。
+ * WebView 形态(V29;V43 T4 拆行):类别 / 操作 / 桥名 / URL 各成行,
+ * 桥名与 headline(域名/桥名回退)重复时不再渲染(V3.5 去重原则)。
  */
 @Composable
 private fun webviewPresentation(record: WebViewRow): RowPresentation {
@@ -433,24 +528,21 @@ private fun webviewPresentation(record: WebViewRow): RowPresentation {
     val kindText = stringResource(webviewKindLabelRes(record.kind))
     val operationText = stringResource(webviewOperationLabelRes(record.operation))
     val headline = record.headlineText() ?: operationText
-    val meta =
-        remember(record.kind, record.operation, kindText, operationText, accent) {
-            buildAnnotatedString {
-                withStyle(SpanStyle(color = accent)) { append(kindText) }
-                append(" · ")
-                append(operationText)
-            }
+    val fields = buildList {
+        add(RowField(value = kindText, valueColor = accent))
+        add(RowField(labelRes = R.string.meta_operation, value = operationText))
+        record.bridgeName?.takeIf { it.isNotBlank() && it != headline }?.let {
+            add(RowField(labelRes = R.string.meta_bridge, value = it, mono = true))
         }
-    val preview = remember(record.url, record.bridgeName) {
-        record.bridgeName?.takeIf { it.isNotBlank() }
-            ?: record.url?.takeIf { it.isNotBlank() }
+        record.url?.takeIf { it.isNotBlank() && it != headline }?.let {
+            add(RowField(labelRes = R.string.meta_url, value = it, mono = true, middleEllipsis = true))
+        }
     }
     return RowPresentation(
         icon = KindIcons.webview(record.kind),
         accent = accent,
         headline = headline,
-        meta = meta,
-        preview = preview,
+        fields = fields,
         badges = emptyList(),
         timestamp = record.recordTimestamp,
     )
@@ -505,14 +597,6 @@ fun CryptoRecord.copySummary(context: Context): String {
     }
 }
 
-/**
- * 最有价值数据段(单段展示不堆叠,优先级 密钥 > 别名 > 输出 > 输入):
- * 列表行只留「最重要的一段数据」(包名/线程为噪音,详情页承担全量)。
- */
-@Composable
-private fun CryptoRecord.valuableDataSnippet(): String? =
-    valuableDataPair()?.let { (labelRes, value) -> stringResource(labelRes) + " " + value }
-
 /** 类别显示名资源(筛选菜单 / 详情页元数据共用)。 */
 @StringRes
 fun kindLabelRes(kind: CryptoKind): Int = when (kind) {
@@ -530,7 +614,7 @@ fun kindLabelRes(kind: CryptoKind): Int = when (kind) {
     CryptoKind.WEB_CRYPTO -> R.string.kind_webview
 }
 
-/** 操作标签资源(2026-08-16 V3 起走资源,消除硬编码英文;i18n 双语言)。 */
+/** 操作标签资源(2026-08-16 V3 起走资源,消除硬编码英文;i18n 四语)。 */
 @StringRes
 fun operationLabelRes(operation: CryptoOperation): Int = when (operation) {
     CryptoOperation.GET_INSTANCE -> R.string.op_get_instance
@@ -581,19 +665,27 @@ fun directionLabel(direction: Int): String =
 fun directionLabel(context: Context, direction: Int): String =
     directionLabelRes(direction)?.let { context.getString(it) } ?: context.getString(R.string.dir_mode, direction)
 
-/** 行最小高度(V27 密度规范)。 */
+/** 行最小高度(V27 密度规范;V43 T4 一行一参数后行数增长,容器自适应)。 */
 private val MIN_ROW_HEIGHT: Dp = 68.dp
+
+/**
+ * 行锚点 testTag —— 由本组件自持(V46:必须挂在 ListItem 合并语义节点上,
+ * 宿主只传布局用 modifier,禁再自带同名 tag 造成双节点)。
+ */
+const val ROW_TEST_TAG = "record-row"
 
 /** leading 徽章边长。 */
 private const val BADGE_SIZE = 36
 
-/** 徽章容器/微徽章淡底透明度。 */
-
-/** 行内元素间距。 */
-private const val SPACING = 12
-
-/** 元行来源语境与应用内原词元的分隔(V40 T4)。 */
-private const val SEPARATOR = " · "
+/**
+ * 干预动作本地化(非组合,供摘要路径;BLOCKED/DETECTED 协议值映射资源,D-3)。
+ */
+fun interventionActionLabel(context: Context, action: String?): String? =
+    when (action?.uppercase(Locale.ROOT)) {
+        "BLOCKED" -> context.getString(R.string.record_action_blocked)
+        "DETECTED" -> context.getString(R.string.record_action_detected)
+        else -> action
+    }
 
 // ---------------------------------------------------------------------------
 // WebView 标签资源(V29 一等公民)
@@ -630,7 +722,7 @@ fun webviewOperationLabelRes(operation: WebViewOperation): Int = when (operation
     WebViewOperation.JS_GENERATE_KEY -> R.string.op_wv_js_generate_key
 }
 
-/** WebView 记录摘要文本(列表行长按复制)。 */
+/** WebView 记录摘要文本(列表行长按复制;V43 T4:桥名行走 meta_bridge 资源)。 */
 fun webviewSummary(context: Context, record: WebViewRow): String {
     val time = SimpleDateFormat(
         if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
@@ -641,7 +733,9 @@ fun webviewSummary(context: Context, record: WebViewRow): String {
         append('\n')
         append(context.getString(webviewOperationLabelRes(record.operation)))
         record.url?.let { append('\n').append(it) }
-        record.bridgeName?.let { append('\n').append("bridge: ").append(it) }
+        record.bridgeName?.let {
+            append('\n').append(context.getString(R.string.meta_bridge)).append(' ').append(it)
+        }
         append('\n').append(time)
         append('\n').append(record.packageName)
     }
@@ -655,31 +749,37 @@ private fun networkPresentation(record: NetworkRow): RowPresentation {
     val kindText = stringResource(networkKindLabelRes(record.kind))
     val operationText = stringResource(networkOperationLabelRes(record.operation))
     val headline = record.headlineText() ?: operationText
-    val meta = remember(record.kind, record.operation, kindText, operationText, accent) {
-        buildAnnotatedString {
-            withStyle(SpanStyle(color = accent)) { append(kindText) }
-            append(" · ")
-            append(operationText)
+    val vpnDetected = stringResource(R.string.record_action_detected)
+    val vpnNone = stringResource(R.string.record_value_no)
+    val fields = buildList {
+        add(RowField(value = kindText, valueColor = accent))
+        add(RowField(labelRes = R.string.meta_operation, value = operationText))
+        record.url?.takeIf { it.isNotBlank() }?.let {
+            add(RowField(labelRes = R.string.meta_url, value = it, mono = true, middleEllipsis = true))
         }
-    }
-    val preview = remember(record.url, record.method, record.statusCode, record.proxyHost, record.vpnActive) {
-        when (record.kind) {
-            NetworkKind.REQUEST -> record.url?.takeIf { it.isNotBlank() }
-            NetworkKind.PROXY_SYSTEM_PROP, NetworkKind.PROXY_CONNECTIVITY,
-            NetworkKind.PROXY_SETTINGS, NetworkKind.PROXY_OKHTTP ->
-                record.proxyHost?.takeIf { it.isNotBlank() }
-            NetworkKind.VPN_CAPABILITIES, NetworkKind.VPN_INTERFACE,
-            NetworkKind.VPN_NETWORK_INFO, NetworkKind.VPN_LINK_PROPERTIES ->
-                if (record.vpnActive == true) "VPN active" else null
-            else -> null
+        record.method?.takeIf { it.isNotBlank() }?.let {
+            add(RowField(labelRes = R.string.meta_method, value = it))
+        }
+        record.statusCode?.let {
+            add(RowField(labelRes = R.string.meta_status_code, value = it.toString()))
+        }
+        record.proxyHost?.takeIf { it.isNotBlank() }?.let {
+            add(RowField(labelRes = R.string.meta_proxy, value = it, mono = true, middleEllipsis = true))
+        }
+        record.vpnActive?.let { active ->
+            add(
+                RowField(
+                    labelRes = R.string.meta_vpn,
+                    value = if (active) vpnDetected else vpnNone,
+                ),
+            )
         }
     }
     return RowPresentation(
         icon = KindIcons.network(record.kind),
         accent = accent,
         headline = headline,
-        meta = meta,
-        preview = preview,
+        fields = fields,
         badges = emptyList(),
         timestamp = record.recordTimestamp,
     )
@@ -691,24 +791,18 @@ private fun deviceEnvPresentation(record: DeviceEnvRow): RowPresentation {
     val kindText = stringResource(deviceEnvKindLabelRes(record.kind))
     val operationText = stringResource(deviceEnvOperationLabelRes(record.operation))
     val headline = record.headlineText() ?: operationText
-    val meta = remember(record.kind, record.operation, kindText, operationText, accent) {
-        buildAnnotatedString {
-            withStyle(SpanStyle(color = accent)) { append(kindText) }
-            append(" · ")
-            append(operationText)
+    val fields = buildList {
+        add(RowField(value = kindText, valueColor = accent))
+        add(RowField(labelRes = R.string.meta_operation, value = operationText))
+        interventionActionLabel(record.interventionAction)?.let {
+            add(RowField(value = it, valueColor = accent))
         }
-    }
-    val preview = remember(record.targetPath, record.targetClass, record.targetProperty) {
-        record.targetPath?.takeIf { it.isNotBlank() }
-            ?: record.targetClass?.takeIf { it.isNotBlank() }
-            ?: record.targetProperty?.takeIf { it.isNotBlank() }
     }
     return RowPresentation(
         icon = KindIcons.deviceEnv(record.kind),
         accent = accent,
         headline = headline,
-        meta = meta,
-        preview = preview,
+        fields = fields,
         badges = emptyList(),
         timestamp = record.recordTimestamp,
     )
@@ -720,24 +814,25 @@ private fun uiInteractionPresentation(record: UiInteractionRow): RowPresentation
     val kindText = stringResource(uiInteractionKindLabelRes(record.kind))
     val operationText = stringResource(uiInteractionOperationLabelRes(record.operation))
     val headline = record.headlineText() ?: operationText
-    val meta = remember(record.kind, record.operation, kindText, operationText, accent) {
-        buildAnnotatedString {
-            withStyle(SpanStyle(color = accent)) { append(kindText) }
-            append(" · ")
-            append(operationText)
+    // 主体值三选一与 headline 去重(V3.5 原则):headline 已承担的不再上屏
+    val subject =
+        remember(record.dialogTitle, record.dialogMessage, record.widgetText, record.activityName, headline) {
+            sequenceOf(record.dialogTitle, record.dialogMessage, record.widgetText, record.activityName)
+                .mapNotNull { it?.takeIf { v -> v.isNotBlank() } }
+                .firstOrNull { it != headline }
         }
-    }
-    val preview = remember(record.dialogTitle, record.dialogMessage, record.widgetText, record.activityName) {
-        record.dialogTitle?.takeIf { it.isNotBlank() }
-            ?: record.activityName?.takeIf { it.isNotBlank() }?.substringAfterLast('.')
-            ?: record.widgetText?.takeIf { it.isNotBlank() }
+    val fields = buildList {
+        add(RowField(value = kindText, valueColor = accent))
+        add(RowField(labelRes = R.string.meta_operation, value = operationText))
+        subject?.let {
+            add(RowField(value = it.take(80), middleEllipsis = true))
+        }
     }
     return RowPresentation(
         icon = KindIcons.uiInteraction(record.kind),
         accent = accent,
         headline = headline,
-        meta = meta,
-        preview = preview,
+        fields = fields,
         badges = emptyList(),
         timestamp = record.recordTimestamp,
     )
@@ -749,23 +844,27 @@ private fun systemPresentation(record: SystemRow): RowPresentation {
     val kindText = stringResource(systemKindLabelRes(record.kind))
     val operationText = stringResource(systemOperationLabelRes(record.operation))
     val headline = record.headlineText() ?: operationText
-    val meta = remember(record.kind, record.operation, kindText, operationText, accent) {
-        buildAnnotatedString {
-            withStyle(SpanStyle(color = accent)) { append(kindText) }
-            append(" · ")
-            append(operationText)
+    val hashSnippet = record.signatureHash?.takeIf { it.isNotBlank() }?.take(16)?.let { "$it…" }
+    // V43 T4(V3.5 去重):headline 已承担的 tag/hash 不再重复上屏;
+    // logcat level/message 恢复呈现(旧行模型零展示)
+    val fields = buildList {
+        add(RowField(value = kindText, valueColor = accent))
+        add(RowField(labelRes = R.string.meta_operation, value = operationText))
+        record.logcatLevel?.takeIf { it.isNotBlank() }?.let {
+            add(RowField(value = it))
         }
-    }
-    val preview = remember(record.logcatTag, record.logcatMessage, record.signatureHash) {
-        record.logcatTag?.takeIf { it.isNotBlank() }?.let { "[$it]" }
-            ?: record.signatureHash?.takeIf { it.isNotBlank() }?.take(16)?.let { "$it…" }
+        record.logcatMessage?.takeIf { it.isNotBlank() }?.let {
+            add(RowField(value = it, middleEllipsis = true))
+        }
+        hashSnippet?.takeIf { it != headline }?.let {
+            add(RowField(value = it, mono = true))
+        }
     }
     return RowPresentation(
         icon = KindIcons.system(record.kind),
         accent = accent,
         headline = headline,
-        meta = meta,
-        preview = preview,
+        fields = fields,
         badges = emptyList(),
         timestamp = record.recordTimestamp,
     )
@@ -776,27 +875,31 @@ private fun processPresentation(record: ProcessRow): RowPresentation {
     val accent = processKindColor(record.kind)
     val kindText = stringResource(processKindLabelRes(record.kind))
     val operationText = stringResource(processOperationLabelRes(record.operation))
-    val headline = record.headlineText() ?: operationText
-    val meta = remember(record.kind, record.operation, kindText, operationText, accent) {
-        buildAnnotatedString {
-            withStyle(SpanStyle(color = accent)) { append(kindText) }
-            append(" · ")
-            append(operationText)
-        }
-    }
-    val preview = remember(record.exitCode, record.processPid, record.crashType, record.interventionAction) {
+    // V43 T4/D-3:headline 身份 = 操作名(资源);退出码/pid 拆独立参数行
+    // (旧 `"exit=X pid=Y"` 双参数一行 + 英文前缀,V3.3 违规清除)
+    val fields = buildList {
+        add(RowField(value = kindText, valueColor = accent))
+        add(RowField(labelRes = R.string.meta_operation, value = operationText))
         when (record.kind) {
-            ProcessKind.EXIT_INTERCEPT -> "exit=${record.exitCode ?: "?"} pid=${record.processPid ?: "?"}"
-            ProcessKind.CRASH_PREVENT -> record.crashType?.takeIf { it.isNotBlank() }?.substringAfterLast('.')
-            ProcessKind.SCREEN_RECORD -> record.interventionAction?.lowercase() ?: "detected"
+            ProcessKind.EXIT_INTERCEPT -> {
+                record.exitCode?.let { add(RowField(labelRes = R.string.meta_exit_code, value = it.toString())) }
+                record.processPid?.let { add(RowField(labelRes = R.string.meta_pid, value = it.toString())) }
+            }
+
+            ProcessKind.CRASH_PREVENT -> record.crashType?.takeIf { it.isNotBlank() }
+                ?.let { add(RowField(value = it.substringAfterLast('.'), mono = true, middleEllipsis = true)) }
+
+            ProcessKind.SCREEN_RECORD -> Unit
+        }
+        interventionActionLabel(record.interventionAction)?.let {
+            add(RowField(value = it, valueColor = accent))
         }
     }
     return RowPresentation(
         icon = KindIcons.process(record.kind),
         accent = accent,
-        headline = headline,
-        meta = meta,
-        preview = preview,
+        headline = operationText,
+        fields = fields,
         badges = emptyList(),
         timestamp = record.recordTimestamp,
     )
@@ -851,7 +954,7 @@ fun networkOperationLabelRes(operation: NetworkOperation): Int = when (operation
     NetworkOperation.REQUEST_END -> R.string.op_net_request_end
 }
 
-/** 网络记录摘要文本(列表行长按复制)。 */
+/** 网络记录摘要文本(列表行长按复制;V43 T4:状态/代理/VPN 行走资源)。 */
 fun networkSummary(context: Context, record: NetworkRow): String {
     val time = SimpleDateFormat(
         if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
@@ -863,9 +966,20 @@ fun networkSummary(context: Context, record: NetworkRow): String {
         append(context.getString(networkOperationLabelRes(record.operation)))
         record.url?.let { append('\n').append(it) }
         record.method?.let { append('\n').append(it) }
-        record.statusCode?.let { append('\n').append("HTTP $it") }
-        record.proxyHost?.let { append('\n').append("proxy: $it") }
-        record.vpnActive?.let { append('\n').append("VPN: $it") }
+        record.statusCode?.let {
+            append('\n').append(context.getString(R.string.meta_status_code)).append(' ').append(it)
+        }
+        record.proxyHost?.let {
+            append('\n').append(context.getString(R.string.meta_proxy)).append(' ').append(it)
+        }
+        record.vpnActive?.let { active ->
+            append('\n').append(context.getString(R.string.meta_vpn)).append(' ')
+            append(
+                context.getString(
+                    if (active) R.string.record_action_detected else R.string.record_value_no,
+                ),
+            )
+        }
         append('\n').append(time)
         append('\n').append(record.packageName)
     }
@@ -1093,7 +1207,7 @@ fun processOperationLabelRes(op: ProcessOperation): Int = when (op) {
     ProcessOperation.MEDIA_PROJECTION -> R.string.op_process_block
 }
 
-/** 进程控制记录摘要文本(V33)。 */
+/** 进程控制记录摘要文本(V33;V43 T4:exit/pid/状态行全走资源)。 */
 fun processControlSummary(context: Context, record: ProcessRow): String {
     val time = SimpleDateFormat(
         if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
@@ -1103,12 +1217,24 @@ fun processControlSummary(context: Context, record: ProcessRow): String {
         append(context.getString(processKindLabelRes(record.kind)))
         append('\n')
         append(context.getString(processOperationLabelRes(record.operation)))
-        record.exitCode?.let { v -> append('\n').append("exit=$v") }
-        record.processPid?.let { v -> append('\n').append("pid=$v") }
+        record.exitCode?.let { v ->
+            append('\n').append(context.getString(R.string.meta_exit_code)).append(' ').append(v)
+        }
+        record.processPid?.let { v ->
+            append('\n').append(context.getString(R.string.meta_pid)).append(' ').append(v)
+        }
         record.crashType?.let { v -> append('\n').append(v.substringAfterLast('.')) }
-        record.interventionAction?.let { v -> append('\n').append(v.lowercase()) }
-        record.crashBlocked?.let { v -> append('\n').append(if (v == 1) "blocked" else "detected") }
-        record.screenRecordBlocked?.let { v -> append('\n').append("screen=${if (v == 1) "blocked" else "detected"}") }
+        interventionActionLabel(context, record.interventionAction)?.let { v ->
+            append('\n').append(v)
+        }
+        record.crashBlocked?.let { v ->
+            append('\n')
+                .append(context.getString(if (v == 1) R.string.record_action_blocked else R.string.record_action_detected))
+        }
+        record.screenRecordBlocked?.let { v ->
+            append('\n').append(context.getString(R.string.kind_process_SCREEN_RECORD)).append(' ')
+            append(context.getString(if (v == 1) R.string.record_action_blocked else R.string.record_action_detected))
+        }
         append('\n').append(record.threadName)
         append('\n').append(time)
         append('\n').append(record.packageName)

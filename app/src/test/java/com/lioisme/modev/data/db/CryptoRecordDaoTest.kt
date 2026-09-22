@@ -1,6 +1,8 @@
 package com.lioisme.modev.data.db
 
 import androidx.paging.PagingSource
+import com.lioisme.modev.domain.record.RecordFilter
+import com.lioisme.modev.domain.record.SortOrder
 import androidx.room.Room
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.first
@@ -64,8 +66,8 @@ class CryptoRecordDaoTest {
         // recordType = null 不过滤(跨类型合计)
         assertEquals(2, page().size)
         // 按类型过滤:仅 crypto
-        assertEquals(1, page(recordType = "crypto").size)
-        assertEquals("cipher", page(recordType = "crypto").single().kind)
+        assertEquals(1, page(recordTypes = setOf("crypto")).size)
+        assertEquals("cipher", page(recordTypes = setOf("crypto")).single().kind)
     }
 
     @Test
@@ -74,7 +76,7 @@ class CryptoRecordDaoTest {
         dao.insert(entity("pkg.a", "digest", "op2", "SHA-256", 2).copy(recordType = "database"))
 
         assertEquals(1L, dao.counts("crypto").single().count)
-        assertEquals(listOf("pkg.a"), dao.observePackages("crypto").first())
+        assertEquals(listOf("pkg.a"), dao.packagesOver(0).map { it.packageName }.sorted())
         // null = 不过滤
         assertEquals(2L, dao.counts(null).single().count)
         assertEquals(1L, dao.observeRecordCounts("crypto").first().single().count)
@@ -87,58 +89,143 @@ class CryptoRecordDaoTest {
         val dbId = dao.insertReturningId(entity("pkg.a", "cipher", "op3", "AES", 300).copy(recordType = "database"))
 
         // crypto 视角:op2 之后无更近的 crypto 记录(database 记录不可见)
-        assertNull(dao.neighborIdNewerThan("crypto", "pkg.a", 200, cryptoId))
+        assertNull(neighbor("crypto", "pkg.a", 200, cryptoId, newer = true))
         // 不过滤视角:database 记录就是更新的邻居
-        assertEquals(dbId, dao.neighborIdNewerThan(null, "pkg.a", 200, cryptoId))
+        assertEquals(dbId, neighbor(null, "pkg.a", 200, cryptoId, newer = true))
         // 更旧方向:两种视角都回到 op1
-        assertEquals(op1Id, dao.neighborIdOlderThan("crypto", "pkg.a", 200, cryptoId))
+        assertEquals(op1Id, neighbor("crypto", "pkg.a", 200, cryptoId, newer = false))
     }
 
+    /**
+     * PagingSource 执行位的窗口上限(= 生产 `LogRepository.PAGING_WINDOW_CAP` 同义:
+     * Room 生成式计数会按 SQL 自带 LIMIT 钳制 itemCount,传小 limit 会死锁于第一页,
+     * AGENTS #14 / V20 R3.1 实锤)。
+     */
+    private val PAGING_TEST_WINDOW = 20_000
+
+    /**
+     * 对账(UI 路径 vs MCP 路径,V45 T1.1):同一 filter 经 `pagedRows`(PagingSource)
+     * 与 `sliceRows`(切片)必须返回同一批行与同一顺序——「双端同一查询核心」的执行位证据。
+     */
+    @Test
+    fun pagingSourcePathAgreesWithSlice() = runBlocking {
+        for (i in 1..5) dao.insert(entity("pkg.a", "cipher", "op$i", "AES", i.toLong()))
+        dao.insert(entity("pkg.b", "mac", "other", "HmacSHA256", 6))
+
+        val filter = RecordFilter(packages = setOf("pkg.a"))
+        val viaPaging = paged(filter, loadSize = 5).map { it.id }
+        val viaSlice = rows(packages = setOf("pkg.a")).map { it.id }
+        assertEquals(viaSlice, viaPaging)
+        assertEquals(5, viaPaging.size)
+    }
+
+    /**
+     * 行加载助手(V45 T1.1:谓词唯一来源 = [RecordQueryFactory],执行位 = `@RawQuery`)。
+     *
+     * 旧助手承载「哨兵计数」契约(`typeCount = 0` 跳过该维),该契约已随哨兵 WHERE 片段
+     * 一并退役——现在**集合缺省(null)= 不过滤**,非空集合 = IN 多值,与
+     * [com.lioisme.modev.domain.record.RecordFilter] 声明语义逐字一致;
+     * `query` 传**裸关键字**(LIKE 模式与转义由生成器负责,调用方不再拼 `%`)。
+     * 默认走切片执行位(LIMIT/OFFSET 直白);PagingSource 执行位由
+     * [pagingSourcePathAgreesWithSlice] 专门对账(UI 路径)。
+     */
     private suspend fun page(
-        recordType: String? = null,
-        packageName: String? = null,
-        kind: String? = null,
+        recordTypes: Set<String>? = null,
+        packages: Set<String>? = null,
+        kinds: Set<String>? = null,
+        operations: Set<String>? = null,
         query: String? = null,
         limit: Int = 20,
         offset: Int = 0,
-    ): List<CryptoRecordEntity> {
-        val source: PagingSource<Int, CryptoRecordEntity> =
-            dao.observePaged(recordType, packageName, kind, query, limit, offset)
-        val result = source.load(
-            PagingSource.LoadParams.Refresh(key = null, loadSize = limit, placeholdersEnabled = false),
-        )
-        return (result as PagingSource.LoadResult.Page).data
-    }
+        sort: SortOrder = SortOrder.DESC,
+    ): List<CryptoRecordRow> = rows(
+        recordTypes = recordTypes,
+        packages = packages,
+        kinds = kinds,
+        operations = operations,
+        query = query,
+        limit = limit,
+        offset = offset,
+        sort = sort,
+    )
 
-    /** 集合过滤投影分页加载助手(哨兵语义:count=0 跳过该维过滤)。 */
-    private suspend fun pageByFilter(
-        recordTypes: List<String> = listOf(""),
-        packages: List<String> = listOf(""),
-        kinds: List<String> = listOf(""),
-        typeCount: Int = 0,
-        packageCount: Int = 0,
-        kindCount: Int = 0,
+    /** 切片执行位助手(MCP / 导出路径)。 */
+    private suspend fun rows(
+        recordTypes: Set<String>? = null,
+        packages: Set<String>? = null,
+        kinds: Set<String>? = null,
+        operations: Set<String>? = null,
         query: String? = null,
         limit: Int = 20,
         offset: Int = 0,
-    ): List<CryptoRecordRow> {
-        val source: PagingSource<Int, CryptoRecordRow> = dao.observePagedRowsByFilter(
-            recordTypes = recordTypes,
-            packages = packages,
-            kinds = kinds,
-            typeCount = typeCount,
-            packageCount = packageCount,
-            kindCount = kindCount,
-            query = query,
-            previewChars = 48,
+        sort: SortOrder = SortOrder.DESC,
+    ): List<CryptoRecordRow> = dao.sliceRows(
+        RecordQueryFactory.rows(
+            filterOf(recordTypes, packages, kinds, operations, query, sort),
             limit = limit,
             offset = offset,
+            previewChars = 48,
+        ),
+    )
+
+    /** PagingSource 执行位助手(UI 路径;窗口上限同生产 `PAGING_WINDOW_CAP` 语义)。 */
+    private suspend fun paged(
+        filter: RecordFilter,
+        loadSize: Int = 20,
+    ): List<CryptoRecordRow> {
+        val source = dao.pagedRows(
+            RecordQueryFactory.rows(filter, limit = PAGING_TEST_WINDOW, offset = 0, previewChars = 48),
         )
         val result = source.load(
-            PagingSource.LoadParams.Refresh(key = null, loadSize = limit, placeholdersEnabled = false),
+            PagingSource.LoadParams.Refresh(key = null, loadSize = loadSize, placeholdersEnabled = false),
         )
         return (result as PagingSource.LoadResult.Page).data
     }
+
+    /** 计数执行位助手。 */
+    private suspend fun countOf(
+        recordTypes: Set<String>? = null,
+        packages: Set<String>? = null,
+        kinds: Set<String>? = null,
+        query: String? = null,
+    ): Long = dao.countByQuery(
+        RecordQueryFactory.count(filterOf(recordTypes, packages, kinds, null, query, SortOrder.DESC)),
+    ).first()
+
+    /** 邻接 id 执行位助手([newer] = true 取更新、false 取更旧)。 */
+    private suspend fun neighbor(
+        recordType: String?,
+        packageName: String,
+        ts: Long,
+        id: Long,
+        newer: Boolean,
+    ): Long? = dao.neighborIdByQuery(
+        RecordQueryFactory.neighborId(
+            filter = RecordFilter(
+                recordTypes = recordType?.let { setOf(it) },
+                packages = setOf(packageName),
+            ),
+            ts = ts,
+            id = id,
+            newer = newer,
+        ),
+    )
+
+    private fun filterOf(
+        recordTypes: Set<String>?,
+        packages: Set<String>?,
+        kinds: Set<String>?,
+        operations: Set<String>?,
+        query: String?,
+        sort: SortOrder,
+    ) = RecordFilter(
+        recordTypes = recordTypes,
+        packages = packages,
+        kinds = kinds,
+        operations = operations,
+        query = query,
+        sort = sort,
+    )
 
     @Test
     fun `paged query orders by timestamp desc then id desc`() = runBlocking {
@@ -161,10 +248,10 @@ class CryptoRecordDaoTest {
         dao.insert(entity("pkg.b", "cipher", "encrypt", "AES", 200))
         dao.insert(entity("pkg.a", "digest", "digest", "SHA-256", 300))
 
-        assertEquals(2, page(packageName = "pkg.a").size)
-        assertEquals(1, page(packageName = "pkg.b").size)
-        assertEquals(1, page(packageName = "pkg.a", kind = "digest").size)
-        assertEquals(0, page(packageName = "pkg.a", kind = "mac").size)
+        assertEquals(2, page(packages = setOf("pkg.a")).size)
+        assertEquals(1, page(packages = setOf("pkg.b")).size)
+        assertEquals(1, page(packages = setOf("pkg.a"), kinds = setOf("digest")).size)
+        assertEquals(0, page(packages = setOf("pkg.a"), kinds = setOf("mac")).size)
     }
 
     @Test
@@ -173,9 +260,11 @@ class CryptoRecordDaoTest {
         dao.insert(entity("pkg.a", "cipher", "decrypt", "AES/ECB", 200))
         dao.insert(entity("pkg.a", "digest", "digest", "SHA-256", 300))
 
-        assertEquals(1, page(query = "%CBC%").size)
-        assertEquals(1, page(query = "%decrypt%").size)
-        assertEquals(0, page(query = "%HmacSHA1%").size)
+        assertEquals(1, page(query = "CBC").size)
+        assertEquals(1, page(query = "decrypt").size)
+        assertEquals(0, page(query = "HmacSHA1").size)
+        // 生成器负责转义:字面 % 不得被当作通配符
+        assertEquals(0, page(query = "CBC%25").size)
     }
 
     @Test
@@ -202,44 +291,41 @@ class CryptoRecordDaoTest {
     }
 
     @Test
-    fun `paged rows by filter supports IN collections and sentinel skip`() = runBlocking {
+    fun `paged rows by filter supports IN collections and dimension skip`() = runBlocking {
         dao.insert(entity("pkg.a", "cipher", "encrypt", "AES", 100))
         dao.insert(entity("pkg.a", "digest", "digest", "SHA-256", 200).copy(recordType = "database"))
         dao.insert(entity("pkg.b", "mac", "mac", "HmacSHA256", 300))
 
-        // 哨兵全跳过 = 不过滤(全部 3 条)
-        assertEquals(3, pageByFilter().size)
+        // 维度全缺省 = 不过滤(全部 3 条;谓词里根本不出这些列)
+        assertEquals(3, page().size)
         // 类型 IN 多值
-        assertEquals(2, pageByFilter(recordTypes = listOf("crypto"), typeCount = 1).size)
+        assertEquals(2, page(recordTypes = setOf("crypto")).size)
         assertEquals(
             3,
-            pageByFilter(recordTypes = listOf("crypto", "database"), typeCount = 2).size,
+            page(recordTypes = setOf("crypto", "database")).size,
         )
         // 包 IN 多值(pkg.a 两行 + pkg.b 一行 = 3)
         assertEquals(
             3,
-            pageByFilter(packages = listOf("pkg.a", "pkg.b"), packageCount = 2).size,
+            page(packages = setOf("pkg.a", "pkg.b")).size,
         )
-        assertEquals(2, pageByFilter(packages = listOf("pkg.a"), packageCount = 1).size)
+        assertEquals(2, page(packages = setOf("pkg.a")).size)
         // 类别 IN
-        assertEquals(1, pageByFilter(kinds = listOf("mac"), kindCount = 1).size)
+        assertEquals(1, page(kinds = setOf("mac")).size)
         // 组合过滤
         assertEquals(
             1,
-            pageByFilter(
-                recordTypes = listOf("database"),
-                packages = listOf("pkg.a"),
-                typeCount = 1,
-                packageCount = 1,
+            page(
+                recordTypes = setOf("database"),
+                packages = setOf("pkg.a"),
             ).size,
         )
-        // 关键字与哨兵维度共存
+        // 关键字与已启用维度共存(关键字走生成器转义的 LIKE)
         assertEquals(
             1,
-            pageByFilter(
-                packages = listOf("pkg.a"),
-                packageCount = 1,
-                query = "%SHA%",
+            page(
+                packages = setOf("pkg.a"),
+                query = "SHA",
             ).size,
         )
     }
@@ -250,10 +336,10 @@ class CryptoRecordDaoTest {
         dao.insert(entity("pkg.a", "digest", "digest", "SHA-256", 200).copy(recordType = "database"))
         dao.insert(entity("pkg.b", "mac", "mac", "HmacSHA256", 300))
 
-        assertEquals(3L, dao.observeCountByFilter(listOf(""), listOf(""), listOf(""), 0, 0, 0, null).first())
-        assertEquals(2L, dao.observeCountByFilter(listOf("crypto"), listOf(""), listOf(""), 1, 0, 0, null).first())
-        assertEquals(3L, dao.observeCountByFilter(listOf(""), listOf("pkg.a", "pkg.b"), listOf(""), 0, 2, 0, null).first())
-        assertEquals(1L, dao.observeCountByFilter(listOf(""), listOf(""), listOf("mac"), 0, 0, 1, "%Hmac%").first())
+        assertEquals(3L, countOf())
+        assertEquals(2L, countOf(recordTypes = setOf("crypto")))
+        assertEquals(3L, countOf(packages = setOf("pkg.a", "pkg.b")))
+        assertEquals(1L, countOf(kinds = setOf("mac"), query = "Hmac"))
     }
 
     @Test
@@ -276,15 +362,15 @@ class CryptoRecordDaoTest {
         val newerId = dao.insertReturningId(entity("pkg.a", "cipher", "op3", "AES", 300))
         dao.insert(entity("pkg.b", "cipher", "opx", "AES", 100))
 
-        val older = dao.neighborIdOlderThan(null, "pkg.a", 300, mid)
-        val newer = dao.neighborIdNewerThan(null, "pkg.a", 100, mid)
+        val older = neighbor(null, "pkg.a", 300, mid, newer = false)
+        val newer = neighbor(null, "pkg.a", 100, mid, newer = true)
         // 仅投影 id:op3 的相邻上一条 = 同包最新更旧记录 op2
         assertEquals(mid, older)
         assertEquals(newerId, newer)
         // 与 op2 同时间戳时按 id 决胜:仅 op1 严格更旧
-        assertEquals(1L, dao.neighborIdOlderThan(null, "pkg.a", 100, mid))
+        assertEquals(1L, neighbor(null, "pkg.a", 100, mid, newer = false))
         // 邻居查询不跨包
-        assertNull(dao.neighborIdOlderThan(null, "pkg.b", 100, mid))
+        assertNull(neighbor(null, "pkg.b", 100, mid, newer = false))
     }
 
     @Test
@@ -298,12 +384,7 @@ class CryptoRecordDaoTest {
                 outputHex = bigHex,
             ),
         )
-        val source: PagingSource<Int, CryptoRecordRow> =
-            dao.observePagedRows(null, null, null, null, previewChars = 48, limit = 20, offset = 0)
-        val result = source.load(
-            PagingSource.LoadParams.Refresh(key = null, loadSize = 20, placeholdersEnabled = false),
-        )
-        val row = (result as PagingSource.LoadResult.Page).data.single()
+        val row = page().single()
         assertEquals(id, row.id)
         assertEquals("pkg.a", row.packageName)
         assertEquals("encrypt", row.operation)
@@ -320,17 +401,10 @@ class CryptoRecordDaoTest {
         dao.insert(entity("pkg.a", "digest", "digest", "SHA-256", 200))
         dao.insert(entity("pkg.b", "cipher", "encrypt", "AES", 300))
 
-        suspend fun pageRows(pkg: String?, kind: String?, query: String?): List<CryptoRecordRow> {
-            val source: PagingSource<Int, CryptoRecordRow> =
-                dao.observePagedRows(null, pkg, kind, query, previewChars = 48, limit = 20, offset = 0)
-            val result = source.load(
-                PagingSource.LoadParams.Refresh(key = null, loadSize = 20, placeholdersEnabled = false),
-            )
-            return (result as PagingSource.LoadResult.Page).data
-        }
-        assertEquals(2, pageRows("pkg.a", null, null).size)
-        assertEquals(1, pageRows("pkg.a", "digest", null).size)
-        assertEquals(1, pageRows(null, null, "%CBC%").size)
+        // 唯一投影语义面(observePagedRowsByFilter):过滤与排序同全查询一致。
+        assertEquals(2, page(packages = setOf("pkg.a")).size)
+        assertEquals(1, page(packages = setOf("pkg.a"), kinds = setOf("digest")).size)
+        assertEquals(1, page(query = "CBC").size)
     }
 
     @Test
@@ -340,6 +414,21 @@ class CryptoRecordDaoTest {
         assertNotNull(found)
         assertEquals("pkg.a", found?.packageName)
         assertNull(dao.observeById(id + 999).first())
+    }
+
+    /**
+     * V43 T7(V5.13):类型计数投影映射钉死——domain RecordTypeCount 去
+     * androidx.room.ColumnInfo 后,SQL 别名必须与属性名 `count` 对齐
+     * (Room 默认按属性名取列);本测试即别名漂移的运行时门禁。
+     */
+    @Test
+    fun `observe record type counts maps count alias`() = runBlocking {
+        dao.insert(entity("pkg.a", "cipher", "encrypt", "AES", 100))
+        dao.insert(entity("pkg.a", "digest", "digest", "SHA-256", 200))
+        dao.insert(entity("pkg.b", "cipher", "encrypt", "AES", 300).copy(recordType = "database"))
+
+        val counts = dao.observeRecordTypeCounts().first().associate { it.recordType to it.count }
+        assertEquals(mapOf("crypto" to 2L, "database" to 1L), counts)
     }
 
     @Test
@@ -381,7 +470,7 @@ class CryptoRecordDaoTest {
         dao.insertAll(listOf(original.copy(timestamp = 999L)))
 
         assertEquals(1, dao.count("pkg.a"))
-        assertEquals(999L, page(packageName = "pkg.a").single().timestamp)
+        assertEquals(999L, page(packages = setOf("pkg.a")).single().timestamp)
     }
 
     @Test
@@ -409,13 +498,28 @@ class CryptoRecordDaoTest {
         assertEquals(mapOf("pkg.a" to 2L, "pkg.b" to 1L), counts)
     }
 
+    /**
+     * V45 T1.6 截断点键与列表排序键同构:并列同戳必须按 id 定序精确保留 keep 条
+     * (旧 `id NOT IN (…LIMIT)` 天然精确,新形态若漏掉 `id <=` 即静默多留)。
+     */
+    @Test
+    fun `trim keeps exactly keep rows when timestamps tie`() = runBlocking {
+        (1..5).forEach { dao.insert(entity("pkg.a", "cipher", "op$it", "AES", 7L)) }
+        val before = page(packages = setOf("pkg.a")).map { it.id }
+        val deleted = dao.trim(keep = 2)
+        assertEquals(3, deleted)
+        assertEquals(2, dao.count("pkg.a"))
+        // 保留集 = 现排序键下的前 keep 行(与列表首屏同构)
+        assertEquals(before.take(2), page(packages = setOf("pkg.a")).map { it.id })
+    }
+
     @Test
     fun `global trim keeps newest and returns deleted count`() = runBlocking {
         for (i in 1..6) dao.insert(entity("pkg.a", "cipher", "op$i", "AES", i.toLong()))
         val deleted = dao.trim(keep = 2)
         assertEquals(4, deleted)
         assertEquals(2, dao.count("pkg.a"))
-        assertEquals(listOf(6L, 5L), page(packageName = "pkg.a").map { it.timestamp })
+        assertEquals(listOf(6L, 5L), page(packages = setOf("pkg.a")).map { it.timestamp })
     }
 
     @Test
@@ -426,7 +530,7 @@ class CryptoRecordDaoTest {
         assertEquals(2, deleted)
         assertEquals(2, dao.count("pkg.a"))
         assertEquals(1, dao.count("pkg.b"))
-        assertEquals(listOf(4L, 3L), page(packageName = "pkg.a").map { it.timestamp })
+        assertEquals(listOf(4L, 3L), page(packages = setOf("pkg.a")).map { it.timestamp })
     }
 
     @Test

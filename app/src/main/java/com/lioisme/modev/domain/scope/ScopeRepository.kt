@@ -40,6 +40,8 @@ class ScopeRepository(
     private val gateway: ScopeGateway,
     private val requestTimeoutMillis: Long = REQUEST_TIMEOUT_MILLIS,
     private val stateScope: CoroutineScope = repositoryScope,
+    /** V43 T7/V5.1:诊断日志出口由装配层注入(domain 保持纯 JVM)。 */
+    private val logger: (String) -> Unit = {},
 ) {
 
     private val refreshTrigger = MutableStateFlow(0)
@@ -160,14 +162,14 @@ class ScopeRepository(
     private suspend fun loadScope(service: ScopeService): ScopeState =
         try {
             val scope = service.getScope().toSet()
-            runCatching { android.util.Log.i("Modev", "scope loaded: $scope (${service.frameworkName} ${service.frameworkVersion})") }
+            runCatching { logger("scope loaded: $scope (${service.frameworkName} ${service.frameworkVersion})") }
             ScopeState.Ready(
                 frameworkName = service.frameworkName,
                 frameworkVersion = service.frameworkVersion,
                 scope = scope,
             )
         } catch (t: Throwable) {
-            runCatching { android.util.Log.w("Modev", "scope load failed: ${t.message}") }
+            runCatching { logger("scope load failed: ${t.message}") }
             ScopeState.Unavailable(
                 reason = ScopeState.UnavailableReason.SERVICE_ERROR,
                 message = t.message,

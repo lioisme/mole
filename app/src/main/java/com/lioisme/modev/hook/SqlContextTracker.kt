@@ -4,7 +4,6 @@ import com.lioisme.modev.core.model.SqlBindValue
 import com.lioisme.modev.core.model.SqlResultRow
 import java.util.Collections
 import java.util.HashMap
-import java.util.WeakHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -12,22 +11,24 @@ import java.util.concurrent.atomic.AtomicLong
  * 以对象实例为键关联数据库操作上下文,把 open → query/exec → close 串成同一
  * contextId 链路;游标/语句实例与所属 DB 实例关联。
  *
- * 四个弱引用映射 + 同步包装(镜像 [CryptoContextTracker] 模式,防泄漏):
+ * 五个弱引用映射(V44 T2.5 改条带化 [StripedWeakMap]):旧形态五张
+ * `synchronizedMap(WeakHashMap)` 各为全局单锁,全 SQL 事件串行化;条带化后
+ * 锁竞争降为 1/16,弱引用语义与防泄漏特征不变:
  * - DB 实例 → [SqlContext](path/name、事务深度与成功标记、journalMode);
  * - 游标实例 → [CursorBuffer](结果集被动采集缓冲 + 双闸门);
  * - 语句实例 → 绑定暂存表(实例键控,允许跨线程 bind → execute,ADR-7);
- * - 语句实例 → 所属 DB 实例(记录关联 DB contextId 与库名,ADR-7)。
+ * - 语句实例 → 所属 DB 实例(记录关联 DB contextId 与库名,ADR-7);
+ * - 语句实例 → SQL 文本。
  */
 object SqlContextTracker {
 
     private class Entry(val id: Long, val context: SqlContext)
 
-    private val dbEntries = Collections.synchronizedMap(WeakHashMap<Any, Entry>())
-    private val cursorBuffers = Collections.synchronizedMap(WeakHashMap<Any, CursorBuffer>())
-    private val statementBinds =
-        Collections.synchronizedMap(WeakHashMap<Any, MutableMap<Int, SqlBindValue>>())
-    private val statementDb = Collections.synchronizedMap(WeakHashMap<Any, Any>())
-    private val statementSql = Collections.synchronizedMap(WeakHashMap<Any, String>())
+    private val dbEntries = StripedWeakMap<Entry>()
+    private val cursorBuffers = StripedWeakMap<CursorBuffer>()
+    private val statementBinds = StripedWeakMap<MutableMap<Int, SqlBindValue>>()
+    private val statementDb = StripedWeakMap<Any>()
+    private val statementSql = StripedWeakMap<String>()
     private val idCounter = AtomicLong(1)
 
     /** DB 实例 → 上下文(自动注册并分配存活期唯一 ID)。 */

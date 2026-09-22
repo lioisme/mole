@@ -1,4 +1,4 @@
-package com.lioisme.modev.data.mapping
+package com.lioisme.modev.domain.record
 
 import androidx.compose.runtime.Immutable
 import com.lioisme.modev.core.model.BehaviorKind
@@ -308,12 +308,6 @@ data class ProcessRow(
 ) : RowModel {
     override val id: Long get() = recordId
     override val timestamp: Long get() = recordTimestamp
-
-    /** 列表 headline 单一事实源:退出码 / 异常类型 / 拦截标记 / 操作名;恒非空。 */
-    fun headlineText(): String? = when (kind) {
-        ProcessKind.EXIT_INTERCEPT -> "exit=${exitCode ?: "?"}"
-        ProcessKind.CRASH_PREVENT -> crashType?.takeIf { it.isNotBlank() }?.substringAfterLast('.')
-            ?: operation.name
-        ProcessKind.SCREEN_RECORD -> interventionAction?.lowercase() ?: "detected"
-    }
+    // V43 T4:进程行 headline 由 UI 侧以资源本地化承担(操作名 + 拆分参数行);
+    // 旧 headlineText() 硬编码英文("exit=…"/"detected")随 V3.3 违规一并清除。
 }

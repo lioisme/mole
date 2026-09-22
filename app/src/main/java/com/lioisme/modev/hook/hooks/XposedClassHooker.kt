@@ -2,98 +2,59 @@ package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.DeviceEnvOperation
-import com.lioisme.modev.hook.Invocation
-import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * Xposed 类存在性检测 Hooker(V34 增强):拦截 ClassLoader.loadClass /
- * BaseDexClassLoader.findClass,当检测到 Xposed 相关类被加载时,
- * 抛出 ClassNotFoundException 以隐藏 Xposed 框架的存在。
+ * Xposed 类存在性检测 Hooker(V43 T2/T3 重构):不再自持 loadClass/findClass 钩子,
+ * 改为 [com.lioisme.modev.hook.LoadClassWatcher] 单一监视器的干预型订阅者——
+ * 消除与 SSL/okhttp 惰性安装监视器的三处重复注册(Vector 首注册遮蔽,LSPosed 成倍回调)。
  *
- * 干预机制:检测到 Xposed 类名时,在 before() 中抛出 ClassNotFoundException,
- * 阻止类加载完成,使检测框架认为 Xposed 未安装。
+ * 干预机制(V43 T3/D-5 修正):检测到 Xposed 类名时经 [com.lioisme.modev.hook.Invocation.setThrowable]
+ * 以 ClassNotFoundException 短路加载(异常抵达调用方,原方法不执行)。
+ * 旧实现在回调内直接 throw——libxposed PROTECTIVE 与 legacy runSafely 都会吞掉回调异常并
+ * 照常执行原方法,拦截静默失效且记录误报 BLOCKED,双框架下均为假干预。
  *
- * 安全设计:使用 ThreadLocal 防止递归 hook(本 hook 自身触发的类加载不会被二次拦截)。
+ * 安全设计:ThreadLocal 防递归(本订阅者自身触发的类加载不被二次拦截);
+ * BLOCKED 记录仅在 setThrowable 短路真实生效后发出(观测面不再撒谎)。
  */
 class XposedClassHooker(
     context: ProbeContext,
 ) : DeviceEnvBaseHooker(context) {
 
+    private val watcher = context.loadClassWatcher
+
     private val loadingGuard = ThreadLocal<Boolean>()
 
     override fun install() {
-        hookLoadClass()
-        hookFindClass()
-        // D-17 回滚 D-12b:禁止钩取 Class.forName(String) —— 其语义依赖
-        // Reflection.getCallerClass(),LSPlant 桥帧替换调用方 → 应用侧单参
-        // forName 加载自身类全部 CNFE(androidx.startup/okhttp 启动即崩)。
-        // forName 探测面为已知覆盖缺口(Vector 原生解析绕过 Java 钩),接受。
-    }
-
-    private fun hookLoadClass() {
-        val method = runCatching {
-            ClassLoader::class.java.getMethod("loadClass", String::class.java)
-        }.getOrNull() ?: return
-        engine.hook(method, object : MethodHook() {
-            override fun before(invocation: Invocation) {
-                if (!featureOn(DeviceEnvKind.XPOSED_CLASS)) return
-                if (loadingGuard.get() == true) return
-                val name = invocation.getArg(0) as? String ?: return
-                if (isXposedClassName(name)) {
-                    // D-12 修复:记录必须先于抛出(after() 在异常路径永不执行)
-                    emit(
-                        kind = DeviceEnvKind.XPOSED_CLASS,
-                        operation = DeviceEnvOperation.LOAD_CLASS,
-                        originalValue = name,
-                        targetClass = name,
-                        interventionAction = ACTION_BLOCKED,
-                    )
-                    loadingGuard.set(true)
-                    try {
-                        throw ClassNotFoundException(
-                            "Xposed class not found: $name",
-                            Throwable().apply { stackTrace = emptyArray() },
-                        )
-                    } finally {
-                        loadingGuard.remove()
-                    }
-                }
+        watcher.interceptBefore { name, isFindClass, invocation ->
+            if (!featureOn(DeviceEnvKind.XPOSED_CLASS)) return@interceptBefore
+            if (loadingGuard.get() == true) return@interceptBefore
+            if (!isXposedClassName(name)) return@interceptBefore
+            emit(
+                kind = DeviceEnvKind.XPOSED_CLASS,
+                operation = if (isFindClass) {
+                    DeviceEnvOperation.FIND_CLASS
+                } else {
+                    DeviceEnvOperation.LOAD_CLASS
+                },
+                originalValue = name,
+                targetClass = name,
+                interventionAction = ACTION_BLOCKED,
+            )
+            // 短路生效后才可申报 BLOCKED:setThrowable 由框架支持(适配器契约),
+            // loadingGuard 覆盖本回调自身引发的类加载(D-17:不钩 forName,接受该缺口)
+            loadingGuard.set(true)
+            try {
+                invocation.setThrowable(
+                    ClassNotFoundException(
+                        "Xposed class not found: $name",
+                        Throwable().apply { stackTrace = emptyArray() },
+                    ),
+                )
+            } finally {
+                loadingGuard.remove()
             }
-        })
-    }
-
-    private fun hookFindClass() {
-        val clazz = runCatching { Class.forName("dalvik.system.BaseDexClassLoader") }.getOrNull() ?: return
-        val method = runCatching {
-            clazz.getMethod("findClass", String::class.java)
-        }.getOrNull() ?: return
-        engine.hook(method, object : MethodHook() {
-            override fun before(invocation: Invocation) {
-                if (!featureOn(DeviceEnvKind.XPOSED_CLASS)) return
-                if (loadingGuard.get() == true) return
-                val name = invocation.getArg(0) as? String ?: return
-                if (isXposedClassName(name)) {
-                    // D-12 修复:记录先于抛出
-                    emit(
-                        kind = DeviceEnvKind.XPOSED_CLASS,
-                        operation = DeviceEnvOperation.FIND_CLASS,
-                        originalValue = name,
-                        targetClass = name,
-                        interventionAction = ACTION_BLOCKED,
-                    )
-                    loadingGuard.set(true)
-                    try {
-                        throw ClassNotFoundException(
-                            "Xposed class not found: $name",
-                            Throwable().apply { stackTrace = emptyArray() },
-                        )
-                    } finally {
-                        loadingGuard.remove()
-                    }
-                }
-            }
-        })
+        }
     }
 
     /** Xposed 类名判定(V37 T2.4):内置前缀基线 ∪ 用户追加前缀(extraXposedPrefixes)。 */

@@ -1,16 +1,9 @@
 ﻿# tt-lib.ps1 — Modev × ModevTestTarget 集成测试共享库
 # 用法: . "$PSScriptRoot\tt-lib.ps1"
 
-$script:ADB = "D:\leidian\LDPlayer14\adb.exe"
-$script:DEVICE = "127.0.0.1:5555"
-# 独立 adb server 端口:隔离其他工具(platform-tools/IDE)的 server 互杀导致的掉线
-$env:ANDROID_ADB_SERVER_PORT = "5038"
-$script:MODEV_PKG = "com.lioisme.modev"
-$script:TARGET_PKG = "com.lioisme.modev.testtarget"
-$script:MODEV_DB = "/data/user/0/com.lioisme.modev/databases/modev.db"
-$script:CFG_PATH = "/data/local/tmp/modev_config_$($script:TARGET_PKG).json"
-$script:TMP = Join-Path $env:TEMP "modev-tt"
-New-Item -ItemType Directory -Force -Path $script:TMP | Out-Null
+# 环境参数化唯一入口(V45 T0.5):adb 路径 / 设备序列 / 独立 server 端口 / 包名 /
+# 导出目录一律来自环境变量或 local.properties,缺省回落既有默认值。
+. "$PSScriptRoot\tt-env.ps1"
 
 $script:PASS = 0; $script:FAIL = 0; $script:SKIP = 0
 $script:RESULTS = New-Object System.Collections.ArrayList
@@ -35,7 +28,7 @@ function WaitDevice([int]$timeoutSec = 420) {
             Write-Host "  [VM] device lost, cold relaunching dnplayer..." -ForegroundColor Yellow
             Get-Process dnplayer,Ld9BoxHeadless,VBoxNetDHCP -ErrorAction SilentlyContinue | Stop-Process -Force
             Start-Sleep -Seconds 6
-            Start-Process "D:\leidian\LDPlayer14\dnplayer.exe" -ArgumentList "-index","0" -WorkingDirectory "D:\leidian\LDPlayer14"
+            Start-Process -FilePath $script:DNPLAYER -ArgumentList "-index","0" -WorkingDirectory $script:LDPLAYER_DIR
             $miss = 0
             $deadline = (Get-Date).AddSeconds(480)
         }
@@ -215,6 +208,16 @@ function Skip([string]$name, [string]$reason) {
 function DumpResults([string]$file) {
     $script:RESULTS | ConvertTo-Json | Set-Content -Path $file -Encoding UTF8
     Write-Host "`n结果: PASS=$($script:PASS) FAIL=$($script:FAIL) SKIP=$($script:SKIP) → $file"
+}
+
+# V45 T0.4:矩阵脚本必须以 FAIL 数决定退出码(旧 20/21/22/23 恒退出 0 = 编排无法短路根因)
+function Exit-WithResult {
+    if ($script:FAIL -gt 0) {
+        Write-Host "=== matrix result: $($script:PASS) PASS / $($script:FAIL) FAIL / $($script:SKIP) SKIP ===" -ForegroundColor Red
+        exit 1
+    }
+    Write-Host "=== matrix result: $($script:PASS) PASS / 0 FAIL / $($script:SKIP) SKIP ===" -ForegroundColor Green
+    exit 0
 }
 
 function ScreencapNonBlackRatio {

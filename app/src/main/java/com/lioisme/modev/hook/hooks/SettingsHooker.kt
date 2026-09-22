@@ -5,6 +5,7 @@ import com.lioisme.modev.core.model.DeviceEnvOperation
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
+import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
  * Settings Global/Secure 拦截 Hooker(V35 momo 增强):
@@ -140,31 +141,36 @@ class SettingsHooker(
             clazz.getMethod("getString", android.content.ContentResolver::class.java, String::class.java)
         }.getOrNull() ?: return
 
-        engine.hook(method, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                if (!featureOn(DeviceEnvKind.ROOT_PROPERTY)) return
-                if (inHook.get() == true) return
-                inHook.set(true)
-                try {
-                    val key = invocation.getArg(1) as? String ?: return
-                    val strReplacement = SECURE_STRING_REPLACEMENTS[key] ?: return
-                    val original = invocation.result as? String
-                    if (original == strReplacement) return
-                    invocation.setResult(strReplacement)
-                    emit(
-                        kind = DeviceEnvKind.ROOT_PROPERTY,
-                        operation = DeviceEnvOperation.SETTINGS_SECURE_GET,
-                        originalValue = original,
-                        maskedValue = strReplacement,
-                        targetClass = "android.provider.Settings\$Secure",
-                        targetProperty = key,
-                        interventionAction = ACTION_BLOCKED,
-                    )
-                } finally {
-                    inHook.remove()
+        // V43 T3/D-4:Settings$Secure.getString 与 EmulatorNetwork(android_id)共享
+        // 单一广播注册点;after 子链按订阅序执行,结果改写对后续订阅者可见(V2.9)
+        broadcast.subscribe(
+            method,
+            object : SharedMethodBroadcast.Sub {
+                override fun after(invocation: Invocation, result: Any?) {
+                    if (!featureOn(DeviceEnvKind.ROOT_PROPERTY)) return
+                    if (inHook.get() == true) return
+                    inHook.set(true)
+                    try {
+                        val key = invocation.getArg(1) as? String ?: return
+                        val strReplacement = SECURE_STRING_REPLACEMENTS[key] ?: return
+                        val original = result as? String
+                        if (original == strReplacement) return
+                        invocation.setResult(strReplacement)
+                        emit(
+                            kind = DeviceEnvKind.ROOT_PROPERTY,
+                            operation = DeviceEnvOperation.SETTINGS_SECURE_GET,
+                            originalValue = original,
+                            maskedValue = strReplacement,
+                            targetClass = "android.provider.Settings\$Secure",
+                            targetProperty = key,
+                            interventionAction = ACTION_BLOCKED,
+                        )
+                    } finally {
+                        inHook.remove()
+                    }
                 }
-            }
-        })
+            },
+        )
     }
 
     companion object {

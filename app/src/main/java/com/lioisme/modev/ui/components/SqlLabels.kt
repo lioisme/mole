@@ -9,7 +9,7 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.SqlKind
 import com.lioisme.modev.core.model.SqlOperation
 import com.lioisme.modev.core.model.SqlRecord
-import com.lioisme.modev.data.mapping.SqlRow
+import com.lioisme.modev.domain.record.SqlRow
 
 /** SQL 类别显示名资源(筛选菜单 / 详情页元数据 / 列表行共用)。 */
 @StringRes

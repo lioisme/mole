@@ -320,11 +320,13 @@ private fun ModevMarkdownCodeFence(model: MarkdownComponentModel) {
             selectedTabIndex = selectedTab.coerceIn(0, members.size - 1),
             modifier = Modifier.fillMaxWidth().testTag("detail-code-tabs"),
         ) {
-            members.forEachIndexed { tabIndex, (_, fenceEntry) ->
+            members.forEachIndexed { tabIndex, (ordinal, fenceEntry) ->
                 val lang = fenceEntry.info?.language
                 Tab(
                     selected = selectedTab == tabIndex,
                     onClick = { selectedTab = tabIndex },
+                    // V45 T3.7:标签页按围栏序号命名(与 `md-{ordinal}` 同轴,多组代码块可逐tab驱动)
+                    modifier = Modifier.testTag("detail-code-tab-$ordinal"),
                     text = {
                         Text(
                             stringResource(langLabelRes(lang)),
@@ -418,6 +420,8 @@ internal fun MdCodeBlock(
                 tooltip = stringResource(R.string.section_copy),
                 enabled = handle != null && actions != null,
                 onClick = { handle?.let { actions?.onCopyFull(it) } },
+                // V45 T3.7 锚点:围栏头同源派生名(`md-{ordinal}-copy`),多块页面可按块定位
+                modifier = Modifier.testTag("$testTagKey-copy"),
             ) {
                 Icon(
                     Icons.Filled.ContentCopy,
@@ -430,6 +434,7 @@ internal fun MdCodeBlock(
                 tooltip = stringResource(R.string.detail_fullscreen),
                 enabled = handle != null && actions != null && handle.fullText.isNotEmpty(),
                 onClick = { handle?.let { actions?.onFullscreen(it) } },
+                modifier = Modifier.testTag("$testTagKey-fullscreen"),
             ) {
                 Icon(
                     Icons.Filled.Fullscreen,

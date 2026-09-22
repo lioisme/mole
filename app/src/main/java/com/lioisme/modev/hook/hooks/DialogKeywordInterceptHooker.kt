@@ -33,10 +33,17 @@ class DialogKeywordInterceptHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun before(invocation: Invocation) {
+                    // V44 T2.2 门控先行:extractTitle/extractMessage 均为反射路径
+                    // (getMethod/getDeclaredField + setAccessible),旧形态每次
+                    // AlertDialog.show 都先付两次反射取字段,再进门控。
+                    // DIALOG_KEYWORD 默认关 → 主线程白付。
+                    val switch = config()
+                    if (!switch.uiInteractionEnabled(UiInteractionKind.DIALOG_KEYWORD)) return
+                    if (switch.activeKeywordRules.isEmpty()) return
                     val dialog = invocation.thisObject ?: return
                     val title = extractTitle(dialog)
                     val message = extractMessage(dialog)
-                    val matched = matchedKeywords(config(), title, message)
+                    val matched = matchedKeywords(switch, title, message)
                     if (matched.isEmpty()) return
                     emit(
                         kind = UiInteractionKind.DIALOG_KEYWORD,

@@ -43,7 +43,7 @@ class McpEndToEndTest {
 
     @Test
     fun initialize_tools_list_and_records_query_over_real_container() = runBlocking(Dispatchers.IO) {
-        val mcp = (ctx.applicationContext as ModevApp).container.mcp
+        val mcp = (ctx.applicationContext as ModevApp).container.mcpServer
         if (!mcp.isRunning) mcp.start()
         assertTrue("mcp server must be running", mcp.isRunning)
         val port = mcp.actualPort().takeIf { it > 0 } ?: mcp.port
@@ -64,7 +64,10 @@ class McpEndToEndTest {
         val (listCode, _, listBody) = post(port, """{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}""", sid)
         assertEquals(200, listCode)
         val tools = JsonParser.parseString(listBody).asJsonObject.get("result").asJsonObject.get("tools").asJsonArray
-        assertEquals(43, tools.size())
+        // V45 T0.1:期望值来自装配侧真值(registry),非写死数字——协议序列化丢工具即红。
+        val servedNames = tools.map { it.asJsonObject.get("name").asString }
+        assertEquals("tools/list must mirror the assembled tool surface", mcp.toolNames(), servedNames)
+        assertEquals(mcp.toolCount(), tools.size())
         tools.forEach { tool ->
             val obj = tool.asJsonObject
             assertTrue("tool name blank", obj.get("name").asString.isNotBlank())

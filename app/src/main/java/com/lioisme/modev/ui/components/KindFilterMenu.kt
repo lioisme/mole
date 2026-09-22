@@ -12,9 +12,11 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.lioisme.modev.R
+import com.lioisme.modev.ui.theme.Tokens
 
 /**
  * 类别单选菜单(V19 共享组件;V23 增补 [enabled] 联动置灰):
@@ -46,13 +48,14 @@ fun KindFilterMenu(
             tooltip = stringResource(R.string.cd_filter),
             onClick = { onExpandedChange(true) },
             enabled = enabled,
+            modifier = Modifier.testTag("records-filter"),
         ) {
             Icon(
                 Icons.Default.FilterList,
                 contentDescription = stringResource(R.string.cd_filter),
                 tint =
                     when {
-                        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f)
+                        !enabled -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = Tokens.disabledContentAlpha)
                         active -> MaterialTheme.colorScheme.primary
                         else -> MaterialTheme.colorScheme.onSurfaceVariant
                     },
@@ -62,6 +65,9 @@ fun KindFilterMenu(
             DropdownMenuItem(
                 text = { Text(stringResource(R.string.record_types_all), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 leadingIcon = { RadioButton(selected = selectedKindName == null, onClick = null) },
+                // V45 T3.7:菜单项锚点(行为级断言仍按 AGENTS #8 走「点击→行现/行隐」,
+                // tag 提供结构定位:项数、存在性、禁用态不再靠文本反查)
+                modifier = Modifier.testTag("kind-filter-all"),
                 onClick = {
                     onKindSelect(null)
                     onExpandedChange(false)
@@ -71,6 +77,7 @@ fun KindFilterMenu(
                 DropdownMenuItem(
                     text = { Text(stringResource(option.labelRes), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     leadingIcon = { RadioButton(selected = selectedKindName == option.name, onClick = null) },
+                    modifier = Modifier.testTag("kind-filter-${option.name}"),
                     onClick = {
                         onKindSelect(option.name)
                         onExpandedChange(false)

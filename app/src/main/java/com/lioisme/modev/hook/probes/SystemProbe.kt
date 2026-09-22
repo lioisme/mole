@@ -1,5 +1,6 @@
 package com.lioisme.modev.hook.probes
 
+import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.hook.Probe
 import com.lioisme.modev.hook.ProbeContext
@@ -16,6 +17,9 @@ import com.lioisme.modev.hook.hooks.SystemBaseHooker
 class SystemProbe : Probe {
 
     override val recordType: String = RecordTypes.SYSTEM
+
+    /** V44 T2.4 冷启动裁剪:系统信息域全部 kind 经 `systemListen` master ∧ kind 双门控。 */
+    override fun enabledIn(switch: HookSwitch): Boolean = switch.systemListen
 
     override fun install(context: ProbeContext) {
         val hookers: List<SystemBaseHooker> =

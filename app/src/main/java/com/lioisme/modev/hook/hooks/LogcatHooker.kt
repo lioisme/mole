@@ -31,6 +31,9 @@ class LogcatHooker(
             for (m in methods) {
                 engine.hook(m, object : MethodHook() {
                     override fun after(invocation: Invocation) {
+                        // V44 T2.2 门控先行:logcat 为极高频路径(每次 Log.x 一行),
+                        // 取参/截断/字符串化全部排在门控之后。
+                        if (!featureOn(SystemKind.LOGCAT)) return
                         val tag = invocation.getArg(0) as? String ?: return
                         val msg = invocation.getArg(1) as? String ?: return
                         if (msg.isBlank()) return

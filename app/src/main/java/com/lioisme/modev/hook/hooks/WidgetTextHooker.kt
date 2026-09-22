@@ -23,6 +23,10 @@ class WidgetTextHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun after(invocation: Invocation) {
+                    // V44 T2.2 门控先行:setText 在列表滚动期每帧数十次,旧形态
+                    // 「取参 + text.length + subSequence/toString + 取类名」全部先于
+                    // emit 内部门控执行(widgetText 默认关 → 主线程白付分配)。
+                    if (!featureOn(UiInteractionKind.WIDGET_TEXT)) return
                     val text = invocation.getArg(0) as? CharSequence ?: return
                     val len = text.length
                     if (len <= 1) return

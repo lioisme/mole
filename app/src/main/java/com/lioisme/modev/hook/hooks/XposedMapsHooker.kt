@@ -3,111 +3,47 @@ package com.lioisme.modev.hook.hooks
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.DeviceEnvOperation
 import com.lioisme.modev.hook.Invocation
-import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
-import java.io.BufferedReader
-import java.io.FileReader
 
 /**
- * /proc/self/maps 扫描干预 Hooker(V31):拦截 BufferedReader.readLine(),
- * 当读取的是 /proc/[pid]/maps 文件时,过滤包含 Xposed/Magisk/Frida 等关键词的行。
+ * /proc/self/maps 扫描干预(V31;V44 T2.1 收编):readLine 行事件经
+ * [ProcScanBroadcaster] 单一广播分派(旧形态 FileReader/BufferedReader/readLine
+ * 三方法各自注册且构造器回调零门控——全进程每次 new FileReader 付 canonicalPath,
+ * 开关全关照付;多注册在 Vector 下互相遮蔽)。
  *
- * 设计决策:不再通过反射访问 FileReader 内部字段(fp/path)获取路径,
- * 而是在 hookFileReader 阶段直接从构造器参数获取路径并追踪 reader 实例,
- * 避免不同 Android 版本/OEM ROM 内部字段名不一致导致的反射失败。
+ * 拦截 BufferedReader.readLine(),当读取 /proc/[pid]/maps 文件时,
+ * 过滤包含 Xposed/Magisk/Frida 等关键词的行(命中即 setResult(null) 吞行)。
+ *
+ * 设计决策(V43 T6 延续):不反射 FileReader 内部字段;路径识别统一在
+ * [ProcScanBroadcaster.classify] 廉价判定,本处理器仅承载行过滤逻辑。
  */
 class XposedMapsHooker(
     context: ProbeContext,
-) : DeviceEnvBaseHooker(context) {
+    private val procScan: ProcScanBroadcaster,
+) : DeviceEnvBaseHooker(context), ProcScanBroadcaster.Handler {
 
-    /** 已知的 maps reader 集合:由 hookFileReader 填充,由 hookReadLine 消费。 */
-    private val mapsReaders: MutableSet<BufferedReader> =
-        java.util.Collections.synchronizedSet(HashSet())
+    override val kind: DeviceEnvKind = DeviceEnvKind.XPOSED_MAPS
+
+    override val paths: Set<ProcScanBroadcaster.ProcPath> =
+        setOf(ProcScanBroadcaster.ProcPath.MAPS)
 
     override fun install() {
-        hookFileReader()
-        hookBufferedReaderCtor()
-        hookReadLine()
+        procScan.addHandler(this)
     }
 
-    private fun hookFileReader() {
-        val method = runCatching {
-            FileReader::class.java.getConstructor(String::class.java)
-        }.getOrNull() ?: return
-        engine.hook(method, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                // 容量保护:防止长时间运行后 Set 无限增长导致 OOM
-                if (mapsReaderPaths.size >= MAX_TRACKED_READER_COUNT) return
-                val path = invocation.getArg(0) as? String ?: return
-                if (!isProcSelfMaps(path)) return
-                // FileReader 构造后 thisObject 是新创建的 FileReader 实例,
-                // 但它还不是 BufferedReader。需要在 BufferedReader(Reader) 构造器中
-                // 识别此 FileReader 并注册 BufferedReader 实例。
-                // 此处仅记录路径标记,由 hookBufferedReaderCtor 消费。
-                mapsReaderPaths.add(System.identityHashCode(invocation.thisObject))
-            }
-        })
-    }
-
-    private val mapsReaderPaths: MutableSet<Int> =
-        java.util.Collections.synchronizedSet(HashSet())
-
-    private fun hookBufferedReaderCtor() {
-        val method = runCatching {
-            BufferedReader::class.java.getConstructor(java.io.Reader::class.java)
-        }.getOrNull() ?: return
-        engine.hook(method, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                val inner = invocation.getArg(0) as? java.io.Reader ?: return
-                if (inner is FileReader) {
-                    // 检查此 FileReader 是否是 maps reader（由 hookFileReader 标记）
-                    val isMaps = try {
-                        System.identityHashCode(inner) in mapsReaderPaths
-                    } catch (_: Exception) {
-                        false
-                    }
-                    if (isMaps) {
-                        val reader = invocation.thisObject as? BufferedReader ?: return
-                        mapsReaders.add(reader)
-                    }
-                }
-            }
-        })
-    }
-
-    private fun hookReadLine() {
-        val method = runCatching {
-            BufferedReader::class.java.getMethod("readLine")
-        }.getOrNull() ?: return
-        engine.hook(method, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                val reader = invocation.thisObject as? BufferedReader ?: return
-                val isMaps = try { reader in mapsReaders } catch (_: Exception) { false }
-                if (!isMaps) return
-                // 读到 null 表示流结束/reader 已关闭,从追踪集合中移除防止泄漏
-                if (invocation.result == null) {
-                    mapsReaders.remove(reader)
-                    return
-                }
-                if (!featureOn(DeviceEnvKind.XPOSED_MAPS)) return
-                val line = invocation.result as? String ?: return
-                if (isFilteredLine(line)) {
-                    invocation.setResult(null)
-                    emit(
-                        kind = DeviceEnvKind.XPOSED_MAPS,
-                        operation = DeviceEnvOperation.READ_MAPS,
-                        originalValue = line,
-                        targetPath = PROC_MAPS_PATH,
-                        detectionPattern = extractKeyword(line),
-                    )
-                }
-            }
-        })
-    }
-
-    private fun isProcSelfMaps(path: String): Boolean {
-        val canonical = runCatching { java.io.File(path).canonicalPath }.getOrDefault(path)
-        return canonical.endsWith("/maps") && canonical.contains("/proc/")
+    /** 行事件(master 已由协调器粗门;此处自判干预 kind 门控——FeatureGate 红线)。 */
+    override fun onLine(invocation: Invocation, path: ProcScanBroadcaster.ProcPath, line: String) {
+        if (!featureOn(DeviceEnvKind.XPOSED_MAPS)) return
+        if (isFilteredLine(line)) {
+            invocation.setResult(null)
+            emit(
+                kind = DeviceEnvKind.XPOSED_MAPS,
+                operation = DeviceEnvOperation.READ_MAPS,
+                originalValue = line,
+                targetPath = PROC_MAPS_PATH,
+                detectionPattern = extractKeyword(line),
+            )
+        }
     }
 
     /** 生效掩码词表(V37 T2.4):内置基线 ∪ 用户追加关键词(extraMaskKeywords)。 */
@@ -130,7 +66,6 @@ class XposedMapsHooker(
 
     companion object {
         private const val PROC_MAPS_PATH = "/proc/self/maps"
-        private const val MAX_TRACKED_READER_COUNT = 64
 
         private val MAPS_KEYWORDS = listOf(
             "xposed", "lspd", "lsplant", "edxposed",

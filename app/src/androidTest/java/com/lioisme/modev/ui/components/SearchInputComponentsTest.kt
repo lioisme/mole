@@ -20,6 +20,7 @@ import androidx.compose.ui.test.performTextInput
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.lioisme.modev.R
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -191,7 +192,13 @@ class SearchInputComponentsTest {
             expectExpansion = false,
             desc = "动作槽长按",
         )
-        rule.runOnIdle { assertTrue("动作槽点击必须保持生效", actionClicked == 1) }
+        // 长按在 M3 语义下由 TooltipBox 锚点(combinedClickable onLongClick)在长按阈值处
+        // 消费手势弹 tooltip,内层 IconButton 的 onClick **不该**被触发 ——
+        // 门禁契约只有两条:不展开搜索(上方探针已断言)+ 不误触发动作。
+        rule.runOnIdle { assertEquals("长按动作槽不得触发动作(仅出 tooltip)", 0, actionClicked) }
+        // 紧随其后的单击仍必须生效(V42 门禁不得误伤点击)。
+        rule.onNodeWithContentDescription("action-slot").performClick()
+        rule.runOnIdle { assertEquals("动作槽单击必须生效", 1, actionClicked) }
     }
 
     @Test

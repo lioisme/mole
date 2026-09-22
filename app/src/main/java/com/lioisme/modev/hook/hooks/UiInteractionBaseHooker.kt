@@ -4,9 +4,9 @@ import com.lioisme.modev.core.model.UiInteractionKind
 import com.lioisme.modev.core.model.UiInteractionOperation
 import com.lioisme.modev.core.model.UiInteractionRecord
 import com.lioisme.modev.core.util.StackTraceFilter
+import com.lioisme.modev.hook.ProcessIdentity
 import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.RecordSink
-import java.io.File
 
 /**
  * UI 交互 Hooker 基类(V33):统一开关判断(master + kind 双门控)、栈 denylist、
@@ -26,14 +26,12 @@ abstract class UiInteractionBaseHooker(
 
     private val throttle = SessionThrottle()
 
-    protected val processName: String by lazy {
-        runCatching { File("/proc/self/cmdline").readBytes() }
-            .getOrNull()
-            ?.toString(Charsets.UTF_8)
-            ?.substringBefore('\u0000')
-            ?.takeIf { it.isNotBlank() }
-            ?: "unknown"
-    }
+    /**
+     * 目标进程名(V44 T2.6):经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
+     * 旧形态每个 Hooker 基类各自 `by lazy` 读一次 `/proc/self/cmdline`,冷启动期
+     * 约 50 个实例 = 50 次文件读 + 字节解码,而进程身份在进程内恒定不变。
+     */
+    protected val processName: String get() = ProcessIdentity.processName
 
     abstract fun install()
 

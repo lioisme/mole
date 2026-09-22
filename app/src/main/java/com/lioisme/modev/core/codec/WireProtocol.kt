@@ -23,7 +23,7 @@ package com.lioisme.modev.core.codec
  */
 object WireProtocol {
     /** 注入通道默认端口(V39:1510 让位 MCP,wire 迁 1511;双端同 APK 常量单点,宿主自定义经 server_port 偏好重放)。 */
-    const val PORT = 1511
+    const val PORT = com.lioisme.modev.core.model.ConfigKeys.WIRE_DEFAULT_PORT
 
     const val MAGIC = "MDEV"
     const val VERSION = 4

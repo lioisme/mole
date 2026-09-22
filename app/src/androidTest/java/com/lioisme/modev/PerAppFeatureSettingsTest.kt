@@ -48,7 +48,7 @@ class PerAppFeatureSettingsTest {
     private val ownPackage = "com.lioisme.modev"
 
     private fun settings(): SettingsRepository =
-        (ctx.applicationContext as ModevApp).container.settings
+        (ctx.applicationContext as ModevApp).container.settingsRepo
 
     private fun str(id: Int) = ctx.getString(id)
 
@@ -120,7 +120,7 @@ class PerAppFeatureSettingsTest {
         rule.onNodeWithTag("feature-row-EXIT_INTERCEPT")
             .performScrollTo().assertIsDisplayed().assertIsOff()
         rule.onNodeWithTag("feature-row-EXIT_INTERCEPT").performClick()
-        awaitPersisted { it.kinds["EXIT_INTERCEPT"] == true }
+        awaitPersisted { it.kinds["process:EXIT_INTERCEPT"] == true }
         rule.onNodeWithTag("feature-row-EXIT_INTERCEPT").assertIsOn()
     }
 
@@ -130,7 +130,7 @@ class PerAppFeatureSettingsTest {
         // 双域边界:监听类别行(CIPHER)不得出现在功能页。
         assertTrue(
             "监听类别不得混入功能页",
-            rule.onAllNodes(hasText(str(R.string.switch_cipher))).fetchSemanticsNodes().isEmpty(),
+            rule.onAllNodes(hasText(str(R.string.kind_cipher))).fetchSemanticsNodes().isEmpty(),
         )
     }
 

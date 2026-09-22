@@ -14,6 +14,15 @@ import com.lioisme.modev.data.repo.LogRepository
 import com.lioisme.modev.data.repo.MirroredConfigWriter
 import com.lioisme.modev.data.repo.SettingsRepository
 import com.lioisme.modev.data.server.ConfigServer
+import com.lioisme.modev.domain.app.AppCatalogService
+import com.lioisme.modev.domain.app.AppListPreferences
+import com.lioisme.modev.domain.asset.KeywordLibraryService
+import com.lioisme.modev.domain.config.FeatureService
+import com.lioisme.modev.domain.config.ListenConfigService
+import com.lioisme.modev.domain.record.RecordService
+import com.lioisme.modev.domain.server.ConnectionMonitor
+import com.lioisme.modev.domain.server.McpServiceConfig
+import com.lioisme.modev.domain.server.ServerConfigService
 import com.lioisme.modev.domain.scope.ScopeGateway
 import com.lioisme.modev.domain.scope.ScopeRepository
 import com.lioisme.modev.domain.scope.ScopeService
@@ -59,6 +68,10 @@ class ModevApp : Application() {
 
 /**
  * 手动依赖容器:数据库/配置服务端/仓库按需惰性创建,生命周期随进程。
+ *
+ * V45 T2.2(依赖倒置收口):**具体实现类型仅装配可见**(`internal` 段),对外一律
+ * 暴露 `domain.*` 方法层契约(「方法层出口」段)——UI ViewModel 与 MCP 工具组持有的
+ * 静态类型即接口,「这一屏只用什么」由类型系统表达,而非命名纪律。
  */
 class AppContainer(private val context: Context) {
 
@@ -68,17 +81,23 @@ class AppContainer(private val context: Context) {
 
     private val dao by lazy { database.cryptoRecordDao() }
 
-    val catalog: AppCatalogRepository by lazy {
-        AppCatalogRepository(context.packageManager, appScope)
-    }
+    // ------------------------------------------------------------------
+    // 实现层(仅装配期可见:内部装配需要仓库/服务端的实现成员)
+    // ------------------------------------------------------------------
 
-    val server: ConfigServer by lazy {
+    /** wire 注入配置服务端:观测面对外经 [wireStatus] 契约。 */
+    internal val wireServer: ConfigServer by lazy {
         ConfigServer().also { it.start() }
     }
 
-    val settings by lazy {
+    /** 已安装应用目录实现:对外经 [catalog] 契约。 */
+    private val catalogRepo: AppCatalogRepository by lazy {
+        AppCatalogRepository(context.packageManager, appScope)
+    }
+
+    internal val settingsRepo: SettingsRepository by lazy {
         SettingsRepository(
-            server = server,
+            server = wireServer,
             writer = MirroredConfigWriter(
                 prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
                 gson = Gson(),
@@ -86,27 +105,65 @@ class AppContainer(private val context: Context) {
             ),
             gson = Gson(),
             localPrefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE),
-        ).also { server.effectiveResolver = { pkg -> it.effectiveSwitch(pkg) } }
+        ).also { wireServer.effectiveResolver = { pkg -> it.effectiveSwitch(pkg) } }
     }
 
     /** 全局弹窗拦截关键词库(V37 T2.1/T2.2):装配进设置仓库并监听变更重推。 */
-    val keywordLibrary: KeywordLibraryRepository by lazy {
+    private val keywordLibraryRepo: KeywordLibraryRepository by lazy {
         KeywordLibraryRepository(database.keywordLibraryDao(), appScope).also { library ->
-            settings.attachKeywordLibrary(library)
+            settingsRepo.attachKeywordLibrary(library)
             appScope.launch {
                 // 首帧空快照不触发重推;库条目任一变化 → 全部在线会话按包重解析
-                library.entries.drop(1).collect { settings.repushAllConnected() }
+                library.entries.drop(1).collect { settingsRepo.repushAllConnected() }
             }
         }
     }
 
-    val logs: LogRepository by lazy {
+    /** 记录摄入/查询仓库实现:对外经 [records] 契约。 */
+    internal val logsRepo: LogRepository by lazy {
         LogRepository(
             dao = dao,
-            server = server,
+            server = wireServer,
             databaseFile = { context.getDatabasePath(ModevDatabase.NAME) },
+            // V45 T1.7 / ST-8:大批量删除后的库文件治理出口(PRAGMA 恒经 ModevDatabase 单源)
+            maintenance = { database.shrinkStorage() },
+            onDbError = ModevDatabase::noteSqliteError,
         )
     }
+
+    // ------------------------------------------------------------------
+    // 方法层出口(UI ViewModel 与 MCP 工具组的唯一依赖面)
+    // ------------------------------------------------------------------
+
+    /** 记录读写契约面(实现 = [logsRepo])。 */
+    val records: RecordService get() = logsRepo
+
+    /** 每应用配置偏差契约面(监听域 + 功能域共用同一存储)。 */
+    val listenConfig: ListenConfigService get() = settingsRepo
+
+    /** 全局功能资产契约面(画像 / 黑名单追加)。 */
+    val featureConfig: FeatureService get() = settingsRepo
+
+    /** wire 服务与统一外部访问契约面。 */
+    val serverConfig: ServerConfigService get() = settingsRepo
+
+    /** MCP 服务配置契约面(端口 / 启停 / 令牌)。 */
+    val mcpConfig: McpServiceConfig get() = settingsRepo
+
+    /** 应用目录契约面。 */
+    val catalog: AppCatalogService get() = catalogRepo
+
+    /** 关键词库契约面。 */
+    val keywordLibrary: KeywordLibraryService get() = keywordLibraryRepo
+
+    /** 应用列表浏览偏好契约面(进程级单一事实源,init 于 ModevApp.onCreate)。 */
+    val appListPrefs: AppListPreferences get() = AppListSettings
+
+    /** wire 服务端观测契约面。 */
+    val wireStatus: ConnectionMonitor get() = wireServer
+
+    /** MCP 服务端观测契约面(绑定地址 / 绑定错误)。 */
+    val mcpStatus: ConnectionMonitor get() = mcpServer
 
     /** 框架作用域网关:现代框架服务 → 领域抽象。
      *  map 参数为 Any?(见 FrameworkBridge),转型在非空分支内,legacy 安全。 */
@@ -118,41 +175,48 @@ class AppContainer(private val context: Context) {
     }
 
     val scopeRepository: ScopeRepository by lazy {
-        ScopeRepository(scopeGateway)
+        ScopeRepository(scopeGateway, logger = { msg -> android.util.Log.i("ModevScope", msg) })
     }
 
     /**
-     * MCP 服务器(V38):Agent 一等公民能力面,43 工具,与 wire ConfigServer 独立生命周期。
+     * MCP 服务器(V38):Agent 一等公民能力面,与 wire ConfigServer 独立生命周期。
+     * 工具面数量/名单唯一事实源 = [com.lioisme.modev.mcp.tools.McpTools.create]
+     * (冻结快照见 `McpToolParityTest`;消费方一律经 `McpServer.toolCount()` 派生,V45 T0.1 禁写死数字)。
      * 自引用快照 lambda 在请求期才解析(server_status 消费),装配期无递归。
+     * 工具装配入参一律取方法层出口属性(V45 T2.2:工具组不见实现类型)。
      */
-    val mcp: com.lioisme.modev.mcp.McpServer by lazy {
+    internal val mcpServer: com.lioisme.modev.mcp.McpServer by lazy {
         val registry = com.lioisme.modev.mcp.tools.McpToolRegistry(
             com.lioisme.modev.mcp.tools.McpTools.create(
                 context = context,
-                logs = logs,
-                settings = settings,
+                logs = records,
+                listenConfig = listenConfig,
+                featureConfig = featureConfig,
+                serverConfig = serverConfig,
                 keywords = keywordLibrary,
                 catalog = catalog,
+                listPrefs = appListPrefs,
                 scopeRepository = scopeRepository,
-                connectionMonitor = server,
+                connectionMonitor = wireStatus,
                 mcpSnapshot = {
                     com.lioisme.modev.mcp.tools.McpJson.obj(
-                        "enabled" to com.google.gson.JsonPrimitive(settings.mcpEnabled.value),
-                        "port" to com.google.gson.JsonPrimitive(mcp.port),
-                        "boundAddress" to com.google.gson.JsonPrimitive(mcp.boundAddress.value),
-                        "externalAccess" to com.google.gson.JsonPrimitive(mcp.externalAccess),
-                        "tokenAuth" to com.google.gson.JsonPrimitive(mcp.tokenAuthEnabled),
-                        "tokenCount" to com.google.gson.JsonPrimitive(settings.mcpTokens.value.size),
-                        "sessionCount" to com.google.gson.JsonPrimitive(mcp.sessionCount()),
+                        "enabled" to com.google.gson.JsonPrimitive(mcpConfig.mcpEnabled.value),
+                        "port" to com.google.gson.JsonPrimitive(mcpServer.port),
+                        "boundAddress" to com.google.gson.JsonPrimitive(mcpServer.boundAddress.value),
+                        "externalAccess" to com.google.gson.JsonPrimitive(mcpServer.externalAccess),
+                        "tokenAuth" to com.google.gson.JsonPrimitive(mcpServer.tokenAuthEnabled),
+                        "tokenCount" to com.google.gson.JsonPrimitive(mcpConfig.mcpTokens.value.size),
+                        "sessionCount" to com.google.gson.JsonPrimitive(mcpServer.sessionCount()),
+                        "toolCount" to com.google.gson.JsonPrimitive(mcpServer.toolCount()),
                     )
                 },
             ),
         )
         val built = com.lioisme.modev.mcp.McpServer(
-            port = settings.mcpPort.value,
-            externalAccess = settings.serverExternalAccess.value,
-            tokenAuthEnabled = settings.mcpTokenAuth.value,
-            requiredTokens = settings.mcpTokens.value.map { it.value }.toSet(),
+            port = mcpConfig.mcpPort.value,
+            externalAccess = serverConfig.serverExternalAccess.value,
+            tokenAuthEnabled = mcpConfig.mcpTokenAuth.value,
+            requiredTokens = mcpConfig.mcpTokens.value.map { it.value }.toSet(),
             serverInfo = com.lioisme.modev.mcp.tools.McpJson.obj(
                 "name" to com.google.gson.JsonPrimitive(com.lioisme.modev.mcp.tools.McpTools.SERVER_NAME),
                 "version" to com.google.gson.JsonPrimitive(
@@ -163,19 +227,19 @@ class AppContainer(private val context: Context) {
             registry = registry,
         )
         // 配置变更 → 重启(enabled=false 时停机;仓库侧已保证异步,见 restartMcpAsync)
-        settings.mcpRestarter = {
-            if (settings.mcpEnabled.value) {
-                built.port = settings.mcpPort.value
-                built.externalAccess = settings.serverExternalAccess.value
-                built.tokenAuthEnabled = settings.mcpTokenAuth.value
-                built.requiredTokens = settings.mcpTokens.value.map { it.value }.toSet()
+        settingsRepo.mcpRestarter = {
+            if (mcpConfig.mcpEnabled.value) {
+                built.port = mcpConfig.mcpPort.value
+                built.externalAccess = serverConfig.serverExternalAccess.value
+                built.tokenAuthEnabled = mcpConfig.mcpTokenAuth.value
+                built.requiredTokens = mcpConfig.mcpTokens.value.map { it.value }.toSet()
                 built.restart()
             } else {
                 built.stop()
             }
         }
         // V39:令牌集合变更原地更新校验集(不重启 socket、不踢已连会话)
-        settings.mcpTokenSetUpdater = { tokens -> built.requiredTokens = tokens }
+        settingsRepo.mcpTokenSetUpdater = { tokens -> built.requiredTokens = tokens }
         built
     }
 
@@ -187,14 +251,16 @@ class AppContainer(private val context: Context) {
 
     init {
         // 进程启动即接线记录回调(并启动服务器),避免 UI 未访问日志页时记录被丢弃
-        logs.start()
+        logsRepo.start()
         // 进程启动即初始化设置仓库:effectiveResolver(握手后立即按包推送有效配置)
         // 依赖 settings 惰性实例,若仅等 UI 打开设置页才初始化,
         // 注入进程握手的配置推送将永远缺席(客户端 60s 读超时 → 无限重连)。
-        settings
+        settingsRepo
+        // 关键词库惰性装配接线(库变更 → 全量重推)必须在进程启动即生效
+        keywordLibraryRepo
         // V38:MCP 服务随进程常驻(默认启用回环;设置变更经 mcpRestarter 重启)
-        if (settings.mcpEnabled.value) {
-            appScope.launch { mcp.start() }
+        if (mcpConfig.mcpEnabled.value) {
+            appScope.launch { mcpServer.start() }
         }
         // M3-2: 框架服务就绪后生成并持久化握手令牌,ConfigServer 启用认证
         // serviceFlow 公开为 Any?(见 FrameworkBridge),转型发生在非空分支内,
@@ -202,19 +268,19 @@ class AppContainer(private val context: Context) {
         appScope.launch {
             RemotePrefsBridge.serviceFlow.collect { service ->
                 if (service == null) {
-                    server.requireToken = null
+                    wireServer.requireToken = null
                 } else {
                     val svc = service as XposedService
                     val prefs = runCatching { svc.getRemotePreferences(RemotePrefsBridge.PREFS_KEY) }.getOrNull()
                     if (prefs == null) {
-                        server.requireToken = null
+                        wireServer.requireToken = null
                     } else {
                         var token = prefs.getString(RemotePrefsBridge.TOKEN_KEY, null)
                         if (token.isNullOrBlank()) {
                             token = UUID.randomUUID().toString().replace("-", "")
                             runCatching { prefs.edit().putString(RemotePrefsBridge.TOKEN_KEY, token).commit() }
                         }
-                        server.requireToken = token
+                        wireServer.requireToken = token
                     }
                 }
             }

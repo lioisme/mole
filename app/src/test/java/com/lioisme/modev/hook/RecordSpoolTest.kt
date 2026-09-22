@@ -280,4 +280,41 @@ class RecordSpoolTest {
         for (i in 1..30) spool.append(i.toLong(), "line-$i")
         assertTrue(spool.spoolDropped > 0)
     }
+
+    /**
+     * V43 T1 核心钉死:drain 网络发送在锁外——慢发送在途期间 [RecordSpool.append]
+     * (队列满降级路径即宿主 hook 线程所走)必须毫秒级完成,不再与 socket 写争 spool 锁。
+     */
+    @Test
+    fun `drain network send happens outside spool lock`() {
+        val spool = RecordSpool(dir)
+        spool.append(1, "slow-line")
+        spool.append(2, "queued")
+        val release = java.util.concurrent.CountDownLatch(1)
+        val drainStarted = java.util.concurrent.CountDownLatch(1)
+        val drainThread = Thread {
+            spool.drain { line ->
+                if (line == "slow-line") {
+                    drainStarted.countDown()
+                    runCatching { release.await(5, java.util.concurrent.TimeUnit.SECONDS) }
+                }
+                true
+            }
+        }.apply { isDaemon = true; start() }
+        assertTrue("drain 应发出快照内首行", drainStarted.await(5, java.util.concurrent.TimeUnit.SECONDS))
+        val t0 = System.currentTimeMillis()
+        spool.append(3, "concurrent-append")
+        val appendMs = System.currentTimeMillis() - t0
+        release.countDown()
+        drainThread.join(5_000)
+        assertTrue(
+            "append 不应被 drain 网络发送阻塞,实测 ${appendMs}ms(旧实现将拖满 5s)",
+            appendMs < 1_000L,
+        )
+        // drain 只发快照内两行;并发追加行完整落盘,留待下一轮重放
+        assertTrue(
+            "并发追加行必须落盘(V43 T1 锁外发送语义)",
+            File(dir, "spool.dat").readLines().any { it.startsWith("3\t") },
+        )
+    }
 }

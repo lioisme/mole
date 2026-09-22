@@ -72,12 +72,14 @@ class BytesViewTest {
 
     @Test
     fun of_hard_b64_cap_bounds_unlimited_request() {
-        // 硬保险丝:base64 与 hex 同字节预算(×2/3 膨胀率),超限物化被截断
+        // V44 T2.3 保元弃内容:输入超 CONTENT_MATERIALIZE_MAX_BYTES(8MB)时,
+        // 无论调用方上限多大(含 Int.MAX_VALUE),base64 一律不物化(防 OOM)。
         val bytes = ByteArray(9 * 1024 * 1024) { 0x41 }
         val view = BytesView.of(bytes, maxHexChars = Int.MAX_VALUE, maxB64Chars = Int.MAX_VALUE)
         assertTrue(view!!.truncated)
-        // 上限向下取整到 4 的倍数(完整 base64 字符组)
-        assertEquals((BytesView.HARD_MAX_B64_CHARS / 4) * 4, view.base64!!.length)
+        assertNull("超预算不得物化 base64(保元弃内容)", view.base64)
+        // hex 仅保留 32 字节标识前缀(64 字符),足以辨识内容形态
+        assertEquals(BytesView.METADATA_HEX_PREFIX_BYTES * 2, view.hex.length)
     }
 
     @Test
@@ -107,11 +109,15 @@ class BytesViewTest {
 
     @Test
     fun of_hard_hex_cap_bounds_unlimited_request() {
-        // 硬保险丝:调用方传无限上限也不得超限物化(防 OOM)
-        val bytes = ByteArray(9 * 1024 * 1024) { 0x41 } // hex 18M 字符 > 16M 硬顶
+        // V44 T2.3 保元弃内容:输入超 CONTENT_MATERIALIZE_MAX_BYTES(8MB)时,
+        // 无论调用方上限多大(含 Int.MAX_VALUE),hex 仅保留 32 字节标识前缀(防 OOM),
+        // 不再物化到 16M 硬顶(旧契约)。
+        val bytes = ByteArray(9 * 1024 * 1024) { 0x41 } // 9MB > 8MB 预算
         val view = BytesView.of(bytes, maxHexChars = Int.MAX_VALUE)
         assertTrue(view!!.truncated)
-        assertEquals(BytesView.HARD_MAX_HEX_CHARS, view.hex.length)
+        assertEquals(BytesView.METADATA_HEX_PREFIX_BYTES * 2, view.hex.length)
+        assertNull(view.base64)
+        assertNull(view.text)
     }
 
     @Test

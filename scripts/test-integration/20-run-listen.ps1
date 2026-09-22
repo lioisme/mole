@@ -152,3 +152,4 @@ Assert "Q/QUERY_RESULT passive capture" ($ok3[0] -match "^[1-9]") "rows=$($ok3[0
 
 RemoveConfig
 DumpResults (Join-Path $script:TMP "listen-round.json")
+Exit-WithResult

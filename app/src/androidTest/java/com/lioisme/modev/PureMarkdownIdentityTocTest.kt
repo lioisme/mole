@@ -13,6 +13,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.ModevDatabase
+import com.lioisme.modev.data.db.RecordQueryFactory
+import com.lioisme.modev.domain.record.RecordFilter
 import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.ui.MainActivity
 import kotlinx.coroutines.flow.first
@@ -74,17 +76,7 @@ class PureMarkdownIdentityTocTest {
                     ),
                 ),
             )
-            val seeded = dao
-                .observeCountByFilter(
-                    recordTypes = listOf(""),
-                    packages = listOf(ownPackage),
-                    kinds = listOf(""),
-                    typeCount = 0,
-                    packageCount = 1,
-                    kindCount = 0,
-                    query = null,
-                )
-                .first()
+            val seeded = dao.countByQuery(RecordQueryFactory.count(RecordFilter(packages = setOf(ownPackage)))).first()
             assertEquals("种子写入须在读回中可见", 1L, seeded)
         }
         AppListSettings.setShowModules(true)
@@ -117,22 +109,26 @@ class PureMarkdownIdentityTocTest {
         }
         assertTrue("被测包行应出现", rowFound)
         rule.onNodeWithText(ownPackage).performClick()
-        rule.waitForIdle()
-        rule.onNodeWithText(str(R.string.algorithm_records_title)).performClick()
-        rule.waitForIdle()
+        rule.awaitAnchor("monitor-entry-algorithm", "点应用行应进监控页")
+        // 监控页是整屏 verticalScroll Column:Hero/统计区之下的入口行常落在视口外,
+        // 直接 performClick 的坐标在窗外被静默丢弃(DEF-V45-009 根因,V40 T4 同坑)。
+        rule.clickScrolledIntoView(hasText(str(R.string.algorithm_records_title)))
+        rule.awaitAnchor("records-filter", "点「算法记录」入口行应进算法记录列表")
         rule.onAllNodes(hasScrollAction()).onFirst()
             .performScrollToNode(hasText(cipherAlgorithm))
         rule.onNodeWithText(cipherAlgorithm).performClick()
 
-        // 详情页哨兵:算法名 ≥ 2 处(顶栏 + 身份区),轮询等待装配完成。
+        // 详情页哨兵 = detail-more 锚点已到位;算法名唯一承载处 = 身份区 H2
+        // (V29 起顶栏标题为静态「记录详情」,V28「双处」口径作废)。轮询等 markdown 装配。
+        rule.awaitAnchor("detail-more", "点记录行应进详情页")
         val detailDeadline = System.currentTimeMillis() + 10_000
         var opened = false
         while (System.currentTimeMillis() < detailDeadline && !opened) {
             rule.waitForIdle()
-            opened = rule.onAllNodesWithText(cipherAlgorithm).fetchSemanticsNodes().size >= 2
+            opened = rule.onAllNodesWithText(cipherAlgorithm).fetchSemanticsNodes().isNotEmpty()
             if (!opened) Thread.sleep(100)
         }
-        assertTrue("详情页应打开", opened)
+        assertTrue("身份区应渲染算法名", opened)
     }
 
     @Test

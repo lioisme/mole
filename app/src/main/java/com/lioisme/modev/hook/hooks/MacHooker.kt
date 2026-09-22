@@ -35,7 +35,7 @@ class MacHooker(
         hookAfter(f.find(MAC, "init", Key::class.java, AlgorithmParameterSpec::class.java)) { inv, _ -> afterInit(inv) }
         hookAfter(f.find(MAC, "update", ByteArray::class.java)) { inv, _ -> afterUpdate(inv) }
         hookAfter(f.find(MAC, "update", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, _ -> afterUpdate(inv) }
-        hookBefore(f.find(MAC, "update", ByteBuffer::class.java)) { inv -> HookerSupport.stash(inv.getArg(0)) }
+        hookBefore(f.find(MAC, "update", ByteBuffer::class.java)) { inv -> HookerSupport.stash(inv, inv.getArg(0)) }
         hookAfter(f.find(MAC, "update", ByteBuffer::class.java)) { inv, _ -> afterUpdate(inv) }
         hookAfter(f.find(MAC, "doFinal")) { inv, result -> afterDoFinal(inv, result) }
         hookAfter(f.find(MAC, "doFinal", ByteArray::class.java)) { inv, result -> afterDoFinal(inv, result) }
@@ -105,7 +105,7 @@ class MacHooker(
                 val len = invocation.getArg(2) as? Int
                 if (off != null && len != null) HookerSupport.slice(arg, off, len) else arg
             }
-            else -> HookerSupport.take()
+            else -> HookerSupport.take(invocation)
         }
         ctx.inputTotal += input?.size ?: 0
         if (input != null) {
@@ -124,7 +124,7 @@ class MacHooker(
         val ctx = tracker.contextFor(instance)
         val input = when (val arg = invocation.getArg(0)) {
             is ByteArray -> arg
-            else -> HookerSupport.take()
+            else -> HookerSupport.take(invocation)
         }
         ctx.inputTotal += input?.size ?: 0
         // doFinal(byte[],int):result 为写入字节数,MAC 落在 arg0[0, result)

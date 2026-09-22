@@ -29,6 +29,8 @@ class DialogLocationHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun after(invocation: Invocation) {
+                    // V44 T2.2 门控先行:extractTitle 走 getMethod+invoke 反射,必须排在门控之后。
+                    if (!featureOn(UiInteractionKind.DIALOG_SHOW)) return
                     val title = extractTitle(invocation.thisObject)
                     emit(
                         kind = UiInteractionKind.DIALOG_SHOW,
@@ -52,6 +54,8 @@ class DialogLocationHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun after(invocation: Invocation) {
+                    // V44 T2.2 门控先行:onBackPressed 为交互热路径,取类名/组装全部后置。
+                    if (!featureOn(UiInteractionKind.DIALOG_SHOW)) return
                     val activityName = invocation.thisObject?.javaClass?.name ?: return
                     emit(
                         kind = UiInteractionKind.DIALOG_SHOW,

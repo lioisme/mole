@@ -3,10 +3,11 @@ package com.lioisme.modev.ui.apps
 import androidx.room.Room
 import com.lioisme.modev.data.db.ModevDatabase
 import com.lioisme.modev.data.repo.AppCatalogRepository
-import com.lioisme.modev.data.repo.AppCatalogSource
+import com.lioisme.modev.domain.app.AppCatalogService
 import com.lioisme.modev.data.repo.AppListSettings
 import com.lioisme.modev.data.repo.LogRepository
 import com.lioisme.modev.data.server.ConfigServer
+import com.lioisme.modev.domain.app.AppInfo
 import com.lioisme.modev.domain.scope.ScopeGateway
 import com.lioisme.modev.domain.scope.ScopeRepository
 import com.lioisme.modev.domain.server.ConnectionMonitor
@@ -46,10 +47,10 @@ class AppsViewModelTest {
     private lateinit var vm: AppsViewModel
     private lateinit var collector: kotlinx.coroutines.Job
 
-    private class FakeCatalog : AppCatalogSource {
-        val appsState = MutableStateFlow<List<AppCatalogRepository.AppInfo>>(emptyList())
+    private class FakeCatalog : AppCatalogService {
+        val appsState = MutableStateFlow<List<AppInfo>>(emptyList())
         val loadingState = MutableStateFlow(false)
-        override val apps: StateFlow<List<AppCatalogRepository.AppInfo>> = appsState
+        override val apps: StateFlow<List<AppInfo>> = appsState
         override val loading: StateFlow<Boolean> = loadingState
         override fun refresh() = Unit
         override suspend fun resolveLaunchable(packageName: String): Boolean = true
@@ -59,6 +60,7 @@ class AppsViewModelTest {
         override val connectedPackagesFlow: StateFlow<Set<String>> =
             MutableStateFlow(setOf("com.online.app"))
         override val boundAddress: StateFlow<String?> = MutableStateFlow(null)
+        override val bindError: StateFlow<String?> = MutableStateFlow(null)
     }
 
     private class NoServiceGateway : ScopeGateway {
@@ -74,11 +76,12 @@ class AppsViewModelTest {
         logs = LogRepository(db.cryptoRecordDao(), ConfigServer())
         fakeCatalog = FakeCatalog()
         fakeCatalog.appsState.value = listOf(
-            AppCatalogRepository.AppInfo("com.online.app", "Online App", system = false),
-            AppCatalogRepository.AppInfo("com.sys.app", "Sys App", system = true),
+            AppInfo("com.online.app", "Online App", system = false),
+            AppInfo("com.sys.app", "Sys App", system = true),
         )
         vm = AppsViewModel(
             catalog = fakeCatalog,
+            listPrefs = AppListSettings,
             logs = logs,
             server = FakeConnection(),
             scopeRepository = ScopeRepository(NoServiceGateway()),
@@ -138,8 +141,8 @@ class AppsViewModelTest {
     @Test
     fun modulesHiddenByDefault_andRevealedBySetting() {
         fakeCatalog.appsState.value = listOf(
-            AppCatalogRepository.AppInfo("com.module.app", "Module App", system = false, isXposedModule = true),
-            AppCatalogRepository.AppInfo("com.plain.app", "Plain App", system = false),
+            AppInfo("com.module.app", "Module App", system = false, isXposedModule = true),
+            AppInfo("com.plain.app", "Plain App", system = false),
         )
         val hidden = awaitState {
             it.rows.any { r -> r.packageName == "com.plain.app" } &&

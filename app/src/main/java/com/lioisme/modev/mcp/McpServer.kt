@@ -39,7 +39,7 @@ class McpServer(
     private val serverInfo: JsonObject,
     private val instructions: String,
     private val registry: McpToolRegistry,
-) {
+) : com.lioisme.modev.domain.server.ConnectionMonitor {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val lifecycleLock = Any()
@@ -52,11 +52,18 @@ class McpServer(
 
     /** 绑定地址观测点("127.0.0.1"/"0.0.0.0";未绑定 = null),服务页与 server_status 消费。 */
     private val _boundAddress = MutableStateFlow<String?>(null)
-    val boundAddress: StateFlow<String?> = _boundAddress
+    override val boundAddress: StateFlow<String?> = _boundAddress
 
     /** 最近一次绑定失败原因(null = 无错误);服务页错误态展示消费。 */
     private val _bindError = MutableStateFlow<String?>(null)
-    val bindError: StateFlow<String?> = _bindError
+    override val bindError: StateFlow<String?> = _bindError
+
+    /**
+     * MCP 是请求/响应式服务,无「持久注入客户端」概念 → 恒空集。
+     * V45 ISO-6:实现 [ConnectionMonitor] 是为让 UI 与服务页只依赖同一抽象,
+     * 不再经容器点名 `McpServer` 具体类读 boundAddress/bindError。
+     */
+    override val connectedPackagesFlow: StateFlow<Set<String>> = MutableStateFlow(emptySet())
 
     val isRunning: Boolean get() = running.get()
 
@@ -113,6 +120,16 @@ class McpServer(
 
     /** 会话数(server_status 消费)。 */
     fun sessionCount(): Int = sessions.count()
+
+    /**
+     * 装配侧工具面真值(V45 T0.1):`server_status.mcp.toolCount` 与 `tools/list`
+     * 构成双通道对账——协议序列化若丢工具即不一致,消费方(测试/脚本)一律派生
+     * 本值而非写死数字(43/46 漂移根因治理)。
+     */
+    fun toolCount(): Int = registry.count()
+
+    /** 装配侧工具名单(与 [toolCount] 同源,顺序稳定)。 */
+    fun toolNames(): List<String> = registry.names()
 
     /**
      * HTTP 入口(引擎回调)。返回状态码/体/会话头。

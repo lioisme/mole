@@ -43,6 +43,7 @@ import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.BehaviorKind
+import com.lioisme.modev.core.model.CapabilityDomain
 import com.lioisme.modev.core.model.CategoryTaxonomy
 import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.HookSwitch
@@ -54,7 +55,7 @@ import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.UiInteractionKind
 import com.lioisme.modev.core.model.SystemKind
 import com.lioisme.modev.core.model.ProcessKind
-import com.lioisme.modev.data.repo.SettingsRepository
+import com.lioisme.modev.domain.config.ListenConfigService
 import com.lioisme.modev.ui.components.HorizontalDivider16
 import com.lioisme.modev.ui.components.IntLimitSheet
 import com.lioisme.modev.ui.components.IgnorePathSheet
@@ -76,11 +77,11 @@ import kotlinx.coroutines.launch
  * - [effective] 有效配置 = 内置默认配置 ⊕ 本应用偏差(默认恒为内置推荐值);
  * - [override] 当前偏差(零偏差时恢复默认行隐藏);
  * - 写操作即时持久化 + 定向推送注入侧(setOverride/removeOverride 全链路);
- * - 零偏差写入自动等价删除存储键(SettingsRepository 契约)。
+ * - 零偏差写入自动等价删除存储键([ListenConfigService] 契约)。
  */
 class PerAppListenSettingsViewModel(
     val packageName: String,
-    private val settings: SettingsRepository,
+    private val settings: ListenConfigService,
 ) : ViewModel() {
 
     /** 行值回显来源:有效配置快照流(默认配置或偏差任一变化即重发射)。 */
@@ -125,9 +126,9 @@ class PerAppListenSettingsViewModel(
         update { it.copy(systemListen = value) }
     }
 
-    /** 类别定制(kind 名跨枚举;非法名由 AppListenOverride 容错忽略)。 */
-    fun setKind(kindId: String, value: Boolean) {
-        update { it.copy(kinds = it.kinds + (kindId to value)) }
+    /** 类别定制(V44 限定键:跨类型裸 id 碰撞 OPEN/SIGNATURE 由类型参数消歧)。 */
+    fun setKind(type: RecordType, kindId: String, value: Boolean) {
+        update { it.copy(kinds = it.kinds + (AppListenOverride.kindKey(type, kindId) to value)) }
     }
 
     /** 记录堆栈定制(V25)。 */
@@ -165,9 +166,12 @@ class PerAppListenSettingsViewModel(
         update { it.copy(ignorePathPrefixes = value.ifEmpty { null }) }
     }
 
-    /** 一键恢复默认配置(删除本包全部偏差存储键)。 */
+    /**
+     * 一键恢复默认配置(V45 T3.5 / DUAL-12:**只清监听域**)。
+     * 旧形态走全量删键,在监听页点恢复会连带抹掉功能页定制(画像/黑名单/关键词子集)。
+     */
     fun reset() {
-        viewModelScope.launch { settings.removeOverride(packageName) }
+        viewModelScope.launch { settings.resetOverride(packageName, CapabilityDomain.LISTEN) }
     }
 
     private fun update(transform: (AppListenOverride) -> AppListenOverride) {
@@ -185,7 +189,7 @@ class PerAppListenSettingsViewModelFactory(
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         return PerAppListenSettingsViewModel(
             packageName = packageName,
-            settings = container.settings,
+            settings = container.listenConfig,
         ) as T
     }
 }
@@ -296,10 +300,10 @@ fun PerAppListenSettingsScreen(
                 CategoryTaxonomy.forType(RecordType.CRYPTO).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ToggleListItem(
-                        label = res.getString(KindLabelRes.resolve(category.id)),
-                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
-                        onCheckedChange = { viewModel.setKind(category.id, it) },
-                        testTag = "listen-row-${category.id}",
+                        label = res.getString(KindLabelRes.resolve(category.type, category.id)),
+                        checked = EffectiveSwitch.readKind(effective, category.type, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.type, category.id, it) },
+                        testTag = "listen-row-${category.type.wire}-${category.id}",
                     )
                 }
             }
@@ -310,10 +314,10 @@ fun PerAppListenSettingsScreen(
                 CategoryTaxonomy.forType(RecordType.DATABASE).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ToggleListItem(
-                        label = res.getString(KindLabelRes.resolve(category.id)),
-                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
-                        onCheckedChange = { viewModel.setKind(category.id, it) },
-                        testTag = "listen-row-${category.id}",
+                        label = res.getString(KindLabelRes.resolve(category.type, category.id)),
+                        checked = EffectiveSwitch.readKind(effective, category.type, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.type, category.id, it) },
+                        testTag = "listen-row-${category.type.wire}-${category.id}",
                     )
                 }
             }
@@ -324,10 +328,10 @@ fun PerAppListenSettingsScreen(
                 CategoryTaxonomy.forType(RecordType.BEHAVIOR).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ToggleListItem(
-                        label = res.getString(KindLabelRes.resolve(category.id)),
-                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
-                        onCheckedChange = { viewModel.setKind(category.id, it) },
-                        testTag = "listen-row-${category.id}",
+                        label = res.getString(KindLabelRes.resolve(category.type, category.id)),
+                        checked = EffectiveSwitch.readKind(effective, category.type, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.type, category.id, it) },
+                        testTag = "listen-row-${category.type.wire}-${category.id}",
                     )
                 }
                 HorizontalDivider16()
@@ -355,10 +359,10 @@ fun PerAppListenSettingsScreen(
                 CategoryTaxonomy.forType(RecordType.PREFS).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ToggleListItem(
-                        label = res.getString(KindLabelRes.resolve(category.id)),
-                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
-                        onCheckedChange = { viewModel.setKind(category.id, it) },
-                        testTag = "listen-row-${category.id}",
+                        label = res.getString(KindLabelRes.resolve(category.type, category.id)),
+                        checked = EffectiveSwitch.readKind(effective, category.type, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.type, category.id, it) },
+                        testTag = "listen-row-${category.type.wire}-${category.id}",
                     )
                 }
             }
@@ -369,10 +373,10 @@ fun PerAppListenSettingsScreen(
                 CategoryTaxonomy.forType(RecordType.WEBVIEW).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ToggleListItem(
-                        label = res.getString(KindLabelRes.resolve(category.id)),
-                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
-                        onCheckedChange = { viewModel.setKind(category.id, it) },
-                        testTag = "listen-row-${category.id}",
+                        label = res.getString(KindLabelRes.resolve(category.type, category.id)),
+                        checked = EffectiveSwitch.readKind(effective, category.type, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.type, category.id, it) },
+                        testTag = "listen-row-${category.type.wire}-${category.id}",
                     )
                 }
             }
@@ -388,10 +392,10 @@ fun PerAppListenSettingsScreen(
                 envObserveKinds.forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ToggleListItem(
-                        label = res.getString(KindLabelRes.resolve(category.id)),
-                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
-                        onCheckedChange = { viewModel.setKind(category.id, it) },
-                        testTag = "listen-row-${category.id}",
+                        label = res.getString(KindLabelRes.resolve(category.type, category.id)),
+                        checked = EffectiveSwitch.readKind(effective, category.type, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.type, category.id, it) },
+                        testTag = "listen-row-${category.type.wire}-${category.id}",
                     )
                 }
             }
@@ -402,10 +406,10 @@ fun PerAppListenSettingsScreen(
                 CategoryTaxonomy.forType(RecordType.SYSTEM).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
                     ToggleListItem(
-                        label = res.getString(KindLabelRes.resolve(category.id)),
-                        checked = EffectiveSwitch.readKind(effective, category.id) == true,
-                        onCheckedChange = { viewModel.setKind(category.id, it) },
-                        testTag = "listen-row-${category.id}",
+                        label = res.getString(KindLabelRes.resolve(category.type, category.id)),
+                        checked = EffectiveSwitch.readKind(effective, category.type, category.id) == true,
+                        onCheckedChange = { viewModel.setKind(category.type, category.id, it) },
+                        testTag = "listen-row-${category.type.wire}-${category.id}",
                     )
                 }
             }
@@ -462,7 +466,9 @@ fun PerAppListenSettingsScreen(
             }
             Spacer(Modifier.height(16.dp))
 
-            if (!override.isDefault) {
+            // V45 T3.5 / DUAL-12:恢复默认行按**本域**偏差出现与计数 ——
+            // 旧形态读跨域总数,功能页有定制时监听页会虚现「N 项自定义」且恢复会连带清功能域。
+            if (override.deviationCountFor(CapabilityDomain.LISTEN) > 0) {
                 SettingsSection(stringResource(R.string.app_monitor_actions_section)) {
                     ListItem(
                         colors = ListItemDefaults.colors(
@@ -476,8 +482,8 @@ fun PerAppListenSettingsScreen(
                             )
                         },
                         supportingContent = {
-                            // V37 C8:偏差计数收敛单一事实源 AppListenOverride.deviationCount
-                            val n = override.deviationCount
+                            // V37 C8 计数单源 + V45 T3.5 域内口径(本页只数监听域偏差)
+                            val n = override.deviationCountFor(CapabilityDomain.LISTEN)
                             Text(
                                 pluralStringResource(R.plurals.listen_settings_custom_n, n, n),
                                 style = MaterialTheme.typography.bodySmall,

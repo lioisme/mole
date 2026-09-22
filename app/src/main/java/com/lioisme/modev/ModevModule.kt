@@ -17,6 +17,16 @@ import io.github.libxposed.service.XposedService
 class ModevModule : XposedModule() {
 
     override fun onModuleLoaded(param: ModuleLoadedParam) {
+        // V43 T1:入口级兜底(与 LegacyModuleEntry 对称)——装配残余异常绝不外抛框架
+        // 加载器,杜绝「注入失败拖垮宿主启动」;失败仅记日志,宿主按无模块行为运行。
+        try {
+            install(param)
+        } catch (t: Throwable) {
+            android.util.Log.e(TAG, "Modev: module init crashed, host continues without hooks", t)
+        }
+    }
+
+    private fun install(param: ModuleLoadedParam) {
         // 注入进程:远程偏好经框架 API 读取(框架侧按"本进程加载的模块"身份提供,
         // 而非调用者 UID);legacy 无此能力时 runCatching 降级为 null,配置走 TCP 推送
         val modulePackage = runCatching { moduleApplicationInfo.packageName }.getOrNull()

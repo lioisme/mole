@@ -1,6 +1,5 @@
 package com.lioisme.modev.core.model
 
-import android.util.Log
 
 /**
  * 二态偏差解析(V24;V25 扩展采集微调项):默认配置 [HookSwitch] +
@@ -13,14 +12,20 @@ import android.util.Log
  */
 object EffectiveSwitch {
 
-    private const val TAG = "EffectiveSwitch"
+    /**
+     * 干预启用安全警告出口(V43 T7/V5.1:core 去 Android 依赖——日志经宿主/注入侧
+     * 装配时注入,默认无操作;core 保持纯 JVM 可测)。
+     */
+    @Volatile
+    var interventionWarn: (String) -> Unit = {}
+
 
     /**
-     * 干预型 kind 名集合(V37 T0.4:由 [CategoryTaxonomy] 功能域标注派生,
-     * 单一事实源,消灭手工清单漂移;供安全审计日志)。
+     * 干预型 (类型,id) 对集合(V44 R1-6:FEATURE 域标注派生,消灭手工清单与裸 id 歧义;
+     * 供安全审计日志)。
      */
-    private val INTERVENTION_KINDS: Set<String> =
-        CategoryTaxonomy.forDomain(CapabilityDomain.FEATURE).map { it.id }.toSet()
+    private val INTERVENTION_KINDS: List<Pair<RecordType, String>> =
+        CategoryTaxonomy.forDomain(CapabilityDomain.FEATURE).map { it.type to it.id }
 
     /**
      * @param default  默认配置(未定制项的取值来源)。
@@ -85,200 +90,312 @@ object EffectiveSwitch {
         return result
     }
 
-    /** 类别 id → 有效开关原始位(非 master 门控;供设置页行值回显)。未知 id 返回 null。 */
-    fun readKind(switch: HookSwitch, kindId: String): Boolean? = when (kindId) {
-        CryptoKind.MESSAGE_DIGEST.name -> switch.messageDigest
-        CryptoKind.CIPHER.name -> switch.cipher
-        CryptoKind.MAC.name -> switch.mac
-        CryptoKind.SIGNATURE.name -> switch.signature
-        CryptoKind.KEY_PARAM.name -> switch.keyParam
-        CryptoKind.KEY_GENERATION.name -> switch.keyGeneration
-        CryptoKind.KEY_FACTORY.name -> switch.keyFactory
-        CryptoKind.KEY_STORE.name -> switch.keyStore
-        CryptoKind.KEY_AGREEMENT.name -> switch.keyAgreement
-        CryptoKind.RANDOM.name -> switch.random
-        CryptoKind.BASE64.name -> switch.base64
-        CryptoKind.WEB_CRYPTO.name -> switch.webView
-        SqlKind.OPEN.name -> switch.dbOpen
-        SqlKind.QUERY.name -> switch.dbQuery
-        SqlKind.DML.name -> switch.dbDml
-        SqlKind.EXEC.name -> switch.dbExec
-        SqlKind.TRANSACTION.name -> switch.dbTransaction
-        BehaviorKind.FILE_READ.name -> switch.fileRead
-        BehaviorKind.FILE_WRITE.name -> switch.fileWrite
-        BehaviorKind.FILE_DELETE.name -> switch.fileDelete
-        BehaviorKind.FILE_RENAME.name -> switch.fileRename
-        BehaviorKind.FILE_LIST.name -> switch.fileList
-        BehaviorKind.ASSET_READ.name -> switch.assetRead
-        BehaviorKind.SHELL_EXEC.name -> switch.shellExec
-        PrefsKind.OPEN.name -> switch.prefsOpen
-        PrefsKind.GET.name -> switch.prefsGet
-        PrefsKind.PUT.name -> switch.prefsPut
-        PrefsKind.REMOVE.name -> switch.prefsRemove
-        PrefsKind.CLEAR.name -> switch.prefsClear
-        WebViewKind.PAGE_LOAD.name -> switch.wvPageLoad
-        WebViewKind.EVALUATE_JS.name -> switch.wvEvaluateJs
-        WebViewKind.JS_BRIDGE.name -> switch.wvJsBridge
-        WebViewKind.DEBUG.name -> switch.wvDebug
-        WebViewKind.JS_CRYPTO.name -> switch.wvJsCrypto
-        NetworkKind.SSL_CONTEXT.name -> switch.sslContext
-        NetworkKind.SSL_TRUST_MANAGER.name -> switch.sslTrustManager
-        NetworkKind.SSL_OKHTTP_PINNER.name -> switch.sslOkhttpPinner
-        NetworkKind.SSL_OKHTTP_VERIFIER.name -> switch.sslOkhttpVerifier
-        NetworkKind.SSL_WEBVIEW.name -> switch.sslWebview
-        NetworkKind.SSL_NETWORK_CONFIG.name -> switch.sslNetworkConfig
-        NetworkKind.PROXY_SYSTEM_PROP.name -> switch.proxySystemProp
-        NetworkKind.PROXY_CONNECTIVITY.name -> switch.proxyConnectivity
-        NetworkKind.PROXY_SETTINGS.name -> switch.proxySettings
-        NetworkKind.PROXY_OKHTTP.name -> switch.proxyOkhttp
-        NetworkKind.VPN_CAPABILITIES.name -> switch.vpnCapabilities
-        NetworkKind.VPN_INTERFACE.name -> switch.vpnInterface
-        NetworkKind.VPN_NETWORK_INFO.name -> switch.vpnNetworkInfo
-        NetworkKind.VPN_LINK_PROPERTIES.name -> switch.vpnLinkProperties
-        NetworkKind.REQUEST.name -> switch.networkRequest
-        DeviceEnvKind.ROOT_FILE.name -> switch.rootFile
-        DeviceEnvKind.ROOT_EXEC.name -> switch.rootExec
-        DeviceEnvKind.ROOT_PACKAGE_MANAGER.name -> switch.rootPackageManager
-        DeviceEnvKind.ROOT_PROPERTY.name -> switch.rootProperty
-        DeviceEnvKind.XPOSED_CLASS.name -> switch.xposedClass
-        DeviceEnvKind.XPOSED_STACK.name -> switch.xposedStack
-        DeviceEnvKind.XPOSED_MAPS.name -> switch.xposedMaps
-        DeviceEnvKind.EMULATOR_BUILD.name -> switch.emulatorBuild
-        DeviceEnvKind.EMULATOR_FILE.name -> switch.emulatorFile
-        DeviceEnvKind.EMULATOR_SENSOR.name -> switch.emulatorSensor
-        DeviceEnvKind.EMULATOR_NETWORK.name -> switch.emulatorNetwork
-        DeviceEnvKind.EMULATOR_TELEPHONY.name -> switch.emulatorTelephony
-        DeviceEnvKind.EMULATOR_CPU.name -> switch.emulatorCpu
-        DeviceEnvKind.EMULATOR_BATTERY.name -> switch.emulatorBattery
-        DeviceEnvKind.SYSTEM_PROPERTIES.name -> switch.systemProperties
-        DeviceEnvKind.PROC_STATUS.name -> switch.procStatus
-        DeviceEnvKind.PROC_MOUNT_INFO.name -> switch.procMountInfo
-        DeviceEnvKind.PROC_CGROUP.name -> switch.procCgroup
-        DeviceEnvKind.PROC_NET.name -> switch.procNet
-        DeviceEnvKind.DETECT_ROOT.name -> switch.detectRoot
-        DeviceEnvKind.DETECT_EMULATOR.name -> switch.detectEmulator
-        UiInteractionKind.DIALOG_SHOW.name -> switch.dialogShow
-        UiInteractionKind.DIALOG_KEYWORD.name -> switch.dialogKeyword
-        UiInteractionKind.WIDGET_TEXT.name -> switch.widgetText
-        UiInteractionKind.ACTIVITY_START.name -> switch.activityStart
-        UiInteractionKind.ACTIVITY_RESUME.name -> switch.activityResume
-        SystemKind.LOGCAT.name -> switch.logcatCapture
-        SystemKind.APP_INFO.name -> switch.appInfoCapture
-        SystemKind.SIGNATURE.name -> switch.signatureMonitor
-        ProcessKind.EXIT_INTERCEPT.name -> switch.exitIntercept
-        ProcessKind.CRASH_PREVENT.name -> switch.crashPrevent
-        ProcessKind.SCREEN_RECORD.name -> switch.screenRecordBypass
-        else -> null
+    /**
+     * (类型,id) → 有效开关原始位(V44 限定键路由:非 master 门控;供设置页行值回显)。
+     * 跨类型裸 id 碰撞(OPEN:DATABASE/PREFS;SIGNATURE:CRYPTO/SYSTEM)由类型参数消歧,
+     * 取代旧字符串分支 first-wins 互踩;未知 (type,id) 返回 null。
+     * 与各枚举 → [HookSwitch] 字段的 when 表为读写互逆唯一映射,新增类别必须同步
+     * [applyKind] 与本表(编译期穷尽保证两表同枚举项)。
+     */
+    fun readKind(switch: HookSwitch, type: RecordType, kindId: String): Boolean? = when (type) {
+        RecordType.CRYPTO -> CryptoKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+            when (k) {
+                CryptoKind.MESSAGE_DIGEST -> switch.messageDigest
+                CryptoKind.CIPHER -> switch.cipher
+                CryptoKind.MAC -> switch.mac
+                CryptoKind.SIGNATURE -> switch.signature
+                CryptoKind.KEY_PARAM -> switch.keyParam
+                CryptoKind.KEY_GENERATION -> switch.keyGeneration
+                CryptoKind.KEY_FACTORY -> switch.keyFactory
+                CryptoKind.KEY_STORE -> switch.keyStore
+                CryptoKind.KEY_AGREEMENT -> switch.keyAgreement
+                CryptoKind.RANDOM -> switch.random
+                CryptoKind.BASE64 -> switch.base64
+                CryptoKind.WEB_CRYPTO -> switch.webView
+            }
+        }
+
+        RecordType.DATABASE -> SqlKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+            when (k) {
+                SqlKind.OPEN -> switch.dbOpen
+                SqlKind.QUERY -> switch.dbQuery
+                SqlKind.DML -> switch.dbDml
+                SqlKind.EXEC -> switch.dbExec
+                SqlKind.TRANSACTION -> switch.dbTransaction
+            }
+        }
+
+        RecordType.BEHAVIOR -> BehaviorKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+            when (k) {
+                BehaviorKind.FILE_READ -> switch.fileRead
+                BehaviorKind.FILE_WRITE -> switch.fileWrite
+                BehaviorKind.FILE_DELETE -> switch.fileDelete
+                BehaviorKind.FILE_RENAME -> switch.fileRename
+                BehaviorKind.FILE_LIST -> switch.fileList
+                BehaviorKind.ASSET_READ -> switch.assetRead
+                BehaviorKind.SHELL_EXEC -> switch.shellExec
+            }
+        }
+
+        RecordType.PREFS -> PrefsKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+            when (k) {
+                PrefsKind.OPEN -> switch.prefsOpen
+                PrefsKind.GET -> switch.prefsGet
+                PrefsKind.PUT -> switch.prefsPut
+                PrefsKind.REMOVE -> switch.prefsRemove
+                PrefsKind.CLEAR -> switch.prefsClear
+            }
+        }
+
+        RecordType.WEBVIEW -> WebViewKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+            when (k) {
+                WebViewKind.PAGE_LOAD -> switch.wvPageLoad
+                WebViewKind.EVALUATE_JS -> switch.wvEvaluateJs
+                WebViewKind.JS_BRIDGE -> switch.wvJsBridge
+                WebViewKind.DEBUG -> switch.wvDebug
+                WebViewKind.JS_CRYPTO -> switch.wvJsCrypto
+            }
+        }
+
+        RecordType.NETWORK -> NetworkKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+            when (k) {
+                NetworkKind.SSL_CONTEXT -> switch.sslContext
+                NetworkKind.SSL_TRUST_MANAGER -> switch.sslTrustManager
+                NetworkKind.SSL_OKHTTP_PINNER -> switch.sslOkhttpPinner
+                NetworkKind.SSL_OKHTTP_VERIFIER -> switch.sslOkhttpVerifier
+                NetworkKind.SSL_WEBVIEW -> switch.sslWebview
+                NetworkKind.SSL_NETWORK_CONFIG -> switch.sslNetworkConfig
+                NetworkKind.PROXY_SYSTEM_PROP -> switch.proxySystemProp
+                NetworkKind.PROXY_CONNECTIVITY -> switch.proxyConnectivity
+                NetworkKind.PROXY_SETTINGS -> switch.proxySettings
+                NetworkKind.PROXY_OKHTTP -> switch.proxyOkhttp
+                NetworkKind.VPN_CAPABILITIES -> switch.vpnCapabilities
+                NetworkKind.VPN_INTERFACE -> switch.vpnInterface
+                NetworkKind.VPN_NETWORK_INFO -> switch.vpnNetworkInfo
+                NetworkKind.VPN_LINK_PROPERTIES -> switch.vpnLinkProperties
+                NetworkKind.REQUEST -> switch.networkRequest
+            }
+        }
+
+        RecordType.DEVICE_ENV -> DeviceEnvKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+            when (k) {
+                DeviceEnvKind.ROOT_FILE -> switch.rootFile
+                DeviceEnvKind.ROOT_EXEC -> switch.rootExec
+                DeviceEnvKind.ROOT_PACKAGE_MANAGER -> switch.rootPackageManager
+                DeviceEnvKind.ROOT_PROPERTY -> switch.rootProperty
+                DeviceEnvKind.XPOSED_CLASS -> switch.xposedClass
+                DeviceEnvKind.XPOSED_STACK -> switch.xposedStack
+                DeviceEnvKind.XPOSED_MAPS -> switch.xposedMaps
+                DeviceEnvKind.EMULATOR_BUILD -> switch.emulatorBuild
+                DeviceEnvKind.EMULATOR_FILE -> switch.emulatorFile
+                DeviceEnvKind.EMULATOR_SENSOR -> switch.emulatorSensor
+                DeviceEnvKind.EMULATOR_NETWORK -> switch.emulatorNetwork
+                DeviceEnvKind.EMULATOR_TELEPHONY -> switch.emulatorTelephony
+                DeviceEnvKind.EMULATOR_CPU -> switch.emulatorCpu
+                DeviceEnvKind.EMULATOR_BATTERY -> switch.emulatorBattery
+                DeviceEnvKind.SYSTEM_PROPERTIES -> switch.systemProperties
+                DeviceEnvKind.PROC_STATUS -> switch.procStatus
+                DeviceEnvKind.PROC_MOUNT_INFO -> switch.procMountInfo
+                DeviceEnvKind.PROC_CGROUP -> switch.procCgroup
+                DeviceEnvKind.PROC_NET -> switch.procNet
+                DeviceEnvKind.DETECT_ROOT -> switch.detectRoot
+                DeviceEnvKind.DETECT_EMULATOR -> switch.detectEmulator
+            }
+        }
+
+        RecordType.UI_INTERACTION -> UiInteractionKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+            when (k) {
+                UiInteractionKind.DIALOG_SHOW -> switch.dialogShow
+                UiInteractionKind.DIALOG_KEYWORD -> switch.dialogKeyword
+                UiInteractionKind.WIDGET_TEXT -> switch.widgetText
+                UiInteractionKind.ACTIVITY_START -> switch.activityStart
+                UiInteractionKind.ACTIVITY_RESUME -> switch.activityResume
+            }
+        }
+
+        RecordType.SYSTEM -> SystemKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+            when (k) {
+                SystemKind.LOGCAT -> switch.logcatCapture
+                SystemKind.APP_INFO -> switch.appInfoCapture
+                SystemKind.SIGNATURE -> switch.signatureMonitor
+            }
+        }
+
+        RecordType.PROCESS_CONTROL -> ProcessKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+            when (k) {
+                ProcessKind.EXIT_INTERCEPT -> switch.exitIntercept
+                ProcessKind.CRASH_PREVENT -> switch.crashPrevent
+                ProcessKind.SCREEN_RECORD -> switch.screenRecordBypass
+            }
+        }
     }
 
-    /** 类别偏差 → [HookSwitch] 平铺字段映射(与 [readKind] 严格互逆,须同步维护)。 */
+    /**
+     * 类别偏差 → [HookSwitch] 平铺字段映射(与 [readKind] 严格互逆,须同步维护)。
+     * 键经 [AppListenOverride.parseKindKey] 归一(限定形态直解;遗留裸 id 按序首类型解析),
+     * 无法解析的键忽略(存储漂移兜底)。
+     */
     private fun applyKinds(
         switch: HookSwitch,
         kinds: Map<String, Boolean>,
     ): HookSwitch {
         var result = switch
-        for ((name, value) in kinds) {
-            result = when (name) {
-                CryptoKind.MESSAGE_DIGEST.name -> result.copy(messageDigest = value)
-                CryptoKind.CIPHER.name -> result.copy(cipher = value)
-                CryptoKind.MAC.name -> result.copy(mac = value)
-                CryptoKind.SIGNATURE.name -> result.copy(signature = value)
-                CryptoKind.KEY_PARAM.name -> result.copy(keyParam = value)
-                CryptoKind.KEY_GENERATION.name -> result.copy(keyGeneration = value)
-                CryptoKind.KEY_FACTORY.name -> result.copy(keyFactory = value)
-                CryptoKind.KEY_STORE.name -> result.copy(keyStore = value)
-                CryptoKind.KEY_AGREEMENT.name -> result.copy(keyAgreement = value)
-                CryptoKind.RANDOM.name -> result.copy(random = value)
-                CryptoKind.BASE64.name -> result.copy(base64 = value)
-                CryptoKind.WEB_CRYPTO.name -> result.copy(webView = value)
-                SqlKind.OPEN.name -> result.copy(dbOpen = value)
-                SqlKind.QUERY.name -> result.copy(dbQuery = value)
-                SqlKind.DML.name -> result.copy(dbDml = value)
-                SqlKind.EXEC.name -> result.copy(dbExec = value)
-                SqlKind.TRANSACTION.name -> result.copy(dbTransaction = value)
-                BehaviorKind.FILE_READ.name -> result.copy(fileRead = value)
-                BehaviorKind.FILE_WRITE.name -> result.copy(fileWrite = value)
-                BehaviorKind.FILE_DELETE.name -> result.copy(fileDelete = value)
-                BehaviorKind.FILE_RENAME.name -> result.copy(fileRename = value)
-                BehaviorKind.FILE_LIST.name -> result.copy(fileList = value)
-                BehaviorKind.ASSET_READ.name -> result.copy(assetRead = value)
-                BehaviorKind.SHELL_EXEC.name -> result.copy(shellExec = value)
-                PrefsKind.OPEN.name -> result.copy(prefsOpen = value)
-                PrefsKind.GET.name -> result.copy(prefsGet = value)
-                PrefsKind.PUT.name -> result.copy(prefsPut = value)
-                PrefsKind.REMOVE.name -> result.copy(prefsRemove = value)
-                PrefsKind.CLEAR.name -> result.copy(prefsClear = value)
-                WebViewKind.PAGE_LOAD.name -> result.copy(wvPageLoad = value)
-                WebViewKind.EVALUATE_JS.name -> result.copy(wvEvaluateJs = value)
-                WebViewKind.JS_BRIDGE.name -> result.copy(wvJsBridge = value)
-                WebViewKind.DEBUG.name -> result.copy(wvDebug = value)
-                WebViewKind.JS_CRYPTO.name -> result.copy(wvJsCrypto = value)
-                NetworkKind.SSL_CONTEXT.name -> result.copy(sslContext = value)
-                NetworkKind.SSL_TRUST_MANAGER.name -> result.copy(sslTrustManager = value)
-                NetworkKind.SSL_OKHTTP_PINNER.name -> result.copy(sslOkhttpPinner = value)
-                NetworkKind.SSL_OKHTTP_VERIFIER.name -> result.copy(sslOkhttpVerifier = value)
-                NetworkKind.SSL_WEBVIEW.name -> result.copy(sslWebview = value)
-                NetworkKind.SSL_NETWORK_CONFIG.name -> result.copy(sslNetworkConfig = value)
-                NetworkKind.PROXY_SYSTEM_PROP.name -> result.copy(proxySystemProp = value)
-                NetworkKind.PROXY_CONNECTIVITY.name -> result.copy(proxyConnectivity = value)
-                NetworkKind.PROXY_SETTINGS.name -> result.copy(proxySettings = value)
-                NetworkKind.PROXY_OKHTTP.name -> result.copy(proxyOkhttp = value)
-                NetworkKind.VPN_CAPABILITIES.name -> result.copy(vpnCapabilities = value)
-                NetworkKind.VPN_INTERFACE.name -> result.copy(vpnInterface = value)
-                NetworkKind.VPN_NETWORK_INFO.name -> result.copy(vpnNetworkInfo = value)
-                NetworkKind.VPN_LINK_PROPERTIES.name -> result.copy(vpnLinkProperties = value)
-                NetworkKind.REQUEST.name -> result.copy(networkRequest = value)
-                DeviceEnvKind.ROOT_FILE.name -> result.copy(rootFile = value)
-                DeviceEnvKind.ROOT_EXEC.name -> result.copy(rootExec = value)
-                DeviceEnvKind.ROOT_PACKAGE_MANAGER.name -> result.copy(rootPackageManager = value)
-                DeviceEnvKind.ROOT_PROPERTY.name -> result.copy(rootProperty = value)
-                DeviceEnvKind.XPOSED_CLASS.name -> result.copy(xposedClass = value)
-                DeviceEnvKind.XPOSED_STACK.name -> result.copy(xposedStack = value)
-                DeviceEnvKind.XPOSED_MAPS.name -> result.copy(xposedMaps = value)
-                DeviceEnvKind.EMULATOR_BUILD.name -> result.copy(emulatorBuild = value)
-                DeviceEnvKind.EMULATOR_FILE.name -> result.copy(emulatorFile = value)
-                DeviceEnvKind.EMULATOR_SENSOR.name -> result.copy(emulatorSensor = value)
-                DeviceEnvKind.EMULATOR_NETWORK.name -> result.copy(emulatorNetwork = value)
-                DeviceEnvKind.EMULATOR_TELEPHONY.name -> result.copy(emulatorTelephony = value)
-                DeviceEnvKind.EMULATOR_CPU.name -> result.copy(emulatorCpu = value)
-                DeviceEnvKind.EMULATOR_BATTERY.name -> result.copy(emulatorBattery = value)
-                DeviceEnvKind.SYSTEM_PROPERTIES.name -> result.copy(systemProperties = value)
-                DeviceEnvKind.PROC_STATUS.name -> result.copy(procStatus = value)
-                DeviceEnvKind.PROC_MOUNT_INFO.name -> result.copy(procMountInfo = value)
-                DeviceEnvKind.PROC_CGROUP.name -> result.copy(procCgroup = value)
-                DeviceEnvKind.PROC_NET.name -> result.copy(procNet = value)
-                DeviceEnvKind.DETECT_ROOT.name -> result.copy(detectRoot = value)
-                DeviceEnvKind.DETECT_EMULATOR.name -> result.copy(detectEmulator = value)
-                UiInteractionKind.DIALOG_SHOW.name -> result.copy(dialogShow = value)
-                UiInteractionKind.DIALOG_KEYWORD.name -> result.copy(dialogKeyword = value)
-                UiInteractionKind.WIDGET_TEXT.name -> result.copy(widgetText = value)
-                UiInteractionKind.ACTIVITY_START.name -> result.copy(activityStart = value)
-                UiInteractionKind.ACTIVITY_RESUME.name -> result.copy(activityResume = value)
-                SystemKind.LOGCAT.name -> result.copy(logcatCapture = value)
-                SystemKind.APP_INFO.name -> result.copy(appInfoCapture = value)
-                SystemKind.SIGNATURE.name -> result.copy(signatureMonitor = value)
-                ProcessKind.EXIT_INTERCEPT.name -> result.copy(exitIntercept = value)
-                ProcessKind.CRASH_PREVENT.name -> result.copy(crashPrevent = value)
-                ProcessKind.SCREEN_RECORD.name -> result.copy(screenRecordBypass = value)
-                // 未知 kind 名:忽略(存储漂移兜底)
-                else -> result
-            }
+        for ((key, value) in kinds) {
+            val parsed = AppListenOverride.parseKindKey(key) ?: continue
+            result = applyKind(result, parsed.first, parsed.second, value)
         }
         return result
     }
+
+    /** (类型,id,值) → 单字段覆写(未知 (type,id) 原样返回,漂移安全)。 */
+    private fun applyKind(switch: HookSwitch, type: RecordType, kindId: String, value: Boolean): HookSwitch =
+        when (type) {
+            RecordType.CRYPTO -> CryptoKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+                when (k) {
+                    CryptoKind.MESSAGE_DIGEST -> switch.copy(messageDigest = value)
+                    CryptoKind.CIPHER -> switch.copy(cipher = value)
+                    CryptoKind.MAC -> switch.copy(mac = value)
+                    CryptoKind.SIGNATURE -> switch.copy(signature = value)
+                    CryptoKind.KEY_PARAM -> switch.copy(keyParam = value)
+                    CryptoKind.KEY_GENERATION -> switch.copy(keyGeneration = value)
+                    CryptoKind.KEY_FACTORY -> switch.copy(keyFactory = value)
+                    CryptoKind.KEY_STORE -> switch.copy(keyStore = value)
+                    CryptoKind.KEY_AGREEMENT -> switch.copy(keyAgreement = value)
+                    CryptoKind.RANDOM -> switch.copy(random = value)
+                    CryptoKind.BASE64 -> switch.copy(base64 = value)
+                    CryptoKind.WEB_CRYPTO -> switch.copy(webView = value)
+                }
+            } ?: switch
+
+            RecordType.DATABASE -> SqlKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+                when (k) {
+                    SqlKind.OPEN -> switch.copy(dbOpen = value)
+                    SqlKind.QUERY -> switch.copy(dbQuery = value)
+                    SqlKind.DML -> switch.copy(dbDml = value)
+                    SqlKind.EXEC -> switch.copy(dbExec = value)
+                    SqlKind.TRANSACTION -> switch.copy(dbTransaction = value)
+                }
+            } ?: switch
+
+            RecordType.BEHAVIOR -> BehaviorKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+                when (k) {
+                    BehaviorKind.FILE_READ -> switch.copy(fileRead = value)
+                    BehaviorKind.FILE_WRITE -> switch.copy(fileWrite = value)
+                    BehaviorKind.FILE_DELETE -> switch.copy(fileDelete = value)
+                    BehaviorKind.FILE_RENAME -> switch.copy(fileRename = value)
+                    BehaviorKind.FILE_LIST -> switch.copy(fileList = value)
+                    BehaviorKind.ASSET_READ -> switch.copy(assetRead = value)
+                    BehaviorKind.SHELL_EXEC -> switch.copy(shellExec = value)
+                }
+            } ?: switch
+
+            RecordType.PREFS -> PrefsKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+                when (k) {
+                    PrefsKind.OPEN -> switch.copy(prefsOpen = value)
+                    PrefsKind.GET -> switch.copy(prefsGet = value)
+                    PrefsKind.PUT -> switch.copy(prefsPut = value)
+                    PrefsKind.REMOVE -> switch.copy(prefsRemove = value)
+                    PrefsKind.CLEAR -> switch.copy(prefsClear = value)
+                }
+            } ?: switch
+
+            RecordType.WEBVIEW -> WebViewKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+                when (k) {
+                    WebViewKind.PAGE_LOAD -> switch.copy(wvPageLoad = value)
+                    WebViewKind.EVALUATE_JS -> switch.copy(wvEvaluateJs = value)
+                    WebViewKind.JS_BRIDGE -> switch.copy(wvJsBridge = value)
+                    WebViewKind.DEBUG -> switch.copy(wvDebug = value)
+                    WebViewKind.JS_CRYPTO -> switch.copy(wvJsCrypto = value)
+                }
+            } ?: switch
+
+            RecordType.NETWORK -> NetworkKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+                when (k) {
+                    NetworkKind.SSL_CONTEXT -> switch.copy(sslContext = value)
+                    NetworkKind.SSL_TRUST_MANAGER -> switch.copy(sslTrustManager = value)
+                    NetworkKind.SSL_OKHTTP_PINNER -> switch.copy(sslOkhttpPinner = value)
+                    NetworkKind.SSL_OKHTTP_VERIFIER -> switch.copy(sslOkhttpVerifier = value)
+                    NetworkKind.SSL_WEBVIEW -> switch.copy(sslWebview = value)
+                    NetworkKind.SSL_NETWORK_CONFIG -> switch.copy(sslNetworkConfig = value)
+                    NetworkKind.PROXY_SYSTEM_PROP -> switch.copy(proxySystemProp = value)
+                    NetworkKind.PROXY_CONNECTIVITY -> switch.copy(proxyConnectivity = value)
+                    NetworkKind.PROXY_SETTINGS -> switch.copy(proxySettings = value)
+                    NetworkKind.PROXY_OKHTTP -> switch.copy(proxyOkhttp = value)
+                    NetworkKind.VPN_CAPABILITIES -> switch.copy(vpnCapabilities = value)
+                    NetworkKind.VPN_INTERFACE -> switch.copy(vpnInterface = value)
+                    NetworkKind.VPN_NETWORK_INFO -> switch.copy(vpnNetworkInfo = value)
+                    NetworkKind.VPN_LINK_PROPERTIES -> switch.copy(vpnLinkProperties = value)
+                    NetworkKind.REQUEST -> switch.copy(networkRequest = value)
+                }
+            } ?: switch
+
+            RecordType.DEVICE_ENV -> DeviceEnvKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+                when (k) {
+                    DeviceEnvKind.ROOT_FILE -> switch.copy(rootFile = value)
+                    DeviceEnvKind.ROOT_EXEC -> switch.copy(rootExec = value)
+                    DeviceEnvKind.ROOT_PACKAGE_MANAGER -> switch.copy(rootPackageManager = value)
+                    DeviceEnvKind.ROOT_PROPERTY -> switch.copy(rootProperty = value)
+                    DeviceEnvKind.XPOSED_CLASS -> switch.copy(xposedClass = value)
+                    DeviceEnvKind.XPOSED_STACK -> switch.copy(xposedStack = value)
+                    DeviceEnvKind.XPOSED_MAPS -> switch.copy(xposedMaps = value)
+                    DeviceEnvKind.EMULATOR_BUILD -> switch.copy(emulatorBuild = value)
+                    DeviceEnvKind.EMULATOR_FILE -> switch.copy(emulatorFile = value)
+                    DeviceEnvKind.EMULATOR_SENSOR -> switch.copy(emulatorSensor = value)
+                    DeviceEnvKind.EMULATOR_NETWORK -> switch.copy(emulatorNetwork = value)
+                    DeviceEnvKind.EMULATOR_TELEPHONY -> switch.copy(emulatorTelephony = value)
+                    DeviceEnvKind.EMULATOR_CPU -> switch.copy(emulatorCpu = value)
+                    DeviceEnvKind.EMULATOR_BATTERY -> switch.copy(emulatorBattery = value)
+                    DeviceEnvKind.SYSTEM_PROPERTIES -> switch.copy(systemProperties = value)
+                    DeviceEnvKind.PROC_STATUS -> switch.copy(procStatus = value)
+                    DeviceEnvKind.PROC_MOUNT_INFO -> switch.copy(procMountInfo = value)
+                    DeviceEnvKind.PROC_CGROUP -> switch.copy(procCgroup = value)
+                    DeviceEnvKind.PROC_NET -> switch.copy(procNet = value)
+                    DeviceEnvKind.DETECT_ROOT -> switch.copy(detectRoot = value)
+                    DeviceEnvKind.DETECT_EMULATOR -> switch.copy(detectEmulator = value)
+                }
+            } ?: switch
+
+            RecordType.UI_INTERACTION -> UiInteractionKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+                when (k) {
+                    UiInteractionKind.DIALOG_SHOW -> switch.copy(dialogShow = value)
+                    UiInteractionKind.DIALOG_KEYWORD -> switch.copy(dialogKeyword = value)
+                    UiInteractionKind.WIDGET_TEXT -> switch.copy(widgetText = value)
+                    UiInteractionKind.ACTIVITY_START -> switch.copy(activityStart = value)
+                    UiInteractionKind.ACTIVITY_RESUME -> switch.copy(activityResume = value)
+                }
+            } ?: switch
+
+            RecordType.SYSTEM -> SystemKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+                when (k) {
+                    SystemKind.LOGCAT -> switch.copy(logcatCapture = value)
+                    SystemKind.APP_INFO -> switch.copy(appInfoCapture = value)
+                    SystemKind.SIGNATURE -> switch.copy(signatureMonitor = value)
+                }
+            } ?: switch
+
+            RecordType.PROCESS_CONTROL -> ProcessKind.entries.firstOrNull { it.name == kindId }?.let { k ->
+                when (k) {
+                    ProcessKind.EXIT_INTERCEPT -> switch.copy(exitIntercept = value)
+                    ProcessKind.CRASH_PREVENT -> switch.copy(crashPrevent = value)
+                    ProcessKind.SCREEN_RECORD -> switch.copy(screenRecordBypass = value)
+                }
+            } ?: switch
+        }
 
     /**
      * V34 审计增强:检测干预型开关从默认关变为开的状态,输出 Log.w 安全警告。
      * 仅在 override 生效时触发,不影响解析结果。
      */
     private fun logInterventionActivation(result: HookSwitch, default: HookSwitch) {
-        val newlyEnabled = INTERVENTION_KINDS.filter { kindId ->
-            val enabled = readKind(result, kindId) == true
-            val wasDefault = readKind(default, kindId) == true
+        val newlyEnabled = INTERVENTION_KINDS.filter { (type, kindId) ->
+            val enabled = readKind(result, type, kindId) == true
+            val wasDefault = readKind(default, type, kindId) == true
             enabled && !wasDefault
         }
         if (newlyEnabled.isNotEmpty()) {
-            Log.w(TAG, "干预型功能已启用: ${newlyEnabled.joinToString()}")
+            interventionWarn(
+                "干预型功能已启用: ${newlyEnabled.joinToString { (t, id) -> "${t.wire}:$id" }}",
+            )
         }
     }
 }

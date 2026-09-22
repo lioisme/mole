@@ -221,6 +221,15 @@ export const T3 = {
   danger_clear_process_control_msg: ['すべてのプロセス制御記録を完全に削除しますか?この操作は元に戻せません。', '모든 프로세스 제어 기록을 영구 삭제하시겠습니까? 되돌릴 수 없습니다.'],
   records_clear_action: ['この種別を消去', '이 유형 삭제'],
   danger_clear_page_records_msg: ['このアプリのこの種別の記録をすべて完全に削除しますか?この操作は元に戻せません。', '이 앱의 이 유형 기록을 모두 영구 삭제하시겠습니까? 되돌릴 수 없습니다.'],
+  // V43 T4/V45 期间这 7 键被直写进 values-ja/ko 而未回写本表 ⇒ 生成器自那以后
+  // 一直抛 "missing from translation table"(V46 实锤)。按现值回填,恢复「表 = 唯一事实源」。
+  record_field_app: ['アプリ', '앱'],
+  meta_exit_code: ['終了コード', '종료 코드'],
+  meta_pid: ['プロセス ID', '프로세스 ID'],
+  record_action_blocked: ['ブロック済み', '차단됨'],
+  record_action_detected: ['検出', '감지됨'],
+  record_value_no: ['なし', '없음'],
+  stats_bytes_dropped: ['廃棄(ペイロード予算)', '버려짐(페이로드 예산)'],
 };
 
 /** plurals(ja/ko CLDR = other のみ) */

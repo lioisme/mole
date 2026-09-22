@@ -6,21 +6,30 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RawQuery
 import androidx.room.Transaction
 import androidx.room.Upsert
+import androidx.sqlite.db.SupportSQLiteQuery
+import com.lioisme.modev.domain.record.RecordTypeCount
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 算法/数据库记录存取。所有查询按 (packageName, timestamp) 倒序,支持
- * recordType / kind / operation / package / 关键字 / 时间范围过滤。
+ * 统一记录表存取(表承载 10 类记录,名 = [CryptoRecordEntity.TABLE_NAME])。
  *
- * 复合索引 (packageName, timestamp)、(packageName, kind)、(recordType, kind)、
- * (recordType, packageName, timestamp) 由实体声明(见 [CryptoRecordEntity])。
+ * 查询形态(V45 T1.1 起,R1「底层数据架构高效」):
+ * - **谓词不写在 SQL 里**——列表 / 计数 / 删除候选 id / 详情邻接四路的谓词一律由
+ *   [RecordQueryFactory] 从 [com.lioisme.modev.domain.record.RecordFilter] 派生
+ *   (缺省维度不出列,使 SQLite 能选索引;旧 `(:xCount = 0 OR col IN (:xs))` 哨兵
+ *   片段与 `WHERE_FILTER` 常量已删除),DAO 侧只留 `@RawQuery` 执行位;
+ * - 「删 = 筛 = 计数」口径单一由「同一生成器 + 同一投影列」保证;`@RawQuery` 不承担
+ *   DML,故删除 = [idsByQuery] 取同谓词 id → [deleteByIds] 按主键分片删;
+ * - 列表投影列([ROW_SELECT])为分页与切片共用,保证两者列集一致,
+ *   且大字段(hex/base64/正文/堆栈/结果集)恒不进列表,仅 SQL 侧 `substr` 预览。
  *
- * recordType 过滤语义:null = 不过滤(跨类型合计),非 null = 仅该监听类型(ADR-4)。
- *
- * WHERE 片段([WHERE_FILTER])为 count / delete / slice 三查询唯一来源,杜绝筛选项漂移;
- * 列表投影列([ROW_SELECT])为分页与切片共用,保证两者列集一致。
+ * 索引(见 [CryptoRecordEntity]):(packageName, timestamp)、(packageName, kind)、
+ * (recordType, kind)、(recordType, packageName, timestamp)、(timestamp) 与唯一
+ * (packageName, processName, seq)。**索引是否真被命中由真机 `EXPLAIN QUERY PLAN`
+ * 门禁裁决**(见 `RecordQueryPlanTest`,Robolectric 会剥离 EXPLAIN 前缀不可用)。
  */
 @Dao
 interface CryptoRecordDao {
@@ -45,218 +54,48 @@ interface CryptoRecordDao {
     @Upsert
     suspend fun upsert(record: CryptoRecordEntity)
 
-    /**
-     * 分页查询(供 Paging3 使用)。关键字为已转义的 LIKE 模式(仓库层负责 escape)。
-     * `LIMIT :limit OFFSET :offset` 由 Room 生成的 PagingSource 注入。
-     */
-    @Query(
-        """
-        SELECT * FROM crypto_records
-        WHERE (:recordType IS NULL OR recordType = :recordType)
-          AND (:packageName IS NULL OR packageName = :packageName)
-          AND (:kind IS NULL OR kind = :kind)
-          AND (:query IS NULL OR :query = ''
-                OR algorithm LIKE :query ESCAPE '\'
-                OR operation LIKE :query ESCAPE '\'
-                OR keyText LIKE :query ESCAPE '\'
-                OR keyHex LIKE :query ESCAPE '\'
-                OR inputText LIKE :query ESCAPE '\'
-                OR inputHex LIKE :query ESCAPE '\'
-                OR outputText LIKE :query ESCAPE '\'
-                OR outputHex LIKE :query ESCAPE '\'
-                OR threadName LIKE :query ESCAPE '\'
-                OR sql LIKE :query ESCAPE '\'
-                OR resultText LIKE :query ESCAPE '\'
-                OR prefKey LIKE :query ESCAPE '\')
-        ORDER BY timestamp DESC, id DESC
-        LIMIT :limit OFFSET :offset
-        """
-    )
-    fun observePaged(
-        recordType: String?,
-        packageName: String?,
-        kind: String?,
-        query: String?,
-        limit: Int,
-        offset: Int,
-    ): PagingSource<Int, CryptoRecordEntity>
+    // ------------------------------------------------------------------
+    // V45 T1.1(ST-1 / ST-2):谓词派生查询四路(列表 / 计数 / 删除前置 id / 详情邻接)。
+    // 谓词唯一生成器 = [RecordQueryFactory]——缺省维度不出列,使 SQLite 可选索引;
+    // 旧 `@Query + $WHERE_FILTER` 哨兵形态在本批删除(见各方法 KDoc)。
+    // ------------------------------------------------------------------
+
+    /** 流式分页记录行(谓词与排序由查询对象承载;[RecordQueryFactory.rows])。 */
+    @RawQuery(observedEntities = [CryptoRecordEntity::class])
+    fun pagedRows(query: SupportSQLiteQuery): PagingSource<Int, CryptoRecordRow>
+
+    /** 同步切片记录行(MCP / 导出等非 Paging 消费者)。 */
+    @RawQuery(observedEntities = [CryptoRecordEntity::class])
+    suspend fun sliceRows(query: SupportSQLiteQuery): List<CryptoRecordRow>
+
+    /** 匹配计数(与 [pagedRows] / [sliceRows] 同谓词)。 */
+    @RawQuery(observedEntities = [CryptoRecordEntity::class])
+    fun countByQuery(query: SupportSQLiteQuery): Flow<Long>
+
+    /** 匹配 id 集(删除前置:`@RawQuery` 不承担 DML,删走 [deleteByIds])。 */
+    @RawQuery(observedEntities = [CryptoRecordEntity::class])
+    suspend fun idsByQuery(query: SupportSQLiteQuery): List<Long>
+
+    /** 邻接 id(keyset,与列表同谓词)。 */
+    @RawQuery(observedEntities = [CryptoRecordEntity::class])
+    suspend fun neighborIdByQuery(query: SupportSQLiteQuery): Long?
+
+    /** 按记录类型分组计数(谓词同 [countByQuery];V45 ST-6 一次 GROUP BY 出全部类型)。 */
+    @RawQuery(observedEntities = [CryptoRecordEntity::class])
+    fun typeCountsByQuery(query: SupportSQLiteQuery): Flow<List<RecordTypeCount>>
 
     /**
-     * 列表投影分页(供 Paging3 使用,2026-08-17 大数据修复):
-     * 仅取展示列 + SQL 侧 `substr` 预览裁剪,列表页零大字段物化。
-     * 过滤/排序语义与 [observePaged] 一致,新增 operation / 时间范围维度。
+     * 按主键批量删除(「删 = 筛」的后半段:候选 id 来自 [idsByQuery] 同一谓词);
+     * 单事务,调用方按 ≤500 分片(SQLite 变量数上限)。
      */
-    @Query(
-        """
-        SELECT $ROW_SELECT
-        FROM crypto_records
-        WHERE (:recordType IS NULL OR recordType = :recordType)
-          AND (:packageName IS NULL OR packageName = :packageName)
-          AND (:kind IS NULL OR kind = :kind)
-          AND (:query IS NULL OR :query = ''
-                OR algorithm LIKE :query ESCAPE '\'
-                OR operation LIKE :query ESCAPE '\'
-                OR keyText LIKE :query ESCAPE '\'
-                OR keyHex LIKE :query ESCAPE '\'
-                OR inputText LIKE :query ESCAPE '\'
-                OR inputHex LIKE :query ESCAPE '\'
-                OR outputText LIKE :query ESCAPE '\'
-                OR outputHex LIKE :query ESCAPE '\'
-                OR threadName LIKE :query ESCAPE '\'
-                OR sql LIKE :query ESCAPE '\'
-                OR resultText LIKE :query ESCAPE '\'
-                OR prefKey LIKE :query ESCAPE '\')
-        ORDER BY timestamp DESC, id DESC
-        LIMIT :limit OFFSET :offset
-        """
-    )
-    fun observePagedRows(
-        recordType: String?,
-        packageName: String?,
-        kind: String?,
-        query: String?,
-        previewChars: Int,
-        limit: Int,
-        offset: Int,
-    ): PagingSource<Int, CryptoRecordRow>
-
-    /**
-     * 集合过滤投影分页(V17 R2 RecordFilter 契约):与 [observePagedRows] 同列投影,
-     * 但类型/包/类别/操作为 IN 多值语义。Room 需绑定非空集合:仓库层以哨兵计数
-     * (`:xCount = 0 OR ... IN (...)`)表达"不过滤",集合为 null/空时绑定占位单例。
-     */
-    @Query(
-        """
-        SELECT $ROW_SELECT
-        FROM crypto_records
-        WHERE $WHERE_FILTER
-        ORDER BY timestamp DESC, id DESC
-        LIMIT :limit OFFSET :offset
-        """
-    )
-    fun observePagedRowsByFilter(
-        recordTypes: List<String>,
-        packages: List<String>,
-        kinds: List<String>,
-        typeCount: Int,
-        packageCount: Int,
-        kindCount: Int,
-        query: String?,
-        previewChars: Int,
-        limit: Int,
-        offset: Int,
-        operations: List<String> = emptyList(),
-        opCount: Int = 0,
-        timeStart: Long? = null,
-        timeEnd: Long? = null,
-    ): PagingSource<Int, CryptoRecordRow>
-
-    /** 匹配 [RecordFilter] 的记录总数(契约计数入口),含 operation / 时间范围维度。 */
-    @Query(
-        """
-        SELECT COUNT(*) AS total FROM crypto_records
-        WHERE $WHERE_FILTER
-        """
-    )
-    fun observeCountByFilter(
-        recordTypes: List<String>,
-        packages: List<String>,
-        kinds: List<String>,
-        typeCount: Int,
-        packageCount: Int,
-        kindCount: Int,
-        query: String?,
-        operations: List<String> = emptyList(),
-        opCount: Int = 0,
-        timeStart: Long? = null,
-        timeEnd: Long? = null,
-    ): Flow<Long>
-
-    /**
-     * 按 [RecordFilter] 批量删除,返回删除条数。WHERE 与 [observeCountByFilter] 完全一致
-     * (共享 [WHERE_FILTER]),保证"删 = 筛";空交集由仓库层短路(见 [RecordService])。
-     */
-    @Query(
-        """
-        DELETE FROM crypto_records
-        WHERE $WHERE_FILTER
-        """
-    )
-    suspend fun deleteByFilter(
-        recordTypes: List<String>,
-        packages: List<String>,
-        kinds: List<String>,
-        operations: List<String>,
-        typeCount: Int,
-        packageCount: Int,
-        kindCount: Int,
-        opCount: Int,
-        timeStart: Long?,
-        timeEnd: Long?,
-        query: String?,
-    ): Int
-
-    /**
-     * 同步切片查询(供 MCP [RecordService.queryPage] 等非 Paging 消费者)。
-     * 列投影/WHERE 与分页一致,仅排序方向按 [asc] 切换。
-     */
-    @Query(
-        """
-        SELECT $ROW_SELECT
-        FROM crypto_records
-        WHERE $WHERE_FILTER
-        ORDER BY timestamp ASC, id ASC
-        LIMIT :limit OFFSET :offset
-        """
-    )
-    fun sliceByFilterAsc(
-        recordTypes: List<String>,
-        packages: List<String>,
-        kinds: List<String>,
-        typeCount: Int,
-        packageCount: Int,
-        kindCount: Int,
-        query: String?,
-        previewChars: Int,
-        limit: Int,
-        offset: Int,
-        operations: List<String> = emptyList(),
-        opCount: Int = 0,
-        timeStart: Long? = null,
-        timeEnd: Long? = null,
-    ): List<CryptoRecordRow>
-
-    /** 同步切片查询(时间倒序,列表默认方向)。 */
-    @Query(
-        """
-        SELECT $ROW_SELECT
-        FROM crypto_records
-        WHERE $WHERE_FILTER
-        ORDER BY timestamp DESC, id DESC
-        LIMIT :limit OFFSET :offset
-        """
-    )
-    fun sliceByFilterDesc(
-        recordTypes: List<String>,
-        packages: List<String>,
-        kinds: List<String>,
-        typeCount: Int,
-        packageCount: Int,
-        kindCount: Int,
-        query: String?,
-        previewChars: Int,
-        limit: Int,
-        offset: Int,
-        operations: List<String> = emptyList(),
-        opCount: Int = 0,
-        timeStart: Long? = null,
-        timeEnd: Long? = null,
-    ): List<CryptoRecordRow>
+    @Transaction
+    @Query("DELETE FROM ${CryptoRecordEntity.TABLE_NAME} WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>): Int
 
     /** 按记录类型分组计数(V17 R2:全类型总览,设置页/未来 REST 元信息)。 */
     @Query(
         """
-        SELECT recordType, COUNT(*) AS recordCount FROM crypto_records
+        SELECT recordType, COUNT(*) AS count FROM ${CryptoRecordEntity.TABLE_NAME}
         GROUP BY recordType
         """
     )
@@ -265,7 +104,7 @@ interface CryptoRecordDao {
     /** 每包记录数(应用列表徽标;可限定类型)。 */
     @Query(
         """
-        SELECT packageName, COUNT(*) AS recordCount FROM crypto_records
+        SELECT packageName, COUNT(*) AS recordCount FROM ${CryptoRecordEntity.TABLE_NAME}
         WHERE (:recordType IS NULL OR recordType = :recordType)
         GROUP BY packageName
         """
@@ -275,98 +114,107 @@ interface CryptoRecordDao {
     /** 每类别记录数(筛选菜单徽标;限定单一记录类型)。 */
     @Query(
         """
-        SELECT kind AS kind, COUNT(*) AS count FROM crypto_records
+        SELECT kind AS kind, COUNT(*) AS count FROM ${CryptoRecordEntity.TABLE_NAME}
         WHERE recordType = :type
         GROUP BY kind
         """
     )
     fun observeCategoryCounts(type: String): Flow<List<KindCount>>
 
-    @Query(
-        """
-        SELECT DISTINCT packageName FROM crypto_records
-        WHERE (:recordType IS NULL OR recordType = :recordType)
-        ORDER BY packageName
-        """
-    )
-    fun observePackages(recordType: String?): Flow<List<String>>
+    // V45 T1.8:死查询 observePackages(recordType) 已删除(生产零调用点,
+    // 仅测试自用);包维度观测出口 = [packagesOver](容量治理)与
+    // [observeRecordCounts](列表徽标),二者已覆盖旧语义。
 
-    @Query("DELETE FROM crypto_records WHERE packageName = :packageName")
+    @Query("DELETE FROM ${CryptoRecordEntity.TABLE_NAME} WHERE packageName = :packageName")
     suspend fun clearPackage(packageName: String)
 
     /** 按记录类型清理(V19 T7 数据管理按类型清理)。 */
-    @Query("DELETE FROM crypto_records WHERE recordType = :recordType")
+    @Query("DELETE FROM ${CryptoRecordEntity.TABLE_NAME} WHERE recordType = :recordType")
     suspend fun clearByType(recordType: String)
 
-    @Query("DELETE FROM crypto_records")
+    @Query("DELETE FROM ${CryptoRecordEntity.TABLE_NAME}")
     suspend fun clearAll()
 
     /** 按 id 删除单条(CRUD 删除,MCP/详情页)。 */
-    @Query("DELETE FROM crypto_records WHERE id = :id")
+    @Query("DELETE FROM ${CryptoRecordEntity.TABLE_NAME} WHERE id = :id")
     suspend fun deleteById(id: Long): Int
 
     /** 按 id 取单条记录(记录详情页,唯一允许全量物化的查询)。 */
-    @Query("SELECT * FROM crypto_records WHERE id = :id")
+    @Query("SELECT * FROM ${CryptoRecordEntity.TABLE_NAME} WHERE id = :id")
     fun observeById(id: Long): Flow<CryptoRecordEntity?>
 
     /**
-     * 比 (ts, id) 更旧的相邻一条的 id(记录详情"上一条";2026-08-17 大数据修复:
-     * 仅投影 id,杜绝邻居全量大字段物化)。
+     * 全局容量截断点(V45 T1.6 / ST-7):第 `keep + 1` 新的 `(timestamp, id)`,
+     * 行数 ≤ keep 时 null。排序键与列表/详情完全一致(`timestamp DESC, id DESC`),
+     * 故「保留的恒是列表首屏所见」;`ORDER BY … LIMIT 1 OFFSET :keep` 走
+     * `index_…_timestamp`(旧 `id NOT IN (SELECT …)` 需物化命中集再全表探测)。
      */
     @Query(
         """
-        SELECT id FROM crypto_records
-        WHERE (:recordType IS NULL OR recordType = :recordType)
-          AND (:packageName IS NULL OR packageName = :packageName)
-          AND (timestamp < :ts OR (timestamp = :ts AND id < :id))
-        ORDER BY timestamp DESC, id DESC
-        LIMIT 1
+        SELECT timestamp, id FROM ${CryptoRecordEntity.TABLE_NAME}
+        ORDER BY timestamp DESC, id DESC LIMIT 1 OFFSET :keep
         """
     )
-    suspend fun neighborIdOlderThan(recordType: String?, packageName: String?, ts: Long, id: Long): Long?
+    suspend fun globalTrimCutoff(keep: Int): TrimCutoff?
 
-    /** 比 (ts, id) 更新的相邻一条的 id(记录详情"下一条";投影语义同 [neighborIdOlderThan])。 */
+    /** 删除截断行及其更早的记录(索引范围删除;截断点本身即第 keep+1 行,故恒被删除)。 */
     @Query(
         """
-        SELECT id FROM crypto_records
-        WHERE (:recordType IS NULL OR recordType = :recordType)
-          AND (:packageName IS NULL OR packageName = :packageName)
-          AND (timestamp > :ts OR (timestamp = :ts AND id > :id))
-        ORDER BY timestamp ASC, id ASC
-        LIMIT 1
+        DELETE FROM ${CryptoRecordEntity.TABLE_NAME}
+        WHERE timestamp < :timestamp OR (timestamp = :timestamp AND id <= :id)
         """
     )
-    suspend fun neighborIdNewerThan(recordType: String?, packageName: String?, ts: Long, id: Long): Long?
+    suspend fun deleteBefore(timestamp: Long, id: Long): Int
 
-    /** 保留最近 [keep] 条,其余删除(全局容量治理);返回删除条数。 */
+    /**
+     * 保留最近 [keep] 条,其余删除(全局容量治理入口,V45 T1.6 起 = 截断点 + 范围删两段);
+     * 两步之间即使被并发写入插入更新行,下一治理周期自会纠正,故不必包事务。
+     */
+    suspend fun trim(keep: Int): Int = globalTrimCutoff(keep)?.let { deleteBefore(it.timestamp, it.id) } ?: 0
+
+    /** 单包容量截断点(走 `index_…_packageName_timestamp` 的包内时间序)。 */
     @Query(
         """
-        DELETE FROM crypto_records WHERE id NOT IN (
-            SELECT id FROM crypto_records ORDER BY timestamp DESC LIMIT :keep
-        )
+        SELECT timestamp, id FROM ${CryptoRecordEntity.TABLE_NAME}
+        WHERE packageName = :packageName
+        ORDER BY timestamp DESC, id DESC LIMIT 1 OFFSET :keep
         """
     )
-    suspend fun trim(keep: Int): Int
+    suspend fun packageTrimCutoff(packageName: String, keep: Int): TrimCutoff?
+
+    /** 删除某包截断行及其更早的记录(截断点 = 该包第 keep+1 新行,恒被删除)。 */
+    @Query(
+        """
+        DELETE FROM ${CryptoRecordEntity.TABLE_NAME}
+        WHERE packageName = :packageName
+          AND (timestamp < :timestamp OR (timestamp = :timestamp AND id <= :id))
+        """
+    )
+    suspend fun deletePackageBefore(packageName: String, timestamp: Long, id: Long): Int
 
     /** 保留某包最近 [keep] 条,其余删除(每包容量治理);返回删除条数。 */
+    suspend fun trimPackage(packageName: String, keep: Int): Int =
+        packageTrimCutoff(packageName, keep)?.let { deletePackageBefore(packageName, it.timestamp, it.id) } ?: 0
+
+    /** 超过 [limit] 条的包(容量治理探针:GROUP BY + HAVING,结果集受 offenders 数约束)。 */
     @Query(
         """
-        DELETE FROM crypto_records WHERE packageName = :packageName AND id NOT IN (
-            SELECT id FROM crypto_records
-            WHERE packageName = :packageName
-            ORDER BY timestamp DESC LIMIT :keep
-        )
+        SELECT packageName, COUNT(*) AS recordCount FROM ${CryptoRecordEntity.TABLE_NAME}
+        GROUP BY packageName HAVING COUNT(*) > :limit
         """
     )
-    suspend fun trimPackage(packageName: String, keep: Int): Int
+    suspend fun packagesOver(limit: Int): List<RecordCount>
 
-    @Query("SELECT COUNT(*) FROM crypto_records WHERE packageName = :packageName")
+    @Query("SELECT COUNT(*) FROM ${CryptoRecordEntity.TABLE_NAME} WHERE packageName = :packageName")
     suspend fun count(packageName: String): Long
 
-    /** 每包记录数一次快照(宿主管线每包容量治理用)。 */
+    /**
+     * 每包记录数一次快照(V45 契约归属标注:容量治理走有界的 [packagesOver],
+     * 本查询保留给观测/测试与未来 REST 元信息,不在写入热路径上)。
+     */
     @Query(
         """
-        SELECT packageName, COUNT(*) AS recordCount FROM crypto_records
+        SELECT packageName, COUNT(*) AS recordCount FROM ${CryptoRecordEntity.TABLE_NAME}
         WHERE (:recordType IS NULL OR recordType = :recordType)
         GROUP BY packageName
         """
@@ -394,44 +242,6 @@ interface CryptoRecordDao {
             interventionAction
             """
 
-        /**
-         * count / delete / slice 三查询共享 WHERE 片段(单一事实源,杜绝筛选项漂移):
-         * 集合维度以哨兵计数(`:xCount = 0 OR ... IN (...)`)表达"不过滤",
-         * 空集合由仓库层绑定占位单例;时间范围以 NULL 哨兵;关键字 LIKE 转义由仓库层负责。
-         */
-        const val WHERE_FILTER = """
-            (:typeCount = 0 OR recordType IN (:recordTypes))
-            AND (:packageCount = 0 OR packageName IN (:packages))
-            AND (:kindCount = 0 OR kind IN (:kinds))
-            AND (:opCount = 0 OR operation IN (:operations))
-            AND (:timeStart IS NULL OR timestamp >= :timeStart)
-            AND (:timeEnd IS NULL OR timestamp <= :timeEnd)
-            AND (:query IS NULL OR :query = ''
-                 OR algorithm LIKE :query ESCAPE '\'
-                 OR operation LIKE :query ESCAPE '\'
-                 OR keyText LIKE :query ESCAPE '\'
-                 OR keyHex LIKE :query ESCAPE '\'
-                 OR inputText LIKE :query ESCAPE '\'
-                 OR inputHex LIKE :query ESCAPE '\'
-                 OR outputText LIKE :query ESCAPE '\'
-                 OR outputHex LIKE :query ESCAPE '\'
-                 OR threadName LIKE :query ESCAPE '\'
-                   OR sql LIKE :query ESCAPE '\'
-                   OR resultText LIKE :query ESCAPE '\'
-                   OR path LIKE :query ESCAPE '\'
-                   OR destPath LIKE :query ESCAPE '\'
-                   OR command LIKE :query ESCAPE '\'
-                   OR prefKey LIKE :query ESCAPE '\'
-                   OR dialogTitle LIKE :query ESCAPE '\'
-                   OR dialogMessage LIKE :query ESCAPE '\'
-                   OR widgetText LIKE :query ESCAPE '\'
-                   OR activityName LIKE :query ESCAPE '\'
-                   OR logcatTag LIKE :query ESCAPE '\'
-                   OR logcatMessage LIKE :query ESCAPE '\'
-                   OR signatureHash LIKE :query ESCAPE '\'
-                   OR crashType LIKE :query ESCAPE '\'
-                   OR crashMessage LIKE :query ESCAPE '\')
-             """
     }
 }
 
@@ -442,10 +252,13 @@ data class RecordCount(
 )
 
 /**
- * 按记录类型的记录计数(V17 R2)。
- * 类型别名:兼容旧导入路径,实际数据类已迁移至 [com.lioisme.modev.domain.record.RecordTypeCount]。
+ * 容量治理截断点(V45 T1.6):第 keep+1 行的 `(timestamp, id)`,
+ * 与列表排序键同构 ⇒ 「保留集 = 列表首屏所见」在并列同戳下仍精确。
  */
-typealias RecordTypeCount = com.lioisme.modev.domain.record.RecordTypeCount
+data class TrimCutoff(
+    val timestamp: Long,
+    val id: Long,
+)
 
 /** 按类别的记录计数(筛选菜单徽标)。 */
 data class KindCount(

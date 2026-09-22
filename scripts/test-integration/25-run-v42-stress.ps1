@@ -77,8 +77,8 @@ if ($okInstall) { Gate "G2-1 三包 install -r" $true }
 
 # 整机重启(install -r 后 lspd 模块表失效,唯一恢复法;AGENTS 已知坑)
 Write-Host "  整机重启以重载 lspd 模块表(约 60-120s)…"
-$dnconsole = "D:\leidian\LDPlayer14\dnconsole.exe"
-$dnplayer = "D:\leidian\LDPlayer14\dnplayer.exe"
+$dnconsole = $script:DNCONSOLE
+$dnplayer = $script:DNPLAYER
 if (Test-Path $dnconsole) {
     & $dnconsole quit --index 0 | Out-Null
     Start-Sleep -Seconds 8
@@ -116,9 +116,9 @@ AdbShell "am force-stop $script:MODEV_PKG" | Out-Null
 Start-Sleep -Seconds 2
 # am instrument -w 全量 20+ 分钟:直接调 adb 后台执行 + 输出文件轮询
 # (AdbShell 的 5 次重试封装会阻塞收不到流,不经它)。
-$env:ANDROID_ADB_SERVER_PORT = "5038"
+$env:ANDROID_ADB_SERVER_PORT = "$($script:ADB_PORT)"
 $instLog = Join-Path $env:TEMP "modev-tt\v42-instrument-$roundId.log"
-$adbExe = "D:\leidian\LDPlayer14\adb.exe"
+$adbExe = $script:ADB
 $proc = Start-Process -FilePath $adbExe -ArgumentList "-s $script:DEVICE", "shell", "am instrument -w com.lioisme.modev.test/androidx.test.runner.AndroidJUnitRunner" -NoNewWindow -PassThru -RedirectStandardOutput $instLog
 $deadline5 = (Get-Date).AddMinutes(45)
 $done = $false

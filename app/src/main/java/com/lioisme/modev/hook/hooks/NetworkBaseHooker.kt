@@ -7,7 +7,7 @@ import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.core.util.StackTraceFilter
 import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.RecordSink
-import java.io.File
+import com.lioisme.modev.hook.ProcessIdentity
 
 /**
  * 网络环境 Hooker 基类(V30):统一开关判断(network 类别,master+kind 双门控前置)、
@@ -22,21 +22,19 @@ abstract class NetworkBaseHooker(
 
     protected val engine = context.engine
     protected val config = context.config
+    protected val broadcast = context.broadcast // V43 T3/D-4:热门平台方法单一广播注册点
     protected val sink: RecordSink = context.sink
     protected val packageName = context.packageName
 
     /** 装配上下文(V38:app dex 类显式装载 appClassLoader 消费点)。 */
     protected val contextRef = context
 
-    /** 目标进程名(/proc/self/cmdline)。 */
-    protected val processName: String by lazy {
-        runCatching { File("/proc/self/cmdline").readBytes() }
-            .getOrNull()
-            ?.toString(Charsets.UTF_8)
-            ?.substringBefore('\u0000')
-            ?.takeIf { it.isNotBlank() }
-            ?: "unknown"
-    }
+    /**
+     * 目标进程名(V44 T2.6):经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
+     * 旧形态每个 Hooker 基类各自 `by lazy` 读一次 `/proc/self/cmdline`,冷启动期
+     * 约 50 个实例 = 50 次文件读 + 字节解码,而进程身份在进程内恒定不变。
+     */
+    protected val processName: String get() = ProcessIdentity.processName
 
     abstract fun install()
 

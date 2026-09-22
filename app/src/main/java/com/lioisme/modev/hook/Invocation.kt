@@ -21,12 +21,37 @@ abstract class Invocation {
     abstract val result: Any?
 
     /**
+     * 本次调用的底层句柄(V43 T3):before/after 两次视图共享同一 token,
+     * [HookerSupport] 据此做**按调用配对**的入参暂存——原方法抛异常跳过 after 时,
+     * 残留条目受容量上限回收,不再依赖 ThreadLocal 栈的时序配对(V4.4:数据错位与
+     * 驻留泄漏双修)。
+     */
+    open val token: Any? get() = this
+
+    /** before 阶段是否已被短路(setResult/setThrowable 已生效):广播侧据此停止后续干预订阅。 */
+    open val consumed: Boolean get() = false
+
+    /**
      * 替换原方法返回值(仅 before 阶段有效):
      * - 设置后原方法不再执行(libxposed)或结果被覆盖(legacy);
      * - 供 SSL 绕过/代理隐藏/VPN 隐藏等干预型 hook 使用。
      */
     open fun setResult(value: Any?) {
         throw UnsupportedOperationException("setResult not supported by this Invocation")
+    }
+
+    /**
+     * 以异常结束本次调用(V43 T3/D-5):原方法不执行,[t] 抛给调用方——
+     * 忠实还原 JDK/Android「查不到抛 NameNotFoundException」类契约,
+     * 替代 `setResult(null)` 破坏返回值契约导致宿主 NPE 的旧式干预。
+     *
+     * 语义约束:必须经干预型注册([HookEngine.hookThrowing])挂载的钩子才生效——
+     * libxposed PROTECTIVE 模式会吞回调异常并照常执行原方法(旧「回调内抛 CNFE」
+     * 实现静默失效的根因);干预型注册使用 PASSTHROUGH + 回调体内 runSafely
+     * 隔离,业务缺陷异常不外泄,唯有本方法设置的异常会抵达调用方。
+     */
+    open fun setThrowable(t: Throwable) {
+        throw UnsupportedOperationException("setThrowable not supported by this Invocation")
     }
 
     /**

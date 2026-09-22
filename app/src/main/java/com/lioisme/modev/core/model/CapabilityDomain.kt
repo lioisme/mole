@@ -18,3 +18,10 @@ enum class CapabilityDomain {
     /** 功能域:主动干预。 */
     FEATURE,
 }
+
+/** 对侧域(穷尽 `when`:新增域编译期强制登记,杜绝 `!!`/默认回落)。 */
+val CapabilityDomain.opposite: CapabilityDomain
+    get() = when (this) {
+        CapabilityDomain.LISTEN -> CapabilityDomain.FEATURE
+        CapabilityDomain.FEATURE -> CapabilityDomain.LISTEN
+    }

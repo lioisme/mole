@@ -8,6 +8,8 @@ import com.lioisme.modev.core.model.SystemOperation
 import com.lioisme.modev.core.model.SystemRecord
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
+import com.lioisme.modev.domain.record.SystemRow
+import com.lioisme.modev.domain.record.RowModel
 
 /**
  * 系统信息记录映射(V33):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,

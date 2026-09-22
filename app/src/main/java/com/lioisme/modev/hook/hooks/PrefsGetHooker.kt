@@ -37,6 +37,9 @@ class PrefsGetHooker(
         valueType: String,
     ) {
         hookAfter(registry.named(name)) { inv, result ->
+            // V43 T2 门控前置:emit 内部虽再判 kind,但 pathOf(LRU 锁)/capturedText
+            // 作为实参先于调用求值——GET 默认关时必须零工作
+            if (!config().prefsEnabled(PrefsKind.GET)) return@hookAfter
             emit(
                 kind = PrefsKind.GET,
                 operation = scalarOperation(name),
@@ -65,6 +68,8 @@ class PrefsGetHooker(
     ) {
         hookAfter(registry.named(name)) { inv, result ->
             val set = result as? Set<*> ?: return@hookAfter
+            // V43 T2:全量序列化与 pathOf 必须在 kind 门控之后(V2.2 热路径白付费)
+            if (!config().prefsEnabled(PrefsKind.GET)) return@hookAfter
             emit(
                 kind = PrefsKind.GET,
                 operation = PrefsOperation.GET_STRING_SET,
@@ -80,6 +85,7 @@ class PrefsGetHooker(
     private fun installContains(registry: BehaviorMethodRegistry) {
         hookAfter(registry.named("contains")) { inv, result ->
             if (result !is Boolean) return@hookAfter
+            if (!config().prefsEnabled(PrefsKind.GET)) return@hookAfter // V43 T2
             emit(
                 kind = PrefsKind.GET,
                 operation = PrefsOperation.CONTAINS,
@@ -95,6 +101,8 @@ class PrefsGetHooker(
         hookAfter(registry.named("getAll")) { inv, result ->
             val map = result as? Map<*, *> ?: return@hookAfter
             if (map.isEmpty()) return@hookAfter
+            // V43 T2:getAll 常含会话全部键值——序列化/索引必须在 GET 开启后才发生
+            if (!config().prefsEnabled(PrefsKind.GET)) return@hookAfter
             emit(
                 kind = PrefsKind.GET,
                 operation = PrefsOperation.GET_ALL,

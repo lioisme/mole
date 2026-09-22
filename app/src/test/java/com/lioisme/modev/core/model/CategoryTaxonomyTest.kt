@@ -162,6 +162,92 @@ class CategoryTaxonomyTest {
         assertEquals(21, CategoryTaxonomy.forType(RecordType.DEVICE_ENV).size)
     }
 
+    /**
+     * V44 D2 门禁:枚举 ⊆ taxonomy(与上方 taxonomy ⊆ 枚举合成双向锁)。
+     * 旧门禁只锁 taxonomy 登记的 id 都存在于枚举,但**新枚举值漏登记 taxonomy** 不被捕获——
+     * 菜单由枚举遍历驱动时幽灵项经 validateKinds 交集空即「静默零结果陷阱」。
+     * 菜单收敛到 [CategoryTaxonomy.forType] 驱动后,本测试转为唯一防线:
+     * 任何 kind 枚举新增值必须同步登记 taxonomy,否则红。
+     */
+    @Test
+    fun `every kind enum value is registered in taxonomy`() {
+        for (kind in CryptoKind.entries) {
+            assert(CategoryTaxonomy.byId(RecordType.CRYPTO, kind.name) != null) {
+                "CryptoKind.$kind not registered in CategoryTaxonomy"
+            }
+        }
+        for (kind in SqlKind.entries) {
+            assert(CategoryTaxonomy.byId(RecordType.DATABASE, kind.name) != null) {
+                "SqlKind.$kind not registered in CategoryTaxonomy"
+            }
+        }
+        for (kind in BehaviorKind.entries) {
+            assert(CategoryTaxonomy.byId(RecordType.BEHAVIOR, kind.name) != null) {
+                "BehaviorKind.$kind not registered in CategoryTaxonomy"
+            }
+        }
+        for (kind in PrefsKind.entries) {
+            assert(CategoryTaxonomy.byId(RecordType.PREFS, kind.name) != null) {
+                "PrefsKind.$kind not registered in CategoryTaxonomy"
+            }
+        }
+        for (kind in WebViewKind.entries) {
+            assert(CategoryTaxonomy.byId(RecordType.WEBVIEW, kind.name) != null) {
+                "WebViewKind.$kind not registered in CategoryTaxonomy"
+            }
+        }
+        for (kind in NetworkKind.entries) {
+            assert(CategoryTaxonomy.byId(RecordType.NETWORK, kind.name) != null) {
+                "NetworkKind.$kind not registered in CategoryTaxonomy"
+            }
+        }
+        for (kind in DeviceEnvKind.entries) {
+            assert(CategoryTaxonomy.byId(RecordType.DEVICE_ENV, kind.name) != null) {
+                "DeviceEnvKind.$kind not registered in CategoryTaxonomy"
+            }
+        }
+        for (kind in UiInteractionKind.entries) {
+            assert(CategoryTaxonomy.byId(RecordType.UI_INTERACTION, kind.name) != null) {
+                "UiInteractionKind.$kind not registered in CategoryTaxonomy"
+            }
+        }
+        for (kind in SystemKind.entries) {
+            assert(CategoryTaxonomy.byId(RecordType.SYSTEM, kind.name) != null) {
+                "SystemKind.$kind not registered in CategoryTaxonomy"
+            }
+        }
+        for (kind in ProcessKind.entries) {
+            assert(CategoryTaxonomy.byId(RecordType.PROCESS_CONTROL, kind.name) != null) {
+                "ProcessKind.$kind not registered in CategoryTaxonomy"
+            }
+        }
+    }
+
+    /** V44 D2:枚举总数 == taxonomy 条目数(双向锁计数侧,防多类型漏登记抵消)。 */
+    @Test
+    fun `taxonomy size equals total kind enum values`() {
+        val enumTotal =
+            CryptoKind.entries.size + SqlKind.entries.size + BehaviorKind.entries.size +
+                PrefsKind.entries.size + WebViewKind.entries.size + NetworkKind.entries.size +
+                DeviceEnvKind.entries.size + UiInteractionKind.entries.size +
+                SystemKind.entries.size + ProcessKind.entries.size
+        assertEquals("枚举与 taxonomy 条目数漂移", enumTotal, CategoryTaxonomy.all().size)
+    }
+
+    /**
+     * V44 跨类型 kind id 碰撞集回归:唯一合法碰撞 = (db/prefs OPEN) ∪ (crypto/system SIGNATURE)。
+     * 新增碰撞即红(限定键 [AppListenOverride.kindKey] 已彻底消歧,但裸 id 遗留解析
+     * first-wins 序依赖碰撞集不变)。
+     */
+    @Test
+    fun `cross-type colliding kind ids are exactly the documented set`() {
+        val colliding = CategoryTaxonomy.all().groupBy { it.id }.filterValues { it.size > 1 }.keys
+        assertEquals(setOf(SqlKind.OPEN.name, CryptoKind.SIGNATURE.name), colliding)
+        // 序首归一:Databases 前于 Prefs;Crypto 前于 System
+        assertEquals(RecordType.DATABASE, CategoryTaxonomy.typesWithId(SqlKind.OPEN.name).first())
+        assertEquals(RecordType.CRYPTO, CategoryTaxonomy.typesWithId(CryptoKind.SIGNATURE.name).first())
+    }
+
     // ── V37 T1.1 双域拆分(D-0 基线)快照锁定 ───────────────────────────
 
     @Test

@@ -18,3 +18,7 @@ docs/log/
 .env.*
 org/
 .zcode/
+.workbuddy-ai/
+arthub/
+third_party/
+docs/test-reports/v45-*/

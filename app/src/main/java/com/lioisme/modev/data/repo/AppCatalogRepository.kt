@@ -3,6 +3,8 @@ package com.lioisme.modev.data.repo
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import com.lioisme.modev.core.util.installedApplications
+import com.lioisme.modev.domain.app.AppCatalogService
+import com.lioisme.modev.domain.app.AppInfo
 import java.util.zip.ZipFile
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -45,15 +47,7 @@ internal fun isXposedModuleApk(apkPath: String): Boolean = runCatching {
 class AppCatalogRepository(
     private val pm: PackageManager,
     private val scope: CoroutineScope,
-) : AppCatalogSource {
-
-    data class AppInfo(
-        val packageName: String,
-        val label: String,
-        val system: Boolean,
-        /** Xposed 模块(V17 R1 模块识别;列表默认隐藏,设置项可显示)。 */
-        val isXposedModule: Boolean = false,
-    )
+) : AppCatalogService {
 
     private val _apps = MutableStateFlow<List<AppInfo>>(emptyList())
     override val apps: StateFlow<List<AppInfo>> = _apps

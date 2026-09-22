@@ -68,11 +68,18 @@ object DeviceEnvCases {
             // ---- Xposed 隐藏 ----
             "L-DEV-05", "E-XPP-01" -> {
                 // ART 的 Class.forName 走原生解析,可绕过 Java 层 loadClass 钩子;
-                // 检测框架两种都用,靶程序双路径触发
+                // 检测框架两种都用,靶程序双路径触发。
+                // V43 T3:双路径分别上报——loadClass 路径经 setThrowable 干预应为 cnfe,
+                // forName 路径是已声明覆盖缺口(D-17 回滚,found 属预期)。
                 val r1 = runCatching { Class.forName("de.robv.android.xposed.XposedBridge") }
                 val r2 = runCatching { ctx.classLoader.loadClass("de.robv.android.xposed.XposedHelpers") }
                 val found = listOf(r1, r2).count { it.isSuccess }
-                Tt.result(case, "xposedClass" to if (found > 0) "found" else "cnfe")
+                Tt.result(
+                    case,
+                    "xposedClass" to if (found > 0) "found" else "cnfe",
+                    "forNamePath" to if (r1.isSuccess) "found" else "cnfe",
+                    "loadClassPath" to if (r2.isSuccess) "found" else "cnfe",
+                )
             }
             "L-DEV-06", "E-XPP-02" -> {
                 val frames = Thread.currentThread().stackTrace.map { it.className }

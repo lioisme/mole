@@ -1,4 +1,4 @@
-package com.lioisme.modev.ui.apps
+package com.lioisme.modev.domain.app
 
 import java.util.Locale
 import org.junit.Assert.assertEquals

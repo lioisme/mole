@@ -19,7 +19,7 @@ object McpProtocol {
     const val HEADER_SESSION = "Mcp-Session-Id"
 
     /** MCP 默认绑定端口(V39:1510;wire 迁 1511 区隔,宿主本地偏好可改)。 */
-    const val DEFAULT_PORT = 1510
+    const val DEFAULT_PORT = com.lioisme.modev.core.model.ConfigKeys.MCP_DEFAULT_PORT
 
     /** 协议方法。 */
     const val METHOD_INITIALIZE = "initialize"

@@ -31,6 +31,13 @@ class CipherHooker(
     context: ProbeContext,
 ) : BaseHooker(context, CryptoKind.CIPHER) {
 
+    /**
+     * UPDATE 记录节流(V44 T2.3,镜像 [MessageDigestHooker] 的 V2.10 先例):
+     * 同实例 1s 窗口一条——大文件按块 update 时每块全量记录 = GC 风暴/掉帧。
+     * 键为实例 contextId(数值键,免字符串拼接,V44 T2.5)。
+     */
+    private val updateThrottle = SessionThrottle()
+
     override fun install() {
         val f = MethodFinder
         // 实例化(算法 + provider)
@@ -55,7 +62,7 @@ class CipherHooker(
         hookAfter(f.find(CIPHER, "update", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, ctx, _ ->
             afterUpdate(inv, ctx, null)
         }
-        hookBefore(f.find(CIPHER, "update", ByteBuffer::class.java)) { inv, _ -> HookerSupport.stash(inv.getArg(0)) }
+        hookBefore(f.find(CIPHER, "update", ByteBuffer::class.java)) { inv, _ -> HookerSupport.stash(inv, inv.getArg(0)) }
         hookAfter(f.find(CIPHER, "update", ByteBuffer::class.java)) { inv, ctx, result -> afterUpdate(inv, ctx, result) }
 
         // updateAAD
@@ -66,9 +73,9 @@ class CipherHooker(
         hookAfter(f.find(CIPHER, "doFinal")) { inv, ctx, result -> afterDoFinal(inv, ctx, null, result) }
         hookAfter(f.find(CIPHER, "doFinal", ByteArray::class.java)) { inv, ctx, result -> afterDoFinal(inv, ctx, null, result) }
         hookAfter(f.find(CIPHER, "doFinal", ByteArray::class.java, Int::class.javaPrimitiveType, Int::class.javaPrimitiveType)) { inv, ctx, result -> afterDoFinal(inv, ctx, null, result) }
-        hookBefore(f.find(CIPHER, "doFinal", ByteBuffer::class.java)) { inv, _ -> HookerSupport.stash(inv.getArg(0)) }
+        hookBefore(f.find(CIPHER, "doFinal", ByteBuffer::class.java)) { inv, _ -> HookerSupport.stash(inv, inv.getArg(0)) }
         hookAfter(f.find(CIPHER, "doFinal", ByteBuffer::class.java)) { inv, ctx, result -> afterDoFinal(inv, ctx, null, result) }
-        hookBefore(f.find(CIPHER, "doFinal", ByteBuffer::class.java, ByteBuffer::class.java)) { inv, _ -> HookerSupport.stash(inv.getArg(0)) }
+        hookBefore(f.find(CIPHER, "doFinal", ByteBuffer::class.java, ByteBuffer::class.java)) { inv, _ -> HookerSupport.stash(inv, inv.getArg(0)) }
         hookAfter(f.find(CIPHER, "doFinal", ByteBuffer::class.java, ByteBuffer::class.java)) { inv, ctx, result -> afterDoFinal(inv, ctx, inv.getArg(1), result) }
 
         // 动态 IV
@@ -168,24 +175,43 @@ class CipherHooker(
 
     private fun afterUpdate(invocation: Invocation, ctx: CryptoContext, result: Any?) {
         val instance = invocation.thisObject ?: return
-        val input = when (val arg = invocation.getArg(0)) {
+        val arg0 = invocation.getArg(0)
+        // V44 T2.3 内容捕获护栏:先做**廉价尺寸判定**(零拷贝),把累计量记全,
+        // 再按实例节流——大文件按块 update 时每块全量 emit + 三态物化
+        // (1MB 字段 ≈ hex×2 + base64×4/3 + text 三份字符串)是宿主 GC 风暴根因;
+        // 与 [MessageDigestHooker] 的 1s 窗口语义对齐(周期性访问仍可观测)。
+        val size = when (arg0) {
+            is ByteArray -> {
+                val off = (invocation.getArg(1) as? Int)?.coerceIn(0, arg0.size)
+                val len = invocation.getArg(2) as? Int
+                if (off != null && len != null) len.coerceIn(0, arg0.size - off) else arg0.size
+            }
+            is ByteBuffer -> arg0.remaining()
+            else -> 0
+        }
+        ctx.inputTotal += size
+        val contextId = CryptoContextTracker.identity(instance)
+        if (updateThrottle.shouldSkip(contextId)) {
+            // 节流分支仍须消费 before 阶段暂存的 ByteBuffer(防线程暂存表滞留)
+            HookerSupport.take(invocation)
+            return
+        }
+        val input = when (arg0) {
             is ByteArray -> {
                 val off = invocation.getArg(1) as? Int
                 val len = invocation.getArg(2) as? Int
-                if (off != null && len != null) HookerSupport.slice(arg, off, len) else arg
+                if (off != null && len != null) HookerSupport.slice(arg0, off, len) else arg0
             }
-            else -> HookerSupport.take()
+            else -> HookerSupport.take(invocation)
         }
-        ctx.inputTotal += input?.size ?: 0
-        if (input != null) {
-            emit(
-                operation = CryptoOperation.UPDATE,
-                algorithm = ctx.algorithm,
-                contextId = CryptoContextTracker.identity(instance),
-                context = ctx,
-                input = viewOf(input),
-            )
-        }
+        if (input == null) return
+        emit(
+            operation = CryptoOperation.UPDATE,
+            algorithm = ctx.algorithm,
+            contextId = contextId,
+            context = ctx,
+            input = viewOf(input),
+        )
     }
 
     private fun beforeUpdateAad(invocation: Invocation, ctx: CryptoContext) {
@@ -210,7 +236,7 @@ class CipherHooker(
                 val len = invocation.getArg(2) as? Int
                 if (off != null && len != null) HookerSupport.slice(arg, off, len) else arg
             }
-            else -> HookerSupport.take()
+            else -> HookerSupport.take(invocation)
         }
         ctx.inputTotal += input?.size ?: 0
         // int 返回型:结果写入出参缓冲 arg0[off, off+result)

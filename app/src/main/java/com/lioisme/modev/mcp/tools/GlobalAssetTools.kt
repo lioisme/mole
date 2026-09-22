@@ -1,27 +1,32 @@
 package com.lioisme.modev.mcp.tools
 
 import com.google.gson.JsonObject
+import com.lioisme.modev.core.model.BlacklistKind
 import com.lioisme.modev.core.model.FeatureConfig
 import com.lioisme.modev.core.model.KeywordEntry
 import com.lioisme.modev.core.model.KeywordMatchMode
 import com.lioisme.modev.core.model.SpoofProfiles
-import com.lioisme.modev.data.repo.KeywordLibraryRepository
-import com.lioisme.modev.data.repo.SettingsRepository
+import com.lioisme.modev.core.model.merged
+import com.lioisme.modev.domain.asset.KeywordLibraryService
+import com.lioisme.modev.domain.config.FeatureService
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
- * 全局资产组工具(V38,8 个):关键词库 CRUD + 伪装画像 + 黑名单追加。
- * 上游与 KeywordLibraryViewModel/SpoofProfileViewModel/FeatureBlacklistViewModel 同源
- * (KeywordLibraryRepository + setGlobalFeature,推送链路 pushToAllConnected 自动)。
+ * 全局资产组工具(V38 8 个 + V44 条目启停/词表清空 = 10 个):关键词库 CRUD + 启停 +
+ * 清空 + 伪装画像 + 黑名单追加。
+ * 上游与 KeywordLibraryViewModel/SpoofProfileViewModel/FeatureBlacklistViewModel
+ * **同契约面**(V45 T2.2:[KeywordLibraryService] + [FeatureService];
+ * 推送链路 pushToAllConnected 由实现内自动触发)。
  */
 class GlobalAssetTools(
-    private val keywords: KeywordLibraryRepository,
-    private val settings: SettingsRepository,
+    private val keywords: KeywordLibraryService,
+    private val settings: FeatureService,
 ) {
 
     val tools: List<McpTool> = listOf(
         keywordsList(), keywordsAdd(), keywordsUpdate(), keywordsRemove(),
+        keywordSetEnabled(), keywordsClear(),
         spoofProfilesList(), spoofGlobalSet(), blacklistList(), blacklistEdit(),
     )
 
@@ -36,12 +41,12 @@ class GlobalAssetTools(
     private fun parseMatchMode(args: JsonObject): KeywordMatchMode {
         val mode = McpJson.str(args, "matchMode") ?: KeywordMatchMode.CONTAINS.name
         return runCatching { KeywordMatchMode.valueOf(mode) }.getOrElse {
-            throw McpTool.McpToolException("Unknown matchMode '$mode'; valid: CONTAINS|REGEX|EQUALS")
+            throw McpTool.McpToolException("Unknown matchMode '$mode'; valid: ${MATCH_MODES.joinToString("|")}")
         }
     }
 
     /**
-     * 等待库快照反映变更(V38):[KeywordLibraryRepository.entries] 由 Room 失效追踪
+     * 等待库快照反映变更(V38):[KeywordLibraryService.entries] 由 Room 失效追踪
      * 异步刷新,写后立即读存在竞态;超时 3s 仍不满足则放行(读侧自会反映现状)。
      */
     private suspend fun awaitSnapshot(predicate: (List<KeywordEntry>) -> Boolean) {
@@ -51,7 +56,7 @@ class GlobalAssetTools(
     private fun keywordsList() = schemaTool(
         name = "keywords_list",
         description = "Global dialog-intercept keyword library (Room-backed; text unique). " +
-            "matchMode: CONTAINS|REGEX|EQUALS.",
+            "matchMode: ${MATCH_MODES.joinToString("|")}.",
         schema = emptySchema(),
     ) { _ ->
         McpJson.obj("entries" to McpJson.arr(keywords.entries.value.map { entryJson(it) }))
@@ -64,7 +69,7 @@ class GlobalAssetTools(
         schema = {
             required(listOf("text"))
             str("text", "Keyword text (unique, trimmed)")
-            str("matchMode", "CONTAINS (default)|REGEX|EQUALS", listOf("CONTAINS", "REGEX", "EQUALS"))
+            str("matchMode", "Match mode (default CONTAINS)", MATCH_MODES)
         },
     ) { args ->
         val text = McpJson.str(args, "text") ?: throw McpTool.McpToolException("text is required")
@@ -83,7 +88,7 @@ class GlobalAssetTools(
             required(listOf("id", "text"))
             long("id", "Keyword entry id")
             str("text", "New keyword text")
-            str("matchMode", "CONTAINS|REGEX|EQUALS (optional; default keeps current)")
+            str("matchMode", "Match mode (optional; default keeps current)", MATCH_MODES)
         },
     ) { args ->
         val id = McpJson.long(args, "id") ?: throw McpTool.McpToolException("id is required")
@@ -112,9 +117,48 @@ class GlobalAssetTools(
         McpJson.obj("ok" to com.google.gson.JsonPrimitive(true))
     }
 
+    /** V44 Q5 能力补齐:UI「条目启停」同上游(setEnabled → 库变更重推)。 */
+    private fun keywordSetEnabled() = schemaTool(
+        name = "keyword_set_enabled",
+        description = "Enable or disable one keyword library entry by id (per-entry toggle, same upstream " +
+            "as the UI; library changes are re-pushed to connected targets).",
+        schema = {
+            required(listOf("id", "enabled"))
+            long("id", "Keyword entry id")
+            bool("enabled", "true = entry enabled, false = disabled")
+        },
+    ) { args ->
+        val id = McpJson.long(args, "id") ?: throw McpTool.McpToolException("id is required")
+        val enabled = McpJson.bool(args, "enabled") ?: throw McpTool.McpToolException("enabled is required")
+        kotlinx.coroutines.runBlocking {
+            keywords.setEnabled(id, enabled)
+            awaitSnapshot { entries -> entries.firstOrNull { it.id == id }?.enabled == enabled }
+        }
+        McpJson.obj("ok" to com.google.gson.JsonPrimitive(true), "enabled" to com.google.gson.JsonPrimitive(enabled))
+    }
+
+    /** V44 Q5 能力补齐:UI「清空词表」同上游(危险操作,恒需 confirm,与 records_clear_all 同门槛)。 */
+    private fun keywordsClear() = schemaTool(
+        name = "keywords_clear",
+        description = "DANGER: delete ALL keyword library entries. Requires confirm=true.",
+        schema = {
+            required(listOf("confirm"))
+            bool("confirm", "Must be true to execute this destructive action")
+        },
+    ) { args ->
+        if (McpJson.bool(args, "confirm") != true) {
+            throw McpTool.McpToolException("confirm=true is required for destructive clear")
+        }
+        kotlinx.coroutines.runBlocking {
+            keywords.clear()
+            awaitSnapshot { entries -> entries.isEmpty() }
+        }
+        McpJson.obj("ok" to com.google.gson.JsonPrimitive(true))
+    }
+
     private fun spoofProfilesList() = schemaTool(
         name = "spoof_profiles_list",
-        description = "Built-in spoof profiles (auto/pixel7pro/xiaomi13) with resolved Build/ro fields, " +
+        description = "Built-in spoof profiles (${PROFILE_IDS.joinToString("/")}) with resolved Build/ro fields, " +
             "telephony/wifi/cpu fake values, plus the currently selected global profile id and overrides.",
         schema = emptySchema(),
     ) { _ ->
@@ -147,7 +191,7 @@ class GlobalAssetTools(
             "(keys: build.<FIELD>, ro.<prop>, telephony.imeiPrefix|imsiPrefix|iccidPrefix|phonePrefix, " +
             "wifi.ssid|wifi.bssid, cpu.cores); overrideKeysRemove deletes listed keys.",
         schema = {
-            str("profileId", "auto|pixel7pro|xiaomi13 (optional)")
+            str("profileId", "Spoof profile id (optional)", PROFILE_IDS)
             obj("overridesAdd", "Key->value overrides to merge (optional)")
             array("overrideKeysRemove", "Override keys to remove (optional)")
         },
@@ -155,7 +199,9 @@ class GlobalAssetTools(
         val current = settings.globalFeature.value
         val profileId = McpJson.str(args, "profileId")
         if (profileId != null && SpoofProfiles.BUILTINS.none { it.id == profileId }) {
-            throw McpTool.McpToolException("Unknown profileId '$profileId'; valid: ${SpoofProfiles.BUILTINS.joinToString(",") { it.id }}")
+            throw McpTool.McpToolException(
+                "Unknown profileId '$profileId'; valid: ${PROFILE_IDS.joinToString(",")}",
+            )
         }
         var overrides = current.spoofOverrides
         args.getAsJsonObject("overridesAdd")?.let { add ->
@@ -195,45 +241,34 @@ class GlobalAssetTools(
 
     private fun blacklistEdit() = schemaTool(
         name = "blacklist_edit",
-        description = "Add or remove user blacklist appends. kind: rootPackages|xposedPrefixes|" +
-            "fridaPorts|maskKeywords. action: add|remove. fridaPorts values are integers.",
+        description = "Add or remove user blacklist appends. kind: " +
+            BLACKLIST_WIRES.joinToString("|") + ". action: add|remove. fridaPorts values are integers.",
         schema = {
             required(listOf("kind", "action", "values"))
-            str("kind", "Blacklist kind", listOf("rootPackages", "xposedPrefixes", "fridaPorts", "maskKeywords"))
+            str("kind", "Blacklist kind", BLACKLIST_WIRES)
             str("action", "add or remove", listOf("add", "remove"))
-            array("values", "Values (strings; integers for fridaPorts)")
+            // V45 T3.2:元素类型随 kind 变化(fridaPorts 必须是整数,其余字符串),
+            // 单一 items 类型声明会谎报 —— 故只声明数组,值类型由 handler 分型裁决。
+            arrayRaw("values", "Values (strings; integers for kind=fridaPorts)")
         },
     ) { args ->
-        val kind = McpJson.str(args, "kind") ?: throw McpTool.McpToolException("kind is required")
+        val kind = BlacklistKind.fromWire(McpJson.str(args, "kind"))
+            ?: throw McpTool.McpToolException(
+                "Unknown blacklist kind; valid: ${BLACKLIST_WIRES.joinToString("|")}",
+            )
         val action = McpJson.str(args, "action") ?: throw McpTool.McpToolException("action is required")
         if (action != "add" && action != "remove") {
             throw McpTool.McpToolException("action must be add or remove")
         }
-        val current = settings.globalFeature.value
         val values = args.getAsJsonArray("values")?.mapNotNull { it?.takeIf { e -> e.isJsonPrimitive } }
             ?: throw McpTool.McpToolException("values is required")
-        fun strings(): List<String> = values.mapNotNull { it.asJsonPrimitive.takeIf { p -> p.isString }?.asString }
-        fun ints(): List<Int> = values.mapNotNull { it.asJsonPrimitive.takeIf { p -> p.isNumber }?.asInt }
-        val next: FeatureConfig = when (kind) {
-            "rootPackages" -> {
-                val delta = strings()
-                current.copy(extraRootPackages = applyList(current.extraRootPackages, delta, action))
-            }
-            "xposedPrefixes" -> {
-                val delta = strings()
-                current.copy(extraXposedPrefixes = applyList(current.extraXposedPrefixes, delta, action))
-            }
-            "maskKeywords" -> {
-                val delta = strings()
-                current.copy(extraMaskKeywords = applyList(current.extraMaskKeywords, delta, action))
-            }
-            "fridaPorts" -> {
-                val delta = ints()
-                if (delta.isEmpty()) throw McpTool.McpToolException("fridaPorts values must be integers")
-                current.copy(extraFridaPorts = applyList(current.extraFridaPorts, delta, action))
-            }
-            else -> throw McpTool.McpToolException("Unknown blacklist kind '$kind'")
+        if (kind == BlacklistKind.FRIDA_PORTS &&
+            values.any { p -> !p.asJsonPrimitive.isNumber }
+        ) {
+            throw McpTool.McpToolException("fridaPorts values must be integers")
         }
+        val current = settings.globalFeature.value
+        val next = current.merged(kind, values.map { it.asJsonPrimitive.asString }, add = action == "add")
         kotlinx.coroutines.runBlocking { settings.setGlobalFeature(next) }
         McpJson.obj(
             "extraRootPackages" to McpJson.tree(next.extraRootPackages),
@@ -243,8 +278,14 @@ class GlobalAssetTools(
         )
     }
 
-    private fun <T> applyList(current: List<T>, delta: List<T>, action: String): List<T> = when (action) {
-        "add" -> (current + delta).distinct()
-        else -> current - delta.toSet()
+    private companion object {
+        /** 匹配模式名集(派生自枚举,协议文档与校验同源)。 */
+        val MATCH_MODES: List<String> = KeywordMatchMode.entries.map { it.name }
+
+        /** 内置画像 id 集(派生自 SpoofProfiles 唯一事实源)。 */
+        val PROFILE_IDS: List<String> = SpoofProfiles.BUILTINS.map { it.id }
+
+        /** 黑名单 kind 线名集(派生自 core [BlacklistKind])。 */
+        val BLACKLIST_WIRES: List<String> = BlacklistKind.entries.map { it.wire }
     }
 }

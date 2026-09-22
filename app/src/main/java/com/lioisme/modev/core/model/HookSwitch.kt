@@ -99,7 +99,14 @@ data class HookSwitch(
     val maxResultRows: Int = RecordLimits.DEFAULT_MAX_RESULT_ROWS,
     /** 数据库监听:单条查询结果序列化字符上限;0 = 不限制(不推荐)。 */
     val maxResultChars: Int = RecordLimits.DEFAULT_MAX_RESULT_CHARS,
-    val logStack: Boolean = true,
+    /**
+     * 调用栈采集(V44 D-V44-2:默认 **false**)。
+     *
+     * 默认预算最大单项:每条开启态记录都在 hook 线程同步做全栈捕获 + denylist 过滤
+     * + 24 帧字符串化([com.lioisme.modev.core.util.StackTraceFilter]),是宿主线程
+     * 最大的单点固定开销。需要调用链溯源时逐应用显式开启。
+     */
+    val logStack: Boolean = false,
     val maxStackDepth: Int = 24,
     /** 单字段字节上限(全量捕获保险丝);0 表示无限。 */
     val maxBytesPerField: Int = RecordLimits.DEFAULT_MAX_BYTES_PER_FIELD,

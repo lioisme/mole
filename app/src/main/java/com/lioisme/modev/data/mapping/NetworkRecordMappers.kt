@@ -7,6 +7,8 @@ import com.lioisme.modev.core.model.NetworkOperation
 import com.lioisme.modev.core.model.NetworkRecord
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
+import com.lioisme.modev.domain.record.NetworkRow
+import com.lioisme.modev.domain.record.RowModel
 
 /**
  * 网络环境监听记录映射(V30 一等公民):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,

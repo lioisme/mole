@@ -9,6 +9,12 @@ import com.lioisme.modev.core.model.ConfigKeys
 import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.FeatureConfig
 import com.lioisme.modev.core.model.HookSwitch
+import com.lioisme.modev.domain.asset.KeywordLibraryService
+import com.lioisme.modev.domain.config.FeatureService
+import com.lioisme.modev.domain.config.ListenConfigService
+import com.lioisme.modev.domain.server.McpServiceConfig
+import com.lioisme.modev.domain.server.PortWriteGuard
+import com.lioisme.modev.domain.server.ServerConfigService
 import com.lioisme.modev.data.server.ConfigServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -141,7 +147,7 @@ class SettingsRepository(
     private val writer: ConfigWriter,
     private val gson: Gson,
     private val localPrefs: SharedPreferences,
-) {
+) : ListenConfigService, FeatureService, ServerConfigService, McpServiceConfig {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -151,7 +157,7 @@ class SettingsRepository(
      * 默认配置流(V25:恒为内置推荐值;保留流形态供每应用页 combine 与
      * capability 消费,不再有任何写入方)。
      */
-    val globalSwitch: StateFlow<HookSwitch> = _globalSwitch
+    override val globalSwitch: StateFlow<HookSwitch> = _globalSwitch
 
     private val _serverExternalAccess = MutableStateFlow(false)
 
@@ -161,7 +167,7 @@ class SettingsRepository(
      * (同网段设备可连)。宿主本地偏好,不经远程镜像(注入侧零感知)。
      * V41 起取代 V26/V38 的 wire/MCP 双键分裂(`MCP_EXTERNAL_ACCESS` 仅迁移输入)。
      */
-    val serverExternalAccess: StateFlow<Boolean> = _serverExternalAccess
+    override val serverExternalAccess: StateFlow<Boolean> = _serverExternalAccess
 
     /**
      * 写入统一外部访问开关并即时生效(D-1):本地持久化 → 双服务改绑——
@@ -170,7 +176,7 @@ class SettingsRepository(
      * 与令牌认证互相独立(V40 D-4 语义保持):是否要求 Bearer 仅由
      * [ConfigKeys.MCP_TOKEN_AUTH] 决定。
      */
-    suspend fun setExternalAccess(enabled: Boolean) {
+    override suspend fun setExternalAccess(enabled: Boolean) {
         withContext(Dispatchers.IO) {
             localPrefs.edit { putBoolean(ConfigKeys.SERVER_EXTERNAL_ACCESS, enabled) }
         }
@@ -185,41 +191,50 @@ class SettingsRepository(
     private val _serverPort = MutableStateFlow(WireProtocol.PORT)
 
     /** 服务监听端口(V29):默认 1511(V39:1510 让位 MCP),可自定义。 */
-    val serverPort: StateFlow<Int> = _serverPort
+    override val serverPort: StateFlow<Int> = _serverPort
 
     /**
-     * 写入监听端口并即时生效:本地持久化 → 服务端改绑新端口([ConfigServer.restart],
-     * 已连接会话由注入侧重连循环恢复;hook 侧与宿主同 APK 共享 [WireProtocol.PORT] 常量,
-     * 非默认端口时注入侧以磁盘兜底/握手重连自适应)。
+     * 写入监听端口并即时生效:可用性硬闸 → 本地持久化 → 服务端改绑
+     * ([ConfigServer.restart],已连接会话由注入侧重连循环恢复)。
+     *
+     * V45 DUAL-3 / T2.4:校验从 UI 组件上移到本写口 —— UI 与 MCP 两侧走同一实现,
+     * 不再出现「UI 三闸硬拒、MCP clamp 直写」;被拒时偏好零写入。
      */
-    suspend fun setServerPort(port: Int) {
-        val clamped = port.coerceIn(1, 65535)
+    override suspend fun setServerPort(port: Int) {
+        PortWriteGuard.requireAvailable(
+            candidate = port,
+            selfPort = _serverPort.value,
+            selfLabel = WIRE_LABEL,
+            otherPort = _mcpPort.value,
+            otherLabel = MCP_LABEL,
+            externalAccess = _serverExternalAccess.value,
+        )
         withContext(Dispatchers.IO) {
-            localPrefs.edit { putInt(ConfigKeys.SERVER_PORT, clamped) }
+            localPrefs.edit { putInt(ConfigKeys.SERVER_PORT, port) }
         }
-        _serverPort.value = clamped
-        server.port = clamped
+        _serverPort.value = port
+        server.port = port
         scope.launch { server.restart() }
     }
 
     private val _overrides = MutableStateFlow<Map<String, AppListenOverride>>(emptyMap())
 
     /** 已存在的单应用自定义偏差(包名 → 偏差;仅含非零偏差项,init 时从本地预载)。 */
-    val overrides: StateFlow<Map<String, AppListenOverride>> = _overrides
+    override val overrides: StateFlow<Map<String, AppListenOverride>> = _overrides
 
     /** 当前包的自定义偏差快照(未定制返回 [AppListenOverride.DEFAULT],调用方免空判)。 */
-    fun overrideFor(packageName: String): AppListenOverride =
+    override fun overrideFor(packageName: String): AppListenOverride =
         _overrides.value[packageName] ?: AppListenOverride.DEFAULT
 
     /** 该包的有效配置快照(默认配置 ⊕ 偏差,纯解析;V37 T2.2 叠加关键词库解析)。 */
-    fun effectiveSwitch(packageName: String): HookSwitch =
+    override fun effectiveSwitch(packageName: String): HookSwitch =
         withKeywordRules(
             EffectiveSwitch.resolve(_globalSwitch.value, _overrides.value[packageName]),
             _overrides.value[packageName],
         )
 
     /** 该包的有效配置流:默认配置、偏差或关键词库任一变化即重发射(distinct 由数据类 equals 保证)。 */
-    fun effectiveSwitchFlow(packageName: String): Flow<HookSwitch> {
+    override fun effectiveSwitchFlow(packageName: String): Flow<HookSwitch> {
         val library = keywordLibrary
         val global = globalSwitch
         val overrideFlow = combine(global, overrides) { g, map -> g to map[packageName] }
@@ -235,15 +250,15 @@ class SettingsRepository(
 
     // ---- V37 T2.2 关键词库接线 ----
 
-    private var keywordLibrary: KeywordLibraryRepository? = null
+    private var keywordLibrary: KeywordLibraryService? = null
 
     /** 装配关键词库(容器初始化期一次;null = 未装配,规则解析恒空)。 */
-    fun attachKeywordLibrary(library: KeywordLibraryRepository) {
+    fun attachKeywordLibrary(library: KeywordLibraryService) {
         keywordLibrary = library
     }
 
     /** 关键词库变更后向全部在线会话重推各自有效配置(库为全局资产,影响所有作用域包)。 */
-    fun repushAllConnected() {
+    override fun repushAllConnected() {
         scope.launch { server.pushToAllConnected() }
     }
 
@@ -264,7 +279,7 @@ class SettingsRepository(
      * 写入单应用自定义偏差:双写持久化 + 内存热更 + 向该包会话定向推送有效配置。
      * 零偏差([AppListenOverride.isDefault])等价删除存储键。
      */
-    suspend fun setOverride(packageName: String, override: AppListenOverride) {
+    override suspend fun setOverride(packageName: String, override: AppListenOverride) {
         if (override.isDefault) {
             removeOverride(packageName)
             return
@@ -276,7 +291,13 @@ class SettingsRepository(
         pushOverride(packageName)
     }
 
-    /** 删除单应用自定义(该包回落纯默认配置语义)并定向推送。 */
+    /**
+     * 删除单应用自定义(两域一起清)并定向推送。
+     *
+     * **不是契约方法**(V45 T3.5 / DUAL-12):UI 与 MCP 的「恢复默认配置」一律走
+     * [ListenConfigService.resetOverride] 按域清,否则一页恢复会抹掉另一页的定制。
+     * 本入口只服务两件事 —— [setOverride] 的零偏差删键归一、测试夹具复位。
+     */
     suspend fun removeOverride(packageName: String) {
         withContext(Dispatchers.IO) {
             writer.remove(ConfigKeys.overrideKey(packageName))
@@ -294,29 +315,29 @@ class SettingsRepository(
     private val _globalFeature = MutableStateFlow(FeatureConfig())
 
     /** 全局功能配置(伪装画像选择 + 黑名单追加项;所有作用域包的 feature 默认值)。 */
-    val globalFeature: StateFlow<FeatureConfig> = _globalFeature
+    override val globalFeature: StateFlow<FeatureConfig> = _globalFeature
 
     // ---- V38 MCP 服务配置(V39 令牌化;宿主本地;与 wire ConfigServer 完全独立) ----
 
     private val _mcpEnabled = MutableStateFlow(true)
 
     /** MCP 服务启用(V38):默认 true = 随宿主进程常驻(V39:默认回环 127.0.0.1:1510,令牌认证默认停用)。 */
-    val mcpEnabled: StateFlow<Boolean> = _mcpEnabled
+    override val mcpEnabled: StateFlow<Boolean> = _mcpEnabled
 
-    private val _mcpPort = MutableStateFlow(com.lioisme.modev.mcp.protocol.McpProtocol.DEFAULT_PORT)
+    private val _mcpPort = MutableStateFlow(ConfigKeys.MCP_DEFAULT_PORT)
 
     /** MCP 监听端口(V39):默认 1510,与 wire 1511 区隔。 */
-    val mcpPort: StateFlow<Int> = _mcpPort
+    override val mcpPort: StateFlow<Int> = _mcpPort
 
     private val _mcpTokenAuth = MutableStateFlow(false)
 
     /** MCP 令牌认证(V39):默认停用;启用后**全接口**(含回环 adb forward)必须携带 Bearer 令牌。 */
-    val mcpTokenAuth: StateFlow<Boolean> = _mcpTokenAuth
+    override val mcpTokenAuth: StateFlow<Boolean> = _mcpTokenAuth
 
     private val _mcpTokens = MutableStateFlow<List<com.lioisme.modev.core.model.McpTokenEntry>>(emptyList())
 
     /** MCP 令牌列表(V39):多令牌;创建/撤销即时生效(原地更新校验集,不重启 socket、不踢会话)。 */
-    val mcpTokens: StateFlow<List<com.lioisme.modev.core.model.McpTokenEntry>> = _mcpTokens
+    override val mcpTokens: StateFlow<List<com.lioisme.modev.core.model.McpTokenEntry>> = _mcpTokens
 
     /** MCP 回调:端口/绑定/启停变更后由仓库驱动服务端重启(setter 装配,AppContainer 接线)。 */
     var mcpRestarter: (() -> Unit)? = null
@@ -335,7 +356,7 @@ class SettingsRepository(
     var mcpTokenSetUpdater: ((Set<String>) -> Unit)? = null
 
     /** 写 MCP 启用开关:持久化 → 内存 → 异步 start/stop。 */
-    suspend fun setMcpEnabled(enabled: Boolean) {
+    override suspend fun setMcpEnabled(enabled: Boolean) {
         withContext(Dispatchers.IO) {
             localPrefs.edit { putBoolean(ConfigKeys.MCP_ENABLED, enabled) }
         }
@@ -343,13 +364,23 @@ class SettingsRepository(
         restartMcpAsync()
     }
 
-    /** 写 MCP 端口(1..65535):持久化 → 内存 → 异步重启改绑。 */
-    suspend fun setMcpPort(port: Int) {
-        val clamped = port.coerceIn(1, 65535)
+    /**
+     * 写 MCP 端口:可用性硬闸(与 wire 同一 [PortWriteGuard],对端 = wire 端口)→
+     * 持久化 → 内存 → 异步重启改绑(V45 DUAL-3 同源收口)。
+     */
+    override suspend fun setMcpPort(port: Int) {
+        PortWriteGuard.requireAvailable(
+            candidate = port,
+            selfPort = _mcpPort.value,
+            selfLabel = MCP_LABEL,
+            otherPort = _serverPort.value,
+            otherLabel = WIRE_LABEL,
+            externalAccess = _serverExternalAccess.value,
+        )
         withContext(Dispatchers.IO) {
-            localPrefs.edit { putInt(ConfigKeys.MCP_PORT, clamped) }
+            localPrefs.edit { putInt(ConfigKeys.MCP_PORT, port) }
         }
-        _mcpPort.value = clamped
+        _mcpPort.value = port
         restartMcpAsync()
     }
 
@@ -357,7 +388,7 @@ class SettingsRepository(
      * 避免「启用即锁死」);false = 停用认证。与外部访问无级联——外部 0.0.0.0 监听
      * 是否可无认证访问由用户显式选择(UI 文案承载风险提示)。
      */
-    suspend fun setMcpTokenAuth(enabled: Boolean) {
+    override suspend fun setMcpTokenAuth(enabled: Boolean) {
         if (enabled && _mcpTokens.value.isEmpty()) {
             persistMcpTokens(_mcpTokens.value + com.lioisme.modev.core.model.McpTokenEntry.create(label = ""))
         }
@@ -366,14 +397,23 @@ class SettingsRepository(
     }
 
     /** 新增令牌(label 可空 = 未命名,UI 回落资源文案):持久化 → 原地更新校验集;返回新条目。 */
-    suspend fun addMcpToken(label: String): com.lioisme.modev.core.model.McpTokenEntry {
+    override suspend fun addMcpToken(label: String): com.lioisme.modev.core.model.McpTokenEntry {
         val entry = com.lioisme.modev.core.model.McpTokenEntry.create(label.trim())
         persistMcpTokens(_mcpTokens.value + entry)
         return entry
     }
 
+    /** 重命名:仅换 label,值集合原序原值 → 校验集内容零变化(不重启不踢会话)。 */
+    override suspend fun setMcpTokenLabel(id: String, label: String) {
+        val trimmed = label.trim()
+        val current = _mcpTokens.value
+        val next = current.map { if (it.id == id) it.copy(label = trimmed) else it }
+        if (next == current) return
+        persistMcpTokens(next)
+    }
+
     /** 撤销令牌:持久化 → 原地更新校验集;撤销最后一枚不自动停用认证(空集合 = 全拒,UI 提示)。 */
-    suspend fun revokeMcpToken(id: String) {
+    override suspend fun revokeMcpToken(id: String) {
         persistMcpTokens(_mcpTokens.value.filterNot { it.id == id })
     }
 
@@ -396,7 +436,7 @@ class SettingsRepository(
      * 写入全局功能配置:本地持久化 → 重播 switch_global 种子(注入侧直读兜底可见)
      * → 全部在线会话重推各自有效配置。
      */
-    suspend fun setGlobalFeature(config: FeatureConfig) {
+    override suspend fun setGlobalFeature(config: FeatureConfig) {
         withContext(Dispatchers.IO) {
             localPrefs.edit { putString(ConfigKeys.GLOBAL_FEATURE, gson.toJson(config)) }
         }
@@ -410,6 +450,8 @@ class SettingsRepository(
     init {
         // 迁移旧按包配置 → 全局键(仅一次;无旧键则回落默认并落盘,保证远程侧有值)
         writer.migrateLegacy()
+        // V43 T7/V5.1:core 日志出口注入(宿主侧)
+        EffectiveSwitch.interventionWarn = { msg -> android.util.Log.w("EffectiveSwitch", msg) }
         // V37 T3.5:恢复全局功能配置(画像/黑名单;默认空 = 内置行为不变)
         _globalFeature.value = localPrefs.getString(ConfigKeys.GLOBAL_FEATURE, null)
             ?.let { runCatching { gson.fromJson(it, FeatureConfig::class.java) }.getOrNull() }
@@ -462,7 +504,7 @@ class SettingsRepository(
         // V38→V39:恢复 MCP 服务偏好(进程重启后重放;enabled 默认 true,端口默认零动作)。
         // V41 T2:外部访问已随统一键上方重放(mcp_external_access 退役为迁移输入)。
         _mcpEnabled.value = localPrefs.getBoolean(ConfigKeys.MCP_ENABLED, true)
-        _mcpPort.value = localPrefs.getInt(ConfigKeys.MCP_PORT, com.lioisme.modev.mcp.protocol.McpProtocol.DEFAULT_PORT)
+        _mcpPort.value = localPrefs.getInt(ConfigKeys.MCP_PORT, ConfigKeys.MCP_DEFAULT_PORT)
         // V39 令牌迁移:旧单键 mcp_token 导入为未命名条目(一次性,导入后删旧键);
         // 令牌认证直读偏好(V40 D-4 解耦;V39 升级用户曾级联写入过显式 prefs 值,保持不变)。
         var tokens = localPrefs.getString(ConfigKeys.MCP_TOKENS, null)
@@ -485,5 +527,11 @@ class SettingsRepository(
         // V40 D-4 解耦:令牌认证直读偏好,不再按外部访问重推导(升级用户若曾依赖
         // V39 级联语义,升级后保持 prefs 中的显式值;V39 未级联写入过 prefs 时默认停用)。
         _mcpTokenAuth.value = localPrefs.getBoolean(ConfigKeys.MCP_TOKEN_AUTH, false)
+    }
+
+    companion object {
+        /** 端口冲突分型文案用服务名(与 UI 预检同源字面,AGENTS #29)。 */
+        private const val WIRE_LABEL = "wire"
+        private const val MCP_LABEL = "MCP"
     }
 }

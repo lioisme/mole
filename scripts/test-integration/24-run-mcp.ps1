@@ -1,7 +1,12 @@
-﻿# 24-run-mcp.ps1 — V38 MCP 服务集成测试矩阵(任务书 §9.2)
+﻿# 24-run-mcp.ps1 — V38 MCP 服务集成测试矩阵(任务书 §9.2;V45 起对齐 ACCEPTANCE §6)
 # 前置:雷电模拟器在线;本脚本自建 APK 构建 + 安装 + 作用域 + 端口转发。
 # 用法: powershell -File scripts/test-integration/24-run-mcp.ps1
-# 断言 22 项:协议 6 + 记录 7 + 配置 2 + 资产 2 + 服务 2 + 应用/作用域/危险 3。
+# 断言项以运行时输出为准(PASS/FAIL/SKIP 计数由 tt-lib 汇总;V45 T0.1 起禁手维护条数——
+# 旧头注「22 项」与实态漂移即为本轮登记的 QA-8 反例)。
+# -SkipBuild(V45 T0.4):由 run-acceptance.ps1 统一构建安装时跳过本脚本自建 ——
+# 其 `install -r` 会让 lspd 模块表失效(AGENTS 实锤坑),编排轮严禁覆盖安装。
+
+param([switch]$SkipBuild)
 
 $ErrorActionPreference = "Continue"
 . "$PSScriptRoot\tt-lib.ps1"
@@ -11,10 +16,14 @@ Write-Host "=== V38 MCP integration matrix ===" -ForegroundColor Cyan
 
 # ---- 环境准备 ----
 if (-not (WaitDevice)) { Write-Host "FATAL: device lost"; exit 1 }
-Write-Host "[env] installing APKs..."
-cmd /c "gradlew.bat :app:assembleModernDebug :testtarget:assembleDebug --console=plain -q" | Out-Null
-& $script:ADB -s $script:DEVICE install -r "app\build\outputs\apk\modern\debug\app-modern-x86_64-debug.apk" 2>&1 | Out-Null
-& $script:ADB -s $script:DEVICE install -r "testtarget\build\outputs\apk\debug\testtarget-debug.apk" 2>&1 | Out-Null
+if (-not $SkipBuild) {
+    Write-Host "[env] building + installing APKs..."
+    cmd /c "gradlew.bat :app:assembleModernDebug :testtarget:assembleDebug --console=plain -q" | Out-Null
+    & $script:ADB -s $script:DEVICE install -r "app\build\outputs\apk\modern\debug\app-modern-x86_64-debug.apk" 2>&1 | Out-Null
+    & $script:ADB -s $script:DEVICE install -r "testtarget\build\outputs\apk\debug\testtarget-debug.apk" 2>&1 | Out-Null
+} else {
+    Write-Host "[env] -SkipBuild:复用编排器已安装产物(避免 install -r 失效 lspd 模块表)"
+}
 & $script:ADB -s $script:DEVICE shell "settings put global cached_apps_freezer disabled" 2>$null | Out-Null
 EnsureHost
 McpForward
@@ -26,7 +35,12 @@ Assert "M-PROTO-01" ($null -ne $ver -and $ver -eq "2025-06-18") "initialize hand
 
 $r = McpRpc "tools/list" @{}
 $toolNames = @($r.obj.result.tools | ForEach-Object { $_.name })
-Assert "M-PROTO-02" ($r.status -eq 200 -and $toolNames.Count -eq 43) "tools/list count=$($toolNames.Count) expect=43"
+# V45 T0.1:期望值派生自装配侧真值 server_status.mcp.toolCount(注册表计数),
+# 与本通道(tools/list 序列化)双通道对账 —— 禁写死数字(旧 `expect=43` 与实态 46 漂移 = 首跑必红根因)。
+$ssTools = McpTool "server_status" @{}
+$expectTools = [int]$ssTools.mcp.toolCount
+Assert "M-PROTO-02" ($r.status -eq 200 -and $expectTools -gt 0 -and $toolNames.Count -eq $expectTools) "tools/list count=$($toolNames.Count) registry=$expectTools"
+Assert "M-PROTO-02b" (($toolNames | Sort-Object -Unique).Count -eq $toolNames.Count) "tool names unique (count=$($toolNames.Count))"
 
 # 错误语义:未知 method → -32601
 $bad = McpRpc "resources/list" @{}
@@ -139,7 +153,7 @@ $null = McpTool "records_delete_by_filter" @{ packageName = "com.mcp.import.test
 $mk = McpTool "record_create" @{ packageName = "com.mcp.import.test"; kind = "CIPHER"; operation = "ENCRYPT"; algorithm = "AES/MCP-IMPORT"; threadName = "mcp-it"; recordType = "crypto" }
 $cntAfter = McpTool "records_count" @{ recordType = "crypto"; packageName = "com.mcp.import.test" }
 Assert "M-REC-07b" ($null -ne $mk.id -and $cntAfter.count -eq 1) "record_create id=$($mk.id)"
-$up = McpTool "record_update" @{ id = $mk.id; draft = @{ packageName = "com.mcp.import.test"; kind = "CIPHER"; operation = "DECRYPT"; algorithm = "AES/MCP-EDIT"; threadName = "mcp-it"; recordType = "crypto" } }
+$up = McpTool "record_update" @{ id = $mk.id; record = @{ packageName = "com.mcp.import.test"; kind = "CIPHER"; operation = "DECRYPT"; algorithm = "AES/MCP-EDIT"; threadName = "mcp-it"; recordType = "crypto" } }
 $det2 = McpTool "record_get" @{ id = $mk.id }
 Assert "M-REC-07c" ($null -ne $up -and $det2.record.algorithm -eq "AES/MCP-EDIT") "record_update"
 $del = McpTool "record_delete" @{ id = $mk.id }
@@ -230,10 +244,17 @@ $ttRow = @($apps.apps | Where-Object { $_.packageName -eq $script:TARGET_PKG })
 Assert "M-APP-01a" ($ttRow.Count -eq 1 -and $ttRow[0].scoped -eq $true) "apps_list query scoped=$($ttRow[0].scoped)"
 $mon = McpTool "app_monitor" @{ packageName = $script:TARGET_PKG }
 Assert "M-APP-01b" ($null -ne $mon.counts -and $mon.counts.crypto -ge 0) "app_monitor counts"
-$prefs = McpTool "applist_prefs_set" @{ showXposedModules = $true }
+$prefs = McpTool "applist_prefs_set" @{ showModules = $true }
 $prefs2 = McpTool "applist_prefs_get" @{}
-Assert "M-APP-01c" ($prefs2.showXposedModules -eq $true) "applist_prefs roundtrip"
-$null = McpTool "applist_prefs_set" @{ showXposedModules = $false }
+Assert "M-APP-01c" ($prefs2.showModules -eq $true) "applist_prefs roundtrip (V45 T3.4 键名与契约一致)"
+$null = McpTool "applist_prefs_set" @{ showModules = $false }
+# V45 T3.2:schema 声明面即生效面 —— 未声明参数与非法枚举一律协议错误,不再穿透成业务错误
+$undeclared = McpRpc "tools/call" @{ name = "records_count"; arguments = @{ page = 1 } }
+Assert "M-PROTO-03a" ($undeclared.obj.error.code -eq -32602) "undeclared param -32602 (no silent ignore)"
+$badEnum = McpRpc "tools/call" @{ name = "records_query"; arguments = @{ sort = "ASC" } }
+Assert "M-PROTO-03b" ($badEnum.obj.error.code -eq -32602) "enum violation -32602 (case-sensitive)"
+$nullParam = McpRpc "tools/call" @{ name = "record_get"; arguments = @{ id = $null } }
+Assert "M-PROTO-03c" ($nullParam.obj.error.code -eq -32602) "required-with-null = same as missing"
 
 # ---- 作用域组 ----
 # Vector 2.2 不投递 XposedService → 宿主侧 ScopeState 可能为 unavailable(合法形态);

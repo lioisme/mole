@@ -44,6 +44,18 @@ data class BytesView(
         ): BytesView? {
             if (bytes == null || bytes.isEmpty()) return null
             val total = bytes.size
+            // V44 T2.3 内容物化字节预算护栏(「保元弃内容」):输入超上限时三态字符串
+            // 一律不生成,仅保留元数据 + hex 标识前缀。上限与 HARD_MAX_HEX_CHARS 同字节
+            // 预算(单一事实源 = RecordLimits.MAX_CONTENT_MATERIALIZE_BYTES)。
+            if (total > CONTENT_MATERIALIZE_MAX_BYTES) {
+                return BytesView(
+                    hex = Hex.encode(bytes, 0, minOf(METADATA_HEX_PREFIX_BYTES, total)),
+                    base64 = null,
+                    text = null,
+                    totalLength = total,
+                    truncated = true,
+                )
+            }
             val hexLen = maxHexChars.coerceAtLeast(32).coerceAtMost(HARD_MAX_HEX_CHARS)
             val truncated = total * 2 > hexLen
             val hex = if (truncated) Hex.encode(bytes, 0, hexLen / 2) else Hex.encode(bytes)
@@ -85,11 +97,20 @@ data class BytesView(
          * 单字段 hex 字符数 / 文本字节数不超此值 —— 详情页解码与渲染永不
          * 因超大字段 OOM/ANR。
          */
-        const val HARD_MAX_HEX_CHARS = 16 * 1024 * 1024
+        const val HARD_MAX_HEX_CHARS = RecordLimits.MAX_CONTENT_MATERIALIZE_BYTES * 2
         const val HARD_MAX_TEXT_CHARS = 8 * 1024 * 1024
 
         /** Base64 硬保险丝:与 [HARD_MAX_HEX_CHARS] 同字节预算(×2/3)。 */
         const val HARD_MAX_B64_CHARS = HARD_MAX_HEX_CHARS * 2 / 3
+
+        /**
+         * 内容物化上限(V44 T2.3):输入字节数超过此值即「保元弃内容」——
+         * 见 [of] 与 [RecordLimits.MAX_CONTENT_MATERIALIZE_BYTES]。
+         */
+        const val CONTENT_MATERIALIZE_MAX_BYTES = RecordLimits.MAX_CONTENT_MATERIALIZE_BYTES
+
+        /** 保元形态保留的 hex 标识前缀字节数(32 字节 = 64 字符,足以辨识内容形态)。 */
+        const val METADATA_HEX_PREFIX_BYTES = 32
     }
 }
 

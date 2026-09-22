@@ -7,7 +7,7 @@ import androidx.compose.ui.res.stringResource
 import com.lioisme.modev.R
 import com.lioisme.modev.core.model.PrefsKind
 import com.lioisme.modev.core.model.PrefsOperation
-import com.lioisme.modev.data.mapping.PrefsRow
+import com.lioisme.modev.domain.record.PrefsRow
 
 /**
  * 偏好监听标签资源(V28):类别/操作显示名单一事实源,

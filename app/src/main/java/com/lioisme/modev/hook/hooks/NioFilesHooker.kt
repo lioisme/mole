@@ -21,9 +21,11 @@ class NioFilesHooker(
     override fun install() {
         val r = registry ?: return
         hookAfter(r.named("delete")) { inv, _ ->
+            if (!featureOn(BehaviorKind.FILE_DELETE)) return@hookAfter
             emit(BehaviorKind.FILE_DELETE, BehaviorOperation.DELETE, path = inv.argPath(0))
         }
         hookAfter(r.named("move")) { inv, _ ->
+            if (!featureOn(BehaviorKind.FILE_RENAME)) return@hookAfter
             emit(
                 kind = BehaviorKind.FILE_RENAME,
                 operation = BehaviorOperation.RENAME,
@@ -32,6 +34,7 @@ class NioFilesHooker(
             )
         }
         hookAfter(r.named("copy")) { inv, _ ->
+            if (!featureOn(BehaviorKind.FILE_WRITE)) return@hookAfter
             emit(
                 kind = BehaviorKind.FILE_WRITE,
                 operation = BehaviorOperation.WRITE_ALL,
@@ -40,15 +43,19 @@ class NioFilesHooker(
             )
         }
         hookAfter(r.namedAny("createDirectory")) { inv, _ ->
+            if (!featureOn(BehaviorKind.FILE_WRITE)) return@hookAfter
             emit(BehaviorKind.FILE_WRITE, BehaviorOperation.MKDIR, path = inv.argPath(0))
         }
         hookAfter(r.namedAny("createDirectories")) { inv, _ ->
+            if (!featureOn(BehaviorKind.FILE_WRITE)) return@hookAfter
             emit(BehaviorKind.FILE_WRITE, BehaviorOperation.MKDIRS, path = inv.argPath(0))
         }
         hookAfter(r.named("newInputStream")) { inv, _ ->
+            if (!featureOn(BehaviorKind.FILE_READ)) return@hookAfter
             emit(BehaviorKind.FILE_READ, BehaviorOperation.OPEN_READ, path = inv.argPath(0))
         }
         hookAfter(r.named("newOutputStream")) { inv, _ ->
+            if (!featureOn(BehaviorKind.FILE_WRITE)) return@hookAfter
             val append = hasAppendOption(inv)
             emit(
                 kind = BehaviorKind.FILE_WRITE,
@@ -58,27 +65,35 @@ class NioFilesHooker(
             )
         }
         hookAfter(r.named("readAllBytes")) { inv, result ->
+            // V44 T2.2 门控先行:readAllBytes 返回整文件字节,fileRead 默认关时
+            // 旧形态仍会先走 viewOf(result) 的三态物化(hex+base64+text)。
+            if (!featureOn(BehaviorKind.FILE_READ)) return@hookAfter
+            val capture = config().fileContentCapture
             emit(
                 kind = BehaviorKind.FILE_READ,
                 operation = BehaviorOperation.READ_ALL,
                 path = inv.argPath(0),
                 fileSize = (result as? ByteArray)?.size?.toLong(),
-                content = if (config().fileContentCapture) viewOf(result as? ByteArray) else null,
+                content = if (capture) viewOf(result as? ByteArray) else null,
             )
         }
         hookAfter(r.named("readAllLines")) { inv, result ->
+            // V44 T2.2 门控先行 + 内容护栏:joinToString/toByteArray 必须在门控
+            // 与 fileContentCapture 之后(旧形态每次调用先全量拼接整文件字符串)。
+            if (!featureOn(BehaviorKind.FILE_READ)) return@hookAfter
             val lines = result as? List<*> ?: return@hookAfter
-            val text = lines.joinToString("\n") { it?.toString().orEmpty() }
+            val capture = config().fileContentCapture
             emit(
                 kind = BehaviorKind.FILE_READ,
                 operation = BehaviorOperation.READ_ALL,
                 path = inv.argPath(0),
                 fileSize = lines.size.toLong(),
-                content = if (config().fileContentCapture) viewOf(text.toByteArray()) else null,
+                content = if (capture) viewOf(lines.joinToString("\n") { it?.toString().orEmpty() }.toByteArray()) else null,
                 params = mapOf(LINE_COUNT to lines.size.toString()),
             )
         }
         hookAfter(r.named("write")) { inv, _ ->
+            if (!featureOn(BehaviorKind.FILE_WRITE)) return@hookAfter
             // write(Path, byte[], ...) 与 write(Path, Iterable<CharSequence>, ...) 双形态。
             val bytes = inv.getArg(1) as? ByteArray
             val lines = inv.getArg(1) as? List<*>

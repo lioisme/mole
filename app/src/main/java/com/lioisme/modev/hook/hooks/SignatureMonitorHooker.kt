@@ -27,6 +27,8 @@ class SignatureMonitorHooker(
         for (method in methods) {
             engine.hook(method, object : MethodHook() {
                 override fun after(invocation: Invocation) {
+                    // V43 T2:签名哈希/Base64 为每调用重成本,SIGNATURE kind 关闭必须首行短路
+                    if (!config().systemEnabled(SystemKind.SIGNATURE)) return
                     val pkgName = invocation.getArg(0) as? String ?: return
                     val flags = (invocation.getArg(1) as? Number)?.toLong() ?: return
                     val hasSignatures = (flags and FLAG_GET_SIGNATURES != 0L) ||

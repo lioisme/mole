@@ -37,7 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.paging.LoadState
 import androidx.paging.compose.LazyPagingItems
 import com.lioisme.modev.R
-import com.lioisme.modev.data.mapping.RowModel
+import com.lioisme.modev.domain.record.RowModel
 import com.lioisme.modev.ui.components.RecordRow
 import com.lioisme.modev.ui.components.RetryRow
 import com.lioisme.modev.ui.common.groupLabelOrNull
@@ -66,6 +66,23 @@ fun RecordTimelineList(
     val context = LocalContext.current
     val locale = rememberEffectiveLocale()
     val is24h = remember(context) { DateFormat.is24HourFormat(context) }
+
+    // V43 T5:组头判定配对记忆化——groupLabelOrNull/timelineLabel 为纯函数
+    // (AGENTS #10 邻行比较契约不变),但分页 append 致全列表内容体重组合,旧实现
+    // 每索引 2×secondKey + 2×dayKey + 格式化重算;同 (prev, ts) 输入必得同输出,
+    // 缓存按 locale/时制作用域,命中即 O(1)。缓存写入幂等,重启安全。
+    val groupCache = remember(locale, is24h) { HashMap<Pair<Long?, Long>, String?>() }
+    val firstLabelCache = remember(locale, is24h) { HashMap<Long, String>() }
+    fun groupLabelCached(
+        ts: Long,
+        prev: Long?,
+    ): String? {
+        val key = prev to ts
+        if (groupCache.containsKey(key)) return groupCache[key]
+        return groupLabelOrNull(ts, prev, locale, is24h).also { groupCache[key] = it }
+    }
+    fun firstLabelCached(ts: Long): String =
+        firstLabelCache.getOrPut(ts) { timelineLabel(ts, locale, is24h) }
 
     LazyColumn(
         state = listState,
@@ -149,14 +166,9 @@ fun RecordTimelineList(
                         val previous = if (index > 0) records[index - 1] else null
                         val label =
                             if (index == 0) {
-                                timelineLabel(record.timestamp, locale, is24h)
+                                firstLabelCached(record.timestamp)
                             } else {
-                                groupLabelOrNull(
-                                    record.timestamp,
-                                    previous?.timestamp,
-                                    locale,
-                                    is24h,
-                                )
+                                groupLabelCached(record.timestamp, previous?.timestamp)
                             }
                         if (label != null) {
                             item(key = "h-" + secondKey(record.timestamp), contentType = "header") {
@@ -190,8 +202,12 @@ fun RecordTimelineList(
                                 onLongClick = { onRecordLongPress?.invoke(record) },
                                 modifier =
                                     Modifier
-                                        .testTag("record-row")
-                                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                                        // V46:record-row 锚点由 RecordRow 自持(必须落在
+                                        // ListItem 合并语义节点上),宿主只传间距。
+                                        // V46 D8:行间 4dp → 6dp。相邻卡片间隙 = 2×6 = 12dp
+                                        // = 行容器半径(shapes.medium);间隙小于半径一半时
+                                        // 圆角会读成波浪边。
+                                        .padding(horizontal = 16.dp, vertical = 6.dp),
                                 contextLabel =
                                     packageLabels?.get(record.packageName)
                                         ?.takeIf { it.isNotBlank() },

@@ -1,5 +1,6 @@
 package com.lioisme.modev.hook.probes
 
+import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.hook.Probe
 import com.lioisme.modev.hook.ProbeContext
@@ -19,6 +20,9 @@ import com.lioisme.modev.hook.hooks.PrefsOpenHooker
 class PrefsProbe : Probe {
 
     override val recordType: String = RecordTypes.PREFS
+
+    /** V44 T2.4 冷启动裁剪:偏好域全部 kind 经 `prefsListen` master ∧ kind 双门控。 */
+    override fun enabledIn(switch: HookSwitch): Boolean = switch.prefsListen
 
     override fun install(context: ProbeContext) {
         val index = PrefsInstanceIndex()

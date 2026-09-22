@@ -1,6 +1,7 @@
 package com.lioisme.modev.ui.components
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -22,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -325,9 +327,11 @@ fun <T> ModevChoiceSheet(
                         )
                     },
                     leadingContent = {
+                        // U3〔P2〕只读 RadioButton:不再独立可聚焦(onClick=null),
+                        // 避免与行 clickable 构成 TalkBack 双节点重复;选中态仅作视觉指示。
                         RadioButton(
                             selected = option.value == selected,
-                            onClick = { sheet.dismissWith { onSelect(option.value) } },
+                            onClick = null,
                         )
                     },
                     modifier =
@@ -337,7 +341,13 @@ fun <T> ModevChoiceSheet(
                             .let { base ->
                                 option.testTag?.let { base.testTag(it) } ?: base
                             }
-                            .clickable { sheet.dismissWith { onSelect(option.value) } },
+                            // 单一语义节点:行整体 selectable(role=RadioButton),
+                            // 替代「RadioButton 可聚焦 + 行 clickable」双节点重复。
+                            .selectable(
+                                selected = option.value == selected,
+                                role = Role.RadioButton,
+                                onClick = { sheet.dismissWith { onSelect(option.value) } },
+                            ),
                 )
             }
         }

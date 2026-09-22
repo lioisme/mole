@@ -4,6 +4,7 @@ import com.lioisme.modev.core.model.KeywordEntry
 import com.lioisme.modev.core.model.KeywordMatchMode
 import com.lioisme.modev.core.model.KeywordRule
 import com.lioisme.modev.data.db.KeywordEntity
+import com.lioisme.modev.domain.asset.KeywordLibraryService
 import com.lioisme.modev.data.db.KeywordLibraryDao
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,12 +25,12 @@ import kotlinx.coroutines.launch
 class KeywordLibraryRepository(
     private val dao: KeywordLibraryDao,
     scope: CoroutineScope,
-) {
+) : KeywordLibraryService {
 
     private val _entries = MutableStateFlow<List<KeywordEntry>>(emptyList())
 
     /** 库全量快照(createdAt 降序)。 */
-    val entries: StateFlow<List<KeywordEntry>> = _entries.asStateFlow()
+    override val entries: StateFlow<List<KeywordEntry>> = _entries.asStateFlow()
 
     init {
         // 收集器容错收场(V38):Robolectric 等环境下仓库可能随宿主沙箱一起消亡
@@ -44,8 +45,8 @@ class KeywordLibraryRepository(
         }
     }
 
-    /** 新增关键词;空白/重复返回 false。 */
-    suspend fun add(text: String, matchMode: KeywordMatchMode = KeywordMatchMode.CONTAINS): Boolean {
+    /** 新增关键词;空白/重复返回 false(默认匹配模式由接口声明侧给定)。 */
+    override suspend fun add(text: String, matchMode: KeywordMatchMode): Boolean {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return false
         val id = dao.insertIgnore(
@@ -60,7 +61,7 @@ class KeywordLibraryRepository(
     }
 
     /** 更新文本/模式;空白或与他项冲突返回 false。 */
-    suspend fun update(id: Long, text: String, matchMode: KeywordMatchMode): Boolean {
+    override suspend fun update(id: Long, text: String, matchMode: KeywordMatchMode): Boolean {
         val trimmed = text.trim()
         if (trimmed.isEmpty()) return false
         val current = _entries.value.firstOrNull { it.id == id } ?: return false
@@ -69,16 +70,16 @@ class KeywordLibraryRepository(
     }
 
     /** 全局启停。 */
-    suspend fun setEnabled(id: Long, enabled: Boolean) {
+    override suspend fun setEnabled(id: Long, enabled: Boolean) {
         val current = _entries.value.firstOrNull { it.id == id } ?: return
         dao.update(current.copy(enabled = enabled).toEntity())
     }
 
-    suspend fun remove(id: Long) {
+    override suspend fun remove(id: Long) {
         dao.deleteById(id)
     }
 
-    suspend fun clear() {
+    override suspend fun clear() {
         dao.clear()
     }
 
@@ -87,7 +88,7 @@ class KeywordLibraryRepository(
      * - [keywordIds] = null → 跟随全局(全部全局启用条目);
      * - 非 null → 全局启用 ∧ 应用启用子集(库中已删除条目自然失效)。
      */
-    fun resolveRules(keywordIds: List<Long>?): List<KeywordRule> {
+    override fun resolveRules(keywordIds: List<Long>?): List<KeywordRule> {
         val snapshot = _entries.value
         val globallyEnabled = snapshot.filter { it.enabled }
         val selected = if (keywordIds == null) {

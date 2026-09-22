@@ -39,54 +39,36 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
 import com.lioisme.modev.AppContainer
 import com.lioisme.modev.R
+import com.lioisme.modev.core.model.BlacklistKind
+import com.lioisme.modev.core.model.blacklistValues
+import com.lioisme.modev.core.model.merged
 import com.lioisme.modev.ui.components.ModevInputSheet
 import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
 import kotlinx.coroutines.launch
 
-/** 可编辑黑名单分区种类(V37 T2.4)。 */
-enum class BlacklistKind { ROOT_PACKAGES, XPOSED_PREFIXES, FRIDA_PORTS, MASK_KEYWORDS }
+/** 可编辑黑名单分区种类(V44 上移 core,与 MCP `blacklist_edit` 共享唯一枚举)。 */
 
-/** 全局检测黑名单追加 VM(写全局 feature 种子;内置基线只增不删)。 */
+/** 全局检测黑名单追加 VM(写全局 feature 种子;内置基线只增不删;合并映射唯一在 core)。 */
 class FeatureBlacklistViewModel(private val container: AppContainer) : ViewModel() {
 
-    val feature = container.settings.globalFeature
+    val feature = container.featureConfig.globalFeature
 
     fun add(kind: BlacklistKind, value: String) {
         val trimmed = value.trim()
         if (trimmed.isEmpty()) return
+        if (kind == BlacklistKind.FRIDA_PORTS && trimmed.toIntOrNull() == null) return
         viewModelScope.launch {
-            val current = feature.value
-            val next = when (kind) {
-                BlacklistKind.ROOT_PACKAGES ->
-                    current.copy(extraRootPackages = (current.extraRootPackages + trimmed).distinct())
-                BlacklistKind.XPOSED_PREFIXES ->
-                    current.copy(extraXposedPrefixes = (current.extraXposedPrefixes + trimmed).distinct())
-                BlacklistKind.FRIDA_PORTS -> {
-                    val port = trimmed.toIntOrNull() ?: return@launch
-                    current.copy(extraFridaPorts = (current.extraFridaPorts + port).distinct())
-                }
-                BlacklistKind.MASK_KEYWORDS ->
-                    current.copy(extraMaskKeywords = (current.extraMaskKeywords + trimmed).distinct())
-            }
-            container.settings.setGlobalFeature(next)
+            val next = feature.value.merged(kind, listOf(trimmed), add = true)
+            container.featureConfig.setGlobalFeature(next)
         }
     }
 
     fun remove(kind: BlacklistKind, value: String) {
         viewModelScope.launch {
-            val current = feature.value
-            val next = when (kind) {
-                BlacklistKind.ROOT_PACKAGES -> current.copy(extraRootPackages = current.extraRootPackages - value)
-                BlacklistKind.XPOSED_PREFIXES -> current.copy(extraXposedPrefixes = current.extraXposedPrefixes - value)
-                BlacklistKind.FRIDA_PORTS -> {
-                    val port = value.toIntOrNull() ?: return@launch
-                    current.copy(extraFridaPorts = current.extraFridaPorts - port)
-                }
-                BlacklistKind.MASK_KEYWORDS -> current.copy(extraMaskKeywords = current.extraMaskKeywords - value)
-            }
-            container.settings.setGlobalFeature(next)
+            val next = feature.value.merged(kind, listOf(value), add = false)
+            container.featureConfig.setGlobalFeature(next)
         }
     }
 }
@@ -132,12 +114,7 @@ fun FeatureBlacklistScreen(
                 modifier = Modifier.padding(start = 4.dp, bottom = 12.dp),
             )
             BlacklistKind.entries.forEach { kind ->
-                val items = when (kind) {
-                    BlacklistKind.ROOT_PACKAGES -> feature.extraRootPackages
-                    BlacklistKind.XPOSED_PREFIXES -> feature.extraXposedPrefixes
-                    BlacklistKind.FRIDA_PORTS -> feature.extraFridaPorts.map { it.toString() }
-                    BlacklistKind.MASK_KEYWORDS -> feature.extraMaskKeywords
-                }
+                val items = feature.blacklistValues(kind)
                 SettingsSection(stringResource(blacklistKindLabelRes(kind))) {
                     if (items.isEmpty()) {
                         ListItem(

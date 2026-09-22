@@ -89,9 +89,10 @@ class MonitorEntryHeaderTest {
         // Hero 卡(V23):作用域 Switch 行。
         rule.onNodeWithTag("app-scope-row").assertIsDisplayed()
 
-        // 两记录入口(单应用语境)+ 顶栏返回。
-        rule.onNodeWithText(str(R.string.algorithm_records_title)).assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.database_records_title)).assertIsDisplayed()
+        // 两记录入口(单应用语境)+ 顶栏返回。入口行在 Hero/统计区之下,
+        // 先滚进视口再断言显示性(V40 T4 同坑:视口外节点恒「not displayed」)。
+        rule.onNodeWithText(str(R.string.algorithm_records_title)).performScrollTo().assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.database_records_title)).performScrollTo().assertIsDisplayed()
         rule.onAllNodesWithContentDescription(str(R.string.cd_back)).assertCountEquals(1)
 
         // V37 T3.2:启动/清空 = Appbar actions(图标;testTag 锚定);

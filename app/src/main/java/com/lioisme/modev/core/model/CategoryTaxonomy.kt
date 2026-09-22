@@ -164,6 +164,15 @@ object CategoryTaxonomy {
     fun isFeature(type: RecordType, id: String): Boolean =
         byId(type, id)?.domain == CapabilityDomain.FEATURE
 
+    /**
+     * kinds 映射键(限定形态 `wire:ID`,或遗留裸 ID)的域归属(V45 T3.5 / DUAL-12):
+     * 按域清除与按域计数都经本判定,未知键归 LISTEN(解析期已容错丢弃,不影响有效条目)。
+     */
+    fun isFeatureKindKey(key: String): Boolean {
+        val parsed = AppListenOverride.parseKindKey(key) ?: return false
+        return isFeature(parsed.first, parsed.second)
+    }
+
     /** 指定类型的类别(按 order 升序)。 */
     fun forType(type: RecordType): List<RecordCategory> =
         entries.filter { it.type == type }.sortedBy { it.order }
@@ -171,6 +180,15 @@ object CategoryTaxonomy {
     /** 按类型 + id 取类别(非法返回 null,协议/存储漂移兜底)。 */
     fun byId(type: RecordType, id: String): RecordCategory? =
         entries.firstOrNull { it.type == type && it.id == id }
+
+    /**
+     * 承载指定裸 kind id 的类型集合(V44 R1-6:遗留偏差键解析用),
+     * 按 [RecordType.ordinal] 升序——裸 id 歧义解析恒取序首,与历史
+     * [EffectiveSwitch.readKind] 字符串分支 first-wins 语义逐位一致
+     * (OPEN → DATABASE,SIGNATURE → CRYPTO)。
+     */
+    fun typesWithId(id: String): List<RecordType> =
+        entries.filter { it.id == id }.map { it.type }.distinct().sortedBy { it.ordinal }
 
     /**
      * 将 [kinds] 收敛到 [recordType] 所属类别集合(精准查询保证,防跨类型 kind 名碰撞):
@@ -192,19 +210,52 @@ object CategoryTaxonomy {
     fun validateOperations(recordType: String?, operations: Set<String>?): Set<String>? {
         if (operations.isNullOrEmpty()) return null
         val type = RecordType.fromWire(recordType) ?: return operations
-        val valid = when (type) {
-            RecordType.CRYPTO -> CryptoOperation.entries.map { it.name }.toSet()
-            RecordType.DATABASE -> SqlOperation.entries.map { it.name }.toSet()
-            RecordType.BEHAVIOR -> BehaviorOperation.entries.map { it.name }.toSet()
-            RecordType.PREFS -> PrefsOperation.entries.map { it.name }.toSet()
-            RecordType.WEBVIEW -> WebViewOperation.entries.map { it.name }.toSet()
-            RecordType.NETWORK -> NetworkOperation.entries.map { it.name }.toSet()
-            RecordType.DEVICE_ENV -> DeviceEnvOperation.entries.map { it.name }.toSet()
-            RecordType.UI_INTERACTION -> UiInteractionOperation.entries.map { it.name }.toSet()
-            RecordType.SYSTEM -> SystemOperation.entries.map { it.name }.toSet()
-            RecordType.PROCESS_CONTROL -> ProcessOperation.entries.map { it.name }.toSet()
-        }
-        return operations.intersect(valid)
+        return operations.intersect(operationsOf(type))
+    }
+
+    /** 该 wire 类型名是否已登记(V45 T1.8:[RecordFilter.normalize] 判定是否收敛的前置)。 */
+    fun isKnownType(recordType: String): Boolean = RecordType.fromWire(recordType) != null
+
+    /**
+     * 多类型 kind 收敛(V45 T1.8 / QA-6):取各所选类型合法集的**并集**。
+     * 旧形态仅在单类型下收敛,多类型选择时跨类同名 id(如 `OPEN`:SQL 与 Prefs 皆有)
+     * 会命中未选类型的行 —— 双端筛选语义因此分叉。
+     * 入参空/null → null(不过滤);全部所选类型未知 → 原样返回。
+     */
+    fun convergeKinds(recordTypes: Collection<String>, kinds: Set<String>?): Set<String>? {
+        if (kinds.isNullOrEmpty()) return null
+        val valid = recordTypes.mapNotNull { id ->
+            val type = RecordType.fromWire(id) ?: return@mapNotNull null
+            forType(type).map { it.id }.toSet()
+        }.flatten().toSet()
+        return if (valid.isEmpty()) kinds else kinds.intersect(valid)
+    }
+
+    /** 多类型 operation 收敛(与 [convergeKinds] 同规:所选类型合法操作并集)。 */
+    fun convergeOperations(recordTypes: Collection<String>, operations: Set<String>?): Set<String>? {
+        if (operations.isNullOrEmpty()) return null
+        val valid = recordTypes.mapNotNull { id ->
+            val type = RecordType.fromWire(id) ?: return@mapNotNull null
+            operationsOf(type)
+        }.flatten().toSet()
+        return if (valid.isEmpty()) operations else operations.intersect(valid)
+    }
+
+    /**
+     * 该类型的合法操作名集([validateOperations] 的单一事实源抽取;
+     * V45 T3.2 起对消费方开放 —— MCP 写入矩阵需按类型取一个真实操作做种子)。
+     */
+    fun operationsOf(type: RecordType): Set<String> = when (type) {
+        RecordType.CRYPTO -> CryptoOperation.entries.map { it.name }.toSet()
+        RecordType.DATABASE -> SqlOperation.entries.map { it.name }.toSet()
+        RecordType.BEHAVIOR -> BehaviorOperation.entries.map { it.name }.toSet()
+        RecordType.PREFS -> PrefsOperation.entries.map { it.name }.toSet()
+        RecordType.WEBVIEW -> WebViewOperation.entries.map { it.name }.toSet()
+        RecordType.NETWORK -> NetworkOperation.entries.map { it.name }.toSet()
+        RecordType.DEVICE_ENV -> DeviceEnvOperation.entries.map { it.name }.toSet()
+        RecordType.UI_INTERACTION -> UiInteractionOperation.entries.map { it.name }.toSet()
+        RecordType.SYSTEM -> SystemOperation.entries.map { it.name }.toSet()
+        RecordType.PROCESS_CONTROL -> ProcessOperation.entries.map { it.name }.toSet()
     }
 
     /** 默认启用的类别 id 集合(供 HookSwitch 默认推导/校验)。 */

@@ -8,6 +8,8 @@ import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
+import com.lioisme.modev.domain.record.BehaviorRow
+import com.lioisme.modev.domain.record.RowModel
 
 /**
  * 行为记录映射(V27):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,

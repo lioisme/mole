@@ -1,7 +1,6 @@
 package com.lioisme.modev.ui.settings
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,20 +12,23 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
@@ -42,7 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -51,7 +53,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -63,23 +65,26 @@ import com.lioisme.modev.ui.common.rememberEffectiveLocale
 import com.lioisme.modev.ui.components.ModevConfirmDialog
 import com.lioisme.modev.ui.components.ModevInputSheet
 import com.lioisme.modev.ui.components.ModevTopBar
+import com.lioisme.modev.ui.components.ModevValueDialog
 import com.lioisme.modev.ui.components.SettingsToggleItem
 import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.theme.Tokens
 import kotlinx.coroutines.launch
 
 /**
- * MCP 访问令牌管理页(V39 R3;V40 T6 重设计:高级/简约/优美,三层信息架构):
+ * MCP 访问令牌管理页(V39 R3;V40 T6 三层信息架构;**V46 R3 动作菜单化**):
  * ①认证状态卡(开关 + 一句话状态:认证态/令牌数/空集全拒警示,单卡定调);
- * ②令牌卡列表(每枚一卡:名称 headline + mono 值/创建日 supporting +
- * 复制/显隐/撤销三动作依危险度排序,撤销 error 色并间距分离);
+ * ②令牌卡列表(每枚一卡:名称 headline + 掩码值·创建日 supporting +
+ *   trailing **唯一「更多」按钮** → 查看 / 重命名 / 删除三项菜单,删除项 error 色;
+ *   **行体不承载点击** —— 明文只经查看对话框上屏,故不留「看着可点却无动作」的 affordance);
  * ③空态(内联 Icon+Text,按认证态区分文案)。
  *
- * 契约保留:令牌值宿主本地秘密(显隐/复制仅本页消费,恒不进 MCP 工具输出与
- * 诊断快照);`mcpTokenSetUpdater` 原地生效不重启不踢会话;撤销最后一枚不停用
- * 认证(空集 = 全拒,状态卡可见);legacy 迁移条目显示「导入」;新建走
- * [ModevInputSheet]、撤销走 [ModevConfirmDialog](V39 契约);本页无搜索 →
- * Appbar actions 仅「新建」一枚(排他规范合规)。
+ * 契约保留:令牌值宿主本地秘密(**行内恒掩码,明文仅 [ModevValueDialog] 一处上屏**;
+ * 恒不进 MCP 工具输出与诊断快照);`mcpTokenSetUpdater` 原地生效不重启不踢会话
+ * (重命名只动 label、值集合内容不变 ⇒ 会话零影响);删除最后一枚不停用
+ * 认证(空集 = 全拒,状态卡可见);legacy 迁移条目显示「导入」;新建与重命名走
+ * [ModevInputSheet]、查看走 [ModevValueDialog]、删除走 [ModevConfirmDialog](#27);
+ * 本页无搜索 → Appbar actions 仅「新建」一枚(排他规范合规)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,8 +96,10 @@ fun McpTokensScreen(
     val tokens by viewModel.tokens.collectAsStateWithLifecycle()
 
     var addSheetOpen by rememberSaveable { mutableStateOf(false) }
-    var revokeTarget by remember { mutableStateOf<McpTokenEntry?>(null) }
-    var visibleIds by remember { mutableStateOf(setOf<String>()) }
+    // V46 R3:三动作各自的目标态(取代旧 visibleIds 显隐集合)。
+    var viewTarget by remember { mutableStateOf<McpTokenEntry?>(null) }
+    var renameTarget by remember { mutableStateOf<McpTokenEntry?>(null) }
+    var deleteTarget by remember { mutableStateOf<McpTokenEntry?>(null) }
 
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -177,18 +184,10 @@ fun McpTokensScreen(
                 tokens.forEachIndexed { index, entry ->
                     TokenCard(
                         entry = entry,
-                        visible = entry.id in visibleIds,
                         localeTag = locale,
-                        onToggleVisible = {
-                            visibleIds =
-                                if (entry.id in visibleIds) {
-                                    visibleIds - entry.id
-                                } else {
-                                    visibleIds + entry.id
-                                }
-                        },
-                        onCopy = { copyToken(entry) },
-                        onRevoke = { revokeTarget = entry },
+                        onView = { viewTarget = entry },
+                        onRename = { renameTarget = entry },
+                        onDelete = { deleteTarget = entry },
                     )
                     if (index != tokens.lastIndex) {
                         Spacer(Modifier.height(12.dp))
@@ -216,16 +215,55 @@ fun McpTokensScreen(
         )
     }
 
-    revokeTarget?.let { target ->
+    // V46 R3:查看 = 只读值对话框(唯一明文上屏处);复制后关窗,明文不常驻。
+    viewTarget?.let { target ->
+        ModevValueDialog(
+            title = stringResource(R.string.token_value_title),
+            value = target.value,
+            onCopy = {
+                copyToken(target)
+                viewTarget = null
+            },
+            onDismiss = { viewTarget = null },
+            modifier = Modifier.testTag("token-view-dialog"),
+            valueTestTag = "token-view-value",
+            copyTestTag = "token-view-copy",
+            closeTestTag = "token-view-close",
+        )
+    }
+
+    // 重命名 = 底部输入 sheet(强约束 #4);预填旧名,允许提交空名 = 清除名称
+    // (与「新建令牌 label 可选」对称,空名回落 token_unnamed 显示形态)。
+    renameTarget?.let { target ->
+        ModevInputSheet(
+            title = stringResource(R.string.token_rename),
+            label = stringResource(R.string.tokens_add_label_hint),
+            initialValue = target.label,
+            hint = null,
+            validate = { true },
+            onSubmit = { label ->
+                viewModel.setTokenLabel(target.id, label)
+                renameTarget = null
+                scope.launch { snackbarHostState.showSnackbar(context.getString(R.string.token_renamed)) }
+            },
+            onDismiss = { renameTarget = null },
+            modifier = Modifier.testTag("token-rename-sheet"),
+            inputTestTag = "token-rename-input",
+            confirmTestTag = "token-rename-confirm",
+        )
+    }
+
+    deleteTarget?.let { target ->
         ModevConfirmDialog(
             title = stringResource(R.string.danger_title),
-            message = stringResource(R.string.token_revoke_confirm_msg),
+            message = stringResource(R.string.token_delete_confirm_msg),
+            confirmTextRes = R.string.token_delete,
             onConfirm = {
                 viewModel.revokeToken(target.id)
-                revokeTarget = null
+                deleteTarget = null
             },
-            onDismiss = { revokeTarget = null },
-            confirmTestTag = "token-revoke-confirm",
+            onDismiss = { deleteTarget = null },
+            confirmTestTag = "token-delete-confirm",
         )
     }
 }
@@ -279,21 +317,21 @@ internal fun AuthStatusLine(authEnabled: Boolean, tokenCount: Int) {
 }
 
 /**
- * 令牌卡(V40 T6):名称 + 掩码/明文值 + 创建日 supporting;trailing 动作依
- * 危险度排序「复制 → 显隐 → 撤销」,撤销 error 色且与左邻间距分离;
- * 掩码形态 = 前 4 后 4 摘要(`MDEV••••••a1b2`,提升辨识度且不泄露全值);
- * 卡整体点击 = 显隐切换(affordance 保留)。
+ * 令牌卡(V46 R3 重排):行体不承载点击(D4),三动作恒由「更多」菜单驱动;
+ * 值恒掩码(D3)—— 明文只经 [ModevValueDialog] 上屏。掩码串长度固定(前 4 +
+ * 六点 + 后 4),与创建日同排因此不会随内容长短被截断。
+ * 菜单序 = 查看 → 重命名 → 删除(危险度递进),删除项整项 error 语义。
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TokenCard(
     entry: McpTokenEntry,
-    visible: Boolean,
     localeTag: java.util.Locale,
-    onToggleVisible: () -> Unit,
-    onCopy: () -> Unit,
-    onRevoke: () -> Unit,
+    onView: () -> Unit,
+    onRename: () -> Unit,
+    onDelete: () -> Unit,
 ) {
+    var menuExpanded by remember { mutableStateOf(false) }
     Card(
         colors =
             CardDefaults.cardColors(
@@ -302,89 +340,102 @@ private fun TokenCard(
         shape = MaterialTheme.shapes.medium,
         modifier = Modifier
             .fillMaxWidth()
-            .testTag("token-row-${entry.id}")
-            .clickable(onClick = onToggleVisible),
+            .testTag("token-row-${entry.id}"),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 12.dp, bottom = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(Modifier.weight(1f)) {
+        val createdText =
+            if (entry.createdAt <= 0L) {
+                stringResource(R.string.token_created_legacy)
+            } else {
+                formatDay(entry.createdAt, localeTag)
+            }
+        ListItem(
+            colors = ListItemDefaults.colors(containerColor = Color.Transparent),
+            headlineContent = {
                 Text(
                     entry.label.ifBlank {
                         stringResource(R.string.token_unnamed, entry.value.take(6))
                     },
                     style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-                Spacer(Modifier.height(2.dp))
-                val valueText =
-                    if (visible) {
-                        entry.value
-                    } else {
-                        maskValue(entry.value)
-                    }
-                val createdText =
-                    if (entry.createdAt <= 0L) {
-                        stringResource(R.string.token_created_legacy)
-                    } else {
-                        formatDay(entry.createdAt, localeTag)
-                    }
+            },
+            supportingContent = {
                 Text(
-                    text = "$valueText · $createdText",
+                    text = "${maskValue(entry.value)} · $createdText",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontFamily = if (visible) FontFamily.Monospace else FontFamily.Default,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
-            }
-            Spacer(Modifier.width(8.dp))
-            TokenAction(Icons.Default.ContentCopy, R.string.diagnostics_detail_copy, onCopy) {
-                Modifier.testTag("token-copy-${entry.id}")
-            }
-            TokenAction(
-                icon = if (visible) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                tooltipRes = if (visible) R.string.token_hide else R.string.token_show,
-                onClick = onToggleVisible,
-            ) {
-                Modifier
-            }
-            Spacer(Modifier.width(12.dp))
-            TokenAction(Icons.Default.Delete, R.string.token_revoke, onRevoke, errorTint = true) {
-                Modifier.testTag("token-revoke-${entry.id}")
-            }
-            Spacer(Modifier.width(4.dp))
-        }
-    }
-}
-
-/** trailing 动作图标按钮(统一 20dp 图标;[errorTint] = 撤销语义 error 色)。 */
-@Composable
-private fun TokenAction(
-    icon: ImageVector,
-    tooltipRes: Int,
-    onClick: () -> Unit,
-    errorTint: Boolean = false,
-    tag: () -> androidx.compose.ui.Modifier,
-) {
-    TipIconButton(
-        tooltip = stringResource(tooltipRes),
-        onClick = onClick,
-        modifier = tag(),
-    ) {
-        Icon(
-            icon,
-            contentDescription = null,
-            tint =
-                if (errorTint) {
-                    MaterialTheme.colorScheme.error
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
-                },
-            modifier = Modifier.size(20.dp),
+            },
+            trailingContent = {
+                // Box 锚定:菜单挂在「更多」按钮处(与 AppsScreen 筛选菜单同构)。
+                Box {
+                    TipIconButton(
+                        tooltip = stringResource(R.string.token_more),
+                        onClick = { menuExpanded = true },
+                        modifier = Modifier.testTag("token-more-${entry.id}"),
+                    ) {
+                        Icon(
+                            Icons.Default.MoreVert,
+                            contentDescription = stringResource(R.string.token_more),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp),
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = { menuExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.token_view)) },
+                            leadingIcon = {
+                                Icon(Icons.Default.Visibility, null, modifier = Modifier.size(20.dp))
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onView()
+                            },
+                            modifier = Modifier.testTag("token-menu-view"),
+                        )
+                        DropdownMenuItem(
+                            text = { Text(stringResource(R.string.token_rename)) },
+                            leadingIcon = {
+                                Icon(Icons.Default.Edit, null, modifier = Modifier.size(20.dp))
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onRename()
+                            },
+                            modifier = Modifier.testTag("token-menu-rename"),
+                        )
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    stringResource(R.string.token_delete),
+                                    color = MaterialTheme.colorScheme.error,
+                                )
+                            },
+                            leadingIcon = {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.error,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onDelete()
+                            },
+                            modifier = Modifier.testTag("token-menu-delete"),
+                        )
+                    }
+                }
+            },
         )
     }
 }

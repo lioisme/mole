@@ -1,6 +1,6 @@
 package com.lioisme.modev.domain.diagnostics
 
-import com.lioisme.modev.data.repo.PipelineStats
+import com.lioisme.modev.domain.diagnostics.PipelineStats
 import com.lioisme.modev.domain.scope.ScopeState
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -34,7 +34,8 @@ class DiagnosticsReportTest {
         stateOn = "On",
         stateOff = "Off",
         statsReceived = "Received",
-        statsDropped = "Dropped",
+        statsDropped = "Dropped (queue full)",
+        statsBytesDropped = "Dropped (payload budget)",
         statsWriteFailures = "Write failures",
         statsTrimmed = "Trimmed",
         statsRejectedHellos = "Rejected hellos",
@@ -100,5 +101,21 @@ class DiagnosticsReportTest {
         val statsIdx = lines.indexOfFirst { it.startsWith("Received:") }
         assertEquals(listOf(frameworkIdx, portIdx, targetsIdx, mcpIdx, authIdx, statsIdx),
             listOf(0, 1, 2, 3, 4, 5))
+    }
+
+    @Test
+    fun `queue drops and payload-budget drops stay separate rows`() {
+        // V45 T1.6:两类丢弃成因不同(消费不及 vs 大字段洪峰),合并计数即误导调参
+        val lines = DiagnosticsReport.build(
+            snapshot(mcpEnabled = true, mcpBound = "127.0.0.1", mcpTokenAuth = false).copy(
+                pipelineStats = PipelineStats(received = 10, dropped = 3, bytesDropped = 5),
+            ),
+            labels,
+        ) { it.toString() }
+        assertTrue("缺条数丢弃行:$lines", lines.contains("Dropped (queue full): 3"))
+        assertTrue("缺载荷预算行:$lines", lines.contains("Dropped (payload budget): 5"))
+        val queueIdx = lines.indexOfFirst { it.startsWith("Dropped (queue full):") }
+        val budgetIdx = lines.indexOfFirst { it.startsWith("Dropped (payload budget):") }
+        assertEquals("预算行必须紧随条数丢弃行(与页面序一致)", queueIdx + 1, budgetIdx)
     }
 }

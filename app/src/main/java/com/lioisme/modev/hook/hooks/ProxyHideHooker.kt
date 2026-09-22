@@ -6,6 +6,7 @@ import com.lioisme.modev.core.model.activeSpoofProfile
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
+import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
  * WiFi 代理隐藏 Hooker(V30):隐藏系统/应用层代理配置,防止应用检测到 MITM 代理。
@@ -44,20 +45,26 @@ class ProxyHideHooker(
             System::class.java.getMethod("getProperty", String::class.java)
         }.getOrNull() ?: return
 
-        engine.hook(method, object : MethodHook() {
-            override fun before(invocation: Invocation) {
-                if (!featureOn(NetworkKind.PROXY_SYSTEM_PROP)) return
-                val key = invocation.getArg(0) as? String ?: return
-                if (key in proxyKeys) {
-                    invocation.setResult(null)
-                    emit(
-                        kind = NetworkKind.PROXY_SYSTEM_PROP,
-                        operation = NetworkOperation.PROP_GET,
-                        params = mapOf("key" to key),
-                    )
+        // V43 T3/D-4:System.getProperty 三 hooker 共享单一广播注册点
+        broadcast.subscribe(
+            method,
+            object : SharedMethodBroadcast.Sub {
+                override fun before(invocation: Invocation) {
+                    if (!featureOn(NetworkKind.PROXY_SYSTEM_PROP)) return
+                    val key = invocation.getArg(0) as? String ?: return
+                    if (key in proxyKeys) {
+                        // 代理属性未配置 = null 是 JDK 契约内的正确返回值(非异常路径),
+                        // setResult 语义安全;与 RootProperty/DeviceSysProp 键空间不相交
+                        invocation.setResult(null)
+                        emit(
+                            kind = NetworkKind.PROXY_SYSTEM_PROP,
+                            operation = NetworkOperation.PROP_GET,
+                            params = mapOf("key" to key),
+                        )
+                    }
                 }
-            }
-        })
+            },
+        )
     }
 
     /**

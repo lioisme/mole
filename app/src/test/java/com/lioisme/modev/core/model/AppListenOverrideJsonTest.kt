@@ -8,10 +8,11 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 单应用监听自定义 JSON 契约(V24 D2):
- * - 新格式 round-trip 严格对称(布尔 + kinds 键);
+ * 单应用监听自定义 JSON 契约(V24 D2;V44 R1-6 限定键模型):
+ * - 新格式 round-trip 严格对称(布尔 + kinds **限定键** 'recordType:kind');
  * - null/空白/非法/空对象一律容错为 DEFAULT;
- * - 未知 kind 名、非法值条目忽略(防存储漂移);
+ * - 未知 kind 名、非法值条目忽略(防存储漂移);遗留裸 id 键归一为限定键
+ *   (歧义 OPEN/SIGNATURE 按序首类型 = 旧 first-wins 语义);
  * - V23 三态遗留格式无损迁移:"ON"/"OFF" 映射 true/false,"INHERIT"/未知串取默认,
  *   kindOverrides 旧键名平滑读取,写入恒为新格式(首次读改写即收敛)。
  */
@@ -27,8 +28,8 @@ class AppListenOverrideJsonTest {
             cryptoListen = false,
             dbListen = true,
             kinds = mapOf(
-                CryptoKind.CIPHER.name to false,
-                SqlKind.DML.name to true,
+                AppListenOverride.kindKey(RecordType.CRYPTO, CryptoKind.CIPHER.name) to false,
+                AppListenOverride.kindKey(RecordType.DATABASE, SqlKind.DML.name) to true,
             ),
         )
         assertEquals(override, parse(override.toJson(gson)))
@@ -50,8 +51,31 @@ class AppListenOverrideJsonTest {
     fun `unknown kind names dropped`() {
         val json = "{ \"kinds\": { " +
             quoted("NOT_A_KIND") + ": false, " +
+            quoted("bogus:ALSO_BAD") + ": false, " +
             quoted(CryptoKind.MAC.name) + ": false } }"
-        assertEquals(mapOf(CryptoKind.MAC.name to false), parse(json).kinds)
+        assertEquals(mapOf(AppListenOverride.kindKey(RecordType.CRYPTO, CryptoKind.MAC.name) to false), parse(json).kinds)
+    }
+
+    /** V44 限定键:跨类型同名 OPEN 独立存储、往返无损。 */
+    @Test
+    fun `qualified keys store cross-type colliding ids independently`() {
+        val json = "{ " + quoted("kinds") + ": { " +
+            quoted("db:OPEN") + ": true, " + quoted("prefs:OPEN") + ": false } }"
+        assertEquals(
+            mapOf("db:OPEN" to true, "prefs:OPEN" to false),
+            parse(json).kinds,
+        )
+    }
+
+    /** V44 遗留裸键归一:歧义 id 恒按序首类型(DATABASE/CRYPTO),与历史解析逐位一致。 */
+    @Test
+    fun `bare legacy keys normalize to first-wins qualified keys`() {
+        assertEquals(mapOf("db:OPEN" to true), parse("{ " + quoted("kinds") + ": { " + quoted("OPEN") + ": true } }").kinds)
+        assertEquals(
+            mapOf("crypto:SIGNATURE" to false),
+            parse("{ " + quoted("kinds") + ": { " + quoted("SIGNATURE") + ": false } }").kinds,
+        )
+        assertEquals(mapOf("system:APP_INFO" to true), parse("{ " + quoted("kinds") + ": { " + quoted("APP_INFO") + ": true } }").kinds)
     }
 
     @Test
@@ -84,7 +108,10 @@ class AppListenOverrideJsonTest {
             quoted(CryptoKind.MAC.name) + ": \"OFF\", " +
             quoted(CryptoKind.BASE64.name) + ": \"ON\" } }"
         assertEquals(
-            mapOf(CryptoKind.MAC.name to false, CryptoKind.BASE64.name to true),
+            mapOf(
+                AppListenOverride.kindKey(RecordType.CRYPTO, CryptoKind.MAC.name) to false,
+                AppListenOverride.kindKey(RecordType.CRYPTO, CryptoKind.BASE64.name) to true,
+            ),
             parse(json).kinds,
         )
     }
@@ -95,7 +122,10 @@ class AppListenOverrideJsonTest {
             quoted("kindOverrides") + ": { " + quoted(CryptoKind.CIPHER.name) + ": \"OFF\" } }"
         val parsed = parse(legacy)
         assertEquals(
-            AppListenOverride(cryptoListen = false, kinds = mapOf(CryptoKind.CIPHER.name to false)),
+            AppListenOverride(
+                cryptoListen = false,
+                kinds = mapOf(AppListenOverride.kindKey(RecordType.CRYPTO, CryptoKind.CIPHER.name) to false),
+            ),
             parsed,
         )
         // 写回恒为新格式:kinds 键名 + JSON 布尔(一次读改写完成迁移收敛)
@@ -112,7 +142,7 @@ class AppListenOverrideJsonTest {
         // null 位(cryptoListen)不输出;零偏差类别为空对象,无垃圾条目
         assertTrue(!json.contains(quoted("cryptoListen")))
         assertEquals(
-            mapOf(CryptoKind.CIPHER.name to false),
+            mapOf(AppListenOverride.kindKey(RecordType.CRYPTO, CryptoKind.CIPHER.name) to false),
             parse("{ " + quoted("kinds") + ": { " + quoted(CryptoKind.CIPHER.name) + ": false } }").kinds,
         )
     }
@@ -162,20 +192,23 @@ class AppListenOverrideJsonTest {
         val legacy = "{ " + quoted("kindOverrides") + ": { " +
             quoted(CryptoKind.CIPHER.name) + ": \"OFF\" } }"
         val parsed = parse(legacy)
-        assertEquals(mapOf(CryptoKind.CIPHER.name to false), parsed.kinds)
+        assertEquals(
+            mapOf(AppListenOverride.kindKey(RecordType.CRYPTO, CryptoKind.CIPHER.name) to false),
+            parsed.kinds,
+        )
         assertNull(parsed.logStack)
         assertNull(parsed.maxBytesPerField)
         assertNull(parsed.ignoreStackPrefixes)
     }
 
-    /** V27 行为域:master 偏差 + 行为 kind 白名单 + 新微调项 round-trip。 */
+    /** V27 行为域:master 偏差 + 行为 kind 限定键 + 新微调项 round-trip。 */
     @Test
     fun `behavior fields roundtrip symmetrically`() {
         val override = AppListenOverride(
             behaviorListen = false,
             kinds = mapOf(
-                BehaviorKind.FILE_READ.name to true,
-                BehaviorKind.SHELL_EXEC.name to false,
+                AppListenOverride.kindKey(RecordType.BEHAVIOR, BehaviorKind.FILE_READ.name) to true,
+                AppListenOverride.kindKey(RecordType.BEHAVIOR, BehaviorKind.SHELL_EXEC.name) to false,
             ),
             fileContentCapture = true,
             ignorePathPrefixes = listOf("/proc/", "/sys/"),
@@ -183,14 +216,14 @@ class AppListenOverrideJsonTest {
         assertEquals(override, parse(override.toJson(gson)))
     }
 
-    /** V27:行为 kind 名进入白名单,未知名依旧忽略;空路径表与默认等价。 */
+    /** V27:行为 kind 名进入白名单(限定键),未知名依旧忽略;空路径表与默认等价。 */
     @Test
     fun `behavior kinds whitelisted and empty path list normalizes to default`() {
         val json = "{ " + quoted("kinds") + ": { " +
             quoted(BehaviorKind.FILE_DELETE.name) + ": true, " +
             quoted("NOT_A_BEHAVIOR") + ": true } }"
         assertEquals(
-            mapOf(BehaviorKind.FILE_DELETE.name to true),
+            mapOf(AppListenOverride.kindKey(RecordType.BEHAVIOR, BehaviorKind.FILE_DELETE.name) to true),
             parse(json).kinds,
         )
         assertTrue(AppListenOverride(ignorePathPrefixes = emptyList()).isDefault)

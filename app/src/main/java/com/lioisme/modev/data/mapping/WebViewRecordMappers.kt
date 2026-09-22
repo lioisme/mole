@@ -7,6 +7,8 @@ import com.lioisme.modev.core.model.WebViewOperation
 import com.lioisme.modev.core.model.WebViewRecord
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
+import com.lioisme.modev.domain.record.WebViewRow
+import com.lioisme.modev.domain.record.RowModel
 
 /**
  * WebView 记录映射(V29 一等公民):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,

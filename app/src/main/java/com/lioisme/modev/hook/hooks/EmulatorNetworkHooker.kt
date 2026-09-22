@@ -5,6 +5,7 @@ import com.lioisme.modev.core.model.DeviceEnvOperation
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
+import com.lioisme.modev.hook.SharedMethodBroadcast
 import java.util.Random
 
 class EmulatorNetworkHooker(
@@ -25,21 +26,25 @@ class EmulatorNetworkHooker(
     private fun hookGetMacAddress() {
         val clazz = runCatching { Class.forName("android.net.wifi.WifiInfo") }.getOrNull() ?: return
         val method = runCatching { clazz.getMethod("getMacAddress") }.getOrNull() ?: return
-        engine.hook(method, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                if (!config().deviceEnvEnabled(DeviceEnvKind.EMULATOR_NETWORK)) return
-                val original = invocation.result as? String ?: return
-                if (isEmulatorMac(original)) {
-                    invocation.setResult(stableMac)
-                    emit(
-                        kind = DeviceEnvKind.EMULATOR_NETWORK,
-                        operation = DeviceEnvOperation.GET_MAC_ADDRESS,
-                        originalValue = original,
-                        maskedValue = stableMac,
-                    )
+        // V43 T3/D-4:getMacAddress 与 DetectionMonitor 观测共享单一广播注册点
+        broadcast.subscribe(
+            method,
+            object : SharedMethodBroadcast.Sub {
+                override fun after(invocation: Invocation, result: Any?) {
+                    if (!config().deviceEnvEnabled(DeviceEnvKind.EMULATOR_NETWORK)) return
+                    val original = result as? String ?: return
+                    if (isEmulatorMac(original)) {
+                        invocation.setResult(stableMac)
+                        emit(
+                            kind = DeviceEnvKind.EMULATOR_NETWORK,
+                            operation = DeviceEnvOperation.GET_MAC_ADDRESS,
+                            originalValue = original,
+                            maskedValue = stableMac,
+                        )
+                    }
                 }
-            }
-        })
+            },
+        )
     }
 
     private fun hookAndroidId() {
@@ -47,14 +52,17 @@ class EmulatorNetworkHooker(
         val method = runCatching {
             clazz.getMethod("getString", android.content.ContentResolver::class.java, String::class.java)
         }.getOrNull() ?: return
-        engine.hook(method, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                if (!config().deviceEnvEnabled(DeviceEnvKind.EMULATOR_NETWORK)) return
-                val key = invocation.getArg(1) as? String ?: return
-                if (key != ANDROID_ID_KEY) return
-                val original = invocation.result as? String ?: return
-                if (isEmulatorAndroidId(original)) {
-                    invocation.setResult(stableAndroidId)
+        // V43 T3/D-4:Settings$Secure.getString 与 SettingsHooker 共享单一广播注册点
+        broadcast.subscribe(
+            method,
+            object : SharedMethodBroadcast.Sub {
+                override fun after(invocation: Invocation, result: Any?) {
+                    if (!config().deviceEnvEnabled(DeviceEnvKind.EMULATOR_NETWORK)) return
+                    val key = invocation.getArg(1) as? String ?: return
+                    if (key != ANDROID_ID_KEY) return
+                    val original = result as? String ?: return
+                    if (isEmulatorAndroidId(original)) {
+                        invocation.setResult(stableAndroidId)
                     emit(
                         kind = DeviceEnvKind.EMULATOR_NETWORK,
                         operation = DeviceEnvOperation.ANDROID_ID,
@@ -62,8 +70,9 @@ class EmulatorNetworkHooker(
                         maskedValue = stableAndroidId,
                     )
                 }
-            }
-        })
+                }
+            },
+        )
     }
 
     private fun isEmulatorMac(mac: String): Boolean {

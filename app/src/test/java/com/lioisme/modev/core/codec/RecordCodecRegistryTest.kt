@@ -55,9 +55,18 @@ class RecordCodecRegistryTest {
     fun `re-registration replaces decoder deterministically`() {
         val registry = RecordCodecRegistry()
         var calls = 0
-        registry.register("t", { calls++; "first" })
-        registry.register("t", { calls++; "second" })
-        assertEquals("second", registry.decode(WireRecord(1L, "t", JsonObject())))
+        // 值类型收口 MonitoredRecord(V45 T2.5)后,替身解码器同样返回类型化记录
+        fun record(algorithm: String) = CryptoRecord(
+            packageName = "pkg.a",
+            kind = CryptoKind.CIPHER,
+            operation = CryptoOperation.ENCRYPT,
+            algorithm = algorithm,
+            threadName = "test",
+        )
+        registry.register("crypto", { calls++; record("first") })
+        registry.register("crypto", { calls++; record("second") })
+        val decoded = registry.decode(WireRecord(1L, "crypto", JsonObject()))
+        assertTrue("重复注册后以最后一次为准", decoded is CryptoRecord && decoded.algorithm == "second")
         assertEquals(1, calls)
     }
 

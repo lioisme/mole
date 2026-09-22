@@ -2,14 +2,21 @@ package com.lioisme.modev.ui.components
 
 import android.text.format.DateFormat
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.assertCountEquals
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.click
+import androidx.compose.ui.test.hasAnyDescendant
+import androidx.compose.ui.test.hasText
+import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.longClick
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.unit.dp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import com.lioisme.modev.R
@@ -17,7 +24,7 @@ import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.core.util.BytesView
-import com.lioisme.modev.data.mapping.CryptoRow
+import com.lioisme.modev.domain.record.CryptoRow
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -70,10 +77,11 @@ class RecordRowLayoutTest {
                 RecordRow(record = row(record), onClick = {}, onLongClick = {})
             }
         }
-        // V14 R1 层级:算法(SemiBold headline)/ 类别·操作组合行(supporting)/
-        // 方向胶囊 / 数据段;时间尾随右对齐(秒级)。
+        // V43 T4/D-1 一行一参数:类别与操作拆为独立行(「类别 · 操作」拼行形态退役);
+        // 数据段行 label+值 合并单行;时间尾随右对齐(秒级)。
         rule.onNodeWithText("WebCrypto/AES-GCM").assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.kind_webview) + " · " + str(R.string.op_encrypt)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.kind_webview), substring = false).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.meta_operation) + " " + str(R.string.op_encrypt)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.dir_encrypt)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.record_data_out) + " " + "cafebabe").assertIsDisplayed()
         // 尾部时间:秒级精度(格式与生产同源)
@@ -81,6 +89,23 @@ class RecordRowLayoutTest {
         val pattern = if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a"
         val expected = SimpleDateFormat(pattern, Locale.getDefault()).format(Date(record.timestamp))
         rule.onNodeWithText(expected).assertIsDisplayed()
+    }
+
+    /**
+     * V43 T4/D-1 结构锁:record-row 内不得再出现「 · 」拼行分隔符——
+     * 每个 supporting 行恒承载一个逻辑参数(一行多参数形态的回归哨兵)。
+     */
+    @Test
+    fun noMultiParameterLines_withMiddleDotJoining() {
+        rule.setContent {
+            MaterialTheme {
+                RecordRow(record = row(record), contextLabel = "com.ctx.app", onClick = {}, onLongClick = {})
+            }
+        }
+        val joined = rule.onAllNodes(hasText(" · ", substring = true)).fetchSemanticsNodes()
+        assertEquals("行内禁止多参数拼接(发现 ${joined.size} 个含 ' · ' 节点)", 0, joined.size)
+        // 应用语境独立成行:「应用: 包名」标签行
+        rule.onNodeWithText(str(R.string.record_field_app) + " " + "com.ctx.app").assertIsDisplayed()
     }
 
     @Test
@@ -157,5 +182,55 @@ class RecordRowLayoutTest {
         }
         rule.onNodeWithText(str(R.string.record_data_key) + " " + "aabbcc").assertIsDisplayed()
         rule.onAllNodesWithText(str(R.string.record_data_out) + " " + "cafebabe").assertCountEquals(0)
+    }
+
+    /**
+     * V46 R1/D1 几何锁:正文列(`record-row-identity` = fillMaxWidth 的身份行)右缘
+     * 必须逼近行容器右缘。修复前 = ListItem 尾栏预留时间/徽章宽度,文本列被削 ~60dp
+     * (用户报的「右侧还有大量位置也被截断」),且该锚点根本不存在;
+     * 修复后仅差 ListItem 收尾内边距(16dp)。
+     * 量测取带 testTag 的自有节点(不受 M3 1.4.0 ListItem 槽位合并影响,AGENTS #13)。
+     */
+    @Test
+    fun textFieldColumn_reachesRowRightEdge_notShrunkByTrailingColumn() {
+        rule.setContent {
+            MaterialTheme {
+                RecordRow(
+                    record = row(record),
+                    modifier = Modifier.testTag("row-under-test"),
+                    onClick = {},
+                    onLongClick = {},
+                )
+            }
+        }
+        val rowNode = rule.onAllNodes(hasTestTag("row-under-test")).fetchSemanticsNodes().first()
+        // 身份行在 ListItem 内容槽的**合并**树里被并到父节点(实测 merged=0 / unmerged=1),
+        // 故几何与结构断言一律走 useUnmergedTree。
+        val columnNode = rule.onAllNodes(hasTestTag("record-row-identity"), useUnmergedTree = true)
+            .fetchSemanticsNodes().first()
+        // 密度取 rule.density(ComposeTestRule 提供;SemanticsNode 在本版本无该属性)
+        val gapDp = with(rule.density) {
+            (rowNode.boundsInRoot.right - columnNode.boundsInRoot.right).toDp()
+        }
+        assertTrue(
+            "正文列右缘距行容器右缘应 ≤32dp(实测 $gapDp;尾栏预留形态会到 ~76dp)",
+            gapDp <= 32.dp,
+        )
+    }
+
+    /** V46 R1/D1 结构锁:时间与徽章只在身份行内(尾栏槽恒空的正面证据)。 */
+    @Test
+    fun timeAndBadges_liveInsideIdentityLine_notTrailingColumn() {
+        rule.setContent {
+            MaterialTheme {
+                RecordRow(record = row(record), onClick = {}, onLongClick = {})
+            }
+        }
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val pattern = if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a"
+        val expected = SimpleDateFormat(pattern, Locale.getDefault()).format(Date(record.timestamp))
+        val identity = rule.onNode(hasTestTag("record-row-identity"), useUnmergedTree = true)
+        identity.assert(hasAnyDescendant(hasText(expected)))
+        identity.assert(hasAnyDescendant(hasText(str(R.string.dir_encrypt))))
     }
 }

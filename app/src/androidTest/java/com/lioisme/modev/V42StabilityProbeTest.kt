@@ -1,6 +1,7 @@
 package com.lioisme.modev
 
 import androidx.compose.ui.test.assertIsDisplayed
+import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodesWithTag
 import androidx.compose.ui.test.onNodeWithTag
@@ -71,14 +72,18 @@ class V42StabilityProbeTest {
         }
         app.registerActivityLifecycleCallbacks(callback)
         try {
-            val settingsTag = LocaleManager.wrap(ctx).getString(R.string.settings_title)
+            // 标题文案在设置页顶栏(V41 根页 IA 后根页不再承载它)——先导航,否则整例「找不到文案」。
+            rule.openSettings(str(R.string.cd_settings))
             repeat(10) { round ->
                 val tag = if (round % 2 == 0) LocaleManager.TAG_EN else LocaleManager.TAG_ZH
                 LocaleManager.setLanguage(ctx, tag)
+                // 期望文案必须按**切换后**的语言即时解析(在循环外算一次 = 拿同一文案去比
+                // 两种语言的界面,第二轮起必然假红)。
+                val expected = LocaleManager.wrap(ctx).getString(R.string.settings_title)
                 assertTrue(
-                    "第 ${round + 1} 次切换后标题未随 locale 渲染",
+                    "第 ${round + 1} 次切换($tag)后标题未随 locale 渲染",
                     pollUntil(5_000) {
-                        rule.onAllNodesWithText(settingsTag).fetchSemanticsNodes().isNotEmpty()
+                        rule.onAllNodesWithText(expected).fetchSemanticsNodes().isNotEmpty()
                     },
                 )
                 assertEquals("热切换不得销毁 Activity(round=$round)", 0, destroyed)
@@ -93,14 +98,16 @@ class V42StabilityProbeTest {
         // 端口 sheet 状态机循环:开 → 非法(80,特权错误)→ 关闭;最终开 → 合法保存。
         // 10 轮后 sheet 仍可正常开合、错误态正确复位 = 状态机无漂移。
         val container = (ctx.applicationContext as ModevApp).container
-        val settings = container.settings
+        val settings = container.settingsRepo
         val vm = com.lioisme.modev.ui.settings.ServicesViewModelFactory(container)
             .create(com.lioisme.modev.ui.settings.ServicesViewModel::class.java)
         val currentPort = settings.serverPort.value
+        // 端口行在服务页(V41 起不在根页):整例先走一次前置导航,循环内在同屏开合 sheet。
+        rule.openServices(str(R.string.cd_settings), str(R.string.services_settings_title))
         var open = false
         repeat(10) { round ->
             if (!open) {
-                rule.onNodeWithText(str(R.string.settings_port)).performClick()
+                rule.clickScrolledIntoView(hasText(str(R.string.settings_port)))
                 rule.waitForIdle()
                 rule.onNodeWithTag("port-setting-sheet").assertIsDisplayed()
                 rule.onNodeWithTag("port-input").performTextReplacement("80")
@@ -124,7 +131,7 @@ class V42StabilityProbeTest {
                 )
                 // 交替开合法端口确认(仅最后一轮,验证保存链路仍通)。
                 if (round == 9) {
-                    rule.onNodeWithText(str(R.string.settings_port)).performClick()
+                    rule.clickScrolledIntoView(hasText(str(R.string.settings_port)))
                     rule.waitForIdle()
                     rule.onNodeWithTag("port-input").performTextReplacement(currentPort.toString())
                     rule.waitForIdle()
@@ -148,7 +155,8 @@ class V42StabilityProbeTest {
         val ctxApp = ctx.applicationContext as ModevApp
         val startSeed = com.lioisme.modev.ui.theme.ThemeSettingsManager.themeConfig.value
         try {
-            rule.onNodeWithText(str(R.string.theme_color)).performClick()
+            rule.openSettings(str(R.string.cd_settings))
+            rule.clickScrolledIntoView(hasText(str(R.string.theme_color)))
             rule.waitForIdle()
             rule.onNodeWithTag("theme-color-sheet").assertIsDisplayed()
             repeat(10) { round ->

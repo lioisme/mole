@@ -1,5 +1,6 @@
 package com.lioisme.modev.hook.probes
 
+import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.hook.InterventionProbeMarker
 import com.lioisme.modev.hook.Probe
@@ -18,6 +19,9 @@ import com.lioisme.modev.hook.hooks.WidgetTextHooker
 class UiInteractionProbe : Probe, InterventionProbeMarker {
 
     override val recordType: String = RecordTypes.UI_INTERACTION
+
+    /** V44 T2.4 冷启动裁剪:交互域(含弹窗关键词拦截干预)经 `uiListen` master ∧ kind 双门控。 */
+    override fun enabledIn(switch: HookSwitch): Boolean = switch.uiListen
 
     override fun install(context: ProbeContext) {
         val hookers: List<UiInteractionBaseHooker> =

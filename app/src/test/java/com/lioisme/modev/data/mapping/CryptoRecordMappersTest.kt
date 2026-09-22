@@ -14,6 +14,9 @@ import com.lioisme.modev.core.model.SqlValueType
 import com.lioisme.modev.core.util.BytesView
 import com.lioisme.modev.data.db.CryptoRecordEntity
 import com.lioisme.modev.data.db.CryptoRecordRow
+import com.lioisme.modev.domain.record.CryptoRow
+import com.lioisme.modev.domain.record.SqlDetail
+import com.lioisme.modev.domain.record.SqlRow
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.Assert.assertEquals

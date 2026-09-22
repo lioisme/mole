@@ -20,15 +20,21 @@ data class RecordFilter(
     val timeRange: LongRange? = null,
     val sort: SortOrder = SortOrder.DESC,
 ) {
+    /**
+     * 把 [kinds]/[operations] 收敛到所选类型的合法名集(V45 T1.8 / QA-6 补全):
+     * - 单类型:该类型合法集(原语义不变);
+     * - **多类型:各类型合法集的并集** —— 旧形态在多类型下完全不收敛,
+     *   跨类同名 kind(如 `OPEN` 同属 SQL 与 Prefs 两域)可命中未选类型的行,
+     *   且筛选菜单在「记录类型 + 类别」双组单选下会静默返回全集或空集;
+     * - 未选类型 / 空集:不过滤(维持「缺省维度不出列」口径);
+     * - 未知类型名(协议漂移):不收敛(由调用侧类型校验负责拒绝)。
+     */
     fun normalize(): RecordFilter {
-        val singleType = recordTypes?.singleOrNull()
+        val types = recordTypes?.filter { CategoryTaxonomy.isKnownType(it) }
+        if (types.isNullOrEmpty()) return this
         return copy(
-            kinds = if (singleType != null) CategoryTaxonomy.validateKinds(singleType, kinds) else kinds,
-            operations = if (singleType != null) {
-                CategoryTaxonomy.validateOperations(singleType, operations)
-            } else {
-                operations
-            },
+            kinds = CategoryTaxonomy.convergeKinds(types, kinds),
+            operations = CategoryTaxonomy.convergeOperations(types, operations),
         )
     }
 }

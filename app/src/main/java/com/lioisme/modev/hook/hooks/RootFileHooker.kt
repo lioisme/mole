@@ -33,11 +33,16 @@ class RootFileHooker(
 
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
+                // V43 T2:File.exists 是宿主最热探针之一——两分支门控先行,
+                // lowercase 分配仅在任一干预开启时发生(V2.7)
+                val rootOn = featureOn(DeviceEnvKind.ROOT_FILE)
+                val emuOn = featureOn(DeviceEnvKind.EMULATOR_FILE)
+                if (!rootOn && !emuOn) return
                 val path = (invocation.thisObject as? java.io.File)?.path ?: return
                 val lower = path.lowercase()
 
                 // Root 路径检测干预
-                if (featureOn(DeviceEnvKind.ROOT_FILE)) {
+                if (rootOn) {
                     if (matchesRootPath(lower)) {
                         val original = runCatching { invocation.result }.getOrNull()?.toString()
                         invocation.setResult(false)
@@ -54,7 +59,7 @@ class RootFileHooker(
                 }
 
                 // 模拟器路径检测干预
-                if (featureOn(DeviceEnvKind.EMULATOR_FILE)) {
+                if (emuOn) {
                     val emuSuffix = matchesEmulatorPath(lower)
                     if (emuSuffix != null) {
                         invocation.setResult(false)

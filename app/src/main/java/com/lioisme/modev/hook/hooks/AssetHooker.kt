@@ -21,6 +21,9 @@ class AssetHooker(
     override fun install() {
         val r = registry ?: return
         hookAfter(r.namedAny("open", "openNonAsset")) { inv, _ ->
+            // V44 T2.2 门控先行:AssetManager.open 在启动期极高频(资源加载),
+            // assetRead 默认关时必须首行短路,取参/建 map 全部后置。
+            if (!featureOn(BehaviorKind.ASSET_READ)) return@hookAfter
             val name = inv.getArg(0) as? String ?: return@hookAfter
             val params = buildMap {
                 val mode = inv.getArg(1)
@@ -34,6 +37,7 @@ class AssetHooker(
             )
         }
         hookAfter(r.named("openFd")) { inv, result ->
+            if (!featureOn(BehaviorKind.ASSET_READ)) return@hookAfter
             val name = inv.getArg(0) as? String ?: return@hookAfter
             val fdLength = runCatching { (result as? AssetFileDescriptor)?.length }.getOrNull()
             emit(
@@ -44,6 +48,7 @@ class AssetHooker(
             )
         }
         hookAfter(r.named("list")) { inv, result ->
+            if (!featureOn(BehaviorKind.ASSET_READ)) return@hookAfter
             val dir = inv.getArg(0) as? String ?: return@hookAfter
             val names = result as? Array<String> ?: return@hookAfter
             emit(

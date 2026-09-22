@@ -18,6 +18,14 @@ interface Platform {
      */
     fun register(executable: Executable?, hook: MethodHook): Boolean
 
+    /**
+     * 干预型注册(V43 T3/D-5):支持 [Invocation.setThrowable] 把异常抛给调用方。
+     * legacy 的 MethodHookParam.setThrowable 天然可用(默认转 [register]);
+     * libxposed 需 PASSTHROUGH + 回调体内异常隔离,由适配器覆写。
+     */
+    fun registerInterventional(executable: Executable?, hook: MethodHook): Boolean =
+        register(executable, hook)
+
     /** 写入框架日志(Xposed log),供宿主未运行时的排障兜底。 */
     fun log(message: String, throwable: Throwable? = null)
 }
