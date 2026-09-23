@@ -211,6 +211,24 @@ class FourScreensNavTest {
         rule.onAllNodesWithTag("app-row-run").assertCountEquals(0)
     }
 
+    /**
+     * V48 R-1 设备档:应用列表行尾第二控件与监控页作用域开关必须共享**同一个名词**
+     * (旧形是零标签零锚点的裸 Checkbox = V48-DFC-07 的根因)。行尾 Checkbox 挂在
+     * `ListItem` 的 trailingContent 槽里 ⇒ 它的 testTag 只在**非合并树**可见(AGENTS 坑),
+     * 故锚点与文案分两棵树取,再对账「带名词的控件数 == 锚点数」。
+     */
+    @Test
+    fun appRowScopeCheckbox_carriesTheGateNoun() {
+        rule.waitForIdle()
+        assumeTrue(rule.onAllNodesWithTag("app-row").fetchSemanticsNodes().isNotEmpty())
+        val label = str(R.string.app_monitor_scope_row)
+        val named = rule.onAllNodesWithContentDescription(label).fetchSemanticsNodes().size
+        val anchored =
+            rule.onAllNodesWithTag("app-row-scope", useUnmergedTree = true).fetchSemanticsNodes().size
+        assertTrue("行尾作用域控件必须自带「作用域此应用」名词,实到 named=$named", named >= 1)
+        assertTrue("带名词的控件数必须等于 app-row-scope 锚点数,实际 named=$named anchored=$anchored", named == anchored)
+    }
+
     @Test
     fun appRowOpensAppMonitor_andDangerMenu_andAlgorithmListNavigates() {
         rule.waitForIdle()

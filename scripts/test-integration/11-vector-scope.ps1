@@ -37,8 +37,26 @@ $log = AdbShell "logcat -d -s HookInstaller"
 if ($log -match "探针已安装|Probe") {
     Assert "Vector injection into testtarget" $true
 } else {
-    Write-Host "注入日志缺失,可能需要重启模拟器使 Vector 重载作用域" -ForegroundColor Yellow
-    Assert "Vector injection into testtarget" $false "reboot required?"
+    # 归因先于结论(V48 实锤:把「框架整场缺席」报成「大概要重启模拟器」会让人白重开 VM)。
+    # LSPosed 与 Vector 都是 Zygisk 模块 —— Magisk 没跑则两者一起不加载,与本项目代码无关;
+    # 而雷电自带 su,所以「能 root」不等于「框架在跑」。
+    PushScript "fwprobe.sh" @"
+#!/system/bin/sh
+if [ -d /dev/.magisk ] || [ -d /sbin/.magisk ]; then echo magisk=mounted; else echo magisk=absent; fi
+Z=`$(pidof zygote64)
+echo zygisk_in_zygote=`$(grep -c zygisk /proc/`$Z/maps 2>/dev/null)
+echo module_mapped=`$(grep -c $($script:MODEV_PKG)- /proc/`$(pidof $($script:TARGET_PKG))/maps 2>/dev/null)
+echo framework_log_newest=`$(ls -t /data/adb/lspd/log 2>/dev/null | head -1)
+"@
+    $fw = SuShell "sh /data/local/tmp/fwprobe.sh"
+    $absent = "$fw" -match "magisk=absent|zygisk_in_zygote=0"
+    if ($absent) {
+        Write-Host "框架守护进程未运行(Zygisk 缺席)⇒ 注入类断言本轮必红,属环境档" -ForegroundColor Yellow
+    } else {
+        Write-Host "框架在跑但未注入,可能需要整机重启使 lspd 重载模块表" -ForegroundColor Yellow
+    }
+    Assert "Vector injection into testtarget" $false $(if ($absent) { "environment: magisk/zygisk not running" } else { "reboot required?" })
+    Write-Host "注入诊断:`n$fw" -ForegroundColor Gray
 }
 DumpResults (Join-Path $script:TMP "scope-round.json")
 Exit-WithResult

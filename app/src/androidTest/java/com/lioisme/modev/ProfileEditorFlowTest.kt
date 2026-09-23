@@ -1,5 +1,6 @@
 package com.lioisme.modev
 
+import androidx.compose.ui.test.assert
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
@@ -73,6 +74,18 @@ class ProfileEditorFlowTest {
         rule.waitForIdle()
     }
 
+    /**
+     * 选择 sheet 的列表是 LazyColumn(只组合视口内行,V48 选型库把整表
+     * verticalScroll 换成懒列表):目标行可能压根没组合,`performScrollTo` 对未组合
+     * 节点零办法 ⇒ 先按关键词过滤再点 —— 这也正是产品给长名单设计的通路(搜索框 +
+     * 「请缩小搜索范围」截断提示),测试走同一条路才不掩盖真实行为。
+     */
+    private fun filterSheet(query: String) {
+        rule.awaitAnchor("sheet-search-input", "选择 sheet 必须自带搜索框")
+        rule.onNodeWithTag("sheet-search-input").performTextReplacement(query)
+        rule.waitForIdle()
+    }
+
     private fun purgeDiy() {
         runBlocking {
             // 先补一次内置档:账本同步末尾必回读 ⇒ 内存快照确定已就位(冷进程不等 Flow)。
@@ -123,8 +136,10 @@ class ProfileEditorFlowTest {
 
         click("profile-device-pick")
         rule.awaitAnchor("profile-device-brand-sheet", "点「选择真实机型」应开品牌 sheet")
+        filterSheet("xiaomi")
         click("profile-device-brand-xiaomi")
         rule.awaitAnchor("profile-device-model-sheet", "选完品牌应进型号 sheet")
+        filterSheet("2211133C")
         click("profile-device-model-2211133C")
 
         assertTextOnScreen("2211133C")
@@ -135,14 +150,60 @@ class ProfileEditorFlowTest {
         assertTextAbsent("keep-me")
     }
 
+    /**
+     * V48 C2 设备档:「选择 Android 版本」必须一次写全 release + SDK 两个字段
+     * (可分开可写 = 允许存出 15/34 这种自相矛盾画像,#31⑤)。
+     */
+    @Test
+    fun androidVersionPicking_writesReleaseAndSdkTogether() {
+        val id = seedProfile(DeviceProfile(model = "keep-me"))
+        openEditor(id)
+
+        click("profile-android-pick")
+        rule.awaitAnchor("profile-android-sheet", "「选择 Android 版本」行必须开版本 sheet")
+        filterSheet("15")
+        click("profile-android-option-15")
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("profile-row-${ProfileField.ANDROID_VERSION.name}")
+            .assert(hasText("15", substring = true))
+        rule.onNodeWithTag("profile-row-${ProfileField.SDK_INT.name}")
+            .assert(hasText("35", substring = true))
+    }
+
+    /**
+     * V48 C3 设备档:运营商一行选完 ⇒ PLMN + 名 + 国码三项同落(1597 条走懒列表,
+     * 目标行只能经 sheet 自带搜索框抵达 —— 这条通路本身就是产品给长名单的答复)。
+     */
+    @Test
+    fun carrierPicking_fillsPlmnNameAndCountryAtOnce() {
+        val id = seedProfile(DeviceProfile(model = "keep-me"))
+        openEditor(id)
+
+        click("profile-carrier-pick")
+        rule.awaitAnchor("profile-carrier-sheet", "「选择真实运营商」行必须开运营商 sheet")
+        filterSheet("46000")
+        click("profile-carrier-option-46000")
+        rule.waitForIdle()
+
+        rule.onNodeWithTag("profile-row-${ProfileField.SIM_OPERATOR.name}")
+            .assert(hasText("46000", substring = true))
+        rule.onNodeWithTag("profile-row-${ProfileField.SIM_OPERATOR_NAME.name}")
+            .assert(hasText("China Mobile", substring = true))
+        rule.onNodeWithTag("profile-row-${ProfileField.SIM_COUNTRY.name}")
+            .assert(hasText("CN", substring = true))
+    }
+
     /** 枚举字段(语言)选择即写值;sheet 内「改为手动填写」仍能落到文本输入通路。 */
     @Test
     fun enumeratedField_pickerSetsValue_andManualEscapeWorks() {
-        val id = seedProfile(DeviceProfile.EMPTY)
+        // 库里不留空行是契约(#30③:create 对零字段正文恒返回 null)⇒ 夹具必须带一项。
+        val id = seedProfile(DeviceProfile(model = "keep-me"))
         openEditor(id)
 
         click("profile-row-${ProfileField.LANGUAGE.name}")
         rule.awaitAnchor("profile-enum-LANGUAGE", "语言行应开枚举 sheet(而非文本输入)")
+        filterSheet("ja")
         click("profile-option-LANGUAGE-ja")
         assertTextOnScreen("ja")
 
@@ -154,7 +215,7 @@ class ProfileEditorFlowTest {
     // ------------------------------------------------------------------ 库
 
     @Test
-    fun library_seedsTheThreeBuiltins_asDistinctRows() {
+    fun library_seedsEveryBuiltin_asDistinctRows() {
         openLibrary()
         BuiltinDeviceProfiles.BUILTINS.forEach { spec ->
             rule.awaitAnchor(

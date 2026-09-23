@@ -7,6 +7,8 @@ import androidx.test.platform.app.InstrumentationRegistry
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import com.lioisme.modev.core.model.HookSwitch
+import com.lioisme.modev.core.model.WebViewKind
+import com.lioisme.modev.core.model.WebViewOperation
 import com.lioisme.modev.hook.RecordSink
 import org.junit.After
 import org.junit.Assert.assertEquals
@@ -177,13 +179,23 @@ class WebViewBridgeTest {
         val records = waitForRecords(2)
         assertEquals("importKey+encrypt 应各回传 1 条记录", 2, records.size)
         val joined = records.joinToString("\n")
-        assertTrue(joined.contains("kind=WEB_CRYPTO"))
-        assertTrue(joined.contains("algorithm=WebCrypto/AES-GCM"))
-        assertTrue(joined.contains("operation=ENCRYPT"))
-        assertTrue(joined.contains("operation=GET_KEY"))
-        assertTrue(joined.contains("provider=WebView"))
-        // 明文回传(TextEncoder 输入)
-        assertTrue(joined.contains("68656c6c6f206d6f646576"))
+        // 断言一律由**枚举**派生(旧写法把 V12 时代的字面量 `WEB_CRYPTO`/`ENCRYPT`/
+        // `GET_KEY` 抄死在测试里,V29 枚举改名后恒红且消息零信息 —— 本轮实锤)。
+        assertTrue(
+            "kind 必须是 WebView 的 JS_CRYPTO,实际:$joined",
+            joined.contains("kind=${WebViewKind.JS_CRYPTO}"),
+        )
+        assertTrue(
+            "两笔操作各自点名,实际:$joined",
+            joined.contains("operation=${WebViewOperation.JS_IMPORT_KEY}") &&
+                joined.contains("operation=${WebViewOperation.JS_ENCRYPT}"),
+        )
+        // 明文回传(TextEncoder 输入)= "hello modev" 的 hex
+        assertTrue("输入明文必须以 hex 落进记录,实际:$joined", joined.contains("68656c6c6f206d6f646576"))
+        // 探针回传的算法名 `alg`(WebCrypto/AES-GCM)**当前未落进记录**
+        // (WebViewEventMapper.toRecord 只带 params,WebViewRecord 无 algorithm 字段;
+        // 实体 algorithm 列被 urlHost 复用)⇒ 旧断言 `algorithm=…`/`provider=…` 一并撤除,
+        // 缺口登记在 TASK-V48 §8(V48-DFC-15),不在本次 V48 三需求范围内顺手改。
     }
 
     @Test

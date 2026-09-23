@@ -268,20 +268,37 @@ if ($Stage -in @("all", "install")) {
         # 覆盖安装后 lspd 不再向新进程注入(AGENTS 实锤),唯一恢复 = 整机冷重启;
         # 重启后必须等 boot_completed,否则后续 scope/inject 对着开机中的设备全红。
         . "$PSScriptRoot\tt-lib.ps1"
-        if (Test-Path $script:DNCONSOLE) {
-            & $script:DNCONSOLE quit --index 0 | Out-Null
-            Start-Sleep -Seconds 8
-            Start-Process -FilePath $script:DNPLAYER -ArgumentList "-index", "0" -WorkingDirectory $script:LDPLAYER_DIR | Out-Null
-            Write-Host "  [reboot] dnplayer 已冷启动,等待 boot_completed…" -ForegroundColor Gray
-            if (WaitDevice -timeoutSec 480) {
-                Write-Host "  [reboot] 设备已就绪" -ForegroundColor Green
-            } else {
-                $script:BLOCKED = $true
-                Write-Host "  [reboot] 等待超时 = 整轮 BLOCKED" -ForegroundColor Red
-            }
-        } else {
+        if (-not (Test-Path $script:DNCONSOLE)) {
             $script:BLOCKED = $true
             Write-Host "  [reboot] dnconsole 缺失:$($script:DNCONSOLE) = 整轮 BLOCKED" -ForegroundColor Red
+        } else {
+            # dnconsole 直调可抛 ApplicationFailedException(V48 实机复现),但「调用报了错」
+            # 与「VM 真关了」是两件事 —— 唯一判据 = 设备确实失联。旧实装不查失联就打印
+            # 「设备已就绪」,后续矩阵对着 lspd 的陈旧模块表全红 = 假就绪。
+            & cmd.exe /c "`"$($script:DNCONSOLE)`" quit --index 0" 2>&1 | Out-Null
+            $down = $false
+            $deadline = (Get-Date).AddSeconds(90)
+            while ((Get-Date) -lt $deadline) {
+                Start-Sleep -Seconds 3
+                $probe = ((& $script:ADB -s $script:DEVICE shell "getprop sys.boot_completed" 2>&1 | ForEach-Object { "$_" }) -join "").Trim()
+                if ($probe -ne "1") { $down = $true; break }
+                Reconnect
+            }
+            if (-not $down) {
+                $script:BLOCKED = $true
+                Write-Host "  [reboot] quit 后设备始终可达 = VM 从未关机,整轮 BLOCKED(禁止假就绪)" -ForegroundColor Red
+            } else {
+                Start-Process -FilePath $script:DNPLAYER -ArgumentList "-index", "0" -WorkingDirectory $script:LDPLAYER_DIR | Out-Null
+                Write-Host "  [reboot] 设备已失联, dnplayer 冷启动,等待 boot_completed…" -ForegroundColor Gray
+                if (WaitDevice -timeoutSec 480) {
+                    # uptime 归零是「真重启」的第二重证据(AGENTS 实锤判据)
+                    $up = ((& $script:ADB -s $script:DEVICE shell "uptime" 2>&1 | ForEach-Object { "$_" }) -join "")
+                    Write-Host "  [reboot] 设备已就绪 | $up" -ForegroundColor Green
+                } else {
+                    $script:BLOCKED = $true
+                    Write-Host "  [reboot] 等待超时 = 整轮 BLOCKED" -ForegroundColor Red
+                }
+            }
         }
     }
 }

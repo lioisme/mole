@@ -281,6 +281,10 @@ class MonitorListScreensTest {
         waitForVisible("SHA-256")
         assertEquals(1, rowCount("AES"))
 
+        // 筛选菜单必须先收起再点折叠条:菜单弹出层的 scrim 仍在退场动画里时,
+        // 这一击打在遮罩上被吞 ⇒ 输入域从未获得焦点 ⇒ 展开零次触发、零异常
+        // (V48 设备档实锤:多加一次 waitForIdle 就绿 = 时序,不是断言写错)。
+        rule.awaitUntilGone("kind-filter-CIPHER", "筛选项应随菜单收起而消失")
         // 搜索词过滤(展开搜索视图输入 → SQL 侧过滤)。
         rule.onAllNodesWithText(str(R.string.algorithm_records_search)).onFirst().performClick()
         // Dialog 是新窗口:单次 waitForIdle 不保证首帧已组合(高负载机器上随机红),
@@ -356,7 +360,10 @@ class MonitorListScreensTest {
         // 先有界等待其锚点(超时消息 = 「点击被吞」),再断言文案显示性。
         rule.onAllNodesWithTag("records-clear-type").onFirst().performClick()
         rule.awaitAnchor("records-clear-confirm", "点清空槽应弹出危险确认")
-        rule.onNodeWithText(str(R.string.danger_clear_algorithm_msg)).assertIsDisplayed()
+        // 本用例走的是「每应用 × 类型」列表:确认文案 = danger_clear_page_records_msg
+        // (V41 T5 双形态拆分,#17)。`danger_clear_*_msg` 十键属「类型 × 全部应用」全局
+        // 列表形态,断错形态的文案永远等不到(V48 设备档实锤)。
+        rule.onNodeWithText(str(R.string.danger_clear_page_records_msg)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.cancel)).performClick()
         rule.waitForIdle()
         waitForVisible("SHA-256")

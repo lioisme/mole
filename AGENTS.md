@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法/数据库/行为/偏好/WebView/系统信息 + 环境观测)+ 功能域(退出拦截/崩溃预防/解除录屏/弹窗关键词拦截/SSL 绕过/代理 VPN 隐藏/设备环境伪装)+ 宿主双进程日志。
-构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀;2026-08-26 V27 记录列表重构/行为监听一等公民增量沉淀;2026-08-26 V28 详情页纯 markdown 化/偏好监听一等公民增量沉淀;2026-09-04 V37 双域拆分/FeatureGate 红线/关键词库与画像契约增量沉淀;2026-09-05 V38 MCP 服务/工具面 parity/注入侧 seq 续号修复增量沉淀;2026-09-06 V39 MCP 端口 1510/多令牌/服务诊断拆分/对话框统一/Appbar 排他/双击退出增量沉淀;2026-09-07 V41 令牌页崩溃修复/统一外部访问双服务消费/端口行纯端口化/副标题动态有效值/按应用浏览退役/根页 IA 五分区/DAO 直调门禁/全局记录路由 e2e 增量沉淀;2026-09-08 V42 搜索槽长按门禁/AppIcon 底图状态驱动/端口可用性校验链/主题色板回退 v8/四语 i18n 增量沉淀;2026-09-13 V43 宿主零阻塞锁链修复/热路径门控先行红线/单一类加载监视器/干预 setThrowable 契约忠实化/列表一行一参数重构增量沉淀;2026-09-22 V46 记录行圆角容器化(尾栏槽退役 ⇒ 正文通栏、波纹可见)/色板网格步长单点/令牌动作菜单化(查看·重命名·删除 + 契约层改名)增量沉淀;2026-09-23 V48 作用域更名(「作用域此应用」)/能力表前后端逐类对齐(强约束 #31)/画像选型库(carriers + 成对选择器 + 九内置档)增量沉淀)。
+构建与质量契约(2026-08-20 审计沉淀 V21;2026-08-25 V24 二态监听/记录收敛/详情重设计增量沉淀;2026-08-26 V26 详情页 markdown 化/外部监听开关/诊断详情弹层增量沉淀;2026-08-26 V27 记录列表重构/行为监听一等公民增量沉淀;2026-08-26 V28 详情页纯 markdown 化/偏好监听一等公民增量沉淀;2026-09-04 V37 双域拆分/FeatureGate 红线/关键词库与画像契约增量沉淀;2026-09-05 V38 MCP 服务/工具面 parity/注入侧 seq 续号修复增量沉淀;2026-09-06 V39 MCP 端口 1510/多令牌/服务诊断拆分/对话框统一/Appbar 排他/双击退出增量沉淀;2026-09-07 V41 令牌页崩溃修复/统一外部访问双服务消费/端口行纯端口化/副标题动态有效值/按应用浏览退役/根页 IA 五分区/DAO 直调门禁/全局记录路由 e2e 增量沉淀;2026-09-08 V42 搜索槽长按门禁/AppIcon 底图状态驱动/端口可用性校验链/主题色板回退 v8/四语 i18n 增量沉淀;2026-09-13 V43 宿主零阻塞锁链修复/热路径门控先行红线/单一类加载监视器/干预 setThrowable 契约忠实化/列表一行一参数重构增量沉淀;2026-09-22 V46 记录行圆角容器化(尾栏槽退役 ⇒ 正文通栏、波纹可见)/色板网格步长单点/令牌动作菜单化(查看·重命名·删除 + 契约层改名)增量沉淀;2026-09-23 V48 作用域更名(「作用域此应用」)/能力表前后端逐类对齐(强约束 #31)/画像选型库(carriers + 成对选择器 + 九内置档)+ 设备档插桩全量 136 用例 0 失败(六种静默红点归因入「已知工具链坑」;注入矩阵因靶机 Magisk/Zygisk 整场未运行而阻塞,见 V48-ENV-01)增量沉淀)。
 
 ## 构建 / 测试(Windows,gradlew.bat)
 
@@ -58,7 +58,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 | 检测黑名单追加项 extra* | Root 包名/Xposed 前缀/Frida 端口/掩码词的用户追加项(内置基线 ∪ 追加,只增不删) | 覆盖内置基线 |
 | MCP 服务 MCP Server | 进程内常驻 Streamable HTTP(spec 2025-06-18,V39 起端口默认 **1510**(wire 迁 1511 让位),单端点 POST /mcp,偏好 `mcp_port` 可改);监听绑定随**统一外部访问开关**(V41 D-1,见 #19);令牌认证独立开关(V39,默认停用)启用后**全接口强制**(含回环),服务端是否鉴权仅由 `tokenAuthEnabled` 决定(`McpServer` 无 externalAccess 耦合);多令牌 `McpTokenEntry`(SecureRandom 32 hex,宿主本地 `mcp_tokens` 不镜像,V38 单键惰性迁移);与 wire ConfigServer 完全独立生命周期(独立端口/开关/restart,互不触碰,VERSION 恒 4 零感知) | 把 MCP 当 wire 通道扩展、恢复 resources/prompts 双通道、令牌暴露为 MCP 工具(引导悖论 + PII)、恢复外部访问↔认证级联、恢复 mcp_external_access 独立键 |
 | 令牌管理 Token Management | MCP 访问令牌管理页(`settings/mcp-tokens`):认证开关 + 多令牌列表(**行内零动作按钮,动作唯一入口 = trailing「更多」菜单三项:查看 / 重命名 / 删除**,V46 R3;创建走 Appbar `tokens-add`);重命名走 `McpServiceConfig.setMcpTokenLabel` 方法层契约(仅动 label,值与顺序不变 ⇒ 校验集内容零变化,经 `mcpTokenSetUpdater` 原地生效,不重启不踢会话);**行内恒掩码,明文只在 `ModevValueDialog` 一处上屏**(复制后关窗);删除最后一枚不停用认证(空集 = 全拒);令牌值宿主本地秘密,恒不进 MCP 工具输出与诊断快照 | 显隐(行内 toggle)/行内复制按钮/「撤销」措辞/`token_show`·`token_hide` 键(V46 全部退役);UI 直写 prefs 改名 |
-| 工具面 Tool Surface 50 | MCP 对 Agent 的能力清单(记录 14/应用 6/监听 4/功能 4/资产 10/画像库 5/服务 4/作用域 3),与 UI 能力逐行对照、同上游继承;`McpToolParityTest` 冻结快照 + B1 边界源码扫描 + `UiMcpCapabilityParityTest` 能力归属与动作单点(R1-R6)三门禁(V45 T3.5:`app_clear_records` 与 `records_clear_package` 同上游重复已整体删除,应用组 7→6;V47 WP-7:画像库五工具 = 存/删/绑/目录/导入,`spoof_profiles_list` 改读画像库真身;V48 E1:`spoof_profile_catalog` 由零参数升为 `kind=fields|devices|carriers` 三本目录分派(**名仍 50**,参数字段声明新增;`kind` 带 enum ⇒ 乱值 = -32602;每行回 `writable` 对象 = UI 选择器真正落的那几项,读不到资产回 `available:false` + reason,**禁**回空表) | 「MCP 子集」「UI 专属阉割」(§5.3 明示排除除外)、「同一动作两处广告」(R1 红) |
+| 工具面 Tool Surface 50 | MCP 对 Agent 的能力清单(记录 14/应用 6/监听 4/功能 4/资产 10/画像库 5/服务 4/作用域 3),与 UI 能力逐行对照、同上游继承;`McpToolParityTest` 冻结快照 + B1 边界源码扫描 + `UiMcpCapabilityParityTest` 能力归属与动作单点(R1-R6)三门禁(V45 T3.5:`app_clear_records` 与 `records_clear_package` 同上游重复已整体删除,应用组 7→6;V47 WP-7:画像库五工具 = 存/删/绑/目录/导入,`spoof_profiles_list` 改读画像库真身;V48 E1:`spoof_profile_catalog` 由零参数升为 `kind=fields\|devices\|carriers` 三本目录分派(**名仍 50**,参数字段声明新增;`kind` 带 enum ⇒ 乱值 = -32602;每行回 `writable` 对象 = UI 选择器真正落的那几项,读不到资产回 `available:false` + reason,**禁**回空表) | 「MCP 子集」「UI 专属阉割」(§5.3 明示排除除外)、「同一动作两处广告」(R1 红) |
 | 端口校验 Port Validation | 端口编辑可用性链(V42 T3,强约束 #29):`ModevPortSheet` 异步校验 → `PortValidator`(特权 <1024/双服务冲突/占用探测三闸 + 自身豁免),失败硬阻止保存;wire/MCP 双 `bindError` 观测面 + 服务页对称错误行 | 恢复静默保存(无校验)、特权端口可录入、双服务同端口、wire 绑定失败不可见 |
 | 语言 Language | 四语 en/zh/ja/ko(V42 T5):枚举唯一事实源 `LocaleManager.SUPPORTED_TAGS`(`locales_config.xml` 同表);选择面板 5 项(system + 四语,自名键 `lang_*`);values-ja/values-ko 为**生成物**(`scripts/v42_table_*.mjs` + `node scripts/v42_generate.mjs`;V46 复核实测 en 695 键、plurals 8 —— 旧记 701 为 V42 时点口径,以生成器控制台输出为准;技术词回落 en);ja/ko plurals 仅 other;`AppCountFormat` zh/ja/ko 同 10^4 万进位档;`TimelineGroup.formatDay` ja/ko 母语惯形分支 | 三语硬编码枚举(TAG 单常量散落)、ja/ko 资源缺键静默回落 en、日韩日期走 MMM 截断形态、**直写 values-ja/ko 而不回写翻译表**(V46 实锤的静默失效根因) |
 
@@ -577,6 +577,23 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
   (整屏结构 + 派生态渲染,经 VM 写入面驱动)——两侧合起来才是完整证据,单侧绿不算。
   另注意:同一用例**只能一次 `setContent`**(换参数须拆用例);测「编辑既有条目」的
   夹具必须在库里种下那一行,否则跑到的是「条目缺失 ⇒ 弹栈」分支,屏上零节点。
+- **插桩档四种「静默不生效」形态(V48 设备档实锤,四种都红过一整轮才被抓出)**:
+  ① **懒列表点不到** —— `ModevSearchableChoiceSheet` = LazyColumn + `heightIn(max=420.dp)`
+  + 120 行截断 ⇒ 第 8 行之后的行**压根没组合**,`performScrollTo` 对未组合节点无能为力
+  (报「could not find any node」而非「off screen」)。写选择器端到端用例一律先用 sheet
+  自带搜索框(`sheet-search-input`)过滤再点 —— 这也是产品给长名单设计的通路,测试绕开它
+  等于替产品掩盖问题。
+  ② **遮罩吞点击** —— DropdownMenu/Dialog 退场动画期间的 `performClick` 打在 scrim 上,
+  零异常、零效果,失败炸在下一句。跨弹层动作前先 `awaitUntilGone(<弹层内锚点>)`
+  (V48 实锤形态:筛完类别 → 立刻点折叠搜索条 → 展开「不生效」,真因是菜单还没收干净)。
+  ③ **文案断言必须与被测形态同源** —— 「每应用 × 类型」列表的清空确认走
+  `danger_clear_page_records_msg`(默认参),「类型 × 全部应用」全局列表才走
+  `danger_clear_<type>_msg`;在单应用屏断全局键 = 恒红,而消息只说「not displayed」。
+  ④ **枚举字面量不得抄死在断言里** —— 探针/模型改枚举名(V12 `WEB_CRYPTO`/`ENCRYPT`
+  → V29 `JS_CRYPTO`/`JS_ENCRYPT`)后,抄字面量的设备用例当场变假红且**消息为空**;
+  断言一律 `"kind=${WebViewKind.JS_CRYPTO}"` 这样由枚举派生 + 必带说明文案。
+  另:挂在 `ListItem` 槽位(`trailingContent`/`supportingContent`)里的 testTag 只在
+  `useUnmergedTree = true` 可见(同坑见上一条 Robolectric 条目),设备档一样成立。
 - **Material3 1.4.0 `ListItem` 无 `shape` 形参(javap 实锤)**:圆角/自绘背景/可见波纹
   只能在容器层做(见 #13 行容器契约);另注意 `ListItem` 布局会按 `trailingContent`
   宽度**永久削减文本列宽度**(`TrailingContentStartPadding` 常量),尾栏放短内容 =
@@ -616,7 +633,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
   都剥离 EXPLAIN 前缀直接执行原查询,返回普通结果集)——查询计划级验证留待
   真机插桩;JVM 门禁用「sqlite_master 索引存在性 + 行为对账」组合
   (`ExplainQueryPlanProbeTest`)。
-- **验收编排器三坑(V45 首轮实锤,写/改 `run-acceptance.ps1` 一类编排脚本必读)**:
+- **验收编排器四坑(V45 首轮实锤,写/改 `run-acceptance.ps1` 一类编排脚本必读)**:
   ① 子进程**禁止** `& powershell -File … | Tee-Object`:子脚本会拉起 gradle/adb 守护进程,
   它们继承 stdout 句柄 ⇒ 管道永不 EOF ⇒ 编排器在子进程已退出后**永久挂死**
   (特征 = 子脚本日志已到 `install done` 而编排器不打印步结论);一律改
@@ -629,6 +646,20 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
   `-Args @("-SkipBuild")` 一类实参**不绑定**,子脚本按默认档静默跑
   (preflight 误跑全档 → 整轮 BLOCKED;MCP 步丢掉 -SkipBuild → 重复构建)。
   自动变量禁用清单见下文「PowerShell 参数名/脚本变量」条目。
+  ④ `-Reboot` 步的**假就绪**(V48 实锤):`dnconsole.exe` 在本机**无 stdout、退出码恒 0**
+  (直调还会抛 `ApplicationFailedException`),旧实装 `quit` 后仅 `Start-Sleep 8` 就
+  `WaitDevice` —— VM 根本没关过,`boot_completed` 立刻为 1 ⇒ 打印「设备已就绪」,
+  而后续注入矩阵对着 lspd 的陈旧模块表全红。修法 = **判据只能是失联**:`cmd.exe /c` 包装
+  `quit` 后轮询 `sys.boot_completed` 读到非 `1`(90s 窗)才认定关机,否则整轮 BLOCKED。
+- **框架守护进程整场缺席(V48 实锤,注入类断言全红的根因,改代码前先看这条)**:
+  LSPosed 与 Vector 都是 **Zygisk 模块** —— Magisk 没跑,两者一起不加载,与本项目代码零关系。
+  判据(全在设备侧,无需重跑矩阵):`/sbin` 与 `/dev/.magisk` 不存在 +
+  `grep -c zygisk /proc/$(pidof zygote64)/maps` == 0 + `ps -A` 无 `magisk` +
+  `/data/adb/lspd/log/*` 的 mtime 停在若干天前;`su` **仍然可用**(雷电自带 `ldinit`),
+  所以「adb 能 root」不等于「框架在跑」。此时 `modules_config.db` 的
+  `apk_path`/`enabled`/`scope` 三项即使全对,靶进程 `/proc/<pid>/maps` 里也只有自身 APK
+  ⇒ 注入矩阵与 MCP 记录组必然红。**冷重启不恢复**(V48 实测一次无效),
+  恢复属宿主 VM 的 Magisk/root 档位改动 = 共享设备侧操作,须先与使用者确认。
 - **PowerShell 管道处理含中文源码会毁文件**:`Get-Content | -replace |
   Set-Content` 以系统 ANSI 解码 UTF-8,中文注释乱码且尾字节可吞换行把下一行
   代码并入注释(V23 实锤)。改文件一律用 edit 工具或 .NET API 字节级读写

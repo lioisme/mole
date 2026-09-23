@@ -161,7 +161,10 @@ class PerAppFeatureSettingsTest {
         }
         openFeatureSettings()
         rule.onNodeWithTag("feature-profile-picker").performScrollTo()
-        rule.onNodeWithTag("feature-profile-binding")
+        // 行尾栏挂在 ListItem 的 trailingContent 槽里 ⇒ 自定义 testTag 只在**非合并树**
+        // 可见(AGENTS 已知坑;V48 设备档实锤:合并树查询命中 0,而失败信息说的是
+        // 「not displayed」,只看消息会一路猜到医院)。
+        rule.onNodeWithTag("feature-profile-binding", useUnmergedTree = true)
             .assertIsDisplayed()
             .assertTextEquals(str(R.string.profile_binding_missing))
     }

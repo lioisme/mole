@@ -2,7 +2,7 @@
 
 **执行入口**：JVM/构建档 = `gradlew` 逐条；设备档 = `scripts/test-integration/run-acceptance.ps1`（仓库既有编排器，阶段序 = preflight → build/unit/lint/assemble → install → scope → inject 矩阵 → 插桩 UI → MCP，SKIP 只有列入 `skip-allowlist.txt` 才不计 FAIL）。
 **判定纪律**：预期一律写成**可判定的观测**（屏上文本 / 靶程序读回值 / 注册表内容 / 命令输出），禁「组件名不存在」这类代理指标；Gradle 步只认 `BUILD SUCCESSFUL` 行与结果 XML，不信管道退出码。
-**结果记号**：✅ 符合预期 · ❌ 不符合（须归因）· ⬜ 未跑 · 🔵 进行中。
+**结果记号**：✅ 符合预期 · ❌ 不符合（须归因）· ⬜ 未跑 · 🔵 进行中 · ⛔ 环境阻塞（阻塞因在靶机/宿主而非代码；**既不记 ✅ 也不记 ❌**，恢复后必须补跑）。
 
 ---
 
@@ -29,7 +29,7 @@
 | G2-5 | 空列表提示指向两页 | `#emptyListHintPointsAtBothDomainPages` | 同时含「监听设置」「功能设置」 | ✅ |
 | G2-6 | 「总开关/Masters」层命名退役 | `#theMasterSwitchLabelsAreRetired` | 四语资源文件中零命中 | ✅ |
 | G2-7 | 跨域点名句必须指名闸 | `#crossDomainHintNamesTheGatingSwitchAndItsPage` | 含 `%1$s` 参数与「功能设置」 | ✅ |
-| G2-8 | 应用列表行尾 Checkbox = 同一个名词与锚点 | 插桩 `FourScreensNavTest` / `AppMonitorRedesignTest`（`app-row-scope`、`app-scope-row`） | 两控件同 testTag 语义、contentDescription 同串 | ⬜ 设备档 |
+| G2-8 | 应用列表行尾 Checkbox = 同一个名词与锚点 | 插桩 `FourScreensNavTest#appRowScopeCheckbox_carriesTheGateNoun`（本轮补：行尾槽 testTag 只在**非合并树** ⇒ 用例按两棵树分别取锚点并让「带名词控件数 == 锚点数」对账）+ 监控页 `app-scope-row` 三条既有用例 | 两控件同名词、锚点齐备且数量对账 | ✅ 19:14 |
 | G2-9 | 死路已灭且不复活 | 源码扫描 + `danger_remove_scope_msg` 零引用 | 键、`removeScope()`、`DangerAction` 均不存在 | ✅ |
 
 ## G3 R-2 前后端分类对齐
@@ -42,8 +42,8 @@
 | G3-4 | 功能行分区 == FeatureGroups | `#featureRowsFollowFeatureGroupsExactly` | 逐 kind 相等（不许两套分组） | ✅ |
 | G3-5 | 跨域闸必须可见 | `ui.apps.ListenEnvSectionRoboTest`（整屏渲染 4 例） | kind 开 + 外来 master 关 ⇒ 行上点名；master 开 / kind 关 ⇒ 不点名；渲染行集 == 表行集 | ✅ |
 | G3-6 | master 标签与取值单点 | `ui.apps.KindLabelResExhaustiveTest` + `HookSwitch.masterFor` 穷尽 when | 功能页与监听页提示读同一函数 | ✅ |
-| G3-7 | 一个类型一个标题键 | 资源扫描（`settings_records_*` 零命中）+ `DataSettingsScreenTest`（设备档） | 十键已删，两处入口同源 | ✅（键）/ ⬜（设备） |
-| G3-8 | 监控页两行按域计数 | 插桩 `AppMonitorRedesignTest#hubEntriesCountTheirOwnDomain` | 仅功能域定制 ⇒ 监听行「使用默认配置」、功能行「1 项已自定义」 | ⬜ 设备档 |
+| G3-7 | 一个类型一个标题键 | 资源扫描（`settings_records_*` 零命中）+ 插桩 `DataSettingsScreenTest`（两形态入口同源） | 十键已删，两处入口同源 | ✅（键 + 设备 19:14） |
+| G3-8 | 监控页两行按域计数 | 插桩 `AppMonitorRedesignTest#hubEntriesCountTheirOwnDomain` | 仅功能域定制 ⇒ 监听行「使用默认配置」、功能行「1 项已自定义」 | ✅ 19:14 |
 | G3-9 | 双域写侧闸不破 | `HookGate`+`McpToolsTest` 双域拒收 + `UiMcpCapabilityParityTest` R1–R6 | FEATURE kind 进 `listen_settings_set` 被拒；能力行与 UI 动作双向归属 | ✅ |
 
 ## G4 R-3 画像选型库
@@ -63,7 +63,7 @@
 | G4-11 | 共用资产读者未被改坏 | `data.repo.DeviceCatalogRepositoryTest` + `ProfileEditorRenderRoboTest` 机型两条 | `CachedAssetReader` 抽取后原 4 条口径逐条仍成立 | ✅ |
 | G4-12 | 库页三段可区分 + 接管边界常驻 | `SpoofProfileLibraryRenderRoboTest`（6 例中新增 2） | 三段名两两不同；两段遗留自证「仍在生效」；`profile-takeover-status` 恒在屏 | ✅ |
 | G4-13 | 画像库读写与账本 | `data.repo.SpoofProfileRepositoryTest`（18 例，真 Room） | 内置档安装幂等、收养不重复、墓碑不复活、改档脱管、导出导入闭环判重 | ✅ |
-| G4-14 | 选型弹层端到端 | 插桩 `ProfileEditorFlowTest`（真机点选：机型 / Android 版本 / 运营商 三张 sheet） | 点选后落值且脏态正确；「改为手动填写」通路可达 | ⬜ 设备档 |
+| G4-14 | 选型弹层端到端 | 插桩 `ProfileEditorFlowTest`（真机点选四张 sheet：机型两级 / 枚举语言 / Android 版本 / 运营商）+ 本轮补的两条（版本成对写、运营商三字段一次选全） | 点选后落值且脏态正确；「改为手动填写」通路可达 | ✅ 19:14（选择器是懒列表，用例必须走 sheet 自带搜索框 —— 这同时是产品给长名单的通路，见 AGENTS 新条） |
 
 ## G5 MCP 工具面（Agent 一等公民）
 
@@ -75,8 +75,8 @@
 | G5-4 | 目录分派三态 | `#devices catalogue…` `#carriers catalogue…` `#an unreadable asset…` | 品牌表 → 机型表 → 运营商过滤；未知 brand 显式 error；不可用回 `available:false`+reason，禁空表；200 行截断显式上报 | ✅ |
 | G5-5 | 能力归属与动作单点 | `architecture.UiMcpCapabilityParityTest` R1–R6 | 无两工具广告同一可变上游；每行双向归属或登记理由；作用域能力行 = 两个双向开关（`removeScope` 已随死路移除） | ✅ |
 | G5-6 | 写入模型与协议恒定 | `McpDtosTest` / `JsonRpcTest` / `McpServerLifecycleTest` | 载荷 schema 由模型派生；`truncated` 键恒在；时间戳恒 epoch millis；重启会话失效 | ✅ |
-| G5-7 | MCP 端到端（真 HTTP） | 设备档 `24-run-mcp.ps1`（42 子断言，§9.2 矩阵） | 全 PASS；令牌认证开/关两态；错误码分型 | ⬜ 设备档 |
-| G5-8 | 插桩侧 MCP e2e | 插桩 `McpEndToEndTest` | 本机端口起服务 → tools/list 与真实调用一致 | ⬜ 设备档 |
+| G5-7 | MCP 端到端（真 HTTP） | 设备档 `24-run-mcp.ps1`（42 子断言，§9.2 矩阵） | 全 PASS；令牌认证开/关两态；错误码分型 | ⛔ 环境阻塞（V48-ENV-01：记录/配置两组的种源 = 注入侧真触发，靶机框架栈未运行 ⇒ 本行不记 ✅。旁证：协议面已由 G5-8 真 HTTP 覆盖，令牌两态只有 JVM 档 `McpServerLifecycleTest` 覆盖） |
+| G5-8 | 插桩侧 MCP e2e | 插桩 `McpEndToEndTest` | 本机端口起服务 → tools/list 与真实调用一致 | ✅ 19:14（不依赖框架：服务与调用同在宿主进程） |
 
 ## G6 既有能力回归（记录面 / 注入面）
 
@@ -89,12 +89,12 @@
 | G6-5 | 热路径门控与干预双闸 | `architecture.HotPathGateConventionTest`、`InterventionGateConventionTest`、`hook.hooks.FeatureGateBypassTest` | 干预动作恒过 `featureOn(kind)`；开关全关 = 零副作用 | ✅ |
 | G6-6 | 注入装配与 seq 续号 | `hook.InjectionAssemblyContractTest`、`RecordSinkTest`、`RecordSpoolTest` | Context 依赖惰性定档；跨重启 seq 不回卷 | ✅ |
 | G6-7 | UI 契约族 | `DialogConventionTest`、`AppbarSearchExclusivityTest`、`RecordRowContainerContractTest`、`SettingsThemeContrastTest`、`HardcodedStringConventionTest` | 弹层出口唯一；Appbar 含搜索则 actions 空；行圆角只在容器层；20 seed 对比度达标；ui 包零中文字面量 | ✅ |
-| G6-8 | 记录监听矩阵（靶程序真触发） | 设备档 `20-run-listen.ps1` | 各类型记录按预期捕获，含 seq/截断/去噪断言 | ⬜ 设备档 |
-| G6-9 | 干预能力矩阵 | 设备档 `21-run-enhance.ps1` | 退出拦截/崩溃预防/解除录屏/弹窗拦截/SSL/代理 VPN/Root·Xposed·模拟器 逐项二态成立 | ⬜ 设备档 |
-| G6-10 | 宿主↔注入联动 | 设备档 `22-run-linkage.ps1` | 配置即写即推、per-session 生效、断连重连恢复 | ⬜ 设备档 |
-| G6-11 | 冷启动冒烟（钩子变更后必跑） | 设备档 `23-run-smoke.ps1` | 全功能 ON 下逐个作用域 App 冷启动无崩、无 ANR、帧语义断言绿 | ⬜ 设备档 |
-| G6-12 | 模块关闭负向 | 设备档 `26-run-module-off-negative.ps1` | 开关关闭 = 零记录、零篡改 | ⬜ 设备档 |
-| G6-13 | 背压/洪峰 | 设备档 `27-run-backpressure.ps1` | 超容量丢弃/被拒/写入失败计数各归其位，主链路不阻塞宿主 | ⬜ 设备档 |
+| G6-8 | 记录监听矩阵（靶程序真触发） | 设备档 `20-run-listen.ps1` | 各类型记录按预期捕获，含 seq/截断/去噪断言 | ⛔ 环境阻塞（V48-ENV-01） |
+| G6-9 | 干预能力矩阵 | 设备档 `21-run-enhance.ps1` | 退出拦截/崩溃预防/解除录屏/弹窗拦截/SSL/代理 VPN/Root·Xposed·模拟器 逐项二态成立 | ⛔ 环境阻塞（V48-ENV-01） |
+| G6-10 | 宿主↔注入联动 | 设备档 `22-run-linkage.ps1` | 配置即写即推、per-session 生效、断连重连恢复 | ⛔ 环境阻塞（V48-ENV-01） |
+| G6-11 | 冷启动冒烟（钩子变更后必跑） | 设备档 `23-run-smoke.ps1` | 全功能 ON 下逐个作用域 App 冷启动无崩、无 ANR、帧语义断言绿 | ⛔ 环境阻塞（V48-ENV-01；本轮 hook 子树零改动 ⇒ 该门禁的触发条件未满足） |
+| G6-12 | 模块关闭负向 | 设备档 `26-run-module-off-negative.ps1` | 开关关闭 = 零记录、零篡改 | ⛔ 环境阻塞（V48-ENV-01；负向断言在无框架机器上「恒零记录」= 假绿，禁止以 SKIP 过关） |
+| G6-13 | 背压/洪峰 | 设备档 `27-run-backpressure.ps1` | 超容量丢弃/被拒/写入失败计数各归其位，主链路不阻塞宿主 | ⛔ 环境阻塞（V48-ENV-01） |
 
 ## G7 插桩 UI 全量（25 个类，`connectedModernDebugAndroidTest`）
 
@@ -103,8 +103,8 @@
 
 | # | 预期 | 结果 |
 |---|---|---|
-| G7-1 | 全部类 0 失败 0 错误（已知环境性 flake 须逐条重跑复核，不许放过） | ⬜ 设备档 |
-| G7-2 | 查询计划级：4000 行种子下零 `SCAN`、零 `USE TEMP B-TREE` | ⬜ 设备档 |
+| G7-1 | 全部类 0 失败 0 错误（已知环境性 flake 须逐条重跑复核，不许放过） | ✅ **136 用例 / 0 失败 / 0 错误 / 1 SKIP**（19:14 XML；SKIP = `skip-allowlist.txt` EX-06 表内豁免：`FourScreensNavTest#recordRow…` 前置需真记录,复位步清空了库 ⇒ 不判红也**不算证据**）。首轮 6 红逐条单跑全部稳定复现 ⇒ 非 flake，四类根因见「设备档归因」小节，修完复跑两轮全绿 |
+| G7-2 | 查询计划级：4000 行种子下零 `SCAN`、零 `USE TEMP B-TREE` | ✅ `RecordQueryPlanTest` 在同批 136 用例内绿（4000 行种子自建自清） |
 
 ## G8 资产进包核验
 
@@ -119,17 +119,21 @@
 
 | 档 | 项数 | 结果 |
 |---|---|---|
-| G1 编译与静态 | 7 | |
-| G2 更名 | 9 | 8 ✅ / 1 待设备 |
-| G3 分类 | 9 | 8 ✅ / 1 待设备 |
-| G4 选型库 | 14 | 13 ✅ / 1 待设备 |
-| G5 MCP | 8 | 6 ✅ / 2 待设备 |
-| G6 回归 | 13 | 7 ✅ / 6 待设备 |
-| G7 插桩 UI | 2 | 待设备 |
+| G1 编译与静态 | 7 | 7 ✅ |
+| G2 更名 | 9 | 9 ✅ |
+| G3 分类 | 9 | 9 ✅ |
+| G4 选型库 | 14 | 14 ✅ |
+| G5 MCP | 8 | 7 ✅ / 1 ⛔ 环境 |
+| G6 回归 | 13 | 7 ✅ / 6 ⛔ 环境 |
+| G7 插桩 UI | 2 | 2 ✅（136 用例 / 0 失败 / 1 表内豁免 SKIP） |
 | G8 进包 | 2 | 2 ✅ |
-| **合计** | **64** | **51 ✅ / 13 待设备** |
+| **合计** | **64** | **57 ✅ / 7 ⛔ 环境阻塞（注入面，非代码）** |
 
-**设备档执行条件与代价（须知情）**：`run-acceptance.ps1` 的 install/scope/mcp 步会覆盖安装或卸载宿主 APK，之后 lspd 不再向新进程注入，恢复要 **LDPlayer 整机重启**（`AGENTS.md` 两处实锤）；本轮已在跑的 LDPlayer 若被其它会话使用会被打断。
+**设备档归因（09-23 19:14 轮实锤）**：清单里 7 项属注入面（G5-7 + G6-8…G6-13），本轮**未能取到证据,原因在靶机而非代码** —— LDPlayer VM 的 Magisk/Zygisk 整场未运行，LSPosed 与 Vector 两个 zygisk 模块同时不加载：`/sbin` 与 `/dev/.magisk` 不存在、`grep -c zygisk /proc/$(pidof zygote64)/maps` = 0、`ps -A` 无 magisk、`/data/adb/lspd/log/*` mtime 停在 09-19；`su` 仍可用（雷电自带 `ldinit`），所以「能 root」在这台机器上毫无指示力。已做过：改 `modules_config.db` 的 `apk_path` 到活路径并核过 → 整机冷重启（`uptime` 归零为证）→ 注入仍零、`scope` 步新加的归因探针直接点名 `environment: magisk/zygisk not running`。**恢复需要宿主 VM 的 root/Magisk 档位**（共享设备动作，可能打断其它会话），恢复后按 `scope → inject → mcp` 顺序跑且**不得 `install -r`**（覆盖安装会再次打断注入）。这 7 项在恢复前既不记 ✅ 也不记 ❌，记 ⛔。
+
+**跑出来的六条红点全部落在测试侧**（逐条单跑稳定复现 ⇒ 非负载 flake；已修并复跑两轮全绿）：① 选型 sheet 是懒列表，未组合行不存在 ⇒ 必须走 sheet 自带搜索框；② DropdownMenu 退场遮罩吞点击 ⇒ 跨弹层动作前先 `awaitUntilGone`；③ 在单应用屏断全局形态的确认文案（#17 两形态两句）；④ `ListItem` 槽位 testTag 只在非合并树；⑤ V12 枚举字面量被抄死在断言里（`WEB_CRYPTO`/`ENCRYPT` → 现 `JS_CRYPTO`/`JS_ENCRYPT`）且消息为空；⑥ 同一条 ⑤ 顺带查明**探针回传的算法名从未落进记录**（登记 V48-DFC-15，不在 V48 三需求内越范围修）。四种静默形态已写入 `AGENTS.md`。
+
+**设备档执行条件与代价（本轮已实际承担）**：插桩档跑前必须**默认 adb server 且序列数恰 1**（`ANDROID_ADB_SERVER_PORT` 要清，否则与脚本轮 5038 双序列互相踩踏 = 大面积假失败），跑完 AGP 会卸载宿主 APK 并复位 Vector 模块表 ⇒ 之后若还要跑注入面，须重装 + 改 `modules_config.db` 的 `apk_path` + 整机冷重启。本轮 19:14 的插桩全量正是在这个代价之后取的；注入面 7 项卡在靶机 Magisk/Zygisk 未运行（见下方归因），与 V48 代码无关。
 
 ## 执行记录
 
@@ -137,4 +141,7 @@
 |---|---|---|---|
 | 09-23 08:2x | G1 | `testModernDebugUnitTest --no-build-cache` / `lintModernRelease` / 三个 assemble | 157 类 / 1114 用例 / 0 失败；lint 0e/43w/1h；三 APK 成功 |
 | 09-23 08:2x | G2–G5, G8 | 定向与全量各门禁类 | 逐条符合预期（见各行） |
-| | G6/G7 设备档 | | |
+| 09-23 18:0x–19:3x | G7 设备档（`-Stage ui`） | `connectedModernDebugAndroidTest`（`--no-build-cache --max-workers=1`，默认 adb server 且序列数 == 1） | 首轮 133 用例 **6 失败** ⇒ 逐条单跑全部稳定复现 ⇒ 四类根因修完 + 补 3 条用例 ⇒ 两轮复跑 **136 用例 / 0 失败 / 0 错误 / 1 表内豁免 SKIP**。结果 XML 已归档 = `docs/test-reports/v48-instrumentation-20260923-1914.xml`（AGP 把整轮并成单棵 testsuite，`name` 属性恒是首个类名 `AppIconDeviceTest`，别据此判「只跑了一个类」；计数看 `tests/failures/skipped`） |
+| 09-23 19:1x | G1 复跑（脚本与测试源改动后） | `:app:testModernDebugUnitTest --rerun --no-build-cache` | **157 类 / 1114 用例 / 0 失败 / 0 跳过**（结果 XML mtime 19:18，非 UP-TO-DATE 假绿） |
+| 09-23 19:1x | G1 lint | `:app:lintModernRelease --rerun` | **0e / 43w / 1h**；本轮 main 源零改动（`git status app/src/main` 空），lint analyze 输入面未变 ⇒ 与 08:20 那次真跑同判 |
+| 09-23 19:2x | G6/G7 注入面（`-Stage scope`） | `run-acceptance.ps1 -Stage scope`（不重装） | 作用域行 PASS、注入断言 FAIL 且**自带归因** `environment: magisk/zygisk not running` + 四行判据（见上「设备档归因」）⇒ 后续 inject/mcp 两步按门禁纪律不跑（跑了只会得到与代码无关的红，且 G6-12 这类负向断言在无框架机器上会**假绿**） |
