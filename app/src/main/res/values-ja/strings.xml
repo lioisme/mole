@@ -574,6 +574,8 @@
     <string name="kind_device_env_PROC_NET">/proc/net/tcp フィルタ</string>
     <string name="kind_device_env_DETECT_ROOT">Root 検出の監視</string>
     <string name="kind_device_env_DETECT_EMULATOR">エミュレータ検出の監視</string>
+    <string name="kind_device_env_PROFILE_BUILD_IDENTITY">プロフィール:Build 身分</string>
+    <string name="kind_device_env_PROFILE_BUILD_VERSION">プロフィール:Build バージョン</string>
     <string name="detail_device_env_masked">隠蔽済み</string>
     <string name="detail_device_env_target_path">対象パス</string>
     <string name="detail_device_env_target_class">対象クラス</string>
@@ -639,6 +641,8 @@
     <string name="op_device_env_emulator_check_build">エミュレータ Build 確認</string>
     <string name="op_device_env_emulator_check_file">エミュレータファイル確認</string>
     <string name="op_device_env_emulator_check_prop">エミュレータプロパティ確認</string>
+    <string name="op_device_env_build_identity_write">Build 身分を書き換え</string>
+    <string name="op_device_env_build_version_write">Build バージョンを書き換え</string>
     <string name="op_device_env_sys_prop_get">SystemProperties.get</string>
     <string name="op_device_env_proc_status_read">/proc/self/status read</string>
     <string name="op_device_env_proc_mount_read">/proc/self/mountinfo read</string>
@@ -776,7 +780,10 @@
     <string name="danger_clear_page_records_msg">このアプリのこの種別の記録をすべて完全に削除しますか?この操作は元に戻せません。</string>
     <!-- V47 WP-5:设备画像库(可视化参数配置页;分区/字段/干预组/校验/枚举槽全量标签) -->
     <string name="profile_library_section">プロフィールライブラリ（編集・検証・バインド）</string>
-    <string name="profile_takeover_status_hint">ライブラリは編集・検証・バインドの対象です。フック引き継ぎ完了まで、対象アプリが読むのは下の旧プリセット行です。このページをもって偽装が有効だと確認しないでください。</string>
+    <!-- V49 WP-D1:接管边界改为**派生**文案(名单来自注入侧已登记的画像族),
+         免得每接一族就要重写一次四语散文、或留下「全没接管」这句已过期的话。 -->
+    <string name="profile_takeover_status_hint">ライブラリは編集・検証・バインドの対象です。現在ターゲットアプリで有効な族:%1$s。それ以外の項目は対応するフック系が引き継がれるまで旧プリセット行を読みます。この画面を未記載の値が適用された証拠にしないでください。</string>
+    <string name="profile_takeover_none">まだなし</string>
     <string name="profile_library_hint">再利用可能な端末プロフィール。開くと全パラメータを編集でき、どの介入グループがインストールされるか即時に分かります。</string>
     <string name="profile_library_empty">プロフィールがありません</string>
     <string name="profile_library_empty_hint">ゼロから作成するか、内蔵プロフィールをコピーして調整してください。</string>

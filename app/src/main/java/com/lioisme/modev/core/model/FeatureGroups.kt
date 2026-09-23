@@ -82,6 +82,10 @@ object FeatureGroups {
             DeviceEnvKind.EMULATOR_TELEPHONY.name,
             DeviceEnvKind.EMULATOR_CPU.name,
             DeviceEnvKind.EMULATOR_BATTERY.name,
+            // V49 WP-D1:画像驱动的强制档与条件档同卡呈现(用户在一页里既能开「脏值掩蔽」
+            // 也能开「按画像无条件改写」,两者互不隐含 —— FeatureGate 红线要求各自独立可关)
+            DeviceEnvKind.PROFILE_BUILD_IDENTITY.name,
+            DeviceEnvKind.PROFILE_BUILD_VERSION.name,
         )
     }
 

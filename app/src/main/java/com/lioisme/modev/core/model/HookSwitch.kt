@@ -258,6 +258,16 @@ data class HookSwitch(
     val detectRoot: Boolean = false,
     /** 设备环境:模拟器检测行为监控(仅记录,不干预;默认关,噪声大)。 */
     val detectEmulator: Boolean = false,
+    /**
+     * 画像强制档 · `android.os.Build` 身份字段族(V49 WP-D1,默认**开**)。
+     *
+     * 与 `emulatorBuild`(条件档:仅检出脏值时掩蔽)彼此独立。真正的闸是「画像里那八项是否
+     * 被填」—— 全空 ⇒ 钩子一族都不安装,所以默认开不会带来「没想伪装却被改写」的副作用;
+     * 沿用条件档的默认 false 会让「绑了档」与「档生效」之间隔着一排开关(见 DeviceEnvKind 注释)。
+     */
+    val profileBuildIdentity: Boolean = true,
+    /** 画像强制档 · `Build.VERSION` / `Build.ID` 族(V49 WP-D1,默认开;语义同上)。 */
+    val profileBuildVersion: Boolean = true,
 
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
     val maxHexChars: Int = RecordLimits.DEFAULT_MAX_HEX_CHARS,
@@ -313,7 +323,8 @@ data class HookSwitch(
             emulatorBuild || emulatorFile || emulatorSensor || emulatorNetwork ||
             emulatorTelephony || emulatorCpu || emulatorBattery ||
             systemProperties || procStatus || procMountInfo || procCgroup || procNet ||
-            detectRoot || detectEmulator)
+            detectRoot || detectEmulator ||
+            profileBuildIdentity || profileBuildVersion)
 
     /** UI 交互监听相关类别是否任一启用(含全局总开关投影,供 UI 交互监听能力判定)。 */
     val anyUiEnabled: Boolean
@@ -438,6 +449,8 @@ data class HookSwitch(
         DeviceEnvKind.PROC_NET -> procNet
         DeviceEnvKind.DETECT_ROOT -> detectRoot
         DeviceEnvKind.DETECT_EMULATOR -> detectEmulator
+        DeviceEnvKind.PROFILE_BUILD_IDENTITY -> profileBuildIdentity
+        DeviceEnvKind.PROFILE_BUILD_VERSION -> profileBuildVersion
     }
 
     /** UI 交互类别有效开关(master 门控;与 [CategoryTaxonomy] 默认态对齐由测试强制)。 */

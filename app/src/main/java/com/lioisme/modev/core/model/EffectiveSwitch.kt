@@ -206,6 +206,8 @@ object EffectiveSwitch {
                 DeviceEnvKind.PROC_NET -> switch.procNet
                 DeviceEnvKind.DETECT_ROOT -> switch.detectRoot
                 DeviceEnvKind.DETECT_EMULATOR -> switch.detectEmulator
+                DeviceEnvKind.PROFILE_BUILD_IDENTITY -> switch.profileBuildIdentity
+                DeviceEnvKind.PROFILE_BUILD_VERSION -> switch.profileBuildVersion
             }
         }
 
@@ -358,6 +360,8 @@ object EffectiveSwitch {
                     DeviceEnvKind.PROC_NET -> switch.copy(procNet = value)
                     DeviceEnvKind.DETECT_ROOT -> switch.copy(detectRoot = value)
                     DeviceEnvKind.DETECT_EMULATOR -> switch.copy(detectEmulator = value)
+                    DeviceEnvKind.PROFILE_BUILD_IDENTITY -> switch.copy(profileBuildIdentity = value)
+                    DeviceEnvKind.PROFILE_BUILD_VERSION -> switch.copy(profileBuildVersion = value)
                 }
             } ?: switch
 

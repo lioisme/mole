@@ -222,6 +222,16 @@ class SpoofProfileLibraryRenderRoboTest {
     fun takeoverBoundaryIsAlwaysOnScreen() {
         show(builtinStore())
         assertEquals(1, slotTagCount("profile-takeover-status"))
-        assertTrue(textCount(str(R.string.profile_takeover_status_hint)) > 0)
+        // V49 WP-D1:这句从「全未接管」的写死散文改成**派生名单** ——
+        // 断言因此两件事:名单里的族必须都来自注入侧登记集,且屏上文本就是按该名单组装的那句。
+        val resources = org.robolectric.RuntimeEnvironment.getApplication().resources
+        val families = takenOverProfileFamilies(resources)
+        assertTrue(
+            "接管边界必须逐一点名注入侧已登记的画像族",
+            com.lioisme.modev.core.model.DeviceEnvKind.entries
+                .filter { it.name.startsWith("PROFILE_") }
+                .all { families.contains(resources.getString(com.lioisme.modev.ui.components.deviceEnvKindLabelRes(it))) },
+        )
+        assertTrue(textCount(str(R.string.profile_takeover_status_hint, families)) > 0)
     }
 }

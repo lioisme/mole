@@ -244,4 +244,12 @@ enum class DeviceEnvOperation(
 
     /** 模拟器属性检查记录。 */
     EMULATOR_CHECK_PROP(DeviceEnvKind.DETECT_EMULATOR),
+
+    // ---- 画像驱动的强制档(V49 WP-D1) ----
+
+    /** `android.os.Build` 静态身份字段被画像值无条件改写(一项一条记录,字段名在载荷里)。 */
+    BUILD_IDENTITY_WRITE(DeviceEnvKind.PROFILE_BUILD_IDENTITY),
+
+    /** `android.os.Build.VERSION` / `Build.ID` 被画像值无条件改写。 */
+    BUILD_VERSION_WRITE(DeviceEnvKind.PROFILE_BUILD_VERSION),
 }

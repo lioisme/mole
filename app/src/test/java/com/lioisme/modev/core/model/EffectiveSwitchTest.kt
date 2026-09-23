@@ -299,6 +299,8 @@ class EffectiveSwitchTest {
                 DeviceEnvKind.PROC_NET -> d.procNet
                 DeviceEnvKind.DETECT_ROOT -> d.detectRoot
                 DeviceEnvKind.DETECT_EMULATOR -> d.detectEmulator
+                DeviceEnvKind.PROFILE_BUILD_IDENTITY -> d.profileBuildIdentity
+                DeviceEnvKind.PROFILE_BUILD_VERSION -> d.profileBuildVersion
             }
             assertEquals("$kind readKind", original, EffectiveSwitch.readKind(d, RecordType.DEVICE_ENV, kind.name))
             val toggled = EffectiveSwitch.resolve(

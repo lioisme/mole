@@ -20,6 +20,7 @@ import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.ManageSearch
 import androidx.compose.material.icons.outlined.Password
+import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.Save
@@ -145,6 +146,8 @@ object KindIcons {
             DeviceEnvKind.PROC_STATUS, DeviceEnvKind.PROC_MOUNT_INFO,
             DeviceEnvKind.PROC_CGROUP, DeviceEnvKind.PROC_NET -> Icons.Outlined.Description
             DeviceEnvKind.DETECT_ROOT, DeviceEnvKind.DETECT_EMULATOR -> Icons.Outlined.ManageSearch
+            // 画像强制档:改写而非遮掩,故与条件档不同图标
+            DeviceEnvKind.PROFILE_BUILD_IDENTITY, DeviceEnvKind.PROFILE_BUILD_VERSION -> Icons.Outlined.PhoneAndroid
         }
 
     /** UI 交互监听族(V33 一等公民)。 */

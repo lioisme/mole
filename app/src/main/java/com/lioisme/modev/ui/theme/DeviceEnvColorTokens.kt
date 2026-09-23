@@ -45,6 +45,10 @@ private val deviceEnvLightPalette: Map<DeviceEnvKind, Color> =
         // 检测行为监控(灰)
         DeviceEnvKind.DETECT_ROOT to Color(0xFF495057),
         DeviceEnvKind.DETECT_EMULATOR to Color(0xFF495057),
+        // 画像强制档(青绿:与条件档的紫/蓝灰区分开 —— 记录列表里「按画像改写」与「掩蔽脏值」
+        // 是两种不同的用户意图,颜色不得撞)
+        DeviceEnvKind.PROFILE_BUILD_IDENTITY to Color(0xFF0F766E),
+        DeviceEnvKind.PROFILE_BUILD_VERSION to Color(0xFF0F766E),
     )
 
 /** 深色模式设备环境类别色。 */
@@ -77,6 +81,9 @@ private val deviceEnvDarkPalette: Map<DeviceEnvKind, Color> =
         // 检测行为监控(灰)
         DeviceEnvKind.DETECT_ROOT to Color(0xFFB2BAC2),
         DeviceEnvKind.DETECT_EMULATOR to Color(0xFFB2BAC2),
+        // 画像强制档(青绿暗档变体,与浅色侧同一族相)
+        DeviceEnvKind.PROFILE_BUILD_IDENTITY to Color(0xFF5EEAD4),
+        DeviceEnvKind.PROFILE_BUILD_VERSION to Color(0xFF5EEAD4),
     )
 
 /** 设备环境类别语义色(非 Composable 访问器,UI 与对比度门禁测试同源)。 */

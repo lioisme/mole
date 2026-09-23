@@ -2,6 +2,7 @@ package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.DeviceEnvOperation
+import com.lioisme.modev.core.model.ProfileHookPlan
 import com.lioisme.modev.core.model.SpoofProfiles
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
@@ -48,10 +49,22 @@ class EmulatorBuildHooker(
         hookBuildFieldAccess()
     }
 
+    /**
+     * 条件档是否生效 = 自身门控开 **且** 画像强制档不在场(V49 R-D 裁决,判据唯一落在
+     * [ProfileHookPlan.adaptiveMaskShouldYield])。
+     *
+     * 理由:两档写的是同一批 `android.os.Build` 静态字段。画像填了身份值时若条件档仍在跑,
+     * 谁先谁后取决于装钩顺序而非用户意图 —— 会出现在真机值上「画像说 Pixel,掩蔽说 emulator」
+     * 的互相覆写形态。用户显式填了值,就以值为准。
+     */
+    private fun maskActive(): Boolean =
+        featureOn(DeviceEnvKind.EMULATOR_BUILD) &&
+            !ProfileHookPlan.adaptiveMaskShouldYield(config().feature.deviceProfile)
+
     /** 幂等补写入口:开关开启前零副作用,开启后一次性改写(internal 供门控回归测试)。 */
     internal fun applyBuildFieldMasking() {
         if (fieldsMasked.get()) return
-        if (!featureOn(DeviceEnvKind.EMULATOR_BUILD)) return
+        if (!maskActive()) return
         if (!fieldsMasked.compareAndSet(false, true)) return
         hookBuildStaticFields()
     }
@@ -104,7 +117,7 @@ class EmulatorBuildHooker(
         val getter = runCatching { clazz.getMethod("get$fieldName") }.getOrNull() ?: return
         engine.hook(getter, object : MethodHook() {
             override fun after(invocation: Invocation) {
-                if (!featureOn(DeviceEnvKind.EMULATOR_BUILD)) return
+                if (!maskActive()) return
                 val value = invocation.result as? String ?: return
                 if (isEmulatorIndicator(value)) {
                     val fake = getRealisticValue(fieldName, value)
@@ -169,7 +182,7 @@ class EmulatorBuildHooker(
         if (getField != null) {
             engine.hook(getField, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!featureOn(DeviceEnvKind.EMULATOR_BUILD)) return
+                    if (!maskActive()) return
                     val name = invocation.getArg(0) as? String ?: return
                     if (name !in INTERCEPTED_FIELD_NAMES) return
                     val declaringClass = invocation.thisObject as? Class<*> ?: return
@@ -193,7 +206,7 @@ class EmulatorBuildHooker(
         if (getDeclaredField != null) {
             engine.hook(getDeclaredField, object : MethodHook() {
                 override fun after(invocation: Invocation) {
-                    if (!featureOn(DeviceEnvKind.EMULATOR_BUILD)) return
+                    if (!maskActive()) return
                     val name = invocation.getArg(0) as? String ?: return
                     if (name !in INTERCEPTED_FIELD_NAMES) return
                     val declaringClass = invocation.thisObject as? Class<*> ?: return

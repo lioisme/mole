@@ -12,6 +12,7 @@ import com.lioisme.modev.hook.hooks.DeviceEnvBaseHooker
 import com.lioisme.modev.hook.hooks.DeviceSysPropHooker
 import com.lioisme.modev.hook.hooks.DeviceTelephonyHooker
 import com.lioisme.modev.hook.hooks.EmulatorBuildHooker
+import com.lioisme.modev.hook.hooks.ProfileBuildHooker
 import com.lioisme.modev.hook.hooks.EmulatorFileHooker
 import com.lioisme.modev.hook.hooks.EmulatorNetworkHooker
 import com.lioisme.modev.hook.hooks.EmulatorSensorHooker
@@ -56,6 +57,8 @@ class DeviceEnvProbe : Probe, InterventionProbeMarker {
                 XposedStackHooker(context),
                 XposedMapsHooker(context, procScan),
                 EmulatorBuildHooker(context),
+                // V49 WP-D1:画像强制档(条件档之后装,保证同一次配置变更里画像值是最终值)
+                ProfileBuildHooker(context),
                 EmulatorFileHooker(context),
                 EmulatorSensorHooker(context),
                 EmulatorNetworkHooker(context),

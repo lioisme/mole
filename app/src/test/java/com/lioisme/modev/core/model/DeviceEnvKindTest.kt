@@ -23,8 +23,8 @@ class DeviceEnvKindTest {
     }
 
     @Test
-    fun `DeviceEnvKind count is 21`() {
-        assertEquals(21, DeviceEnvKind.entries.size)
+    fun `DeviceEnvKind count is 23`() {
+        assertEquals(23, DeviceEnvKind.entries.size)
     }
 
     @Test

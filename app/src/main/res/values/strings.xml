@@ -578,6 +578,8 @@
     <string name="kind_device_env_PROC_NET">/proc/net/tcp Filter</string>
     <string name="kind_device_env_DETECT_ROOT">Root Detection Monitoring</string>
     <string name="kind_device_env_DETECT_EMULATOR">Emulator Detection Monitoring</string>
+    <string name="kind_device_env_PROFILE_BUILD_IDENTITY">Profile: Build identity</string>
+    <string name="kind_device_env_PROFILE_BUILD_VERSION">Profile: Build version</string>
     <string name="detail_device_env_masked">Masked</string>
     <string name="detail_device_env_target_path">Target Path</string>
     <string name="detail_device_env_target_class">Target Class</string>
@@ -643,6 +645,8 @@
     <string name="op_device_env_emulator_check_build">Emulator build check</string>
     <string name="op_device_env_emulator_check_file">Emulator file check</string>
     <string name="op_device_env_emulator_check_prop">Emulator property check</string>
+    <string name="op_device_env_build_identity_write">Build field rewritten</string>
+    <string name="op_device_env_build_version_write">VERSION field rewritten</string>
     <string name="op_device_env_sys_prop_get">SystemProperties.get</string>
     <string name="op_device_env_proc_status_read">/proc/self/status read</string>
     <string name="op_device_env_proc_mount_read">/proc/self/mountinfo read</string>
@@ -780,7 +784,10 @@
     <string name="danger_clear_page_records_msg">Permanently delete all records of this type for this app? This cannot be undone.</string>
     <!-- V47 WP-5:设备画像库(可视化参数配置页;分区/字段/干预组/校验/枚举槽全量标签) -->
     <string name="profile_library_section">Profile library (edit, validate, bind)</string>
-    <string name="profile_takeover_status_hint">The library is what you edit, validate and bind. Until the hook takeover lands the target app still reads the legacy rows below - do not treat this page as proof that spoofing is live.</string>
+    <!-- V49 WP-D1:接管边界改为**派生**文案(名单来自注入侧已登记的画像族),
+         免得每接一族就要重写一次四语散文、或留下「全没接管」这句已过期的话。 -->
+    <string name="profile_takeover_status_hint">The library is what you edit, validate and bind. Live in the target app today: %1$s. Everything else still reads the legacy rows until its hook family lands — do not treat this page as proof that a value not listed above is applied.</string>
+    <string name="profile_takeover_none">nothing yet</string>
     <string name="profile_library_hint">Reusable device profiles. Open one to edit every parameter and see which intervention groups it installs.</string>
     <string name="profile_library_empty">No profiles yet</string>
     <string name="profile_library_empty_hint">Create one from scratch, or copy a built-in profile and adjust it.</string>

@@ -67,6 +67,8 @@ export const T3 = {
   kind_device_env_PROC_NET: ['/proc/net/tcp フィルタ', '/proc/net/tcp 필터'],
   kind_device_env_DETECT_ROOT: ['Root 検出の監視', '루트 감지 모니터링'],
   kind_device_env_DETECT_EMULATOR: ['エミュレータ検出の監視', '에뮬레이터 감지 모니터링'],
+  kind_device_env_PROFILE_BUILD_IDENTITY: ['プロフィール:Build 身分', '프로필: Build 신원'],
+  kind_device_env_PROFILE_BUILD_VERSION: ['プロフィール:Build バージョン', '프로필: Build 버전'],
   detail_device_env_masked: ['隠蔽済み', '가려짐'],
   detail_device_env_target_path: ['対象パス', '대상 경로'],
   detail_device_env_target_class: ['対象クラス', '대상 클래스'],
@@ -111,6 +113,8 @@ export const T3 = {
   op_device_env_emulator_check_build: ['エミュレータ Build 確認', '에뮬레이터 Build 확인'],
   op_device_env_emulator_check_file: ['エミュレータファイル確認', '에뮬레이터 파일 확인'],
   op_device_env_emulator_check_prop: ['エミュレータプロパティ確認', '에뮬레이터 속성 확인'],
+  op_device_env_build_identity_write: ['Build 身分を書き換え', 'Build 신원 재작성'],
+  op_device_env_build_version_write: ['Build バージョンを書き換え', 'Build 버전 재작성'],
   filter_type_ui_interaction: ['UI インタラクション', 'UI 상호작용'],
   ui_interaction_records_title: ['UI インタラクション記録', 'UI 상호작용 기록'],
   listen_row_master_ui: ['UI インタラクション', 'UI 상호작용'],
@@ -228,7 +232,8 @@ export const T3 = {
 
   /* V47 WP-5 设备画像库(可视化参数配置页)—— 137 键 */
   profile_library_section: ['プロフィールライブラリ（編集・検証・バインド）', '프로필 라이브러리(편집·검증·바인딩)'],
-  profile_takeover_status_hint: ['ライブラリは編集・検証・バインドの対象です。フック引き継ぎ完了まで、対象アプリが読むのは下の旧プリセット行です。このページをもって偽装が有効だと確認しないでください。', '라이브러리는 편집·검증·바인딩 대상입니다. 훅 인계 완료 시까지 대상 앱이 읽는 값은 아래의 레거시 행입니다. 이 화면을 위장 적용 근거로 보지 마세요.'],
+  profile_takeover_status_hint: ['ライブラリは編集・検証・バインドの対象です。現在ターゲットアプリで有効な族:%1$s。それ以外の項目は対応するフック系が引き継がれるまで旧プリセット行を読みます。この画面を未記載の値が適用された証拠にしないでください。', '라이브러리는 편집·검증·바인딩 대상입니다. 현재 대상 앱에서 활성인 계열: %1$s. 목록 외 항목은 해당 훅 계통이 인계될 때까지 레거시 행을 읽습니다 — 이 화면을 미기재 값이 적용된 근거로 보지 마세요.'],
+  profile_takeover_none: ['まだなし', '아직 없음'],
   profile_library_hint: ['再利用可能な端末プロフィール。開くと全パラメータを編集でき、どの介入グループがインストールされるか即時に分かります。', '재사용 가능한 기기 프로필. 열면 모든 매개변수를 편집하고 어떤 중재 그룹이 설치되는지 즉시 확인할 수 있습니다.'],
   profile_library_empty: ['プロフィールがありません', '프로필이 없습니다'],
   profile_library_empty_hint: ['ゼロから作成するか、内蔵プロフィールをコピーして調整してください。', '처음으로 만들거나 내장 프로필을 복사해 조정하세요.'],

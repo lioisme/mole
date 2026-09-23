@@ -134,6 +134,11 @@ object CategoryTaxonomy {
         add(RecordCategory(DeviceEnvKind.PROC_NET.name, RecordType.DEVICE_ENV, F, false, NoiseTier.SIGNAL, 18))
         add(RecordCategory(DeviceEnvKind.DETECT_ROOT.name, RecordType.DEVICE_ENV, L, false, NoiseTier.NOISE_HIGH, 19))
         add(RecordCategory(DeviceEnvKind.DETECT_EMULATOR.name, RecordType.DEVICE_ENV, L, false, NoiseTier.NOISE_HIGH, 20))
+        // V49 WP-D1:画像驱动的**强制档**(填了即无条件改写,值源 = feature.deviceProfile)。
+        // 默认开:用户填画像值这一步就是显式意图,真正的闸是「该项是否被填」(空 ⇒ 一族钩子
+        // 都不安装);沿用条件档的默认 false 会让「绑了档」与「档生效」之间隔 20 个开关。
+        add(RecordCategory(DeviceEnvKind.PROFILE_BUILD_IDENTITY.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 21))
+        add(RecordCategory(DeviceEnvKind.PROFILE_BUILD_VERSION.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 22))
         // V33 UI 交互类别(V37 D-0:DIALOG_KEYWORD 为功能域拦截,其余为监听域观测;
         // 默认态与 HookSwitch.DEFAULT 对齐)
         add(RecordCategory(UiInteractionKind.DIALOG_SHOW.name, RecordType.UI_INTERACTION, L, true, NoiseTier.SIGNAL, 0))

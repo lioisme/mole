@@ -31,6 +31,20 @@ import com.lioisme.modev.core.model.ProfileKind
 internal fun profileSectionTitleRes(): Int = R.string.profile_section_title
 
 /**
+ * 注入侧**已接管**的画像族名单(V49 D-3:kind 登记与钩子实现同一提交原子落 ⇒
+ * `DeviceEnvKind` 里出现 `PROFILE_` 项 ≡ 该族在靶程序真的生效)。
+ *
+ * 派生而非写死:接管边界这句诚实话每接一批就会过期一次,写死的散文必然变成谎报
+ * (AGENTS #30 明令「撤掉它 = 撒谎」的那条边界,同样禁止它朝着另一个方向过期)。
+ */
+internal fun takenOverProfileFamilies(res: android.content.res.Resources): String {
+    val kinds = com.lioisme.modev.core.model.DeviceEnvKind.entries
+        .filter { it.name.startsWith("PROFILE_") }
+    if (kinds.isEmpty()) return res.getString(R.string.profile_takeover_none)
+    return kinds.joinToString(", ") { res.getString(com.lioisme.modev.ui.components.deviceEnvKindLabelRes(it)) }
+}
+
+/**
  * 底层来源族标签(UI 分区标题的本地化半段 + 实时生效预览 chips 共用同一键)。
  *
  * 一个概念一个键(#31②):V48 的 `profile_section_*` 十条与 `profile_kind_*` 十八条是

@@ -82,4 +82,19 @@ enum class DeviceEnvKind {
 
     /** 模拟器检测行为监控(仅记录,不干预)。 */
     DETECT_EMULATOR,
+
+    // ---- 画像驱动的强制档(V49 R-1 分类轴 = 底层来源族;WP-D 逐批登记) ----
+    //
+    // 与上面 21 项的根本差别:上面是**条件档**(只在检出脏值时掩蔽,值源为内置基线),
+    // 本组是**强制档**(画像填了该项就无条件改写,值源恒为 `FeatureConfig.deviceProfile`)。
+    // 默认 **true** 的理由:用户往画像里填值这一步本身就是显式意图,真正的闸是
+    // 「该项是否被填」(`ProfileField.isSetIn` 为空 ⇒ 钩子一族都不安装);
+    // 若沿用条件档的默认 false,绑定画像后还要逐个打开 20 个开关才生效 —— 那既不是
+    // 「填了就生效」,也让 R-4 的逐字段验证无从成立。仍可随时显式关(FeatureGate 红线不破)。
+
+    /** `android.os.Build` 静态身份字段强制伪造(BRAND/MANUFACTURER/MODEL/PRODUCT/DEVICE/BOARD/HARDWARE/FINGERPRINT)。 */
+    PROFILE_BUILD_IDENTITY,
+
+    /** `android.os.Build.VERSION` 与 `Build.ID` 强制伪造(市场版本号 / SDK_INT / 构建号)。 */
+    PROFILE_BUILD_VERSION,
 }

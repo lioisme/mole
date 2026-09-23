@@ -330,10 +330,14 @@ fun SpoofProfileLibraryScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = 4.dp, bottom = 8.dp),
             )
-            // V48 R-3 接管边界(AGENTS #30 的 UI 兑现):本页管编辑/校验/绑定,而靶程序当前
-            // 仍读旧档 —— 不写这句,页面就会被读成「画像已经生效」。这是诚实呈现,不是免责声明。
+            // V48 R-3 / V49 WP-D1 接管边界(AGENTS #30 的 UI 兑现):**名单派生自注入侧已登记的画像族**。
+            // 每接一族就多念一项,不给人留下「写过期的全未接管」或「谎称已接管」的机会 ——
+            // 缺这句是把页面读成「画像已生效」,写死这句是接管后仍自称未生效,两头都是假话。
             Text(
-                stringResource(R.string.profile_takeover_status_hint),
+                stringResource(
+                    R.string.profile_takeover_status_hint,
+                    takenOverProfileFamilies(res),
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
                 modifier = Modifier

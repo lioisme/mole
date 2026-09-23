@@ -1009,6 +1009,8 @@ fun deviceEnvKindLabelRes(kind: DeviceEnvKind): Int = when (kind) {
     DeviceEnvKind.PROC_NET -> R.string.kind_device_env_PROC_NET
     DeviceEnvKind.DETECT_ROOT -> R.string.kind_device_env_DETECT_ROOT
     DeviceEnvKind.DETECT_EMULATOR -> R.string.kind_device_env_DETECT_EMULATOR
+    DeviceEnvKind.PROFILE_BUILD_IDENTITY -> R.string.kind_device_env_PROFILE_BUILD_IDENTITY
+    DeviceEnvKind.PROFILE_BUILD_VERSION -> R.string.kind_device_env_PROFILE_BUILD_VERSION
 }
 
 /** 设备环境监听操作标签资源(V31)。 */
@@ -1071,6 +1073,8 @@ fun deviceEnvOperationLabelRes(operation: DeviceEnvOperation): Int = when (opera
     DeviceEnvOperation.EMULATOR_CHECK_BUILD -> R.string.op_device_env_emulator_check_build
     DeviceEnvOperation.EMULATOR_CHECK_FILE -> R.string.op_device_env_emulator_check_file
     DeviceEnvOperation.EMULATOR_CHECK_PROP -> R.string.op_device_env_emulator_check_prop
+    DeviceEnvOperation.BUILD_IDENTITY_WRITE -> R.string.op_device_env_build_identity_write
+    DeviceEnvOperation.BUILD_VERSION_WRITE -> R.string.op_device_env_build_version_write
     DeviceEnvOperation.SYS_PROP_GET -> R.string.op_device_env_sys_prop_get
     DeviceEnvOperation.PROC_STATUS_READ -> R.string.op_device_env_proc_status_read
     DeviceEnvOperation.PROC_MOUNT_READ -> R.string.op_device_env_proc_mount_read
