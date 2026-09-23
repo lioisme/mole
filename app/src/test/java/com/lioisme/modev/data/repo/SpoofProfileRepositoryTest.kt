@@ -79,18 +79,16 @@ class SpoofProfileRepositoryTest {
     // ---------------------------------------------------------------- 内置档账本
 
     @Test
-    fun `synchronize installs three builtins and is idempotent`() = runBlocking {
+    fun `synchronize installs every builtin exactly once and is idempotent`() = runBlocking {
         repo.synchronizeBuiltins()
         repo.synchronizeBuiltins()
         val live = repo.profiles.value
-        assertEquals(3, live.size)
+        // 条数冻结在 `BuiltinProfileConsistencyTest`(那里改数是有意的扩充动作);
+        // 本处只管「装了什么、装了几次」,故与期望集对比而不再抄一份数字。
+        assertEquals(BuiltinDeviceProfiles.BUILTINS.size, live.size)
         assertTrue(live.all { it.isBuiltin })
         assertEquals(
-            setOf(
-                BuiltinDeviceProfiles.PIXEL_7_PRO,
-                BuiltinDeviceProfiles.XIAOMI_13,
-                BuiltinDeviceProfiles.GALAXY_S23_ULTRA,
-            ),
+            BuiltinDeviceProfiles.BUILTINS.map { it.seedId }.toSet(),
             live.mapNotNull { it.builtinSeedId }.toSet(),
         )
         assertEquals(13, live.first { it.builtinSeedId == BuiltinDeviceProfiles.PIXEL_7_PRO }.filledCount)
@@ -101,10 +99,15 @@ class SpoofProfileRepositoryTest {
         repo.synchronizeBuiltins()
         val id = BuiltinDeviceProfiles.idFor(BuiltinDeviceProfiles.XIAOMI_13)
         assertTrue(repo.delete(id))
-        assertEquals(2, repo.profiles.value.size)
+        val afterDelete = BuiltinDeviceProfiles.BUILTINS.size - 1
+        assertEquals(afterDelete, repo.profiles.value.size)
 
         repo.resynchronizeBuiltins()
-        assertEquals("墓碑档被复活(用户删过的内置档必须恒不再补档)", 2, repo.profiles.value.size)
+        assertEquals(
+            "墓碑档被复活(用户删过的内置档必须恒不再补档)",
+            afterDelete,
+            repo.profiles.value.size,
+        )
         assertNull(repo.find(id))
     }
 
@@ -133,7 +136,7 @@ class SpoofProfileRepositoryTest {
         repo.synchronizeBuiltins()
 
         val live = repo.profiles.value
-        assertEquals("同内容画像应被收养而非重复建档", 3, live.size)
+        assertEquals("同内容画像应被收养而非重复建档", BuiltinDeviceProfiles.BUILTINS.size, live.size)
         val adopted = live.first { it.id == created!!.id }
         assertEquals(BuiltinDeviceProfiles.PIXEL_7_PRO, adopted.builtinSeedId)
         assertTrue(adopted.managed)
@@ -184,7 +187,7 @@ class SpoofProfileRepositoryTest {
     fun `update rejects unknown id and keeps every other row untouched`() = runBlocking {
         repo.synchronizeBuiltins()
         assertFalse(repo.update("nope", "x", "", sampleProfile()))
-        assertEquals(3, repo.profiles.value.size)
+        assertEquals(BuiltinDeviceProfiles.BUILTINS.size, repo.profiles.value.size)
     }
 
     @Test
@@ -210,10 +213,11 @@ class SpoofProfileRepositoryTest {
         val text = repo.exportJson()
 
         val outcome = repo.importJson(text, defaultName = "导入档")
+        val total = BuiltinDeviceProfiles.BUILTINS.size + 1
         assertEquals("内容相同的条目应全部判重跳过", 0, outcome.imported)
-        assertEquals(4, outcome.skipped)
+        assertEquals(total, outcome.skipped)
         assertEquals(0, outcome.rejected)
-        assertEquals(4, repo.profiles.value.size)
+        assertEquals(total, repo.profiles.value.size)
     }
 
     @Test

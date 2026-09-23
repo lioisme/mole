@@ -126,8 +126,10 @@ class ProfileEditorForm(
      * 返回被写入的字段数。
      */
     fun randomizeAll(random: Random = Random.Default): Int {
-        val version = ANDROID_GENERATIONS[random.nextInt(ANDROID_GENERATIONS.size)]
-        val (release, sdk) = version
+        val pool = ProfileValueSets.recentAndroidReleases()
+        val release = pool[random.nextInt(pool.size)]
+        // 配对值回查唯一事实源:整组随机与逐项随机、与编辑器选择器说的是同一张表。
+        val sdk = checkNotNull(ProfileValueSets.sdkForRelease(release)) { "$release 在 Android 公开表里无对应 API level" }
         val brand = samples.brandAt(random.nextInt(samples.brandCount()))
         val device = brand.device
         val buildId = ProfileGenerators.randomBuildId(release, random)
@@ -142,7 +144,7 @@ class ProfileEditorForm(
             ProfileField.PRODUCT to device,
             ProfileField.DEVICE to device,
             ProfileField.ANDROID_VERSION to release,
-            ProfileField.SDK_INT to sdk.toString(),
+            ProfileField.SDK_INT to sdk,
             ProfileField.BUILD_ID to buildId,
             ProfileField.FINGERPRINT to ProfileGenerators.deriveFingerprint(
                 brand = brand.brand,
@@ -203,11 +205,19 @@ class ProfileEditorForm(
             )
         }
 
-        ProfileField.SDK_INT -> ANDROID_GENERATIONS
-            .firstOrNull { it.first == textOf(ProfileField.ANDROID_VERSION) }
-            ?.second?.toString() ?: "34"
+        ProfileField.SDK_INT -> {
+            // 配对值一律回查 ProfileValueSets(唯一事实源)。release 还空着时先就近补一个
+            // release 再回查 —— 绝不写一个与 release 无关的 SDK(旧实装硬写 "34" 就是猜)。
+            val release = textOf(ProfileField.ANDROID_VERSION).ifEmpty {
+                ProfileValueSets.recentAndroidReleases().last().also { texts[ProfileField.ANDROID_VERSION] = it }
+            }
+            ProfileValueSets.sdkForRelease(release) ?: ""
+        }
 
-        ProfileField.ANDROID_VERSION -> ANDROID_GENERATIONS[random.nextInt(ANDROID_GENERATIONS.size)].first
+        ProfileField.ANDROID_VERSION -> {
+            val pool = ProfileValueSets.recentAndroidReleases()
+            pool[random.nextInt(pool.size)]
+        }
         ProfileField.NETWORK_TYPE -> NETWORK_SLOTS[random.nextInt(NETWORK_SLOTS.size)].toString()
         ProfileField.WIFI_SSID -> ProfileGenerators.randomString(10, random)
         ProfileField.WIFI_BSSID, ProfileField.WIFI_MAC_ADDRESS -> ProfileGenerators.randomMacAddress(random)
@@ -226,9 +236,6 @@ class ProfileEditorForm(
     private data class CarrierSample(val plmn: String, val name: String, val country: String)
 
     private companion object {
-        /** 随机候选大版本(与 [ProfileGenerators.buildIdPrefix] 同代)。 */
-        val ANDROID_GENERATIONS = listOf("13" to 33, "14" to 34, "15" to 35)
-
         val NETWORK_SLOTS = listOf(
             ProfileValues.NET_WIFI,
             ProfileValues.NET_MOBILE_4G,

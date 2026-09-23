@@ -210,10 +210,16 @@ class ProfileEditorFormTest {
                 "fingerprint 与版本世代矛盾:${profile.fingerPrint}",
                 profile.fingerPrint.contains(":${profile.androidVersion}/${profile.buildId}/"),
             )
+            // V48:配对判据改钉「与唯一事实源一致」而非一个魔法区间(旧断言 sdkInt in 33..35
+            // 只证没跑飞,不证两段是同一代 —— 而第二份世代表正是本次清掉的东西)。
             assertEquals(
-                "release 与 SDK 世代不符",
-                true,
-                profile.sdkInt in 33..35,
+                "release 与 SDK 不符 Android 公开表:${profile.androidVersion}/${profile.sdkInt}",
+                ProfileValueSets.sdkForRelease(profile.androidVersion),
+                profile.sdkInt.toString(),
+            )
+            assertTrue(
+                "随机池只能取近期世代",
+                ProfileValueSets.recentAndroidReleases().contains(profile.androidVersion),
             )
         }
     }

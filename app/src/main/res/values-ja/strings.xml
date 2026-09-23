@@ -827,6 +827,12 @@
     <string name="profile_device_pick_action">実機モデルを選択</string>
     <string name="profile_device_pick_hint">ブランド・メーカー・モデル・機器コードをまとめて入力</string>
     <string name="profile_catalog_loading">%1$sを読み込み中…</string>
+    <string name="feature_profile_pixel6">Pixel 6</string>
+    <string name="feature_profile_pixel6a">Pixel 6a</string>
+    <string name="feature_profile_pixel8">Pixel 8</string>
+    <string name="feature_profile_xiaomi14ultra">Xiaomi 14 Ultra</string>
+    <string name="feature_profile_galaxys24ultra">Galaxy S24 Ultra</string>
+    <string name="feature_profile_oneplus11">OnePlus 11</string>
     <string name="profile_catalog_unavailable">%1$sを使用できません</string>
     <string name="profile_catalog_devices">デバイスカタログ</string>
     <string name="profile_catalog_carriers">通信事業者カタログ</string>

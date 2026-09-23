@@ -47,6 +47,13 @@ object ProfileValueSets {
     fun releaseLabel(release: String): String =
         sdkForRelease(release)?.let { "$release (API $it)" } ?: release
 
+    /**
+     * 「近期世代」随机池(V48 收口:此前 [ProfileEditorForm] 自带一张 `13/14/15` 私有表,
+     * 那是 release↔SDK 的**第二份事实源**,且 release 认不出时会硬写 `34` 一个猜测值)。
+     * 取本表最后四档 ⇒ 覆盖旧的三档池并补上当代,配对值一律回查本表,不另抄。
+     */
+    fun recentAndroidReleases(): List<String> = androidReleases().takeLast(RECENT_GENERATIONS)
+
     /** 标准密度档(Android 密度桶 + OEM 常见中间档)。 */
     fun densities(): List<String> = DENSITIES
 
@@ -56,4 +63,7 @@ object ProfileValueSets {
     private val DENSITIES = listOf("120", "160", "213", "240", "280", "320", "360", "400", "420", "440", "480", "560", "640")
 
     private val CPU_CORES = listOf("2", "4", "6", "8", "10", "12")
+
+    /** 随机池的世代宽度(表尾向上取四档)。 */
+    private const val RECENT_GENERATIONS = 4
 }

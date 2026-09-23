@@ -831,6 +831,12 @@
     <string name="profile_device_pick_action">Pick a real device</string>
     <string name="profile_device_pick_hint">Fills brand, manufacturer, model and device code name together</string>
     <string name="profile_catalog_loading">Loading the %1$s…</string>
+    <string name="feature_profile_pixel6">Pixel 6</string>
+    <string name="feature_profile_pixel6a">Pixel 6a</string>
+    <string name="feature_profile_pixel8">Pixel 8</string>
+    <string name="feature_profile_xiaomi14ultra">Xiaomi 14 Ultra</string>
+    <string name="feature_profile_galaxys24ultra">Galaxy S24 Ultra</string>
+    <string name="feature_profile_oneplus11">OnePlus 11</string>
     <string name="profile_catalog_unavailable">The %1$s is unavailable.</string>
     <string name="profile_catalog_devices">device catalogue</string>
     <string name="profile_catalog_carriers">carrier catalogue</string>

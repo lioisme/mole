@@ -4,6 +4,7 @@ import androidx.room.Room
 import com.google.gson.JsonObject
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.BehaviorKind
+import com.lioisme.modev.core.model.BuiltinDeviceProfiles
 import com.lioisme.modev.core.model.KeywordMatchMode
 import com.lioisme.modev.core.model.RecordTypes
 import com.lioisme.modev.data.db.ModevDatabase
@@ -394,7 +395,7 @@ class McpToolsTest {
     fun spoof_and_blacklist_global_flow() = runBlocking {
         val profiles = assetTools.tools.first { it.name == "spoof_profiles_list" }
         val listed = profiles.execute(JsonObject())
-        assertEquals(3, listed.get("profiles").asJsonArray.size())
+        assertEquals(BuiltinDeviceProfiles.BUILTINS.size, listed.get("profiles").asJsonArray.size())
         // set pixel7pro
         val setProfile = assetTools.tools.first { it.name == "spoof_global_set" }
         val out = setProfile.execute(JsonObject().apply { addProperty("profileId", "pixel7pro") })

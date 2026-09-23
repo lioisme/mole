@@ -3,6 +3,7 @@ package com.lioisme.modev.mcp.tools
 import androidx.room.Room
 import com.google.gson.JsonObject
 import com.lioisme.modev.core.codec.Json
+import com.lioisme.modev.core.model.BuiltinDeviceProfiles
 import com.lioisme.modev.core.model.DeviceProfile
 import com.lioisme.modev.core.model.ProfileEnvelope
 import com.lioisme.modev.core.model.ProfileField
@@ -68,8 +69,8 @@ class SpoofProfileToolsTest {
 
     private val pkg = "pkg.profile.tools"
 
-    /** 内置三档已随 setUp 补档 ⇒ 库内非 DIY 行数基线。 */
-    private val builtinRows = 3
+    /** 内置档已随 setUp 补档 ⇒ 库内非 DIY 行数基线(取自唯一事实源,扩充内置档时不必改这里)。 */
+    private val builtinRows = BuiltinDeviceProfiles.BUILTINS.size
 
     @Before
     fun setUp() {

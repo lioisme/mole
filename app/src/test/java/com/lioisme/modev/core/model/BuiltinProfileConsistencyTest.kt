@@ -35,20 +35,28 @@ class BuiltinProfileConsistencyTest {
     )
 
     @Test
-    fun `catalog ships exactly three distinct classic devices`() {
-        assertEquals(3, BuiltinDeviceProfiles.BUILTINS.size)
+    fun `catalog ships nine distinct devices`() {
+        // V48 D1:3 → 9。计数是冻结期望(不是"越多越好"),扩充必须是有意动作而非漂移。
+        assertEquals(9, BuiltinDeviceProfiles.BUILTINS.size)
         assertEquals(
             BuiltinDeviceProfiles.BUILTINS.size,
             BuiltinDeviceProfiles.BUILTINS.map { it.seedId }.toSet().size,
         )
         assertEquals(
-            "三档指纹必须互不相同(否则收养逻辑会把两档认成一档)",
+            "各档指纹必须互不相同(否则收养逻辑会把两档认成一档)",
             BuiltinDeviceProfiles.BUILTINS.size,
             BuiltinDeviceProfiles.BUILTINS.map { ProfileCodec.fingerprint(it.profile) }.toSet().size,
         )
+        // V48 修订:原先断「品牌唯一」,而四台 Pixel 让这条不成立、也不该成立 ——
+        // 真正的身份唯一键是 MODEL(账本收养与选择器回认都按它)。
         assertEquals(
+            "MODEL 必须唯一",
             BuiltinDeviceProfiles.BUILTINS.size,
-            BuiltinDeviceProfiles.BUILTINS.map { it.profile.brand }.toSet().size,
+            BuiltinDeviceProfiles.BUILTINS.map { it.profile.model }.toSet().size,
+        )
+        assertTrue(
+            "扩充必须覆盖多厂牌(全是 Google 的九档不算画像库)",
+            BuiltinDeviceProfiles.BUILTINS.map { it.profile.brand.lowercase() }.toSet().size >= 3,
         )
     }
 
@@ -90,13 +98,15 @@ class BuiltinProfileConsistencyTest {
 
     @Test
     fun `release string and sdk level agree on the same android generation`() {
-        // 只锁本仓实际用到的配对;新增档位若用了新世代,必须在此登记,否则视为未核验组合。
-        val knownPairs = mapOf("14" to setOf(34))
+        // V48:配对判据改由 `ProfileValueSets` 单一事实源给 —— 原先本测试自带一张
+        // knownPairs 白名单,新增世代必须"记得来这里登记",那是一张会漏抄的第二事实源
+        // (而 release↔SDK 的合法组合本来就已被 C2 的选择器表钉住)。
         for (spec in BuiltinDeviceProfiles.BUILTINS) {
-            val allowed = knownPairs[spec.profile.androidVersion]
-            assertTrue(
-                "${spec.seedId} 的 release/sdk 组合未在门禁登记:${spec.profile.androidVersion}/${spec.profile.sdkInt}",
-                allowed != null && spec.profile.sdkInt in allowed,
+            val p = spec.profile
+            assertEquals(
+                "${spec.seedId} 的 release/sdk 组合在 Android 公开表里不存在:$p.androidVersion/$p.sdkInt",
+                ProfileValueSets.sdkForRelease(p.androidVersion),
+                p.sdkInt.toString(),
             )
         }
     }

@@ -51,6 +51,13 @@ class StringResourceParityTest {
         // V37:机型品牌名双语同形(专有名词,非漏翻)
         "feature_profile_pixel7pro",
         "feature_profile_xiaomi13",
+        // V48 D1 扩充档:全球通用拉丁商品名,四语同形(专有名词,非漏译)
+        "feature_profile_pixel6",
+        "feature_profile_pixel6a",
+        "feature_profile_pixel8",
+        "feature_profile_xiaomi14ultra",
+        "feature_profile_galaxys24ultra",
+        "feature_profile_oneplus11",
         "op_prefs_get_string",
         "op_prefs_get_int",
         "op_prefs_get_long",

@@ -827,6 +827,12 @@
     <string name="profile_device_pick_action">실제 기기 선택</string>
     <string name="profile_device_pick_hint">브랜드·제조사·모델·기기 코드를 한 번에 채웁니다</string>
     <string name="profile_catalog_loading">%1$s을(를) 불러오는 중…</string>
+    <string name="feature_profile_pixel6">Pixel 6</string>
+    <string name="feature_profile_pixel6a">Pixel 6a</string>
+    <string name="feature_profile_pixel8">Pixel 8</string>
+    <string name="feature_profile_xiaomi14ultra">Xiaomi 14 Ultra</string>
+    <string name="feature_profile_galaxys24ultra">Galaxy S24 Ultra</string>
+    <string name="feature_profile_oneplus11">OnePlus 11</string>
     <string name="profile_catalog_unavailable">%1$s을(를) 사용할 수 없습니다</string>
     <string name="profile_catalog_devices">기기 카탈로그</string>
     <string name="profile_catalog_carriers">통신사 카탈로그</string>

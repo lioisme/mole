@@ -820,6 +820,12 @@
     <string name="profile_device_pick_action">选择真实机型</string>
     <string name="profile_device_pick_hint">一次填好品牌、制造商、型号与设备代号</string>
     <string name="profile_catalog_loading">正在加载%1$s…</string>
+    <string name="feature_profile_pixel6">Pixel 6</string>
+    <string name="feature_profile_pixel6a">Pixel 6a</string>
+    <string name="feature_profile_pixel8">Pixel 8</string>
+    <string name="feature_profile_xiaomi14ultra">Xiaomi 14 Ultra</string>
+    <string name="feature_profile_galaxys24ultra">Galaxy S24 Ultra</string>
+    <string name="feature_profile_oneplus11">OnePlus 11</string>
     <string name="profile_catalog_unavailable">%1$s不可用</string>
     <string name="profile_catalog_devices">机型库</string>
     <string name="profile_catalog_carriers">运营商库</string>

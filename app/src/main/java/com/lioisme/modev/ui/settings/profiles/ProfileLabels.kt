@@ -169,5 +169,11 @@ internal fun builtinProfileNameRes(seedId: String): Int = when (seedId) {
     BuiltinDeviceProfiles.PIXEL_7_PRO -> R.string.feature_profile_pixel7pro
     BuiltinDeviceProfiles.XIAOMI_13 -> R.string.feature_profile_xiaomi13
     BuiltinDeviceProfiles.GALAXY_S23_ULTRA -> R.string.feature_profile_galaxy_s23ultra
+    BuiltinDeviceProfiles.PIXEL_6 -> R.string.feature_profile_pixel6
+    BuiltinDeviceProfiles.PIXEL_6A -> R.string.feature_profile_pixel6a
+    BuiltinDeviceProfiles.PIXEL_8 -> R.string.feature_profile_pixel8
+    BuiltinDeviceProfiles.XIAOMI_14_ULTRA -> R.string.feature_profile_xiaomi14ultra
+    BuiltinDeviceProfiles.GALAXY_S24_ULTRA -> R.string.feature_profile_galaxys24ultra
+    BuiltinDeviceProfiles.ONEPLUS_11 -> R.string.feature_profile_oneplus11
     else -> R.string.unknown_error
 }

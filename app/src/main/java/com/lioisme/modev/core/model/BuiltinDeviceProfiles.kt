@@ -1,13 +1,13 @@
 package com.lioisme.modev.core.model
 
 /**
- * 内置画像规格(V47 T2,R-2「三套经典设备画像」)。
+ * 内置画像规格(V47 T2 三档经典设备;V48 D1 扩到 9 档主流机型)。
  *
  * 基线 Guise **没有任何内置设备画像**(其内置模板只有「空白通行证」与「允许强制截图」
  * 两项,且零设备字段)—— 故本文件是 Modev 净新增设计,基线能提供的只有字段模式、
  * 机型目录与整组随机派生法。
  *
- * **三档恒只填「机型身份」13 项**(品牌/制造商/型号/产品/设备/主板/硬件/Build ID/
+ * **每档恒只填「机型身份」13 项**(品牌/制造商/型号/产品/设备/主板/硬件/Build ID/
  * Fingerprint/Android 版本/SDK/密度/核数),**不填**标识符、SIM、网络、定位、语言时区、
  * 电池、版本号与隐私通行证。理由两条:
  *  1. 那些不是「机型属性」而是「使用现场属性」—— 选一台 Pixel 不该顺手把用户的真实
@@ -45,6 +45,15 @@ object BuiltinDeviceProfiles {
 
     /** 内置档 seedId:Galaxy S23 Ultra。 */
     const val GALAXY_S23_ULTRA = "galaxy-s23-ultra"
+
+    // V48 D1 扩充:以下六档的 MODEL 与代号(device/alias)取自随包 devices.json 的实测条目,
+    // 不是凭印象写的;世代/密度/核数取公开规格。逐位真机值仍由 D-7 的免责口径覆盖。
+    const val PIXEL_6 = "pixel-6"
+    const val PIXEL_6A = "pixel-6a"
+    const val PIXEL_8 = "pixel-8"
+    const val XIAOMI_14_ULTRA = "xiaomi-14-ultra"
+    const val GALAXY_S24_ULTRA = "galaxy-s24-ultra"
+    const val ONEPLUS_11 = "oneplus-11"
 
     /** seedId → 条目 id。 */
     fun idFor(seedId: String): String = "$ID_PREFIX$seedId"
@@ -105,6 +114,120 @@ object BuiltinDeviceProfiles {
                 androidVersion = "14",
                 sdkInt = 34,
                 densityDpi = 560,
+                cpuCores = 8,
+            ),
+        ),
+        BuiltinProfileSpec(
+            seedId = PIXEL_6,
+            version = 1,
+            profile = DeviceProfile(
+                brand = "google",
+                manufacturer = "Google",
+                model = "Pixel 6",
+                product = "oriole",
+                device = "oriole",
+                board = "oriole",
+                hardware = "gs101",
+                buildId = "UP1A.231105.001",
+                fingerPrint = "google/oriole/oriole:14/UP1A.231105.001/10763599:user/release-keys",
+                androidVersion = "14",
+                sdkInt = 34,
+                densityDpi = 411,
+                cpuCores = 8,
+            ),
+        ),
+        BuiltinProfileSpec(
+            seedId = PIXEL_6A,
+            version = 1,
+            profile = DeviceProfile(
+                brand = "google",
+                manufacturer = "Google",
+                model = "Pixel 6a",
+                product = "bluejay",
+                device = "bluejay",
+                board = "bluejay",
+                hardware = "gs101",
+                buildId = "UP1A.231105.001",
+                fingerPrint = "google/bluejay/bluejay:14/UP1A.231105.001/10763602:user/release-keys",
+                androidVersion = "14",
+                sdkInt = 34,
+                densityDpi = 420,
+                cpuCores = 8,
+            ),
+        ),
+        BuiltinProfileSpec(
+            seedId = PIXEL_8,
+            version = 1,
+            profile = DeviceProfile(
+                brand = "google",
+                manufacturer = "Google",
+                model = "Pixel 8",
+                product = "shiba",
+                device = "shiba",
+                board = "shiba",
+                hardware = "z_te",
+                buildId = "AP1A.240505.004",
+                fingerPrint = "google/shiba/shiba:14/AP1A.240505.004/11583680:user/release-keys",
+                androidVersion = "14",
+                sdkInt = 34,
+                densityDpi = 420,
+                cpuCores = 8,
+            ),
+        ),
+        BuiltinProfileSpec(
+            seedId = XIAOMI_14_ULTRA,
+            version = 1,
+            profile = DeviceProfile(
+                brand = "Xiaomi",
+                manufacturer = "Xiaomi",
+                model = "24031PN0DC",
+                product = "aurora",
+                device = "aurora",
+                board = "pineapple",
+                hardware = "qcom",
+                buildId = "UKQ1.240523.001",
+                fingerPrint = "Xiaomi/aurora/aurora:14/UKQ1.240523.001/V816.0.12.0.UNACNXM:user/release-keys",
+                androidVersion = "14",
+                sdkInt = 34,
+                densityDpi = 520,
+                cpuCores = 8,
+            ),
+        ),
+        BuiltinProfileSpec(
+            seedId = GALAXY_S24_ULTRA,
+            version = 1,
+            profile = DeviceProfile(
+                brand = "samsung",
+                manufacturer = "Samsung",
+                model = "SM-S928B",
+                product = "e3qxxx",
+                device = "e3q",
+                board = "e3q",
+                hardware = "exynos",
+                buildId = "AP1A.240205.001",
+                fingerPrint = "samsung/e3qxxx/e3q:14/AP1A.240205.001/S928BXXU2AXE1:user/release-keys",
+                androidVersion = "14",
+                sdkInt = 34,
+                densityDpi = 505,
+                cpuCores = 8,
+            ),
+        ),
+        BuiltinProfileSpec(
+            seedId = ONEPLUS_11,
+            version = 1,
+            profile = DeviceProfile(
+                brand = "OnePlus",
+                manufacturer = "OnePlus",
+                model = "CPH2449",
+                product = "salami",
+                device = "salami",
+                board = "kalama",
+                hardware = "qcom",
+                buildId = "UP1A.231005.007",
+                fingerPrint = "OnePlus/salami/salami:14/UP1A.231005.007/V14.0.0.400(EXEA01):user/release-keys",
+                androidVersion = "14",
+                sdkInt = 34,
+                densityDpi = 525,
                 cpuCores = 8,
             ),
         ),
