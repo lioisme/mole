@@ -273,18 +273,22 @@ V48 实测并三次登记：靶机 LDPlayer 的 Magisk/Zygisk 整场未运行 �
 - 插桩档「品牌列表零 Apple 项 + 搜 `iphone` 零结果」两条断言并入 WP-A 之后的 `assembleModernDebugAndroidTest` 编译轮一起取（本包不单独触发一次 androidTest 编译）。
 - APK 进包可见性（`unzip -l` 见两本数据 + 两本 NOTICE）属打包档，在 WP-D 收官的全量 assemble 轮一并取。
 
-### WP-C · 每一处都能自定义（R-2）
+### WP-C · 每一处都能自定义（R-2）　✅ 已完成（2026-09-24，提交见 §8 台账）
 
-**Files:** Modify `core/model/AppListenOverride.kt`（+`profileOverrides`、`clearDomain`/`deviationCountFor` 同步）、`core/model/EffectiveSwitch.kt`（resolve 双臂）、`core/model/FeatureConfig.kt`（删 `spoofOverrides`）、`data/repo/SettingsRepository.kt:260-291`（`expandProfile` = 画像 ⊕ 每应用偏差）、`domain/config/SpoofProfileService.kt`（`previewEffective(pkg)` 只读投影）、新增 `ui/apps/PerAppProfileTuneScreen.kt` + 路由 `apps/{pkg}/profile-tune`、复用 `ui/settings/profiles/ProfileFieldRow`（提到 `ui/common/`）、`mcp/tools/SpoofProfileTools.kt`（+`spoof_app_field_set`/`spoof_app_field_clear`/`spoof_app_fields_list`，工具面 50→52 或登记替换）、`ModevRoutes.kt`、四语表
+**与写文时的预测不同（两处都更省、且都更严）：**
+1. **MCP 不新增三工具**，而是给既有 `feature_settings_set` 加一个参数 `profileFieldEntries`（同一可变上游 = 该包的 `AppListenOverride`；另立工具会直接撞 `UiMcpCapabilityParityTest` R1「同一动作两处广告」），工具面**恒 50**。读侧走既有 `feature_settings_get`（`override` 段自带新字段），目录侧 `spoof_profile_catalog` 的字段行已带 `sourceApi`。
+2. **不新造「还原」的第二份 UI**：把 `ProfileFieldSpec` / `ProfileFieldRow` / 单字段弹层 `ProfileFieldEditSheet` 从 `ProfileEditorScreen`（1331 行）**抽成共享文件** `ui/settings/profiles/ProfileFieldControls.kt`，两屏同一组件；顺带在共享行上加了「还原」槽（编辑器侧传 `overridden=false` 恒不出现）。
 
-- [ ] **Step 1（红）** `AppListenOverrideProfileFieldsTest`：41 项中**任取一项**写入即只脏那一项；`resolve` 产出的快照仅该字段异于所绑画像；`clearDomain(FEATURE)` 只清画像偏差、零跨域；零偏差 = 键被删（#16 的「零偏差即删键」同规）。
-- [ ] **Step 2** 迁移旧 `spoofOverrides` 键：`build.MODEL`→`model`、`ro.*`→**丢弃并登记**（`DeviceProfile` 无 ro 族，V47 O-7；丢弃动作须一次性、有日志、幂等），写入恒为新格式。
-- [ ] **Step 3** 每应用「画像微调」页 = `ProfileFieldRow` 同一组件、同一 catalog 派生顺序；未设置项显示为「取所绑画像：<值> / 未设置」，单击即开该字段的弹层（枚举 → 可搜表 + 「改为手动填写」，槽 → `ModevChoiceSheet`，文本 → `ModevInputSheet`，布尔 → 行内 Switch），底部「还原为画像值」。分区与 WP-A 的 20 组逐字相同（**同一张表**）。
-- [ ] **Step 4** 门禁（源码扫描 + 行为）：`ProfileEditorRenderRoboTest` 补「渲染行数 == catalog 行数」在**两屏**（编辑器 + 每应用微调）都成立；新 `PerFieldIndependenceTest`：从空画像出发，逐个字段 `update(field, x)` 后 `canSave == true` 且 `snapshot` 仅含该项（41 条参数化用例，一次红一次绿都要看）。
-- [ ] **Step 5** 复合选择器仍只是捷径：`ProfileEditorFlowTest` 三条既有对账用例（机型 / release+SDK / 运营商）保留，并新增断言 = 那四个字段的行内弹层各**仍可单独打开并保存**。
-- [ ] **Step 6** 提交 `v49: every profile field customizable per-app, one row one field one action (R-2)`。
+**Files（实际落点）:** Create `core/model/ProfileFieldDeviation.kt`（合并/反推唯一实现点）· `ui/settings/profiles/ProfileFieldControls.kt` · `ui/apps/PerAppProfileTuneScreen.kt` · `app/src/test/.../core/model/ProfileFieldDeviationTest.kt` · `app/src/test/.../ui/settings/profiles/PerFieldIndependenceTest.kt` · `app/src/test/.../ui/apps/PerAppProfileTuneRenderRoboTest.kt`；Modify `core/model/AppListenOverride.kt`（+`profileOverrides` 与 `isDefault`/`deviationCount`/`clearDomain` 三处同步）· `data/repo/SettingsRepository.kt`（`expandProfile(switch, override)` 委派给 `ProfileFieldDeviation.apply`）· `mcp/tools/FeatureConfigTools.kt`（声明 + 校验 + 落盘）· `ui/apps/PerAppFeatureSettingsScreen.kt`（VM 四个动作 + 入口行 + 已定制计数）· `ui/navigation/ModevRoutes.kt` + `ui/ModevNav.kt`（路由 `apps/{pkg}/profile-tune`，与功能设置页共用 VM 工厂）· 四语（6 串 + 1 plurals，回写 `scripts/v42_table_3.mjs` 后跑生成器 DONE）· `UiMcpCapabilityParityTest`（三个 VM 动作并进行能力行）
 
-**出口：** Step 1/4/5 全绿；MCP 三个新工具过 `McpToolParityTest`（声明面即生效面 + 双域闸拒 LISTEN kind）；`UiMcpCapabilityParityTest` R2/R4/R5 双向归属对账绿。
+- [x] **Step 1（红→绿）数据面**：`ProfileFieldDeviationTest` 8 用例 —— `apply` 恒等 / 单项只脏一项 / 空串清掉画像已填项 / 非法与未知键**点名不吞**（`rejected` 逐条，同批合法项照常落）/ `apply ∘ between` 恒等 / 「编辑文本 == 画像值」永不成为偏差（含首尾空白归一）/ 清空是一项真定制 / 41 字段 jsonKey 双向对账。
+- [x] **Step 2 顺序裁决**：**不做** `spoofOverrides` 键迁移。它与新 `profileOverrides` 是两套语法、两组消费者，而现在迁移会打断**当前唯一真正生效**的遗留通路；`spoofOverrides` 与 `SpoofProfiles` 一起在 WP-D6 整体删除（V47 O-7 的 `ro.*` 归属问题随该批一并定）。
+- [x] **Step 3 两屏同一组件**：每应用「画像微调」页 41 行 = 同一 catalog 派生、同一分区轴（20 组，标题同样印出 `sourceApi`）、同一弹层；每行四个动作 **改 / 清 / 随机 / 还原**，无顺序要求。`还原 ≠ 清除` 是本页最重要的语义区分：清除 = 写空（显式不伪装这一项），还原 = 删掉覆写（交回画像）—— 缺前者则「绑了档但这项不要」不可表达，缺后者则改完退不回去。
+- [x] **Step 4 门禁**：`PerFieldIndependenceTest` 41 字段 × 两条方向（单填可保存 + 只脏自己 + 覆写恰一条 + 往返恒等）；`PerAppProfileTuneRenderRoboTest` 4 条（**全装配真仓库真偏好**，零 mock 服务）：41 行全在 / 20 分区全在 / 覆写行的还原锚点 + 画像原值提示 + 落到 `profileOverrides` + 生效快照带新值 / 还原后回画像值且锚点消失 / 非法值不落覆写。**抓到并登记的假故障**：`compose.waitForIdle()` 不等 `withContext(Dispatchers.IO)` 的偏好写入 ⇒ Robolectric 里表现成「VM 没写」；处置 = `shadowOf(mainLooper).idle()` + 短 sleep 轮询 flush，且**先断数据面再断呈现面**（已写入 `AGENTS.md`「已知工具链坑」）。同轮再次踩到「`ListItem` 槽位内的 testTag 只在非合并树可见」，两处锚点按树分开取。
+- [x] **Step 5 复合选择器只是捷径**：`ProfileEditorFlowTest` 三条成对选择器用例原样保留；共享行组件让四个机型字段与 release/SDK、运营商三件套各自的行内弹层仍是独立通路（抽组件后台账上只剩一份实现，不再有两屏漂移的空间）。
+- [x] **Step 6 闸与提交**：全量单测 **161 类 / 1,145 用例 / 0 失败 / 0 错误 / 0 跳过**；`lintModernRelease` **0e/43w/1h**；`compileModernDebugAndroidTestKotlin` 成功；四语生成器 **DONE**（843 串 / plurals 13）。
+
+**出口达成：** 数据面 + 组合面 + MCP 声明面 + 能力对账四组全绿。**仍欠（诚实登记，不记 ✅）**：R-2 验收第 1 条里「任一单项生效」的**设备面**证据 —— 那要等 WP-D 的强制档钩子存在才能测（今天下发快照里有了值，但 `hook/` 还不读它）。
 
 ### WP-D · 注入侧接管（R-4 的**前置**，按批次原子提交）
 
@@ -392,6 +396,14 @@ V48 实测并三次登记：靶机 LDPlayer 的 Magisk/Zygisk 整场未运行 �
 | 09-24 | WP-A lint+插桩编译 | `:app:lintModernRelease :app:compileModernDebugAndroidTestKotlin` | 0 errors / 43 warnings / 1 hint;插桩编译成功(androidTest 对退役键零引用) | ✅ |
 | 09-24 | WP-A 四语 | `node scripts/v42_generate.mjs` | `ja/ko: strings=837 (translated 766, same 71) plurals=12` + **DONE** | ✅ |
 | 09-24 | WP-A 提交 | `git commit` | `c7afdd9` + `AGENTS.md` #30 同轮改写 | ✅ |
+| 09-24 | WP-C 红 | `:app:compileModernDebugUnitTestKotlin` | 站点清单准确:20 处编译错(新组件 `internal` 边界、`ProfileValueType`/`slotLabel` 等)⇒ 逐条修 | ✅ 按预期红 |
+| 09-24 | WP-C 假故障归因 | 定向 `PerAppProfileTuneRenderRoboTest` 三轮 | ① 41→33:8 个 BOOL 行走 `profile-toggle-*` 而非 `profile-row-*`(与编辑器同形态,测试漏派生);② 槽位 testTag 只在**非合并树**可见(AGENTS 已登记坑,再次实证);③ **新坑**:`compose.waitForIdle()` 不等 `withContext(Dispatchers.IO)` 的偏好写 ⇒ 读成「VM 没落盘」;处置 = 主 looper idle + 短 sleep 轮询,并**先断数据面再断呈现面** | ✅ 三条全归因 |
+| 09-24 | WP-C 定向 | `--tests PerFieldIndependenceTest / ProfileFieldDeviationTest / PerAppProfileTuneRenderRoboTest` | 41×2 独立性 + 8 合并对账 + 4 全装配组合档 全绿 | ✅ |
+| 09-24 | WP-C 能力闸 | `--tests UiMcpCapabilityParityTest` | R5 抓到三个未登记的 VM 动作 ⇒ 并进入「按应用功能配置」能力行(同一可变上游,**不另立 MCP 工具**,工具面恒 50) | ✅ |
+| 09-24 | WP-C 全量 | `:app:testModernDebugUnitTest --no-build-cache --no-daemon` | **161 类 / 1,145 用例 / 0 失败 / 0 错误 / 0 跳过**(WP-A 后 159/1,127 ⇒ 净 +2 类 +18 用例) | ✅ |
+| 09-24 | WP-C lint+插桩 | `:app:lintModernRelease :app:compileModernDebugAndroidTestKotlin` | 0 errors / 43 warnings / 1 hint;插桩编译成功 | ✅ |
+| 09-24 | WP-C 四语 | `node scripts/v42_generate.mjs` | `strings=843 (translated 772, same 71) plurals=13` + **DONE** | ✅ |
+| 09-24 | WP-C 提交 | `git commit` | `b2832e4`(代码+测试);AGENTS/任务书随后 | ✅ |
 | | WP-0 | `00-env-verify.ps1 -Mode runtime` | 四判据逐条 | ⬜ |
 | | WP-A | `:app:testModernDebugUnitTest --tests "*ProfileFieldCatalog*"` | | ⬜ |
 | | WP-C | `PerFieldIndependenceTest` | 41/41 | ⬜ |
