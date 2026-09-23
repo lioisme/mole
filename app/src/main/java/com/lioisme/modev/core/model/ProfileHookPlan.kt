@@ -39,10 +39,21 @@ object ProfileHookPlan {
      *
      * 画像显式改写了 `Build` 身份 ⇒ 强制档在场,条件档(「只在脏值上掩蔽」)对该字段族退让,
      * 避免两套实现先后写同一批静态字段。条件档仍继续负责画像**留空**的字段族。
+     *
+     * V49 R-1 把 `PROFILE_BUILD` 拆成身份与版本两族(它们仍是同一批 `android.os.Build`
+     * 静态字段的读者),所以本裁决**恒覆盖两族** —— 只认其一会出现「改了 Build.ID 但
+     * Build.MODEL 仍被条件档先后覆写」的半让位形态。
      */
     fun adaptiveMaskShouldYield(profile: DeviceProfile): Boolean =
-        ProfileFieldCatalog.byKind.getValue(ProfileKind.PROFILE_BUILD)
-            .any { it.isSetIn(profile) }
+        buildFieldFamilies.any { family ->
+            ProfileFieldCatalog.byKind.getValue(family).any { it.isSetIn(profile) }
+        }
+
+    /** 写同一批 `android.os.Build` 静态字段的两族(本文件私有,不构成第二条分类轴)。 */
+    private val buildFieldFamilies = listOf(
+        ProfileKind.PROFILE_BUILD_IDENTITY,
+        ProfileKind.PROFILE_BUILD_VERSION,
+    )
 
     /**
      * 逐组自检:同组内是否同时存在「伪装」与「隐藏该伪装」的矛盾配置。

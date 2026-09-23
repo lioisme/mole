@@ -58,6 +58,8 @@ class StringResourceParityTest {
         "feature_profile_xiaomi14ultra",
         "feature_profile_galaxys24ultra",
         "feature_profile_oneplus11",
+        // V49 R-1 分区标签:Android 平台标识符本名,四语同形(生成器 IDENTICAL_OK 同源)
+        "profile_kind_android_id",
         "op_prefs_get_string",
         "op_prefs_get_int",
         "op_prefs_get_long",

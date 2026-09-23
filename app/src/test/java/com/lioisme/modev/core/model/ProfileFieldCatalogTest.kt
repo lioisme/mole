@@ -43,18 +43,27 @@ class ProfileFieldCatalogTest {
         for (kind in ProfileKind.entries) {
             assertTrue("$kind 无字段归属", ProfileFieldCatalog.byKind.getValue(kind).isNotEmpty())
         }
-        assertEquals(18, ProfileKind.entries.size)
+        assertEquals(20, ProfileKind.entries.size)
         val covered = ProfileFieldCatalog.byKind.values.flatten()
         assertEquals(covered.size, covered.toSet().size)
         assertEquals(ProfileField.entries.size, covered.size)
     }
 
+    /**
+     * V49 R-1 单轴契约:类别 ≡ 底层来源族 ≡ UI 分区。
+     *
+     * 钉三件事 —— 每个类别都点名了它要钩的 API、API 标识彼此不重复(重复即两类别实为一族,
+     * 该合并)、类别声明序就是分区呈现序(`populatedKinds` 不得与 `byKind` 分叉)。
+     * 分区轴若被重新引入(第二份清单),本测试与 `ProfileLabelsTest` 会同时失去对象。
+     */
     @Test
-    fun `every section owns fields and sections partition the catalog`() {
-        val partitioned = ProfileFieldCatalog.bySection.values.flatten()
-        assertEquals(ProfileField.entries.size, partitioned.size)
-        assertEquals(partitioned.size, partitioned.toSet().size)
-        assertTrue(ProfileFieldCatalog.bySection.values.all { it.isNotEmpty() })
+    fun everyKind_namesItsSourceApiAndTheGroupingIsOneTable() {
+        for (kind in ProfileKind.entries) {
+            assertTrue("$kind 未点名来源 API", kind.sourceApi.isNotBlank())
+        }
+        val apis = ProfileKind.entries.map { it.sourceApi }
+        assertEquals(apis.size, apis.toSet().size)
+        assertEquals(ProfileFieldCatalog.byKind.keys.toList(), ProfileFieldCatalog.populatedKinds)
     }
 
     @Test

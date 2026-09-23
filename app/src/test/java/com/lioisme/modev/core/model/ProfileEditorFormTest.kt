@@ -133,7 +133,7 @@ class ProfileEditorFormTest {
     @Test
     fun `row order comes from the catalog so the ui cannot grow a second list`() {
         val form = ProfileEditorForm()
-        assertEquals(ProfileFieldCatalog.bySection, form.rowsBySection())
+        assertEquals(ProfileFieldCatalog.byKind, form.rowsByKind())
         assertEquals(form.fields, ProfileField.entries)
         assertEquals(41, form.fields.size)
     }
@@ -142,7 +142,7 @@ class ProfileEditorFormTest {
     fun `preview groups and conflicts track edits live`() {
         val form = ProfileEditorForm()
         form.update(ProfileField.BRAND, "google")
-        assertEquals(listOf(ProfileKind.PROFILE_BUILD), form.previewGroups())
+        assertEquals(listOf(ProfileKind.PROFILE_BUILD_IDENTITY), form.previewGroups())
         assertTrue(ProfileHookPlan.adaptiveMaskShouldYield(form.snapshot()))
 
         form.update(ProfileField.LONGITUDE, "13.4")

@@ -7,7 +7,6 @@ import com.lioisme.modev.core.model.ProfileField
 import com.lioisme.modev.core.model.ProfileFieldCatalog
 import com.lioisme.modev.core.model.ProfileFieldError
 import com.lioisme.modev.core.model.ProfileKind
-import com.lioisme.modev.core.model.ProfileSection
 import com.lioisme.modev.core.model.ProfileValueType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -16,24 +15,24 @@ import org.junit.Test
 
 /**
  * 画像标签表门禁(V47 WP-5,与 [com.lioisme.modev.ui.apps.KindLabelResExhaustiveTest] 同族):
- * 四张表(分区 / 干预组 / 参数 / 校验结论)必须**逐项有自有标签**且不落兜底文案。
+ * 三张表(类别 = 分区 / 参数 / 校验结论)必须**逐项有自有标签**且不落兜底文案。
  *
  * 「一参数一行」的可视配置页依赖这一点:任何一个新参数若忘了映射标签,
  * 屏上就会出现两行同名或一行「未知」——那是配置面最贵的静默失效。
+ *
+ * V49 R-1 起分区标签就是类别标签(一条轴一套名字,`profile_section_*` 十条已退役),
+ * 只剩 `profile_section_title` 一条**格式串**承担「本地化名 + 来源 API」的组装。
  */
 class ProfileLabelsTest {
 
     @Test
-    fun everySectionHasItsOwnLabel() {
-        val resolved = ProfileSection.entries.map(::profileSectionLabelRes)
-        assertEquals(ProfileSection.entries.size, resolved.distinct().size)
-        assertFalse(R.string.unknown_error in resolved)
-    }
-
-    @Test
     fun everyInterventionGroupHasItsOwnLabel() {
         val resolved = ProfileKind.entries.map(::profileKindLabelRes)
-        assertEquals(ProfileKind.entries.size, resolved.distinct().size)
+        assertEquals(
+            "分区即类别 ⇒ 20 个类别必须 20 个互异标签(重复 = 屏上两段同名)",
+            ProfileKind.entries.size,
+            resolved.distinct().size,
+        )
         assertFalse(R.string.unknown_error in resolved)
     }
 
@@ -49,12 +48,11 @@ class ProfileLabelsTest {
     }
 
     @Test
-    fun everyFieldAndSectionKindPairingIsCoherent() {
-        // 字段所属分区/组必须有标签(分区表与组表按字段遍历同样穷尽)。
+    fun everyFieldAndKindPairingIsCoherent() {
+        // 字段所属类别必须有标签(类别表按字段遍历同样穷尽)。
         ProfileField.entries.forEach { field ->
             assertTrue(R.string.unknown_error != profileFieldLabelRes(field))
             assertTrue(R.string.unknown_error != profileKindLabelRes(field.kind))
-            assertTrue(R.string.unknown_error != profileSectionLabelRes(field.section))
         }
     }
 

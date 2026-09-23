@@ -14,7 +14,6 @@ import com.lioisme.modev.core.model.ProfileConflict
 import com.lioisme.modev.core.model.ProfileField
 import com.lioisme.modev.core.model.ProfileOptionSource
 import com.lioisme.modev.core.model.ProfileKind
-import com.lioisme.modev.core.model.ProfileSection
 import com.lioisme.modev.core.model.ProfileValueType
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -111,9 +110,20 @@ class ProfileEditorRenderRoboTest {
     fun everyParameter_rendersExactlyOneRowInItsSection() {
         showEditor(editorVm(storeWith()))
 
-        assertEquals("分区数即 UI 段数", 10, ProfileSection.entries.size)
-        ProfileSection.entries.forEach { section ->
-            assertTagPresent("profile-section-${section.name}", "分区必须成段渲染")
+        // V49 R-1:分区 ≡ 底层来源族 ⇒ 20 段;且**标题必须把来源 API 印在屏上**
+        // (分类若只活在枚举名里,用户仍然要凭记忆判断这一组改的是哪个子系统)。
+        val app = RuntimeEnvironment.getApplication()
+        assertEquals("分区数即类别数", 20, ProfileKind.entries.size)
+        ProfileKind.entries.forEach { kind ->
+            assertTagPresent("profile-section-${kind.name}", "分区必须成段渲染")
+            assertTextPresent(
+                app.getString(
+                    profileSectionTitleRes(),
+                    app.getString(profileKindLabelRes(kind)),
+                    kind.sourceApi,
+                ),
+                "分区标题须点名来源 API",
+            )
         }
         ProfileField.entries.forEach { field ->
             val tag = if (field.type == ProfileValueType.BOOL) {
@@ -233,7 +243,7 @@ class ProfileEditorRenderRoboTest {
         assertEquals("PRODUCT 不得被猜出来", "", texts[ProfileField.PRODUCT])
         assertEquals("BOARD 不得被猜出来", "", texts[ProfileField.BOARD])
         // 选择必须一次成型:生效组预览随之出现。
-        assertTagPresent("profile-group-${ProfileKind.PROFILE_BUILD.name}", "选完机型即装 Build 组")
+        assertTagPresent("profile-group-${ProfileKind.PROFILE_BUILD_IDENTITY.name}", "选完机型即装 Build 组")
     }
 
     @Test

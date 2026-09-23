@@ -74,7 +74,6 @@ import com.lioisme.modev.core.model.DeviceProfileEntry
 import com.lioisme.modev.core.model.ProfileConflict
 import com.lioisme.modev.core.model.ProfileField
 import com.lioisme.modev.core.model.ProfileFieldCatalog
-import com.lioisme.modev.core.model.ProfileSection
 import com.lioisme.modev.core.model.ProfileKind
 import com.lioisme.modev.core.model.ProfileOptionSource
 import com.lioisme.modev.core.model.ProfileValueSets
@@ -488,24 +487,32 @@ fun ProfileEditorScreen(
             )
             Spacer(Modifier.height(Dimens.sectionGap))
 
-            view.rowsBySection.forEach { (section, fields) ->
+            view.rowsByKind.forEach { (kind, fields) ->
                 SettingsSection(
-                    title = stringResource(profileSectionLabelRes(section)),
-                    modifier = Modifier.testTag("profile-section-${section.name}"),
+                    // 标题 = 本地化名 + 来源 API(V49 R-1:分区即底层来源族,分类必须读得出来,
+                    // 不能只活在枚举名里)。
+                    title = res.getString(
+                        profileSectionTitleRes(),
+                        res.getString(profileKindLabelRes(kind)),
+                        kind.sourceApi,
+                    ),
+                    modifier = Modifier.testTag("profile-section-${kind.name}"),
                 ) {
-                    if (section == ProfileSection.DEVICE) {
-                        // 机型库选择行恒在设备分区首行:它替掉的是「手打四个互相牵连的字段」,
+                    if (kind == ProfileKind.PROFILE_BUILD_IDENTITY) {
+                        // 机型库选择行恒在设备身份分区首行:它替掉的是「手打四个互相牵连的字段」,
                         // 放在字段列表中间会被读成又一个字段,放前面才读成「先选设备,再修细节」。
                         DevicePresetRow(
                             state = catalog,
                             onPick = { showBrandSheet = true },
                         )
                         HorizontalDivider16()
+                    }
+                    if (kind == ProfileKind.PROFILE_BUILD_VERSION) {
                         // Android 版本与 API level 是同一件事的两半,故也放在字段之前一次选全。
                         AndroidVersionRow(onPick = { showAndroidSheet = true })
                         HorizontalDivider16()
                     }
-                    if (section == ProfileSection.SIM) {
+                    if (kind == ProfileKind.PROFILE_SIM) {
                         CarrierPresetRow(
                             state = carriers,
                             onPick = { showCarrierSheet = true },

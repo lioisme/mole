@@ -7,7 +7,6 @@ import com.lioisme.modev.core.model.ProfileConflict
 import com.lioisme.modev.core.model.ProfileField
 import com.lioisme.modev.core.model.ProfileFieldError
 import com.lioisme.modev.core.model.ProfileKind
-import com.lioisme.modev.core.model.ProfileSection
 
 /**
  * 画像配置面的**标签映射唯一出口**(V47 WP-5)。
@@ -21,31 +20,34 @@ import com.lioisme.modev.core.model.ProfileSection
  * (`ProfileLabelsTest` 锁四张表的穷尽性与「不得回落 unknown_error」)。
  */
 
-/** 分区标题(UI 行序分组 = `ProfileFieldCatalog.bySection` 同表)。 */
+/**
+ * 分区标题的**组装**格式(V49 R-1):本地化名 + 来源 API 标识。
+ *
+ * API 名(`android.os.Build` / `Settings.Secure` 之类)是**代码标识符不是文案** ⇒ 不进四语表,
+ * 由 [ProfileKind.sourceApi] 以参数注入。这样「每个分区都点名它的底层来源」这条验收既成立,
+ * 又不会为了 20×4 条同一串 ASCII 而养一份不可维护的翻译。
+ */
 @StringRes
-internal fun profileSectionLabelRes(section: ProfileSection): Int = when (section) {
-    ProfileSection.DEVICE -> R.string.profile_section_device
-    ProfileSection.NETWORK -> R.string.profile_section_network
-    ProfileSection.SIM -> R.string.profile_section_sim
-    ProfileSection.IDENTITY -> R.string.profile_section_identity
-    ProfileSection.CELL -> R.string.profile_section_cell
-    ProfileSection.LOCATION -> R.string.profile_section_location
-    ProfileSection.LOCALE -> R.string.profile_section_locale
-    ProfileSection.APP_VERSION -> R.string.profile_section_app_version
-    ProfileSection.OTHER -> R.string.profile_section_other
-    ProfileSection.BLANK_PASS -> R.string.profile_section_blank_pass
-}
+internal fun profileSectionTitleRes(): Int = R.string.profile_section_title
 
-/** 干预组标签(实时生效预览的 chips)。 */
+/**
+ * 底层来源族标签(UI 分区标题的本地化半段 + 实时生效预览 chips 共用同一键)。
+ *
+ * 一个概念一个键(#31②):V48 的 `profile_section_*` 十条与 `profile_kind_*` 十八条是
+ * **同一条分类轴的两套名字**(section ≡ kind ≡ 钩子族),故随 `ProfileSection` 一起退役。
+ * 新增类别未映射即编译期红(穷尽 `when`)。
+ */
 @StringRes
 internal fun profileKindLabelRes(kind: ProfileKind): Int = when (kind) {
-    ProfileKind.PROFILE_BUILD -> R.string.profile_kind_build
+    ProfileKind.PROFILE_BUILD_IDENTITY -> R.string.profile_kind_build_identity
+    ProfileKind.PROFILE_BUILD_VERSION -> R.string.profile_kind_build_version
     ProfileKind.PROFILE_DENSITY -> R.string.profile_kind_density
     ProfileKind.PROFILE_CPU -> R.string.profile_kind_cpu
+    ProfileKind.PROFILE_ANDROID_ID -> R.string.profile_kind_android_id
+    ProfileKind.PROFILE_TELEPHONY_ID -> R.string.profile_kind_telephony_id
+    ProfileKind.PROFILE_SIM -> R.string.profile_kind_sim
     ProfileKind.PROFILE_NETWORK -> R.string.profile_kind_network
     ProfileKind.PROFILE_WIFI -> R.string.profile_kind_wifi
-    ProfileKind.PROFILE_SIM -> R.string.profile_kind_sim
-    ProfileKind.PROFILE_UNIQUE_ID -> R.string.profile_kind_unique_id
     ProfileKind.PROFILE_CELL -> R.string.profile_kind_cell
     ProfileKind.PROFILE_LOCATION -> R.string.profile_kind_location
     ProfileKind.PROFILE_WIFI_LOCATION_HIDE -> R.string.profile_kind_wifi_location_hide

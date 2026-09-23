@@ -46,24 +46,27 @@ enum class ProfileFieldError {
 /**
  * 画像字段目录(V47 T1):**41 个字段的行为面唯一事实源**。
  *
- * [ProfileField] 声明静态归属(kind/section/type/基线键),本对象声明行为:
- * 校验、取值界、wire 与 MCP 键派生、分区行序、按类别分组。
+ * [ProfileField] 声明静态归属(kind / type / 基线键),本对象声明行为:
+ * 校验、取值界、wire 与 MCP 键派生、按来源族分组(= UI 分区行序)。
  * UI 表单、MCP 声明面、压测期望表三处一律消费本目录,**禁止任何一处手抄字段清单**
- * (对账由 `ProfileFieldCatalogTest` 与 `ProfileFieldPropertyParityTest` 双向锁定)。
+ * (对账由 `ProfileFieldCatalogTest` 与 `DeviceProfilePropertyParityTest` 双向锁定)。
  */
 object ProfileFieldCatalog {
 
-    /** 分区的字段行序(UI 逐分区渲染,行序 = 本表序)。 */
-    val bySection: Map<ProfileSection, List<ProfileField>> =
-        ProfileSection.entries.associateWith { section ->
-            ProfileField.entries.filter { it.section == section }
-        }.filterValues { it.isNotEmpty() }
-
-    /** 干预类别 → 该类别承载的字段(注入侧门控与 UI 分组共用)。 */
+    /**
+     * 底层来源族 → 该族承载的字段(V49 R-1:**这就是 UI 的分区表**,不再是另一条呈现轴)。
+     *
+     * 行序 = [ProfileKind] 声明序 = 来源族由近到远的阅读序;字段序 = [ProfileField] 声明序。
+     * 注入侧门控、UI 分区、MCP enum 三处共用本表,任何一处分叉都当场被
+     * `ProfileFieldCatalogTest` 的「三方同一」断言抓住。
+     */
     val byKind: Map<ProfileKind, List<ProfileField>> =
         ProfileKind.entries.associateWith { kind ->
             ProfileField.entries.filter { it.kind == kind }
         }
+
+    /** 有字段的类别,按声明序(V49 起每组恒非空,由 `ProfileFieldCatalogTest` 钉住)。 */
+    val populatedKinds: List<ProfileKind> get() = byKind.keys.toList()
 
     /** wire 与 MCP 的键名:基线键优先,Modev 超基线项按枚举名派生小驼峰。 */
     fun jsonKeyOf(field: ProfileField): String = field.baselineKey ?: field.name.toCamelCase()

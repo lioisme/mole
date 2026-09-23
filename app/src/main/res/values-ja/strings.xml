@@ -844,23 +844,19 @@
     <string name="profile_device_no_match">一致する項目がありません - 短いキーワードでお試しください</string>
     <string name="profile_device_truncated">全 %2$,d 件中最初の %1$,d 件を表示 - 検索範囲を絞ってください</string>
     <string name="profile_picker_manual">手動で入力する</string>
-    <string name="profile_section_device">端末とビルド</string>
-    <string name="profile_section_network">ネットワーク</string>
-    <string name="profile_section_sim">SIM 通信事業者</string>
-    <string name="profile_section_identity">一意識別子</string>
-    <string name="profile_section_cell">基地局パラメータ</string>
-    <string name="profile_section_location">位置情報</string>
-    <string name="profile_section_locale">言語とタイムゾーン</string>
-    <string name="profile_section_app_version">対象アプリのバージョン</string>
-    <string name="profile_section_other">バッテリーとスクリーンショット</string>
-    <string name="profile_section_blank_pass">ブランクパス</string>
-    <string name="profile_kind_build">Build アイデンティティ</string>
+    <!-- V49 R-1: 分区 ≡ 底层来源族 ≡ 干预类别 ⇒ 一条轴一套名字。旧的 profile_section_* 十条
+         与 profile_kind_* 是同一概念的两套键,已退役;标题改为「本地化名 + 来源 API 标识」
+         的格式串,第二个参数来自 ProfileKind.sourceApi(代码标识符,不进翻译表)。 -->
+    <string name="profile_section_title">%1$s（%2$s）</string>
+    <string name="profile_kind_build_identity">Build アイデンティティ</string>
+    <string name="profile_kind_build_version">Build バージョン</string>
     <string name="profile_kind_density">画面密度</string>
     <string name="profile_kind_cpu">CPU コア数</string>
+    <string name="profile_kind_android_id">Android ID</string>
+    <string name="profile_kind_telephony_id">端末識別子グループ</string>
+    <string name="profile_kind_sim">SIM 事業者値</string>
     <string name="profile_kind_network">アクティブネットワーク</string>
     <string name="profile_kind_wifi">Wi-Fi 識別子</string>
-    <string name="profile_kind_sim">SIM 事業者値</string>
-    <string name="profile_kind_unique_id">一意識別子グループ</string>
     <string name="profile_kind_cell">基地局パラメータグループ</string>
     <string name="profile_kind_location">位置座標</string>
     <string name="profile_kind_wifi_location_hide">Wi-Fi 測位ソースを隠す</string>

@@ -127,7 +127,7 @@ class SpoofProfileTools(
             "key" to ProfileFieldCatalog.jsonKeyOf(field),
             "field" to field.name,
             "kind" to field.kind.name,
-            "section" to field.section.name,
+            "sourceApi" to field.kind.sourceApi,
             "type" to field.type.name,
             "baselineKey" to field.baselineKey,
             "randomizable" to ProfileFieldCatalog.isRandomizable(field),
@@ -281,10 +281,10 @@ class SpoofProfileTools(
         name = "spoof_profile_catalog",
         description = "Discovery surface for device-profile payloads. kind=fields (default) returns every " +
             "${ProfileField.entries.size} field with its json key, intervention kind, " +
-            "editor section, value type, whether one-click randomize touches it, its declared numeric " +
+            "source API family, value type, whether one-click randomize touches it, its declared numeric " +
             "range (null = unbounded), the accepted slots of enum-typed fields (derived by running the " +
             "catalog validator, so it is exactly what save accepts) and the sentinel value meaning " +
-            "'this field does nothing', plus the section/kind groupings and the per-type sentinel table. " +
+            "'this field does nothing', plus the source-family groupings (kind = UI section = hook family) and the per-type sentinel table. " +
             "Slot meanings: networkType -1 hides the active network, 1 is Wi-Fi, 2-5 are 2G-5G; " +
             "screenshotsFlag 0 forces screenshots off (FLAG_SECURE added), 1 forces them on " +
             "(FLAG_SECURE cleared). Derived at runtime from the single field catalog, so it can never " +
@@ -313,19 +313,14 @@ class SpoofProfileTools(
         }
     }
 
-    /** 字段目录(默认输出;V47 WP-7 原样保留,改的只是入口分派)。 */
+    /** 字段目录(默认输出)。V49 R-1:分类只有一条轴 ⇒ `groups` 一项承载「来源族 ≡ 类别 ≡ 分区」。 */
     private fun fieldsCatalogJson(): JsonObject {
-        val sections = ProfileFieldCatalog.bySection.entries.map { (section, fields) ->
-            McpJson.obj(
-                "section" to section.name,
-                "keys" to fields.map { ProfileFieldCatalog.jsonKeyOf(it) },
-            )
-        }
-        val kinds = ProfileFieldCatalog.byKind.entries
+        val groups = ProfileFieldCatalog.byKind.entries
             .filter { it.value.isNotEmpty() }
             .map { (kind, fields) ->
                 McpJson.obj(
                     "kind" to kind.name,
+                    "sourceApi" to kind.sourceApi,
                     "keys" to fields.map { ProfileFieldCatalog.jsonKeyOf(it) },
                 )
             }
@@ -333,8 +328,7 @@ class SpoofProfileTools(
             "kind" to "fields",
             "total" to ProfileField.entries.size,
             "fields" to McpJson.arr(ProfileField.entries.map { fieldJson(it) }),
-            "sections" to McpJson.arr(sections),
-            "kinds" to McpJson.arr(kinds),
+            "groups" to McpJson.arr(groups),
             "sentinels" to ProfileValueType.entries.associate { it.name to sentinelOf(it) },
         )
     }

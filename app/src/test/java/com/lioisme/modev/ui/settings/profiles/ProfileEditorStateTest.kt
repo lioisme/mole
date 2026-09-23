@@ -89,9 +89,12 @@ class ProfileEditorStateTest {
         val s = state()
         assertEquals(emptyList<ProfileKind>(), s.groups())
         s.update(ProfileField.BRAND, "google")
-        assertEquals(listOf(ProfileKind.PROFILE_BUILD), s.groups())
+        assertEquals(listOf(ProfileKind.PROFILE_BUILD_IDENTITY), s.groups())
         s.update(ProfileField.DENSITY_DPI, "384")
-        assertEquals(listOf(ProfileKind.PROFILE_BUILD, ProfileKind.PROFILE_DENSITY), s.groups())
+        assertEquals(
+            listOf(ProfileKind.PROFILE_BUILD_IDENTITY, ProfileKind.PROFILE_DENSITY),
+            s.groups(),
+        )
     }
 
     @Test
@@ -164,7 +167,7 @@ class ProfileEditorStateTest {
         assertEquals(s.identity(), view.identity)
         assertEquals("google", view.texts[ProfileField.BRAND])
         assertNull(view.errors[ProfileField.BRAND])
-        assertEquals(ProfileFieldCatalog.bySection, view.rowsBySection)
+        assertEquals(ProfileFieldCatalog.byKind, view.rowsByKind)
         assertEquals(ProfileField.entries.size, view.texts.size)
     }
 

@@ -9,6 +9,7 @@ import com.lioisme.modev.core.model.ProfileEnvelope
 import com.lioisme.modev.core.model.ProfileField
 import com.lioisme.modev.core.model.ProfileFieldCatalog
 import com.lioisme.modev.core.model.ProfileImportVerdict
+import com.lioisme.modev.core.model.ProfileKind
 import com.lioisme.modev.core.model.ProfileTransferItem
 import com.lioisme.modev.core.model.ProfileValues
 import com.lioisme.modev.core.model.ProfileValueType
@@ -485,7 +486,7 @@ class SpoofProfileToolsTest {
         ProfileField.entries.forEach { field ->
             val json = entries.first { it.get("key").asString == ProfileFieldCatalog.jsonKeyOf(field) }
             assertEquals(field.kind.name, json.get("kind").asString)
-            assertEquals(field.section.name, json.get("section").asString)
+            assertEquals(field.kind.sourceApi, json.get("sourceApi").asString)
             assertEquals(field.type.name, json.get("type").asString)
             assertEquals(field.baselineKey.orEmpty(), json.get("baselineKey").let { if (it.isJsonNull) "" else it.asString })
             assertEquals(ProfileFieldCatalog.isRandomizable(field), json.get("randomizable").asBoolean)
@@ -521,8 +522,10 @@ class SpoofProfileToolsTest {
         assertEquals("INT", density.get("type").asString)
         assertEquals("${ProfileValues.UNSET_INT}", density.get("sentinel").asString)
         val imei = entries.first { it.get("key").asString == "imei" }
-        assertEquals("PROFILE_UNIQUE_ID", imei.get("kind").asString)
-        assertEquals("IDENTITY", imei.get("section").asString)
+        // 类别名一律由枚举派生(V48 设备档实锤坑④:抄死字面量的断言在枚举改名后变成
+        // 无消息假红)。IMEI 与 Android ID 在 V49 R-1 分成两族,这里正是那条轴的现场。
+        assertEquals(ProfileField.IMEI.kind.name, imei.get("kind").asString)
+        assertEquals(ProfileField.IMEI.kind.sourceApi, imei.get("sourceApi").asString)
         assertEquals("empty string", imei.get("sentinel").asString)
         assertTrue(imei.get("randomizable").asBoolean)
 
@@ -542,15 +545,25 @@ class SpoofProfileToolsTest {
                 .getAsJsonArray("acceptedSlots").map { it.asString },
         )
 
-        // 分组面派生自同一张表:分区/类别的键并集 = 全量键集
+        // 分组面派生自同一张表:V49 R-1 起只剩一条轴 ⇒ `groups` 的键并集 = 全量键集,
+        // 且每组必须带上它自己的来源 API(否则 Agent 读到的是分组名而不是「这组钩哪个子系统」)。
         val flat = { array: com.google.gson.JsonArray ->
             array.flatMap { it.asJsonObject.getAsJsonArray("keys").map { key -> key.asString } }
         }
         val allKeys = entries.map { it.get("key").asString }.toSet()
-        val sectionKeys = flat(out.getAsJsonArray("sections"))
-        assertEquals(allKeys, sectionKeys.toSet())
-        assertEquals(ProfileField.entries.size, sectionKeys.size)
-        assertEquals(allKeys, flat(out.getAsJsonArray("kinds")).toSet())
+        val groups = out.getAsJsonArray("groups")
+        val groupKeys = flat(groups)
+        assertEquals(allKeys, groupKeys.toSet())
+        assertEquals(ProfileField.entries.size, groupKeys.size)
+        assertEquals(
+            "分组数必须恰等于类别数(一条轴,禁再出现第二份分组表)",
+            ProfileKind.entries.size,
+            groups.size(),
+        )
+        groups.forEach { row ->
+            val kind = ProfileKind.valueOf(row.asJsonObject.get("kind").asString)
+            assertEquals(kind.sourceApi, row.asJsonObject.get("sourceApi").asString)
+        }
     }
 
     /** 目录是「可执行」的:照目录键与目录哨兵构造的载荷必须被 save 整张收下。 */
@@ -698,7 +711,7 @@ class SpoofProfileToolsTest {
                 addProperty("text", "{}")
                 addProperty("merge", true)
             },
-            "spoof_profile_catalog" to JsonObject().apply { addProperty("kind", "PROFILE_BUILD") },
+            "spoof_profile_catalog" to JsonObject().apply { addProperty("kind", "NOT_A_KIND") },
         )
         probes.forEach { (name, args) ->
             val outcome = call(name, args)

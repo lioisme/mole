@@ -47,7 +47,13 @@ const TEST_WHITELIST_EXTRA = new Set([
 ]);
 
 // ja/ko 与 en 合法同文键(日韩语中该词即如此书写,非漏译):
-const IDENTICAL_OK = new Set(['confirm', 'feature_profile_pixel7pro', 'feature_profile_xiaomi13']);
+// profile_kind_android_id = 分区标签「Android ID」,日韩开发者文档里也照写英文名,无译形。
+const IDENTICAL_OK = new Set([
+  'confirm',
+  'feature_profile_pixel7pro',
+  'feature_profile_xiaomi13',
+  'profile_kind_android_id',
+]);
 
 const enXml = readFileSync('app/src/main/res/values/strings.xml', 'utf8');
 const lines = enXml.split('\n');

@@ -33,8 +33,8 @@ class ProfileEditorForm(
     /** 目录声明序的字段列表(UI 逐分区渲染时的稳定行序来源)。 */
     val fields: List<ProfileField> get() = ProfileField.entries
 
-    /** 分区 → 行序(直接委派目录,杜绝第二份清单)。 */
-    fun rowsBySection(): Map<ProfileSection, List<ProfileField>> = ProfileFieldCatalog.bySection
+    /** 来源族 → 行序(直接委派目录,杜绝第二份清单;V49 起分区即类别)。 */
+    fun rowsByKind(): Map<ProfileKind, List<ProfileField>> = ProfileFieldCatalog.byKind
 
     /** 该字段当前编辑文本。 */
     fun textOf(field: ProfileField): String = texts[field].orEmpty()

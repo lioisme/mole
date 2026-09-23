@@ -8,7 +8,6 @@ import com.lioisme.modev.core.model.ProfileFieldCatalog
 import com.lioisme.modev.core.model.ProfileFieldError
 import com.lioisme.modev.core.model.ProfileKind
 import com.lioisme.modev.core.model.ProfileResolution
-import com.lioisme.modev.core.model.ProfileSection
 import com.lioisme.modev.core.model.ProfileValues
 import com.lioisme.modev.core.model.ProfileValueType
 import com.lioisme.modev.core.model.stringOf
@@ -37,8 +36,8 @@ class ProfileEditorState(
     /** 编辑态与校验结论的唯一事实源。 */
     val form: ProfileEditorForm = ProfileEditorForm(initial)
 
-    /** 分区到行序(目录驱动;UI 逐分区渲染,禁自造顺序)。 */
-    fun rowsBySection(): Map<ProfileSection, List<ProfileField>> = form.rowsBySection()
+    /** 来源族到行序(目录驱动;UI 逐分区渲染,禁自造顺序。V49:分区即类别)。 */
+    fun rowsByKind(): Map<ProfileKind, List<ProfileField>> = form.rowsByKind()
 
     fun textOf(field: ProfileField): String = form.textOf(field)
 
@@ -198,7 +197,7 @@ data class ProfileEditorView(
     val identity: ProfileIdentityPreview,
     val groups: List<ProfileKind>,
     val conflicts: List<ProfileConflict>,
-    val rowsBySection: Map<ProfileSection, List<ProfileField>>,
+    val rowsByKind: Map<ProfileKind, List<ProfileField>>,
     val texts: Map<ProfileField, String>,
     val errors: Map<ProfileField, ProfileFieldError>,
     val firstError: Pair<ProfileField, ProfileFieldError>?,
@@ -212,7 +211,7 @@ fun ProfileEditorState.toView(): ProfileEditorView = ProfileEditorView(
     identity = identity(),
     groups = groups(),
     conflicts = conflicts(),
-    rowsBySection = rowsBySection(),
+    rowsByKind = rowsByKind(),
     texts = ProfileField.entries.associateWith { textOf(it) },
     errors = ProfileField.entries.mapNotNull { field ->
         errorOf(field)?.let { field to it }

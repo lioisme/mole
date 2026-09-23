@@ -844,23 +844,19 @@
     <string name="profile_device_no_match">일치하는 항목 없음 - 더 짧은 키워드로 시도하세요</string>
     <string name="profile_device_truncated">전체 %2$,d개 중 처음 %1$,d개 표시 - 검색 범위를 좁히세요</string>
     <string name="profile_picker_manual">직접 입력하기</string>
-    <string name="profile_section_device">기기와 빌드</string>
-    <string name="profile_section_network">네트워크</string>
-    <string name="profile_section_sim">SIM 통신사</string>
-    <string name="profile_section_identity">고유 식별자</string>
-    <string name="profile_section_cell">기지국 매개변수</string>
-    <string name="profile_section_location">위치 정보</string>
-    <string name="profile_section_locale">언어와 시간대</string>
-    <string name="profile_section_app_version">대상 앱 버전</string>
-    <string name="profile_section_other">배터리와 스크린샷</string>
-    <string name="profile_section_blank_pass">빈 패스</string>
-    <string name="profile_kind_build">Build 신원</string>
+    <!-- V49 R-1: 分区 ≡ 底层来源族 ≡ 干预类别 ⇒ 一条轴一套名字。旧的 profile_section_* 十条
+         与 profile_kind_* 是同一概念的两套键,已退役;标题改为「本地化名 + 来源 API 标识」
+         的格式串,第二个参数来自 ProfileKind.sourceApi(代码标识符,不进翻译表)。 -->
+    <string name="profile_section_title">%1$s（%2$s）</string>
+    <string name="profile_kind_build_identity">Build 신원</string>
+    <string name="profile_kind_build_version">Build 버전</string>
     <string name="profile_kind_density">화면 밀도</string>
     <string name="profile_kind_cpu">CPU 코어 수</string>
+    <string name="profile_kind_android_id">Android ID</string>
+    <string name="profile_kind_telephony_id">단말 식별자 그룹</string>
+    <string name="profile_kind_sim">SIM 통신사 값</string>
     <string name="profile_kind_network">활성 네트워크</string>
     <string name="profile_kind_wifi">Wi-Fi 식별자</string>
-    <string name="profile_kind_sim">SIM 통신사 값</string>
-    <string name="profile_kind_unique_id">고유 식별자 그룹</string>
     <string name="profile_kind_cell">기지국 매개변수 그룹</string>
     <string name="profile_kind_location">위치 좌표</string>
     <string name="profile_kind_wifi_location_hide">Wi-Fi 측위 원천 숨김</string>

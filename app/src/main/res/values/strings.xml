@@ -848,23 +848,19 @@
     <string name="profile_device_no_match">No match - try a shorter keyword</string>
     <string name="profile_device_truncated">Showing the first %1$,d of %2$,d - narrow the search</string>
     <string name="profile_picker_manual">Type a value instead</string>
-    <string name="profile_section_device">Device and Build</string>
-    <string name="profile_section_network">Network</string>
-    <string name="profile_section_sim">SIM Operator</string>
-    <string name="profile_section_identity">Unique Identifiers</string>
-    <string name="profile_section_cell">Cell Towers</string>
-    <string name="profile_section_location">Location</string>
-    <string name="profile_section_locale">Language and Time Zone</string>
-    <string name="profile_section_app_version">Target App Version</string>
-    <string name="profile_section_other">Battery and Screenshots</string>
-    <string name="profile_section_blank_pass">Blank Pass</string>
-    <string name="profile_kind_build">Build identity</string>
+    <!-- V49 R-1: 分区 ≡ 底层来源族 ≡ 干预类别 ⇒ 一条轴一套名字。旧的 profile_section_* 十条
+         与 profile_kind_* 是同一概念的两套键,已退役;标题改为「本地化名 + 来源 API 标识」
+         的格式串,第二个参数来自 ProfileKind.sourceApi(代码标识符,不进翻译表)。 -->
+    <string name="profile_section_title">%1$s (%2$s)</string>
+    <string name="profile_kind_build_identity">Build identity</string>
+    <string name="profile_kind_build_version">Build version</string>
     <string name="profile_kind_density">Screen density</string>
     <string name="profile_kind_cpu">CPU cores</string>
+    <string name="profile_kind_android_id">Android ID</string>
+    <string name="profile_kind_telephony_id">Device identifiers</string>
+    <string name="profile_kind_sim">SIM operator values</string>
     <string name="profile_kind_network">Active network</string>
     <string name="profile_kind_wifi">Wi-Fi identifiers</string>
-    <string name="profile_kind_sim">SIM operator values</string>
-    <string name="profile_kind_unique_id">Unique identifiers</string>
     <string name="profile_kind_cell">Cell parameters</string>
     <string name="profile_kind_location">Coordinates</string>
     <string name="profile_kind_wifi_location_hide">Hide Wi-Fi location source</string>
