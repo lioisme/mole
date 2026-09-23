@@ -18,6 +18,8 @@ import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.CryptoRecord
 import com.lioisme.modev.mcp.protocol.McpProtocol
+import com.lioisme.modev.ui.settings.profiles.FakeCarrierCatalog
+import com.lioisme.modev.ui.settings.profiles.FakeDeviceCatalog
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
@@ -92,7 +94,7 @@ class McpToolsTest {
         listenTools = ListenConfigTools(settings)
         featureTools = FeatureConfigTools(settings)
         assetTools = GlobalAssetTools(keywords, settings, profiles)
-        profileTools = SpoofProfileTools(profiles, settings)
+        profileTools = SpoofProfileTools(profiles, settings, FakeDeviceCatalog(FakeDeviceCatalog.READY), FakeCarrierCatalog(FakeCarrierCatalog.READY))
     }
 
     @After

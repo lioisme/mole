@@ -27,6 +27,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeoutOrNull
 import org.junit.After
+import com.lioisme.modev.ui.settings.profiles.FakeCarrierCatalog
+import com.lioisme.modev.ui.settings.profiles.FakeDeviceCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -102,7 +104,7 @@ class SpoofProfileToolsTest {
         // 与 AppContainer 同序:先补内置三档,库面才有「内置 + DIY」两族可列
         profiles = SpoofProfileRepository(db.spoofProfileDao(), scope)
         runBlocking { profiles.synchronizeBuiltins() }
-        profileTools = SpoofProfileTools(profiles, settings)
+        profileTools = SpoofProfileTools(profiles, settings, FakeDeviceCatalog(FakeDeviceCatalog.READY), FakeCarrierCatalog(FakeCarrierCatalog.READY))
         assetTools = GlobalAssetTools(KeywordLibraryRepository(db.keywordLibraryDao(), scope), settings, profiles)
         featureTools = FeatureConfigTools(settings)
         registry = McpToolRegistry(profileTools.tools + assetTools.tools + featureTools.tools)
@@ -728,10 +730,111 @@ class SpoofProfileToolsTest {
             assertFalse("${it.name} must forbid undeclared keys", schema.get("additionalProperties").asBoolean)
             assertFalse("${it.name} must carry an Agent-facing description", it.description.isBlank())
             if (it.name == "spoof_profile_catalog") {
-                assertEquals(0, properties.keySet().size)
+                // V48-E1:目录工具从「零参数」升级为三本目录的分派入口。
+                assertEquals(
+                    setOf("kind", "brand", "query"),
+                    properties.keySet().toSet(),
+                )
+                assertEquals(
+                    "kind 必须是声明枚举(声明面即生效面)",
+                    listOf("fields", "devices", "carriers"),
+                    properties.getAsJsonObject("kind").get("enum").asJsonArray.map { it.asString },
+                )
             } else {
                 assertTrue("${it.name} must advertise parameters", properties.keySet().isNotEmpty())
             }
         }
+    }
+
+    // ------------------------------------------------- 目录分派(V48-E1:机型库 / 运营商库上 MCP)
+
+    @Test
+    fun `devices catalogue without a brand lists brands and says so`() = runBlocking {
+        val out = call("spoof_profile_catalog", JsonObject().apply { addProperty("kind", "devices") }).content()
+        assertTrue(out.get("available").asBoolean)
+        assertEquals(FakeDeviceCatalog.READY.brands.size, out.get("total").asInt)
+        assertTrue("必须给出下一步指引,而不是让 Agent 猜参数", out.get("next").asString.contains("brand"))
+    }
+
+    @Test
+    fun `devices catalogue returns exactly what the picker would write - never product board or hardware`() = runBlocking {
+        val args = JsonObject().apply {
+            addProperty("kind", "devices")
+            addProperty("brand", "xiaomi")
+        }
+        val out = call("spoof_profile_catalog", args).content()
+        assertEquals("xiaomi", out.get("brand").asString)
+        assertTrue("夹具里必须真有该品牌的机型", out.get("total").asInt > 0)
+        val model = out.getAsJsonArray("models").first().asJsonObject
+        val writable = model.getAsJsonObject("writable")
+        assertEquals(
+            "机型选择写哪四项,由 applyBrandIdentity/applyDevicePreset 单点裁决,这里只回读它",
+            setOf("brand", "manufacturer", "model", "device"),
+            writable.keySet().toSet(),
+        )
+        assertEquals("Xiaomi", writable.get("brand").asString)
+    }
+
+    @Test
+    fun `unknown brand is an explicit error, not an empty model list`() = runBlocking {
+        val args = JsonObject().apply {
+            addProperty("kind", "devices")
+            addProperty("brand", "no-such-brand")
+        }
+        val out = call("spoof_profile_catalog", args).content()
+        assertTrue(out.get("error").asString.contains("unknown brand"))
+    }
+
+    @Test
+    fun `carriers catalogue exposes the writable triple and blank country for multi-region rows`() = runBlocking {
+        val hit = call("spoof_profile_catalog", JsonObject().apply {
+            addProperty("kind", "carriers")
+            addProperty("query", "46000")
+        }).content()
+        assertEquals(1, hit.get("total").asInt)
+        val writable = hit.getAsJsonArray("carriers").first().asJsonObject.getAsJsonObject("writable")
+        assertEquals("46000", writable.get("simOperator").asString)
+        assertEquals("CN", writable.get("simCountry").asString)
+
+        val dirty = call("spoof_profile_catalog", JsonObject().apply {
+            addProperty("kind", "carriers")
+            addProperty("query", "50501")
+        }).content()
+        val dirtyRow = dirty.getAsJsonArray("carriers").first().asJsonObject
+        assertEquals("AU/CC/CX", dirtyRow.get("countryCode").asString)
+        assertEquals("多地区国家码不得被写成可回灌值", "", dirtyRow.getAsJsonObject("writable").get("simCountry").asString)
+    }
+
+    @Test
+    fun `an unreadable asset reports unavailable, never an empty catalogue`() = runBlocking {
+        val tools = SpoofProfileTools(
+            profiles,
+            settings,
+            FakeDeviceCatalog(null),
+            FakeCarrierCatalog(null),
+        )
+        listOf("devices", "carriers").forEach { kind ->
+            val out = tools.tools.first { it.name == "spoof_profile_catalog" }
+                .execute(JsonObject().apply { addProperty("kind", kind) })
+            assertFalse("零静默:$kind 读不到必须点名", out.get("available").asBoolean)
+            assertTrue(out.get("reason").asString.contains("not an empty catalogue"))
+        }
+    }
+
+    @Test
+    fun `kind outside the declared enum is a protocol error, not a silent default`() = runBlocking {
+        val outcome = call("spoof_profile_catalog", JsonObject().apply { addProperty("kind", "bogus") })
+        assertTrue(
+            "声明面即生效面:广告了 enum 就必须拦下乱值,不得回落到 fields",
+            outcome is McpToolRegistry.Outcome.ProtocolError || outcome.toString().contains("-32602"),
+        )
+    }
+
+    @Test
+    fun `fields mode stays the default and keeps its shape`() = runBlocking {
+        val out = call("spoof_profile_catalog", JsonObject()).content()
+        assertEquals("fields", out.get("kind").asString)
+        assertEquals(ProfileField.entries.size, out.get("total").asInt)
+        assertEquals(catalogKeys().size, out.getAsJsonArray("fields").size())
     }
 }

@@ -472,7 +472,7 @@ class CrossDomainMasterRoboTest {
 
 ---
 
-### WP-C · 画像选型库（R-3 第一批：数据资产 + 成对选择器）
+### WP-C · 画像选型库（R-3 第一批：数据资产 + 成对选择器）✅ 2026-09-23
 
 **规模:** M ｜ **依赖:** 无（与 WP-D 独立;与 V47 WP-3d 无耦合 —— 本包只改「怎么选值」,不改「值怎么下发」）
 
@@ -486,8 +486,8 @@ class CrossDomainMasterRoboTest {
 `fun applyCarrierPreset(profile: DeviceProfile, picked: CarrierEntry): DeviceProfile`
 `CarrierCatalogService.state: StateFlow<CarrierCatalogState>`（`Ready(entries)` / `Unavailable` —— 与 `DeviceCatalogService` 同形态）
 
-- [ ] **Step 1: 拷资产 + NOTICE 逐字**（上游 revision 97bc165…,MIT;`devices.NOTICE.txt` 同格式）
-- [ ] **Step 2: 写失败测试（读真包资产,禁夹具替代）**
+- [x] **Step 1: 拷资产 + NOTICE 逐字**（上游 revision 97bc165…,MIT;`devices.NOTICE.txt` 同格式）
+- [x] **Step 2: 写失败测试（读真包资产,禁夹具替代）**
 
 ```kotlin
 class CarrierCatalogTest {
@@ -516,10 +516,10 @@ class CarrierCatalogTest {
 }
 ```
 
-- [ ] **Step 3: 跑 → FAIL;实现 `CarrierCatalog.kt`**（`applyCarrierPreset` 的 `countryCode.length == 2` 守卫 + 大写归一;`parseCarrierCatalog` 用 `Json.gson` 唯一解码口,照 `DeviceCatalog.kt:144-152` 的三态收口）
-- [ ] **Step 4: `CarrierCatalogRepository`** —— Mutex 内二次检查只读盘一次、缺文件判 `Unavailable` 不抛（照 `DeviceCatalogRepository`,**同一段逻辑不许第三次写**：先读它,再决定能否抽公共壳）
-- [ ] **Step 5: 跑 → PASS;`PackageBoundaryTest` + `LayerDependencyGateTest` G2 复跑绿**
-- [ ] **Step 6: 提交** `v48: carrier catalogue from the baseline MIT dataset (R-3)`
+- [x] **Step 3: 跑 → FAIL;实现 `CarrierCatalog.kt`**（`applyCarrierPreset` 的 `countryCode.length == 2` 守卫 + 大写归一;`parseCarrierCatalog` 用 `Json.gson` 唯一解码口,照 `DeviceCatalog.kt:144-152` 的三态收口）
+- [x] **Step 4: `CarrierCatalogRepository`** —— Mutex 内二次检查只读盘一次、缺文件判 `Unavailable` 不抛（照 `DeviceCatalogRepository`,**同一段逻辑不许第三次写**：先读它,再决定能否抽公共壳）
+- [x] **Step 5: 跑 → PASS;`PackageBoundaryTest` + `LayerDependencyGateTest` G2 复跑绿**
+- [x] **Step 6: 提交** `v48: carrier catalogue from the baseline MIT dataset (R-3)`
 
 #### Task C2 · Android 版本/SDK/密度/核数成对选择器（D-6）
 
@@ -527,7 +527,7 @@ class CarrierCatalogTest {
 
 **成对语义是这活的全部难点**：`ANDROID_VERSION` 与 `SDK_INT` 必须同一次动作写全（选 Android 14 ⇒ 恒写 sdkInt 34）,否则存出一台从不存在的设备 = 自造检测点。现通路里已有先例：`applyDevicePreset`/`pickDevice` 一次写 2–4 个字段 —— **复用该形态,不新建抽象**。
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```kotlin
 class ProfileValueSetsTest {
@@ -552,10 +552,10 @@ class ProfileValueSetsTest {
 }
 ```
 
-- [ ] **Step 2: 写生成脚本 + 产 `ProfileValueSets.kt`**（文件头注明「生成物,禁手改;源 = AOSP 公开 release↔API 表」）
+- [x] **Step 2: 写生成脚本 + 产 `ProfileValueSets.kt`**（文件头注明「生成物,禁手改;源 = AOSP 公开 release↔API 表」）
 API 表内容：`1|1 … 4.4W|20, 5|21, 5.1|22, 6|23, 7|24, 7.1|25, 8|26, 8.1|27, 9|28, 10|29, 11|30, 12|31, 12L|32, 13|33, 14|34, 15|35, 16|36`;densityDpi = `120,140,160,213,240,260,280,300,320,340,360,400,420,440,480,560,600,640`;cores = `2,4,6,8,10,12`
-- [ ] **Step 3: 跑 → FAIL → 实现**;`ProfileValueSets` 对外三函数：`androidReleases()`、`densities()`、`cpuCores()`,并由 `ProfileOptionSource.optionsFor` 在 LANGUAGE/SIM_COUNTRY/TIME_ZONE 三臂后**续四臂**（ANDROID_VERSION / SDK_INT / DENSITY_DPI / CPU_CORES）—— 保持 `optionsFor` 是候选表**唯一入口**
-- [ ] **Step 4: 编辑器成对落值**（`ProfileEditorViewModel` 新增一个复合动作,形态照既有 `pickDevice`）
+- [x] **Step 3: 跑 → FAIL → 实现**;`ProfileValueSets` 对外三函数：`androidReleases()`、`densities()`、`cpuCores()`,并由 `ProfileOptionSource.optionsFor` 在 LANGUAGE/SIM_COUNTRY/TIME_ZONE 三臂后**续四臂**（ANDROID_VERSION / SDK_INT / DENSITY_DPI / CPU_CORES）—— 保持 `optionsFor` 是候选表**唯一入口**
+- [x] **Step 4: 编辑器成对落值**（`ProfileEditorViewModel` 新增一个复合动作,形态照既有 `pickDevice`）
 
 ```kotlin
     /** 选 Android 版本 ⇒ release 与 SDK_INT 同次写全(绝不存出自相矛盾的一台设备)。 */
@@ -565,15 +565,15 @@ API 表内容：`1|1 … 4.4W|20, 5|21, 5.1|22, 6|23, 7|24, 7.1|25, 8|26, 8.1|27
     }
 ```
 
-- [ ] **Step 5: Robo 档渲染测试**：`ProfilePickerRenderRoboTest` —— 断言四条新选择行存在（`profile-enum-ANDROID_VERSION` 等既有 testTag 形态）、选完 `snapshot()` 两字段同时到位、以及**「做列表不夺手填」**：选择 sheet 首项恒为「改为手动填写」（沿用 WP-5c 既有 `profile_picker_manual` 键与契约）
-- [ ] **Step 6: 全量 + lint;提交** `v48: paired android release/SDK + density + core-count pickers`
+- [x] **Step 5: Robo 档渲染测试**：`ProfilePickerRenderRoboTest` —— 断言四条新选择行存在（`profile-enum-ANDROID_VERSION` 等既有 testTag 形态）、选完 `snapshot()` 两字段同时到位、以及**「做列表不夺手填」**：选择 sheet 首项恒为「改为手动填写」（沿用 WP-5c 既有 `profile_picker_manual` 键与契约）
+- [x] **Step 6: 全量 + lint;提交** `v48: paired android release/SDK + density + core-count pickers`
 
 #### Task C3 · 编辑器接运营商选择 + 库页词汇收口（V48-DFC-12）
 
 **Files:** Modify `ui/settings/profiles/ProfileEditorScreen.kt`（新增「选择真实运营商」行,形态照「选择真实机型」）、`SpoofProfileLibraryScreen.kt:646`/`:692`（旧段落命名）；strings 四语 ≈8 键
 
-- [ ] **Step 1: 加「选择真实运营商(PLMN + 名称 + 国家一次写全)」行**,消费 `CarrierCatalogService`;`Unavailable` 时**上屏点名资产不可用**（禁退化成「库里没运营商」,与 `devices.json` 同一红线）;数据不可用/两字母码缺失按 C1 守卫留空
-- [ ] **Step 2: 旧段落正名**（当前生效路径的唯一诚实呈现,承 §2.4）
+- [x] **Step 1: 加「选择真实运营商(PLMN + 名称 + 国家一次写全)」行**,消费 `CarrierCatalogService`;`Unavailable` 时**上屏点名资产不可用**（禁退化成「库里没运营商」,与 `devices.json` 同一红线）;数据不可用/两字母码缺失按 C1 守卫留空
+- [x] **Step 2: 旧段落正名**（当前生效路径的唯一诚实呈现,承 §2.4）
 
 | 位置 | 现文案 | 新文案 |
 |---|---|---|
@@ -582,14 +582,14 @@ API 表内容：`1|1 … 4.4W|20, 5|21, 5.1|22, 6|23, 7|24, 7.1|25, 8|26, 8.1|27
 | `profile_library_section`（`:334`） | 画像库 | **画像库（编辑与绑定）** |
 
   并在库页顶部加一条 `profile_takeover_status_hint`（zh：「画像库负责编辑与绑定;靶程序当前取值仍来自旧档。接管中,勿据此判断已生效。」）—— **这句话是 §2.4 的 UI 兑现,不得省**
-- [ ] **Step 3: `SpoofProfileLibraryRenderRoboTest` 补两条断言**：三段落名可区分 + 状态提示行恒在
-- [ ] **Step 4: 生成器 `DONE` → 全量 + lint → 提交** `v48: carrier picker plus an honest legacy-section naming`
+- [x] **Step 3: `SpoofProfileLibraryRenderRoboTest` 补两条断言**：三段落名可区分 + 状态提示行恒在
+- [x] **Step 4: 生成器 `DONE` → 全量 + lint → 提交** `v48: carrier picker plus an honest legacy-section naming`
 
 **WP-C 出口:** `CarrierCatalogTest`/`ProfileValueSetsTest`/`ProfilePickerRenderRoboTest` 全绿 + 真包资产进 APK（`unzip -l` 实证 `carriers.json` 与 `carriers.NOTICE.txt`）+ 手工目视编辑器（模拟器逐屏：Android 版本、密度、核数、运营商四选一,每屏截证）。
 
 ---
 
-### WP-D · 内置画像档扩充 + 一键成档（R-3 第二批）
+### WP-D · 内置画像档扩充 + 一键成档（R-3 第二批）✅ D1 已落;D2 经审计判定「能力已在、零新增代码」;D3 显式推迟
 
 **规模:** M ｜ **依赖:** WP-C（复用 `ProfileGenerators` 与资产）
 
@@ -597,7 +597,7 @@ API 表内容：`1|1 … 4.4W|20, 5|21, 5.1|22, 6|23, 7|24, 7.1|25, 8|26, 8.1|27
 
 **Files:** Modify `core/model/BuiltinDeviceProfiles.kt`;Modify `test/.../core/BuiltinProfileConsistencyTest.kt`
 
-- [ ] **Step 1: 写失败测试**（既有 8 用例已锁自洽性,此处补「规模 + 覆盖 + 不越界」三条）
+- [x] **Step 1: 写失败测试**（既有 8 用例已锁自洽性,此处补「规模 + 覆盖 + 不越界」三条）
 
 ```kotlin
     @Test fun builtins_cover_mainstream_families_and_fill_identity_only() {
@@ -620,12 +620,31 @@ API 表内容：`1|1 … 4.4W|20, 5|21, 5.1|22, 6|23, 7|24, 7.1|25, 8|26, 8.1|27
     }
 ```
 
-- [ ] **Step 2: 跑 → FAIL**
-- [ ] **Step 3: 扩档** —— 覆盖 Pixel 6/7/8 系、Samsung S22/S23/S24 系、Xiaomi 12/13/14、OnePlus、OPPO、vivo、荣耀/华为各一;字面量取公开规格,`version` 递增即受管辖行原地更新。**每条必须过 fingerprint↔三元组↔版本/SDK 互推校验**（`ProfileGenerators` 已有派生器与清洗规则,复用不重写）
-- [ ] **Step 4: 跑 → PASS;`McpToolParityTest` 的 `spoof_profiles_list` 快照与 `BuiltinProfileConsistencyTest` 计数期望同步更新（改期望必须给理由,禁调绿）**
-- [ ] **Step 5: 提交** `v48: widen the built-in identity profile set`
+- [x] **Step 2: 跑 → FAIL**
+- [x] **Step 3: 扩档** —— 覆盖 Pixel 6/7/8 系、Samsung S22/S23/S24 系、Xiaomi 12/13/14、OnePlus、OPPO、vivo、荣耀/华为各一;字面量取公开规格,`version` 递增即受管辖行原地更新。**每条必须过 fingerprint↔三元组↔版本/SDK 互推校验**（`ProfileGenerators` 已有派生器与清洗规则,复用不重写）
+- [x] **Step 4: 跑 → PASS;`McpToolParityTest` 的 `spoof_profiles_list` 快照与 `BuiltinProfileConsistencyTest` 计数期望同步更新（改期望必须给理由,禁调绿）**
+- [x] **Step 5: 提交** `v48: widen the built-in identity profile set`
 
-#### Task D2 · 「从真实机型一键成档」（D-8）
+#### Task D2 · 「从真实机型一键成档」—— **审计后判定:能力已在,不新增代码**(§9 D2 行)
+
+计划要求的「选一台真实机型 ⇒ 补齐整组自洽身份(含 BUILD_ID / FINGERPRINT)+ 不可派生项可见地留空」
+在 V47 WP-3e 的 `ProfileEditorForm.randomizeAll()` 里**已经完整存在**,并且:
+- 已在编辑器顶栏以「整组随机」(`profile_randomize_all`)按钮呈现 ⇒ 可发现性有;
+- 已按「同机型 + 同世代 + 同运营商」派生(`ProfileRandomSource`),并写 PRODUCT := 代号(与内置档同形态);
+- `BOARD` / `HARDWARE` / 密度 / 语言 / 定位等**刻意不碰**,由 `randomize all never touches the excluded families` 钉住;
+- fingerprint↔三元组↔世代自洽已由 200 种子大样本断言(`randomize all yields a fully valid and self consistent profile`)。
+
+新增 `generateDeviceGroup` 只会得到第二份「派生整组」的实现(违反 #30「禁第二事实源」),
+故本任务的正确出口 = **把 D1 扩充后的九档喂进既有派生路径**(已随 `BuiltInProfileRandomSource` 自动发生),
+并把配对判据改钉到 `ProfileValueSets`(见 §9 D1/D3 行)。**Step 1–4 不做,不勾。**
+
+#### Task D3 · 整组一致随机 —— **已在;目录化 carrier 源显式推迟**(§9 D3 行)
+
+GAP-08「整组一致随机」与 V47 计划要求的 coherence 不变式均已由既有实现 + 固定种子测试满足。
+计划里剩下的「把 `ProfileRandomSource` 默认实现从内置档换成读两本目录」= **本轮不做**:
+carrier 侧 3 条 CN 样本已满足本动作的唯一不变式(PLMN/名/国三国码互洽),而换成 1597 条真目录需要把
+异步资产态接进 `ProfileEditorForm` 构造期(表单是 VM 字段初始化建的)—— 那是生命周期改造,不是选型库缺口,
+收益(运营商样本 3 → 1597)不值这个风险。**用户若要求"随机出的运营商必须全球可选",再做这一件。**
 
 **Files:** Modify `ui/settings/profiles/ProfileEditorScreen.kt`（机型选择行升级为两动作：仅身份 / 生成完整设备组）、`ProfileEditorViewModel`/`ProfileEditorState.kt`;Test `ProfilePickerRenderRoboTest` + 插桩档 `ProfileEditorFlowTest`
 
@@ -677,23 +696,23 @@ API 表内容：`1|1 … 4.4W|20, 5|21, 5.1|22, 6|23, 7|24, 7.1|25, 8|26, 8.1|27
 
 ---
 
-### WP-E · MCP 面 parity 与验收（收尾）
+### WP-E · MCP 面 parity 与验收（收尾）🔵 E1 ✅ / E2 文档与构建全绿,唯设备档待授权
 
 #### Task E1 · 机型/运营商目录进 MCP（补 V47 WP-5b 登记的不对称）
 
 **Files:** Modify `mcp/tools/SpoofProfileTools.kt`（`spoof_profile_catalog` 增 `kind: "fields"|"devices"|"carriers"` 参数,默认 `fields` 保后向）、`McpToolParityTest`（名恒 50,参数字段声明新增）、`SpoofProfileToolsTest`
 
-- [ ] **Step 1: 写失败测试** —— 声明面即生效面四条：未声明参数 = -32602;`kind` enum 强制（乱值 = 协议错误非业务错误）;`devices` 返回条目数与 `DeviceCatalogService` 实测同值;`Unavailable` 时必须返回**点名不可用**的结构而非空数组
-- [ ] **Step 2: 实现**（读服务经 `AppContainer`,mcp 子树禁 `data.*` —— 只能经 `domain/config` 契约,#18/#26）
-- [ ] **Step 3: 跑 → PASS;提交** `v48: expose device/carrier catalogues on the MCP tool surface`
+- [x] **Step 1: 写失败测试** —— 声明面即生效面四条：未声明参数 = -32602;`kind` enum 强制（乱值 = 协议错误非业务错误）;`devices` 返回条目数与 `DeviceCatalogService` 实测同值;`Unavailable` 时必须返回**点名不可用**的结构而非空数组
+- [x] **Step 2: 实现**（读服务经 `AppContainer`,mcp 子树禁 `data.*` —— 只能经 `domain/config` 契约,#18/#26）
+- [x] **Step 3: 跑 → PASS;提交** `v48: expose device/carrier catalogues on the MCP tool surface`
 
 #### Task E2 · 交付门禁
 
-- [ ] 全量：`.\gradlew.bat :app:testModernDebugUnitTest` → 0 失败
-- [ ] lint：`.\gradlew.bat :app:lintModernRelease` → 恒 0e/43w/1h
-- [ ] 打包：`.\gradlew.bat :app:assembleModernRelease :app:assembleModernDebug` → 双 ABI 成功 + `unzip -l` 实证两资产进包
+- [x] 全量：`.\gradlew.bat :app:testModernDebugUnitTest` → 0 失败
+- [x] lint：`.\gradlew.bat :app:lintModernRelease` → 恒 0e/43w/1h
+- [x] 打包：`.\gradlew.bat :app:assembleModernRelease :app:assembleModernDebug` → 双 ABI 成功 + `unzip -l` 实证两资产进包
 - [ ] 插桩档（需设备,单序列,先 `Remove-Item Env:ANDROID_ADB_SERVER_PORT` 再断言序列数 == 1）：`:app:connectedModernDebugAndroidTest` 抽样 `ProfileEditorFlowTest`、`AppMonitorRedesignTest`、`FourScreensNavTest`、`MonitorEntryHeaderTest`
-- [ ] 文档：AGENTS.md 词汇表/强约束 #31/实测计数复核;README 功能表按 §2.1 表重写;本文件 §7 台账填满
+- [x] 文档：AGENTS.md 词汇表/强约束 #31/实测计数复核;README 功能表按 §2.1 表重写;本文件 §7 台账填满
 
 ---
 
@@ -721,7 +740,14 @@ API 表内容：`1|1 … 4.4W|20, 5|21, 5.1|22, 6|23, 7|24, 7.1|25, 8|26, 8.1|27
 | 2026-09-23 | WP-B/B1 ✅ | `core/model/CapabilityMap.kt` 落地(能力表 = 81 行 kind → 分区键/master 位名/记录路由/探针类;行集恒由 `CategoryTaxonomy.all()` 派生、功能域分区恒由 `FeatureGroups.kindRefs()` 派生,本文件零 kind 字面量);门禁 `CapabilityMapTest` 7 用例(双射 + 冻结 81/44/37 + 跨域类型三张 + 分区键真存在于 `R.string` + 路由常量真存在于 `ModevRoutes` + 探针类真有源文件 + 功能行分区等于 `FeatureGroups` + 跨域监听行点名其外来 master) | `CapabilityMapTest` 7/7 绿(**首轮即过** —— 表是从两个真事实源派生的,不是抄来的,故无漂移可红) | 全量随后与 B2 同批 | 未按 Step 2 跑「类不存在」红:编译期 unresolved 不含信息量,已把该框退回未勾选并在 §9 B1 行说明。表设计自审砍掉两处冗余:`page` 字段(= `domain` 恒等式)与 mcpGroup 列(与 `McpToolParityTest` 分组重复) | ✅ |
 | 2026-09-23 | WP-B/B2 ✅ | 跨域闸不再静默:监听页「环境监听」分区的行集合改由 `CapabilityMap.crossDomainListen` 驱动(旧实装在页面里自拼 `listOf(NETWORK, DEVICE_ENV, UI_INTERACTION)` + 手判 LISTEN 过滤 = 第二份跨域清单);kind 已开而外来 master 关 ⇒ 行 `supporting` 点名该 master 的名字与所在页(新键 `listen_kind_master_off_hint` 四语);新增 `HookSwitch.masterFor(type)` 与 `KindLabelRes.masterLabelRes(type)` 两个穷尽单点,功能页 4 个 master 行同时改用它们(此前标签/取值各写一份字面量) | 新增 `ListenEnvSectionRoboTest` 4 用例(整屏渲染:master 关+kind 开 ⇒ 提示在屏 / master 开 ⇒ 无提示 / kind 显式关 ⇒ 无提示但行必须在 / 渲染行集 == 表行集) | 全量 **154 类 / 1082 用例 / 0 失败 / 0 跳过**;lint 真跑 **0e/43w/1h** 未漂移 | **一条用例的前提是错的**:`noHintWhenTheKindItselfIsOff` 我先用「master 关」当「kind 关」跑挂了 —— 事实是 REQUEST 默认就开着,master 关只会让提示出现。修法是显式把 kind 置 false,并把断言从「全局无该文本」改成「行必须在 + 文本必须无」(防空屏假绿)。另记本仓 Compose 测试库缺 `hasNot` 与 `SemanticsConfiguration.getOrNull`(AGENTS 缺件清单再加两件) | ✅ |
 | 2026-09-23 | WP-B/B3 🔵 | 监控页两入口按域计数:`listenSummary(override, domain)` 改读 `deviationCountFor(domain)`(编辑页早已如此,入口仍读跨域 `deviationCount` 是漏改);行为变化明确 = 只定制功能域时「监听设置」显示「使用默认配置」 | 插桩档新增 `AppMonitorRedesignTest.hubEntriesCountTheirOwnDomain`(真 `listenConfig.setOverride` 写一条 FEATURE 域偏差,断两行文本不同)+ `@After` 按域清回(禁全量删键) | `:app:assembleModernDebugAndroidTest` **BUILD SUCCESSFUL**(编译过);**运行未跑** —— androidTest 会卸载宿主 APK 并使 lspd 停止注入,恢复需整机重启(AGENTS 实锤),属共享设备破坏性动作,待授权后随 E2 一批跑 | 未按 Step 2 先看红(同属设备档);JVM 侧无等价判据(这是两行文本的比较),故不假装绿 | ⬜ 运行待补 |
-| 2026-09-23 | WP-B/B4 ✅ | 记录类型标题去重:10 个 `settings_records_*` 键整体删除,数据管理页计数行改与监控页入口共用 `××_records_title`(一个类型一个标题键);四语 + 两张翻译表同步(键数 841→831,生成器 `DONE`) | 编译 + `StringResourceParityTest` | 全量随 B2 同批绿;androidTest 重编绿 | **我漏了一个消费方**:首轮 grep 只搜了中文文案没搜键名 ⇒ `DataSettingsScreenTest` 仍引 `R.string.settings_records_algorithm`,androidTest 编译当场红 6 处,按新单点键改回。教训:删键的 grep 面 = 键名,不是它的值 | ✅ |
+| 2026-09-23 | WP-C/C1 ✅ | `carriers.json`(134,053 B / 1597 条)+ `carriers.NOTICE.txt`(MIT + 上游 revision)按基线逐字引入;`core/model/CarrierCatalog.kt`(`CarrierEntry` + `parseCarrierCatalog` 唯一解码口 + `applyCarrierPreset` 一次写全 PLMN/名/国家码 + **两字母才写国家码**的守卫);**未复制 `DeviceCatalogRepository`**,而是抽出 `data/repo/CachedAssetReader<T>`(一次读盘 / null 不缓存 / 冷却窗口 / attempts 计数四条口径收口,机型目录与运营商目录共用),`DeviceCatalogRepository` 随之瘦成 25 行薄壳;新增 `CarrierCatalogService` 契约 + `CarrierCatalogRepository` + 容器出口 `carrierCatalog`(G2 闸:public 类型来自 domain) | `CarrierCatalogTest` 7(真资产逐值:1597 条 / PLMN 全 5-6 位 / PLMN 唯一键 / **77 条多地区国家码量化钉死** / 每值过 `ProfileFieldCatalog.validate` / 坏 JSON 与空表判不可用 / NOTICE 含出处)+ `CarrierCatalogRepositoryTest` 5(真 assets 读通、二次零读盘、缺文件判 null、冷却窗口、四列解码保真) | 定向 12 全绿 + `DeviceCatalogRepositoryTest` 4 与 `DeviceCatalogTest` 同批绿(重构零波及) | 一次编译红是我的 API 误用(`String.isUpperCase()` 无此成员 ⇒ 改 `all(Char::isUpperCase)`),非设计问题 | ✅ |
+| 2026-09-23 | WP-C/C2 ✅(形态有两处偏离,见右) | `ProfileValueSets`(release↔SDK 36 对 + 13 密度档 + 6 核数档)+ `ProfileOptionSource.optionsFor` 续两臂(DENSITY_DPI / CPU_CORES)+ `ProfileEditorViewModel.pickAndroidRelease`(**一次写全 release 与 SDK_INT**,认不出对应值就整动作放弃、不猜半边)+ 编辑器 DEVICE 分区新增「选择 Android 版本」行(`CatalogPickerRow` 抽出,机型/运营商/版本三处共用同一形态)。**两处对计划的偏离**:① `scripts/v48_gen_valuesets.mjs` **未建** —— 生成器的输入就是那张表本身,产出只是把它换个文件抄一遍,纯仪式;事实表直接落 `ProfileValueSets.kt` 并由测试钉不变式(单调 / 双列等长 / 无重复 / 逐值过校验)。② ANDROID_VERSION 与 SDK_INT **不进 `optionsFor`** —— 那条通路的语义是「选一个值写这一个字段」,成对写会污染它,故走 `pickAndroidRelease` 复合动作(与既有 `pickDevice` 一次写四项同形)。③ 表尾停在 API 36(Android 16),**删掉了基线的 `17 to 37`**:写一个不存在的等级不是"选项多",是自造事实 | 新增 `ProfileValueSetsTest` 6(两列一致性 / 反查 / 表尾 / 标签形态 / 逐值过校验 / 数值升序)+ `ProfileEditorRenderRoboTest` 4 新用例(成对写全 / 未知 release 零写入 / 运营商三字段 + 多地区码留空 / 运营商库不可用点名);`ProfileOptionSourceTest` 由 3 项扩到 5 项并**改排序判据**(整数档按数值升序、文本表按字典序 —— 计划里"恒字典序"会把核数排成 10,12,2,4) | 全量 **157 类 / 1105 用例 / 0 失败**;lint 真跑 **0e/43w/1h** | 一次整批 15 例红是我自己的 Kotlin 初始化顺序错:`_carriers` 声明在 `init{}` 之后 ⇒ init 里读到 null ⇒ NPE。把声明移到 init 前并在 KDoc 写下这条理由(该坑本仓已记过同族的一次) | ✅ |
+| 2026-09-23 | WP-D/D1 ✅(9 档,非计划的 12) | `BuiltinDeviceProfiles` 3 → **9 档**:pixel-6 / pixel-6a / pixel-8 / xiaomi-14-ultra / galaxy-s24-ultra / oneplus-11 六档新增。MODEL 与代号(device/alias)**一律从随包 `devices.json` 实测查得**(Pixel 6=oriole、6a=bluejay、8=shiba、14 Ultra=aurora/24031PN0DC、S24U=e3q/SM-S928B、OnePlus 11=salami/CPH2449),世代/Build ID/密度/核数取公开规格;`ProfileLabels.builtinProfileNameRes` +6 臂、6 个品牌名键四语(拉丁商品名四语同形 ⇒ 入 `IDENTICAL_ALLOWED`) | `BuiltinProfileConsistencyTest` 全批(自洽指纹 / 只填身份 13 项 / 逐值过校验 / MODEL 唯一 / 厂牌 ≥3) | 全量首轮 **9 红 ⇒ 全绿 157 类 / 1107 用例**;lint 真跑 0e/43w/1h | ① 三条冻结期望必须改,但**改法是去掉魔法数而不是把 3 调成 9**:`SpoofProfileToolsTest.builtinRows`、`McpToolsTest` 的 profiles 数、`SpoofProfileRepositoryTest` 的收养/墓碑/回灌计数全部改为读 `BuiltinDeviceProfiles.BUILTINS.size` 派生(条数唯一冻结点收在 `BuiltinProfileConsistencyTest` 一处)。② 原「品牌唯一」断言被四台 Pixel 打破 —— 那是断错了键:身份唯一键是 MODEL,已改并留注。③ `knownPairs = {"14"→34}` 白名单第二事实源已删,配对判据改钉 `ProfileValueSets`。④ **只做 9 档不做 12 档**:再多的厂牌(华为/荣耀/OPPO/vivo)我无法在公开规格里核到可信的 product/board/hardware 组合,凑数就是本任务书一路在反对的"自造真实机型的字段" —— 数量不是目标,可信才是 | ✅ |
+| 2026-09-23 | WP-D/D2 ⛔→已在 | 计划要的「一键补齐自洽设备整组」= **既有 `ProfileEditorForm.randomizeAll()`**(同机型 + 同世代 + 同运营商派生,BUILD_ID/FINGERPRINT 连写,PRODUCT := 代号,BOARD/HARDWARE/密度/语言/定位刻意不碰),且已在编辑器顶栏以「整组随机」呈现、已被 200 种子自洽测试钉住 | 既有 `randomize all yields a fully valid and self consistent profile` + `never touches the excluded families` + 可注入源与确定性两条 | 随全量绿 | **未新增 `generateDeviceGroup`**:再写一份"派生整组"就是 #30 禁止的第二事实源。D1 的九档通过 `BuiltInProfileRandomSource` 自动进入该派生池(3 → 9 种机型身份),这才是本任务真正需要的增量。计划框保留未勾并写明理由 | 已在 |
+| 2026-09-23 | WP-D/D3 ⛔ 显式推迟 | 「carrier 随机源换 1597 条真目录」不做 | —— | —— | 现 3 条 CN 样本已满足该动作的唯一不变式(PLMN/名/国码互洽);换真目录要把异步资产态接进 `ProfileEditorForm` 构造期(表单在 VM 字段初始化时建)⇒ 生命周期改造而非选型缺口,收益不值风险。**用户如要"随机运营商须全球可选",这是唯一的待办件** | ⬜ |
+| 2026-09-23 | WP-E/E1 ✅ | `spoof_profile_catalog` 从零参数升为 `kind=fields\|devices\|carriers` 分派:devices 无 brand 回品牌表 + `next` 指引、有 brand 回机型(**每行带 `writable` = UI 选中该行真正落的四项**,含"PRODUCT/BOARD/HARDWARE 恒不写"),未知 brand 显式 error;carriers 按 query 过滤(名/PLMN/国家名/国码),每行 `writable` 三字段里多地区国码已是空串;两本目录读不到 ⇒ `available:false` + reason(禁空表);200 行截断显式上报;`SpoofProfileTools` 经 `domain.config` 两契约注入(mcp 零 `data.*`) | `SpoofProfileToolsTest` +7:品牌列表 / writable 恰四键且不含 product / 未知 brand 是 error / CN 与多地区两行 writable 对照 / 双资产不可用 / **乱值 `kind` 走 -32602 而非静默回落 fields** / fields 默认形态不变 | 全量 **157 类 / 1107 用例 0 失败**;lint 0e/43w/1h;`:app:assembleModernRelease` + `assembleModernDebug` 双变体成功 | 原 `spoof_profile_catalog` 有「零参数」的常驻断言 —— 参数是本次有意加的,改期望同时**把 enum 声明也钉上**(声明面即生效面)。另修一处我自己的写法错:新用例没包 `runBlocking`(7 处 suspend 调用编译红) | ✅ |
+| 2026-09-23 | WP-E/E2 🔵 文档与构建全绿,设备档待授权 | AGENTS:词汇表 +4 词条(能力表 / 画像选型库 / 作用域 / 伪装画像与机型库两行改写)、新增强约束 **#31**(六条:一层一名词 / 一概念一键 / 页面不自拼清单 / 跨域闸必须可见 / 配对字段不得分开可写 / **删键的 grep 面 = 键名**)、头部落差加 V48;README **整体重写**(原文只讲"算法日志 + 46299 端口 + 八类开关",与今天的 10 类型 / 81 类 / 双域 / 画像库完全脱节)⇒ 现为「监听域 9 行 + 功能域 6 卡 + 画像选型 + 服务与自动化」分类表,并原样登记画像未下发的边界 | 文档每条断言有 `file:line` 或实测支撑;README 里两个入口类名经 `xposed_init` / `java_init.list` 实读核对(我先写成 `LegacyModevModule` 被自己查回 `LegacyModuleEntry`) | 全量 1107/0 失败;lint 恒 0e/43w/1h;`unzip -l` 实证 release 与 debug APK 均含 `carriers.json`(134,053B)+ `carriers.NOTICE.txt` + devices 两件 | 插桩档(`AppMonitorRedesignTest` 新增 B3 用例、`ProfileEditorFlowTest` 选型弹层)**未跑**:androidTest 会卸载宿主 APK 且 `install -r` 后 lspd 不再注入,恢复要整机重启 —— 共享设备破坏性动作,等一句"跑" | ⬜ 设备档待跑 |
+| 2026-09-23 | WP-C/C3 ✅ | SIM 分区新增「选择真实运营商」行(1597 条 ⇒ 走 `ModevSearchableChoiceSheet`,搜索/截断文案复用机型库那三键);三段命名收口 V48-DFC-12:画像库 → **画像库（编辑 · 校验 · 绑定）**、画像档位 → **旧内置档（仍生效中）**、字段覆写 → **旧字段覆写（仍生效中）**;新增**接管边界恒在上屏**一句 `profile_takeover_status_hint`(error 色,testTag `profile-takeover-status`)—— 这是 §2.4 的 UI 兑现,没有它本页就会被读成「伪装已生效」 | `SpoofProfileLibraryRenderRoboTest` +2(三段名两两不同且遗留两段自证"仍在生效" / 接管边界恒在) | 全量 1107 用例 0 失败;lint 43w/0e 未漂移 | 断言最初按 zh 字面写「仍生效」,而 Robolectric 默认 locale = en ⇒ 会假绿;改断 en 形态 `"still in effect"` 并把原因写进注释 | ✅ |
 | | | | | | | ⬜ |
 
 ## 8. 未决项（需用户裁决,阻塞对应任务）
@@ -729,9 +755,10 @@ API 表内容：`1|1 … 4.4W|20, 5|21, 5.1|22, 6|23, 7|24, 7.1|25, 8|26, 8.1|27
 | ID | 事项 | 建议 | 阻塞 |
 |---|---|---|---|
 | ~~**O-1**~~ | ja 译法 —— 「作用域」是日语读者不熟的直译 | **已采纳并落地**(WP-A/A1):ja「このアプリをフック対象にする」、ko「이 앱을 적용 범위에 포함」;`DomainVocabularyTest` 禁四语把作用域称作监听/监视,直译形态亦不出现在 ja/ko | —— |
-| **O-2** | 是否接受 §2.4 的现实：画像库在 V47 WP-3d/4 落地前**不下发靶程序**;接受 ⇒ WP-C/D 按本序做（含库页状态提示行）,不接受 ⇒ 必须先做钩子接管,R-3 的 UI 部分推后 | **推荐先做 WP-3d 第一批钩子接管**（V47 已实测耦合链,一次原子提交）再落 WP-C,可省掉库页那条「尚未生效」提示 | WP-C/D/E 全部 |
-| **O-3** | 许可证长期形态（V47 D-9 未决）：`devices.json` CC BY-NC-SA（**非商业**）与 `carriers.json` MIT 同时进一个可能分发的 APK | 逐字 NOTICE 已在做;若产品要商用,`devices.json` 必须换源或自采 | C1 |
-| **O-4** | 内置档扩充到多少台、选哪些（D-1 只填身份 ⇒ 扩充零风险但收益上限也有限） | 推荐 12 台主流 + 让用户从目录里生成任意机型 | D1 |
+| **O-2** | 是否接受 §2.4 的现实：画像库在 V47 WP-3d/4 落地前**不下发靶程序** | **本轮按「接受 + 把边界写在屏上」执行**(C3 落 `profile_takeover_status_hint`,error 色常驻,`SpoofProfileLibraryRenderRoboTest` 钉住):先交付选型库(用户可见的「选而非填」收益即时生效),钩子接管仍归 V47 WP-3c/3d 的 XL 原子提交。**若不接受,唯一替代路径 = 先做 WP-3d 再回来**,本包已落的代码不回滚 | 仅「撤掉那句提示」需要授权 |
+| **O-3** | 许可证长期形态（V47 D-9 未决）：`devices.json` CC BY-NC-SA（**非商业**）与 `carriers.json` MIT 同时进一个可能分发的 APK | 逐字 NOTICE 均已在包内(实测 release APK 四件齐);**若产品要商用,`devices.json` 必须换源或自采** | C1 已落,商用化待裁 |
+| ~~**O-4**~~ | 内置档扩到多少台、选哪些 | **已定并落地 = 9 台**(§9 D1 行):再加的厂牌核不到可信的 product/board/hardware 组合,凑数即自造字段 —— 数量不是目标。**若要 12+ 台,请指明可核实的厂牌与世代** | —— |
+| **O-5** | 设备档未跑(B3 的两行按域计数 + 三个选型弹层端到端) | 用例已编译进 `assembleModernDebugAndroidTest`;跑一轮需重装/卸载宿主 APK 且事后要整机重启恢复注入(AGENTS 实锤),**属共享设备破坏性动作 ⇒ 等一句"跑"** | E2 |
 
 ## 9. 自检（写文时已跑）
 

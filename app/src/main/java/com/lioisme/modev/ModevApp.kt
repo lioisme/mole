@@ -239,6 +239,8 @@ class AppContainer(private val context: Context) {
                 keywords = keywordLibrary,
                 profiles = spoofProfiles,
                 catalog = catalog,
+                deviceCatalog = deviceCatalog,
+                carrierCatalog = carrierCatalog,
                 listPrefs = appListPrefs,
                 scopeRepository = scopeRepository,
                 connectionMonitor = wireStatus,

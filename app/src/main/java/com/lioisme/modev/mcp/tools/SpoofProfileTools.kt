@@ -1,6 +1,10 @@
 package com.lioisme.modev.mcp.tools
 
 import com.google.gson.JsonObject
+import kotlinx.coroutines.runBlocking
+import com.lioisme.modev.core.model.applyBrandIdentity
+import com.lioisme.modev.core.model.applyCarrierPreset
+import com.lioisme.modev.core.model.applyDevicePreset
 import com.lioisme.modev.core.model.DeviceProfile
 import com.lioisme.modev.core.model.ProfileEditorForm
 import com.lioisme.modev.core.model.ProfileField
@@ -10,6 +14,8 @@ import com.lioisme.modev.core.model.ProfileImportVerdict
 import com.lioisme.modev.core.model.ProfileResolution
 import com.lioisme.modev.core.model.ProfileValues
 import com.lioisme.modev.core.model.ProfileValueType
+import com.lioisme.modev.domain.config.CarrierCatalogService
+import com.lioisme.modev.domain.config.DeviceCatalogService
 import com.lioisme.modev.domain.config.ListenConfigService
 import com.lioisme.modev.domain.config.SpoofProfileService
 
@@ -35,6 +41,8 @@ import com.lioisme.modev.domain.config.SpoofProfileService
 class SpoofProfileTools(
     private val profiles: SpoofProfileService,
     private val settings: ListenConfigService,
+    private val deviceCatalog: DeviceCatalogService,
+    private val carrierCatalog: CarrierCatalogService,
 ) {
 
     val tools: List<McpTool> = listOf(
@@ -271,8 +279,8 @@ class SpoofProfileTools(
 
     private fun spoofProfileCatalog() = schemaTool(
         name = "spoof_profile_catalog",
-        description = "Device profile field catalog - the discovery surface for spoof_profile_save payloads. " +
-            "Returns every ${ProfileField.entries.size} field with its json key, intervention kind, " +
+        description = "Discovery surface for device-profile payloads. kind=fields (default) returns every " +
+            "${ProfileField.entries.size} field with its json key, intervention kind, " +
             "editor section, value type, whether one-click randomize touches it, its declared numeric " +
             "range (null = unbounded), the accepted slots of enum-typed fields (derived by running the " +
             "catalog validator, so it is exactly what save accepts) and the sentinel value meaning " +
@@ -280,9 +288,33 @@ class SpoofProfileTools(
             "Slot meanings: networkType -1 hides the active network, 1 is Wi-Fi, 2-5 are 2G-5G; " +
             "screenshotsFlag 0 forces screenshots off (FLAG_SECURE added), 1 forces them on " +
             "(FLAG_SECURE cleared). Derived at runtime from the single field catalog, so it can never " +
-            "disagree with what spoof_profile_save accepts.",
-        schema = emptySchema(),
-    ) { _ ->
+            "disagree with what spoof_profile_save accepts. " +
+            "kind=devices reads the shipped real-device catalogue (the editor's 'pick a real device' " +
+            "row): without brand it lists brands, with brand it lists that brand's models capped at " +
+            "$CATALOG_PAGE_MAX rows. kind=carriers reads the shipped carrier catalogue, optionally " +
+            "filtered by query over name / PLMN / country, and every row carries a writable object that " +
+            "is exactly what the UI picker would write (multi-region country codes come back as an empty " +
+            "simCountry rather than a guess). Both report available=false when the asset cannot be read " +
+            "- an unavailable catalogue is never rendered as an empty one.",
+        schema = {
+            str(
+                "kind",
+                "Which catalogue to return",
+                listOf("fields", "devices", "carriers"),
+            )
+            str("brand", "kind=devices: a brand key previously listed by this tool")
+            str("query", "kind=carriers: case-insensitive substring over name, PLMN and country name")
+        },
+    ) { args ->
+        when (val kind = McpJson.str(args, "kind") ?: "fields") {
+            "devices" -> deviceCatalogJson(McpJson.str(args, "brand"))
+            "carriers" -> carrierCatalogJson(McpJson.str(args, "query"))
+            else -> fieldsCatalogJson()
+        }
+    }
+
+    /** 字段目录(默认输出;V47 WP-7 原样保留,改的只是入口分派)。 */
+    private fun fieldsCatalogJson(): JsonObject {
         val sections = ProfileFieldCatalog.bySection.entries.map { (section, fields) ->
             McpJson.obj(
                 "section" to section.name,
@@ -297,7 +329,8 @@ class SpoofProfileTools(
                     "keys" to fields.map { ProfileFieldCatalog.jsonKeyOf(it) },
                 )
             }
-        McpJson.obj(
+        return McpJson.obj(
+            "kind" to "fields",
             "total" to ProfileField.entries.size,
             "fields" to McpJson.arr(ProfileField.entries.map { fieldJson(it) }),
             "sections" to McpJson.arr(sections),
@@ -305,6 +338,120 @@ class SpoofProfileTools(
             "sentinels" to ProfileValueType.entries.associate { it.name to sentinelOf(it) },
         )
     }
+
+    private fun deviceCatalogJson(brand: String?): JsonObject = runBlocking {
+        val catalog = deviceCatalog.catalog()
+            ?: return@runBlocking unavailableCatalog("devices", ASSET_DEVICES)
+        if (brand.isNullOrBlank()) {
+            return@runBlocking McpJson.obj(
+                "kind" to "devices",
+                "available" to true,
+                "total" to catalog.brands.size,
+                "brands" to McpJson.arr(
+                    catalog.brands.map {
+                        McpJson.obj(
+                            "key" to it.key,
+                            "displayName" to it.displayName,
+                            "buildBrand" to it.buildBrand,
+                            "manufacturer" to it.manufacturer,
+                            "modelCount" to it.models.size,
+                        )
+                    },
+                ),
+                "next" to "pass brand=<key> to list models of one brand",
+            )
+        }
+        val entry = catalog.brandByKey(brand)
+            ?: return@runBlocking McpJson.obj(
+                "kind" to "devices",
+                "available" to true,
+                "brand" to brand,
+                "error" to "unknown brand key - call kind=devices without brand for the brand list",
+            )
+        val capped = entry.models.take(CATALOG_PAGE_MAX)
+        McpJson.obj(
+            "kind" to "devices",
+            "available" to true,
+            "brand" to entry.key,
+            "buildBrand" to entry.buildBrand,
+            "manufacturer" to entry.manufacturer,
+            "total" to entry.models.size,
+            "returned" to capped.size,
+            "truncated" to (entry.models.size > capped.size),
+            // writable = 编辑器选中该行时真正落画像的那四项(含「PRODUCT/BOARD/HARDWARE 恒不写」)。
+            "models" to McpJson.arr(
+                capped.map { model ->
+                    val picked = "${model.model}:${model.resolvedDevice()}"
+                    val next = applyBrandIdentity(
+                        applyDevicePreset(DeviceProfile.EMPTY, picked),
+                        entry,
+                    )
+                    McpJson.obj(
+                        "model" to model.model,
+                        "name" to model.name,
+                        "device" to model.resolvedDevice(),
+                        "type" to model.type,
+                        "label" to model.label(),
+                        "writable" to McpJson.obj(
+                            "brand" to next.brand,
+                            "manufacturer" to next.manufacturer,
+                            "model" to next.model,
+                            "device" to next.device,
+                        ),
+                    )
+                },
+            ),
+        )
+    }
+
+    private fun carrierCatalogJson(query: String?): JsonObject = runBlocking {
+        val carriers = carrierCatalog.carriers()
+            ?: return@runBlocking unavailableCatalog("carriers", ASSET_CARRIERS)
+        val needle = query?.trim().orEmpty().lowercase()
+        val matched = if (needle.isEmpty()) {
+            carriers
+        } else {
+            carriers.filter {
+                it.name.lowercase().contains(needle) ||
+                    it.plmn.contains(needle) ||
+                    it.countryName.lowercase().contains(needle) ||
+                    it.countryCode.lowercase().contains(needle)
+            }
+        }
+        val capped = matched.take(CATALOG_PAGE_MAX)
+        McpJson.obj(
+            "kind" to "carriers",
+            "available" to true,
+            "query" to query.orEmpty(),
+            "total" to matched.size,
+            "returned" to capped.size,
+            "truncated" to (matched.size > capped.size),
+            "carriers" to McpJson.arr(
+                capped.map { carrier ->
+                    val next = applyCarrierPreset(DeviceProfile.EMPTY, carrier)
+                    McpJson.obj(
+                        "plmn" to carrier.plmn,
+                        "name" to carrier.name,
+                        "countryCode" to carrier.countryCode,
+                        "countryName" to carrier.countryName,
+                        "label" to carrier.label(),
+                        // writable = UI 选中这一行的落值;多地区国家码串在此已是空串(不猜)。
+                        "writable" to McpJson.obj(
+                            "simOperator" to next.simOperator,
+                            "simOperatorName" to next.simOperatorName,
+                            "simCountry" to next.simCountry,
+                        ),
+                    )
+                },
+            ),
+        )
+    }
+
+    private fun unavailableCatalog(kind: String, asset: String): JsonObject = McpJson.obj(
+        "kind" to kind,
+        "available" to false,
+        "reason" to "the shipped $asset could not be read or parsed - this is not an empty catalogue",
+    )
 
     private fun spoofProfileImport() = schemaTool(
         name = "spoof_profile_import",
@@ -336,6 +483,13 @@ class SpoofProfileTools(
 
         /** 导入无名列的回落名(MCP 面恒英文,与 UI 侧四语资源同一参数位;AGENTS #1 D-3 落点)。 */
         const val IMPORT_DEFAULT_NAME = "Imported profile"
+
+        /** 目录类输出的行数闸(8533 机型 / 1597 运营商不可整包回灌;截断显式上报)。 */
+        const val CATALOG_PAGE_MAX = 200
+
+        /** 仅用于「不可用」文案里点名是哪本资产(mcp 子树禁 `data.*`,故不引仓储常量)。 */
+        const val ASSET_DEVICES = "devices.json"
+        const val ASSET_CARRIERS = "carriers.json"
 
         /** [acceptedSlots] 的取值探测窗(仅枚举槽字段进入;合法集由目录 `validate` 裁决)。 */
         val SLOT_PROBE_WINDOW: IntRange = -10..40

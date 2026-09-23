@@ -5,6 +5,8 @@ import com.google.gson.JsonObject
 import com.lioisme.modev.domain.app.AppCatalogService
 import com.lioisme.modev.domain.app.AppListPreferences
 import com.lioisme.modev.domain.asset.KeywordLibraryService
+import com.lioisme.modev.domain.config.CarrierCatalogService
+import com.lioisme.modev.domain.config.DeviceCatalogService
 import com.lioisme.modev.domain.config.FeatureService
 import com.lioisme.modev.domain.config.ListenConfigService
 import com.lioisme.modev.domain.config.SpoofProfileService
@@ -42,6 +44,8 @@ object McpTools {
         keywords: KeywordLibraryService,
         profiles: SpoofProfileService,
         catalog: AppCatalogService,
+        deviceCatalog: DeviceCatalogService,
+        carrierCatalog: CarrierCatalogService,
         listPrefs: AppListPreferences,
         scopeRepository: ScopeRepository,
         connectionMonitor: ConnectionMonitor,
@@ -51,7 +55,7 @@ object McpTools {
         ListenConfigTools(listenConfig).tools +
         FeatureConfigTools(listenConfig).tools +
         GlobalAssetTools(keywords, featureConfig, profiles).tools +
-        SpoofProfileTools(profiles, listenConfig).tools +
+        SpoofProfileTools(profiles, listenConfig, deviceCatalog, carrierCatalog).tools +
         ServerTools(serverConfig, connectionMonitor, scopeRepository, pipelineStats = { logs.stats.value }, mcpSnapshot = mcpSnapshot).tools +
         ScopeTools(scopeRepository).tools
 }
