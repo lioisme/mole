@@ -8,16 +8,20 @@ import com.lioisme.modev.core.codec.Json
  * 文件头注释形态沿用 `ui/theme/KindColorTokens.kt`)。
  *
  * 目的:让用户从**真实机型**里挑,而不是手打 Build.MODEL / Build.DEVICE。
- * 数据随包发布在 `app/src/main/assets/devices.json`(约 1.9 MB / 26 品牌 / 8533 条机型记录,
- * 派生自 KHwang9883/MobileModels-csv,CC BY-NC-SA 4.0;来源与上游修订号见同目录
- * devices.NOTICE.txt,该修订号由 `DeviceCatalogTest` 与目录内容逐字对账)。
+ * 数据随包发布在 `app/src/main/assets/devices.json`(约 1.9 MB / 与基线逐字节同源,
+ * 文件内 26 品牌 / 8,533 条记录;**解码后可达集 = 25 品牌 / 8,075 条** —— Apple 全族
+ * 458 条在 [parseDeviceCatalog] 处剔除,见下第 4 条;派生自 KHwang9883/MobileModels-csv,
+ * CC BY-NC-SA 4.0,来源与上游修订号见同目录 devices.NOTICE.txt,该修订号由
+ * `DeviceCatalogTest` 与目录内容逐字对账)。
  *
- * 与基线的三处刻意差别:
+ * 与基线的四处刻意差别:
  *  1. 本文件**零 android 依赖**(AGENTS:core 子树禁 android import)——读盘与缓存落在
  *     `data.repo.DeviceCatalogRepository`,这里只有数据与纯函数;
  *  2. 解码唯一入口是 [parseDeviceCatalog](全工程统一 Gson,ADR-5),不用 kotlinx.serialization;
  *  3. 查表用**惰性索引**([DeviceCatalog.brandIndex]) —— 基线在构造期 `associateBy`,
- *     而 Modev 侧同一实例要在选择器里逐键过滤复用,索引必须离散步建且不重复扫描。
+ *     而 Modev 侧同一实例要在选择器里逐键过滤复用,索引必须离散步建且不重复扫描;
+ *  4. **非 Android 平台在解码口剔除**(基线不剔,故基线选择器里能选到 iPhone):
+ *     资产不动、可达集剔 —— 同时满足「内置数据照搬基线」与「Android 产品不应有苹果内置库」。
  */
 
 /**
@@ -88,7 +92,21 @@ data class DeviceBrandEntry(
     val buildBrand: String = "",
     val manufacturer: String = "",
     val models: List<DeviceModelEntry> = emptyList(),
-)
+) {
+
+    /**
+     * 该品牌项是否属于**非 Android 平台**(上游目录收了 Apple 全族:iPhone / iPad /
+     * Apple Watch / Apple TV)。`AndroidOnlyDataTest` 逐值断言过滤后全目录零 Apple 痕迹,
+     * 因此这一条谓词就是那条边界的唯一实现点。
+     */
+    fun isNonAndroidPlatform(): Boolean = NON_ANDROID_BRANDS.any { name ->
+        key.equals(name, true) || buildBrand.equals(name, true) || manufacturer.equals(name, true)
+    }
+
+    private companion object {
+        val NON_ANDROID_BRANDS = listOf("apple")
+    }
+}
 
 /**
  * 整本目录。身份查表走惰性索引 [brandIndex](首次查表时一次性建表,此后逐键 O(1)),
@@ -130,14 +148,21 @@ data class DeviceCatalog(
 
 /**
  * 资产文本 → 目录。**唯一解码入口**(别处不得再 `fromJson(DeviceCatalog)`,
- * 否则版本闸与 null 语义会被绕过)。
+ * 否则版本闸、平台闸与 null 语义会被绕过)。
+ *
+ * 上游 MobileModels 收录了 iOS/iPadOS/watchOS/tvOS 机型(`apple` 品牌 458 条,
+ * `buildBrand`/`manufacturer` 皆为 `Apple`,标识符形如 `iPhone12,1`/`Mac-F4228DC8`)。
+ * 本产品是 Android 模块,把这些值写进 `Build.BRAND` 只会造出一台从不存在的设备,
+ * 故**在解码边界一次性剔除**:资产文件与基线逐字节同源(R-3「照搬」+ 上游 NOTICE 修订号对账不破),
+ * 而产品侧可达集恒为 Android 平台(R-3「不应有苹果内置库」)。过滤只在这一处 ——
+ * 选择器、随机源、MCP `spoof_profile_catalog` 全走本函数,漏一处的形态就是「屏上看不见但选得到」。
  *
  * 返回 null 的全部情形(本函数不抛异常;调用方须把 null 上屏为「目录不可用」,
  * 不得静默显示空选择器 —— AGENTS 红线「零静默」):
  * - 文本空白、不是 JSON、或 JSON 形态与目录不符(Gson 抛异常即收口为 null);
  * - `schemaVersion` **高于** [DeviceCatalog.SCHEMA_VERSION]:不认识的格式不猜
  *   (与 [ProfileCodec.decodeEnvelope] 同一红线;现网资产恒为版本 1,低于 1 时不额外拒绝);
- * - 解析后零品牌:一本没有任何可选机型的目录,对用户与「读不到」等价。
+ * - 过滤后零品牌:一本没有任何可选机型的目录,对用户与「读不到」等价。
  *
  * 未知键由 Gson 默认忽略 ⇒ 上游新增字段不会让本版本失去目录。
  */
@@ -147,8 +172,9 @@ fun parseDeviceCatalog(text: String): DeviceCatalog? {
     val parsed = runCatching { Json.gson.fromJson(trimmed, DeviceCatalog::class.java) }.getOrNull()
         ?: return null
     if (parsed.schemaVersion > DeviceCatalog.SCHEMA_VERSION) return null
-    if (parsed.brands.isEmpty()) return null
-    return parsed
+    val androidOnly = parsed.brands.filterNot { it.isNonAndroidPlatform() }
+    if (androidOnly.isEmpty()) return null
+    return parsed.copy(brands = androidOnly)
 }
 
 /**

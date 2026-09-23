@@ -14,11 +14,17 @@ package com.lioisme.modev.core.model
  *     同一条理由。
  *  2. 档位值恒过 [ProfileFieldCatalog.validate](`ProfileValueSetsTest` 逐值断言),
  *     否则选择器会把用户推向「选了却报非法」。
- *  3. 只到本机能理解的最高 API(36 = Android 16);**不预告未来版本**(写一个不存在的
- *     API level 不是"选项多",是自造事实)。
+ *  3. **表尾恒与基线逐行同源**(基线 `res/raw/presets.json` androidVersions = 37 行,
+ *     表尾停在 SDK 37 / Android 17)。V48 曾定档「只到本机理解的最高 API 36、不预告未来版本」,
+ *     V49 R-3「内置数据要求完全照搬基线」把它反转:**照搬**优先于本机 SDK 上下限
+ *     (`BaselineDataParityTest` 逐行对账,少一行即红)。选到高于本机认得的版本不影响真实设备
+ *     上报形态,但少一行就是「基线有的选不了」。
+ *  4. release 字面量以**该 API 级别 `Build.VERSION.RELEASE` 实际会上报的形态**为准
+ *     (API 23 是 `6.0` 而非基线表里的 `6`)——伪装成一个从不存在的上报值是自造检测点,
+ *     这一处不照搬,已在 `BaselineDataParityTest` 的 DELTA 白名单里逐条点名理由。
  */
 
-/** Android 市场版本号 → `Build.VERSION.SDK_INT`(AOSP 公开对应表)。 */
+/** Android 市场版本号 → `Build.VERSION.SDK_INT`(基线 `presets.json` androidVersions 同行集)。 */
 private val ANDROID_RELEASE_TO_SDK: List<Pair<String, Int>> = listOf(
     "1" to 1, "1.1" to 2, "1.5" to 3, "1.6" to 4,
     "2.0" to 5, "2.0.1" to 6, "2.1" to 7, "2.2" to 8,
@@ -28,7 +34,7 @@ private val ANDROID_RELEASE_TO_SDK: List<Pair<String, Int>> = listOf(
     "5.0" to 21, "5.1" to 22,
     "6.0" to 23, "7.0" to 24, "7.1" to 25, "8.0" to 26, "8.1" to 27,
     "9" to 28, "10" to 29, "11" to 30, "12" to 31, "12L" to 32, "13" to 33,
-    "14" to 34, "15" to 35, "16" to 36,
+    "14" to 34, "15" to 35, "16" to 36, "17" to 37,
 )
 
 object ProfileValueSets {

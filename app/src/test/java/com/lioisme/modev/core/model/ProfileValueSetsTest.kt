@@ -37,11 +37,15 @@ class ProfileValueSetsTest {
         assertNull("认不出的 release 不得猜一个 SDK", ProfileValueSets.sdkForRelease("99"))
     }
 
-    /** 不预告不存在的系统版本:表尾必须停在机能理解的最高 API。 */
+    /**
+     * 表尾恒与基线同尾(V49 D-6 反转 V48「不预告未来版本」定档:R-3 要求内置数据
+     * 完全照搬基线 ⇒ 表尾停在基线 androidVersions 的 Android 17 / API 37)。
+     * 与基线的**逐行**同源由 `BaselineDataParityTest` 钉,本处只钉本表自身的尾部形态。
+     */
     @Test
-    fun tableEndsAtTheHighestKnownApi() {
-        assertEquals("36", ProfileValueSets.sdkLevels().last())
-        assertEquals("16", ProfileValueSets.androidReleases().last())
+    fun tableEndsAtTheBaselineHighestApiLevel() {
+        assertEquals("37", ProfileValueSets.sdkLevels().last())
+        assertEquals("17", ProfileValueSets.androidReleases().last())
     }
 
     @Test
