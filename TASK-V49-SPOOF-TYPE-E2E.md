@@ -523,6 +523,8 @@ V49-DFC-13，留待靶机读回（`cpuinfoProcessors`）判决。
 | 09-24 | WP-D3 全量 | `:app:testModernDebugUnitTest --no-build-cache --no-daemon` | **165 类 / 1,174 用例 / 0 失败 / 0 错误 / 0 跳过**(WP-D2 后 164/1,163) | ✅ |
 | 09-24 | WP-D3 lint+插桩 | `:app:lintModernRelease :app:compileModernDebugAndroidTestKotlin` | **0 errors, 43 warnings, 1 hint**(基线零新增);插桩编译成功 | ✅ |
 | 09-24 | WP-D3 四语+计数 | `node scripts/v42_generate.mjs` | `strings=860 (translated 789, same 71) plurals=13` + **DONE**;计数快照 = `DeviceEnvKind` 29 / device_env 29 / FEATURE 45 / 能力表 89 / `taxonomy_feature` 45 kinds in 6 groups | ✅ |
+| 09-24 | WP-D3 打包档 | `assembleModern{Release,Debug} assembleLegacy{Release,Debug} --no-build-cache` | **BUILD SUCCESSFUL 8m26s**,8 个 APK 齐(modern/legacy × debug/release × arm64-v8a/x86_64) | ✅ |
+| 09-24 | WP-B 欠账清偿 | `unzip -l app-modern-x86_64-release.apk` | `assets/devices.json` **1,938,874 B** + `carriers.json` + 两本 `NOTICE.txt` 均进包 ⇒ WP-B「进包可见性」这条欠账闭合 | ✅ |
 | | WP-C | `PerFieldIndependenceTest` | 41/41 | ⬜ |
 | | WP-D4..D7 | 逐批：全量单测 / lint / smoke | | ⬜ |
 | | WP-E | `L-ENV-DUMP-01` 基线 dump | key 数 = | ⬜ |
