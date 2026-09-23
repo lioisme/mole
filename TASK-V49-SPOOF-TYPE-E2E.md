@@ -213,7 +213,7 @@ V48 实测并三次登记：靶机 LDPlayer 的 Magisk/Zygisk 整场未运行 �
 | **D-3** | 画像 kind 在 WP-D **与钩子同一提交**登记进 `CategoryTaxonomy`/`DeviceEnvKind`（V47 3c 定档的原子链：kind 登记 + 操作枚举 + 发射该操作的钩子 + 冻结计数快照 + MCP enum + 四语） | V47 实测过：半批推进 = 仓库红色，主动退回是对的。V49 把它变成**批次纪律**而不是退回理由 |
 | **D-4** | 每应用逐项微调 = **复用既有稀疏偏差机制**：`AppListenOverride` 加 `profileOverrides: Map<String,String>`（键 = `ProfileField` 的 `jsonKeyOf`），宿主侧 `expandProfile` 做 `画像 ⊕ 每应用偏差 → 普通 DeviceProfile 快照`；**`spoofOverrides` 旧语法整体迁移并删除**，注入侧协议 VERSION 恒 4 | #16 已把「每应用稀疏二态偏差 + resolve + 零协议改动」这条路走通并测透，另建一层是重复。**否**：给每应用做独立表单组件（第二事实源）、给 wire 加画像段（协议风险） |
 | **D-5** | 资产文件**逐字节保持与基线相同**（md5 门禁），非 Android 平台在**唯一解码口** `parseDeviceCatalog` 处过滤；扫描门禁覆盖「解码结果 + 品牌集 + 随机源 + 内置档」四处可达面 | 既要「照搬」又要「无 Apple」，只有「文件不动、解码过滤」同时满足；改文件即破照搬、破 NOTICE 的 revision 对账、且 UI 侧过滤漏掉 `ProfileGenerators` |
-| **D-6** | 基线 `presets.json` **作为资产进包并成为取值源**：`ProfileValueSets` 改为读它（37 对 release↔SDK 含 Android 17/37、13 档 dpi、6 槽 network）；**`languages` 的 13 条只取 label 作显示名，值域仍由平台表判定**；基线 2 张模板档**不取**（Modev 已有 9 内置档 + 草稿新建，模板机制与之重复） | R-3 明示「内置数据要求完全照搬基线」。这**推翻** V48 D-3「表尾恒停 API 36、禁预告不存在的版本」—— 重述的需求对冻结契约有否决权（既有记忆口径），但须同步改 `ProfileValueSetsTest` 与 `AGENTS.md`。语言不取第二份值域是 #机型库「禁再手抄第三份清单」不破 |
+| **D-6** | 基线 `presets.json` **行集逐行照搬**：`ProfileValueSets` 的 release↔SDK 表补到基线表尾（Android 17 / API 37），密度 13 档与网络 6 槽与基线零差异，语言取基线 13 条的**值**（恒过本仓校验）；对账由 `BaselineDataParityTest` 直读 `third_party/.../presets.json` 逐行钉死。**不随包复制 presets.json**（对写文时预测的修正）：`ProfileValueSets`/`ProfileOptionSource` 是 `core/model` 纯 Kotlin 零 android 且被 `ProfileEditorForm`、选择器**同步**取值，改成资产读会引入 Context 与异步态，破 #18 边界换不来任何可测性；行集同源由测试保证。两处**有意不照搬**并逐条登记理由：① 基线 release 字面量（`6` 而非真机上报的 `6.0`）照搬等于自造一个从不存在的上报值；② 基线语言 label 是单语硬编码文本，与 #1 四语资源契约冲突 ⇒ 只取值不取 label。基线 2 张模板档（blank-passport / force-screenshots）**不取**：Modev 已有 9 内置档 + 草稿路由，模板机制与之重复 | R-3 明示「内置数据要求完全照搬基线」。这**推翻** V48 D-3「表尾恒停 API 36、禁预告不存在的版本」——重述的需求对冻结契约有否决权（同步改 `ProfileValueSetsTest` 与本条） |
 | **D-7** | 靶机 = **扩 `testtarget`**（同 `:testtarget` 模块，加 `EnvDumpActivity` + `L-ENV-DUMP-01` 用例 + 6 权限），不新建模块、不直接跑基线 `guise-test` | 基线 harness 要 compileSdk 37 + build-tools 37（本机只到 36）、`isDebuggable=false` 且 minify ⇒ `run-as` 通路全断；`testtarget` 已有 `TT_RESULT` 与全套脚本原语。基线 `guise-test/MainActivity.kt:96-167,362-472` 作为**读回点清单**逐条参照（它就是 R-4 要的「自建被作用域靶机」的成熟设计） |
 | **D-8** | 画像设备档 **SKIP 集恒空**、`skip-allowlist.txt` 的画像条目整体删除；缺前置（框架、权限、作用域、夹具）= 用例自己造前置或整轮 BLOCKED，不得逐条 SKIP | 对伪装来说 SKIP 就是覆盖空洞本身。`21-run-enhance.ps1:223-224` 那两条「拿预伪装当真值」的 Skip 是本次要消灭的对象 |
 | **D-9** | 三重 oracle 对账：`TT_RESULT`（靶程序所见）== 夹具期望（派生规则唯一落 `ProfileGenerators`/`ProfileCodec`）== `maskedValue`（钩子自称）。三者任一不一致即 ❌ 并归因 | §2.7；同时给「钩子装了但 App 没读到」和「App 读到了但钩子没记录」两种病留出各自的定位方向 |
@@ -250,33 +250,27 @@ V48 实测并三次登记：靶机 LDPlayer 的 Magisk/Zygisk 整场未运行 �
 
 **出口：** 41 字段全部可经 `ProfileField.kind.sourceFamily` 追溯；屏上 20 个分区标题四语点名来源 API；`DeviceProfilePropertyParityTest` 四视图对账绿（第 5 视图 = 分区标题，新增断言）。
 
-### WP-B · 内置数据：去 Apple + 照搬基线（R-3）
+### WP-B · 内置数据：去 Apple + 照搬基线（R-3）　✅ 已完成（2026-09-24，commit `3583026`）
 
-**Files:** Modify `core/model/DeviceCatalog.kt:144-152`（解码口过滤）、`core/model/ProfileValueSets.kt`（改读资产）、新增 `app/src/main/assets/presets.json` + `presets.NOTICE.txt`、`ProfileFieldCatalog.kt:234-243`（语言值域仍走平台表）、`app/src/test/.../core/model/{DeviceCatalogTest,ProfileValueSetsTest,AndroidOnlyDataTest(新)}.kt`、`app/src/androidTest/.../ProfileEditorFlowTest.kt`
+**Files（实际落点）:**
+- Modify `core/model/DeviceCatalog.kt`（`parseDeviceCatalog` 平台闸 + `DeviceBrandEntry.isNonAndroidPlatform()` + 头注「四处刻意差别」）
+- Modify `core/model/ProfileValueSets.kt`（release↔SDK 表补 `17↔37`，铁律 3/4 改写并点名 D-6 的反转）
+- Create `app/src/test/.../core/model/AndroidOnlyDataTest.kt`（5 用例）· `BaselineDataParityTest.kt`（9 用例）
+- Modify `app/src/test/.../core/model/ProfileValueSetsTest.kt`（`tableEndsAtTheHighestKnownApi` → `tableEndsAtTheBaselineHighestApiLevel`）
 
-- [ ] **Step 1（红）** 新 `AndroidOnlyDataTest`（纯 JVM，读真资产）：
-```kotlin
-@Test fun decodedCatalogCarriesNoApplePlatform() {
-    val catalog = parseDeviceCatalog(readAsset("devices.json"))
-    val brands = catalog.brands.map { it.key.lowercase() }
-    assertTrue(brands.none { it == "apple" || it == "ipad" || it == "iphone" })
-    val hit = catalog.brands.flatMap { b -> b.models.map { b to it } }
-        .filter { (b, m) -> listOf(b.key, b.buildBrand, b.manufacturer, m.model, m.name, m.device, m.code, m.alias.orEmpty())
-            .any { s -> APPLE_TOKENS.any { t -> s.contains(t, true) } } }
-    assertEquals("Apple 记录必须不可达: ${hit.take(3)}", 0, hit.size)
-    assertEquals(25, catalog.brands.size); assertEquals(8075, catalog.brands.sumOf { it.models.size })
-}
-```
-（`APPLE_TOKENS = ["iphone","ipad","ipod","apple","watchos","mac-","airpods","appletv"]` 放测试内，产品码里只有一条品牌谓词。）跑它，确认因未过滤而红。
-- [ ] **Step 2** `parseDeviceCatalog` 里一行收口（**唯一**过滤点，随机源/选择器/MCP catalog 工具都经它）：`brands.filterNot { it.key.equals("apple", true) }`，并在 `DeviceBrandEntry` 解码后加同谓词的注释指向本决定。禁在 `ProfileEditorScreen` 或 `SpoofProfileTools` 里过滤（那才是「可达即违规」的漏点）。
-- [ ] **Step 3** 同测试类再加两条可达面扫描：`BuiltinDeviceProfiles.BUILTINS` 41 字段全值、`ProfileGenerators` 1000 种子的 device/model/brand 输出，均零 `APPLE_TOKENS` 命中（`board="pineapple"` 是骁龙 8 Gen 3 代号，**测试内显式豁免并注释理由**，禁把它算进违规）。
-- [ ] **Step 4** 资产字节对账（新增 `AssetByteParityWithBaselineTest`，JVM）：`assets/devices.json`、`assets/carriers.json`、`assets/presets.json` 与 `third_party/Guise_Reborn-main` 对应文件 **MD5 相同**，且三本 `*.NOTICE.txt` 逐字节相同。`cp` 基线 presets 进包（禁改内容）。跑它确认 Step 4 之前因 presets 缺失而红。
-- [ ] **Step 5** `ProfileValueSets` 改为**读 `presets.json`**（唯一读者，走 `CachedAssetReader<T>` —— 与 `DeviceCatalogRepository`/`CarrierCatalogRepository` 同一复用点，禁再抄 reader）：`androidReleases()`/`sdkLevels()`/`densities()`/`networkSlots()` 全部派生自它；语言 label 走 `presets.json` 的 13 条**仅作显示名**，`ProfileOptionSource.optionsFor(LANGUAGE)` 值集仍为 `Locale.getISOLanguages`（D-6）。
-- [ ] **Step 6** `ProfileValueSetsTest` 改口径：表尾恒到 **API 37 / Android 17**（基线值，逐条 `ProfileFieldCatalog.validate` 通过）；`pickAndroidRelease` 成对写全仍成立。跑它，看到 36→37 的期望变更点逐个红→改→绿。
-- [ ] **Step 7** 全量单测 + lint；`ProfileEditorFlowTest`（插桩）机型选择器用例补断言：品牌列表首项非 Apple、搜索 `iphone` 零结果（禁在设备上验 Step 1 的解码全量 —— 那是 JVM 档）。
-- [ ] **Step 8** `AGENTS.md` 词汇表两行同步（机型库行加「非 Android 平台在解码口过滤，资产与基线逐字节同源」；画像选型库行的 presets 来源），提交 `v49: android-only reachable data, baseline datasets shipped verbatim (R-3)`。
+- [x] **Step 1（红）** `AndroidOnlyDataTest#appleBrand_isNotReachableAfterDecoding` + `#everyReachableModelRecord_isFreeOfAppleIdentifiers`：解码后品牌集零非 Android 平台、可达品牌/机型恰为 **25 / 8,075**（基线 26 / 8,533 减 apple 458），并逐条扫 `key/displayName/buildBrand/manufacturer` 与机型 `model/name/device/code/alias/versionName/label()/resolvedDevice()`。先跑确认真红（两条命中，见 Step 3 的假阳性记录）。
+- [x] **Step 2** 过滤落在**唯一解码口**一行：`parsed.brands.filterNot { it.isNonAndroidPlatform() }`（谓词在 `DeviceBrandEntry`，基线不剔 ⇒ Modev 剔）。选择器、`ProfileEditorScreen`、MCP `spoof_profile_catalog` 全经此函数，无第二处可漏。
+- [x] **Step 3** 其余可达面同扫描：`BuiltinDeviceProfiles` 9 档 × 41 字段（经 `ProfileField.stringOf` 单点取值，不手抄字段清单）、`ProfileGenerators` 2,000 种子（MAC/IMEI/SSAID/手机号/Build ID 逐 release/指纹）、遗留 `SpoofProfiles.BUILTINS` 的 `buildFields + roProperties + SSID/BSSID`。
+  **本轮抓到的两条假阳性（写进 `AGENTS.md` 级别的坑，别再踩）**：`darwin` 是锤子 `hardware` 与荣耀机型代号（`smartisan/darwin/...` 指纹、honor alias `DarwinA`），`pineapple` 是骁龙 8 Gen 3 板级代号 ⇒ 扫描面豁免必须显式列在测试里并附理由，否则真 Android 数据会被判成苹果痕迹（首跑两条红就是这个）。
+- [x] **Step 4** `BaselineDataParityTest` 直读基线真身：`devices.json` / `carriers.json` / 两本 `NOTICE.txt` **MD5 逐字节相同**；解码后的可达集与「基线原始集减非 Android 品牌」**整本 data-class 相等**（比数条数强：逐字段对账）。
+- [x] **Step 5** `presets.json` 五表逐行对账（按修正后的 D-6：不随包复制，改由测试钉行集）：`androidReleaseTable_coversEveryBaselineSdkLevel`（SDK 集恒等 + 差异必须在 `releaseLiteralDeltas` 白名单里逐条点名）、`densityTiers_areTheBaselineSetInBaselineOrder`（13 档零差异）、`networkSlots_matchBaselineValues`、`everyBaselineLanguageValue_passesOurValidator`（13 条值恒过本仓 `LANGUAGE` 校验）、`everyRowOfOurReleaseTable_isValidProfileContent`（照搬来的每一行都存得进画像）。
+- [x] **Step 6** 全量回归：`:app:testModernDebugUnitTest --no-build-cache` → **159 类 / 1,128 用例 / 0 失败 / 0 跳过**（WP-B 前 157/1,114，净 +2 类 +14 用例）；`:app:lintModernRelease` → **0 error / 43 warning / 1 hint**（基线零新增）。
+- [x] **Step 7** 提交：`v49 WP-B: reachable device data is Android-only, and baseline parity is now a gate`。
 
-**出口：** Step 1-6 测试全绿；APK 内 `unzip -l` 见三本数据 + 三本 NOTICE；`md5sum` 对账行贴进 §8 台账。
+**出口达成：** 上列 5+9 条测试全绿；两本资产与基线 md5 对账行见 §8 台账。
+**未随本包做的两项（原因不同，都跟进）：**
+- 插桩档「品牌列表零 Apple 项 + 搜 `iphone` 零结果」两条断言并入 WP-A 之后的 `assembleModernDebugAndroidTest` 编译轮一起取（本包不单独触发一次 androidTest 编译）。
+- APK 进包可见性（`unzip -l` 见两本数据 + 两本 NOTICE）属打包档，在 WP-D 收官的全量 assemble 轮一并取。
 
 ### WP-C · 每一处都能自定义（R-2）
 
@@ -384,9 +378,14 @@ V48 实测并三次登记：靶机 LDPlayer 的 Magisk/Zygisk 整场未运行 �
 
 | 时间(CST) | WP / G# | 命令 | 输出要点 | 结果 |
 |---|---|---|---|---|
+| 09-24 | 基线 | 本文 §0 规模基线 | 157 类 / 1,114 用例 / 0 失败;lint 0e/43w/1h;`hook/` 对 `deviceProfile` grep **空输出**;apple 品牌 458 条(26/8,533 原始) | ✅ 实测 |
+| 09-24 | WP-B 红 | `testModernDebugUnitTest --tests *AndroidOnlyDataTest*`(首跑) | 2 条红,消息 = `fingerprint(smartisan) 命中 "darwin"` / `honor.alias 命中 "darwin"` ⇒ **真 Android 数据被误判**,非产品违规 | ❌→已归因 |
+| 09-24 | WP-B 绿 | 同上定向轮 | 修正 token 表(去 `darwin`、加 `mac-` 前缀族)+ 两条显式豁免注释后 BUILD SUCCESSFUL | ✅ |
+| 09-24 | WP-B 全量 | `:app:testModernDebugUnitTest --no-build-cache --max-workers=1` | **159 类 / 1,128 用例 / 0 失败 / 0 错误 / 0 跳过**(净 +2 类 +14 用例) | ✅ |
+| 09-24 | WP-B lint | `:app:lintModernRelease --max-workers=1` | **0 errors, 43 warnings, 1 hint**(基线零新增) | ✅ |
+| 09-24 | WP-B 提交 | `git commit` | `3583026` 代码与测试;任务书 `18426d3` | ✅ |
 | | WP-0 | `00-env-verify.ps1 -Mode runtime` | 四判据逐条 | ⬜ |
 | | WP-A | `:app:testModernDebugUnitTest --tests "*ProfileFieldCatalog*"` | | ⬜ |
-| | WP-B | `md5sum` 三本资产对账 | | ⬜ |
 | | WP-C | `PerFieldIndependenceTest` | 41/41 | ⬜ |
 | | WP-D1..D7 | 逐批：全量单测 / lint / smoke | | ⬜ |
 | | WP-E | `L-ENV-DUMP-01` 基线 dump | key 数 = | ⬜ |
