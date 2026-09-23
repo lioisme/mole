@@ -204,6 +204,10 @@ node -e "const p=require('./third_party/Guise_Reborn-main/app/src/main/res/raw/p
 
 V48 实测并三次登记：靶机 LDPlayer 的 Magisk/Zygisk 整场未运行 ⇒ LSPosed 与 Vector 两个 zygisk 模块同时不加载。判据四条全在设备侧（`/sbin`+`/dev/.magisk` 不存在、`grep -c zygisk /proc/$(pidof zygote64)/maps`==0、`ps -A` 无 magisk、`/data/adb/lspd/log/*` mtime 陈旧）；`su` 仍可用（雷电自带 `ldinit`）⇒ 「能 root」零指示力；**整机冷重启一次无效**。恢复 = 宿主 VM 的 Magisk/root 档位改动 = **共享设备侧动作，须先与使用者确认**（WP-0）。**在它恢复之前 R-4 不可能「一次性全量通过」，本文不许任何人在此条件下把画像设备档记 ✅。**
 
+**09-24 07:22 复核（WP-D3 提交后，只读探测）**：`/dev/.magisk` 不存在、`zygisk` 在 zygote64 映射里
+计数 0、`/data/adb/lspd/log/` 最新 mtime 停在 09-19（当天为 09-24）⇒ **仍未运行，G5/G6 继续 ⛔**。
+`ps -A | grep -c magisk` 返回 2 是管理器应用进程，不是 `magiskd`（见 WP-0 Step 1 的判据修正）。
+
 ---
 
 ## 3. 设计决定
@@ -233,6 +237,12 @@ V48 实测并三次登记：靶机 LDPlayer 的 Magisk/Zygisk 整场未运行 �
 **Files:** Modify `scripts/test-integration/00-env-verify.ps1:60-75`、`scripts/test-integration/11-vector-scope.ps1:43-58`
 
 - [ ] **Step 1** 把运行期四判据提为**共库函数** `Test-FrameworkLive`（读 `/dev/.magisk` 存在、`grep -c zygisk /proc/$(pidof zygote64)/maps` > 0、`ps -A` 有 `magisk`、`/data/adb/lspd/log/*` mtime 在 30 分钟内），任一不满足 = 该步 `BLOCKED` 并点名缺哪一条。
+  **V49 WP-D3 复核修正(判据本身有假阳性)**：`ps -A | grep -c magisk` 在 V49-ENV-01 现场返回 **2** ——
+  匹配到的是**管理器应用** `io.github.huskydg.magisk`(uid `u0_a89`)与其 `:root` 子进程,
+  而 `magiskd`/`zygiskd` 一个都没有(`/dev/.magisk` 不存在、zygisk 不在 zygote64 映射里、
+  lspd 日志停在 09-17/09-19)。⇒ 该判据必须改成匹配守护进程名(`magiskd`/`zygiskd`,或
+  `pidof magiskd`)而不是子串 `magisk`;照原文写出的 `Test-FrameworkLive` 会把「装了管理器」
+  读成「框架在跑」,正是 V49-DFC-09 要消灭的那种代理指标。
 - [ ] **Step 2** 删除 `00-env-verify.ps1:67-68` 的 `pm list packages | grep magisk` 判定（V49-DFC-09 的代理指标），改调 `Test-FrameworkLive`。**Step 3** `11-vector-scope.ps1` 的内联探针换用同一函数（禁两份判据）。
 - [ ] **Step 4** 向使用者报告四判据实况并**请求授权**处置宿主 VM 的 Magisk/root 档位（共享设备动作）。未获授权 ⇒ 本文其余设备档全部 ⛔，任务不得声称完成（WP-A/B/C 不受影响，可先行）。
 
