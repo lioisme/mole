@@ -5,9 +5,11 @@ import androidx.room.Room
 import com.google.gson.Gson
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.BuiltinDeviceProfiles
+import com.lioisme.modev.core.model.CapabilityDomain
 import com.lioisme.modev.core.model.DeviceProfile
 import com.lioisme.modev.core.model.FeatureConfig
 import com.lioisme.modev.core.model.ProfileField
+import com.lioisme.modev.core.model.ProfileFieldCatalog
 import com.lioisme.modev.core.model.ProfileValues
 import com.lioisme.modev.core.model.withText
 import com.lioisme.modev.data.db.ModevDatabase
@@ -239,4 +241,94 @@ class SettingsRepositoryProfileExpansionTest {
         assertEquals(ProfileValues.SCREENSHOT_UNHOOK, effective.screenshotsFlag)
         assertEquals(ProfileValues.UNSET_DOUBLE, effective.latitude, 0.0)
     }
+
+    /**
+     * V49 R-2 第二层的**数据面**证据:每应用单字段覆写叠在所绑画像之上,
+     * 且只有被覆写的那一项变(其余 40 项恒等)。这条不成立,「逐项自定义」就只是 UI 话术。
+     */
+    @Test
+    fun `per-app field deviation overrides only that field of the bound profile`() = runBlocking {
+        repo.setGlobalFeature(FeatureConfig(spoofProfileId = pixelId))
+        val bound = profiles.find(pixelId)!!.profile
+        repo.setOverride(
+            "com.target",
+            AppListenOverride(
+                spoofProfileId = pixelId,
+                profileOverrides = mapOf(jsonKey(ProfileField.MODEL) to "Galaxy S24"),
+            ),
+        )
+
+        val effective = repo.effectiveSwitch("com.target").feature.deviceProfile
+        assertEquals("Galaxy S24", effective.model)
+        assertEquals("同档其余字段必须原样跟随画像", bound.brand, effective.brand)
+        assertEquals(bound.fingerPrint, effective.fingerPrint)
+        assertEquals(bound.densityDpi, effective.densityDpi)
+    }
+
+    @Test
+    fun `per-app empty value un-sets a field the bound profile fills`() = runBlocking {
+        repo.setGlobalFeature(FeatureConfig(spoofProfileId = pixelId))
+        val bound = profiles.find(pixelId)!!.profile
+        assertTrue("前置:该档确实填了 MODEL", bound.model.isNotBlank())
+        repo.setOverride(
+            "com.target",
+            AppListenOverride(
+                spoofProfileId = pixelId,
+                profileOverrides = mapOf(jsonKey(ProfileField.MODEL) to ""),
+            ),
+        )
+
+        assertEquals(
+            "「绑了档但这一项不要」必须可表达(否则用户只能改档或另存一档)",
+            "",
+            repo.effectiveSwitch("com.target").feature.deviceProfile.model,
+        )
+    }
+
+    @Test
+    fun `illegal and unknown deviations are named, never silently coerced`() = runBlocking {
+        repo.setGlobalFeature(FeatureConfig(spoofProfileId = pixelId))
+        val bound = profiles.find(pixelId)!!.profile
+        repo.setOverride(
+            "com.target",
+            AppListenOverride(
+                spoofProfileId = pixelId,
+                profileOverrides = mapOf(
+                    // 密度档有生效域(72..1000),越界即非法
+                    jsonKey(ProfileField.DENSITY_DPI) to "999999",
+                    "noSuchField" to "whatever",
+                    jsonKey(ProfileField.BRAND) to "Samsung",
+                ),
+            ),
+        )
+
+        val effective = repo.effectiveSwitch("com.target").feature.deviceProfile
+        assertEquals("非法值必须被拒(不钳制、不改写)", bound.densityDpi, effective.densityDpi)
+        assertEquals("未知键不得影响任何字段", bound.model, effective.model)
+        assertEquals("同批里的合法项必须照常生效(一项坏不得拖垮整批)", "Samsung", effective.brand)
+    }
+
+    @Test
+    fun `per-app deviations count as their own items and clear with the feature domain`() = runBlocking {
+        repo.setGlobalFeature(FeatureConfig(spoofProfileId = pixelId))
+        val withTwo = AppListenOverride(
+            spoofProfileId = pixelId,
+            profileOverrides = mapOf(
+                jsonKey(ProfileField.BRAND) to "Samsung",
+                jsonKey(ProfileField.DEVICE) to "x108",
+            ),
+        )
+        // 逐项覆写按项计(与 kinds 同一口径):绑定 1 + 覆写 2。
+        assertEquals(3, withTwo.deviationCount)
+        assertEquals(0, withTwo.deviationCountFor(CapabilityDomain.LISTEN))
+        assertEquals(3, withTwo.deviationCountFor(CapabilityDomain.FEATURE))
+
+        repo.setOverride("com.target", withTwo)
+        repo.resetOverride("com.target", CapabilityDomain.FEATURE)
+        val after = repo.overrideFor("com.target")
+        assertEquals("恢复默认必须连覆写一起清", null, after.profileOverrides)
+        assertTrue("清后必须归零偏差", after.isDefault)
+    }
+
+    private fun jsonKey(field: ProfileField): String = ProfileFieldCatalog.jsonKeyOf(field)
 }

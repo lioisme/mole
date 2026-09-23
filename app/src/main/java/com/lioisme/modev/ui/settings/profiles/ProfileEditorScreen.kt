@@ -396,7 +396,6 @@ fun ProfileEditorScreen(
     var showAndroidSheet by remember { mutableStateOf(false) }
     var showCarrierSheet by remember { mutableStateOf(false) }
     var pickBrandKey by remember { mutableStateOf<String?>(null) }
-    var manualEntryFor by remember { mutableStateOf<ProfileField?>(null) }
 
     val entry = viewModel.entry
     if (entry == null && !viewModel.isDraft) {
@@ -537,103 +536,16 @@ fun ProfileEditorScreen(
     }
 
     editingField?.let { field ->
-        // 语言 / 国家 / 时区:取值是平台权威表里的枚举 ⇒ 先给列表,手填作为表内一项保留
-        // (列表不覆盖用户已填的自定义形态,例如带地区的语言标签)。
-        val enumerated =
-            if (manualEntryFor == field) null else ProfileOptionSource.optionsFor(field)
-        if (enumerated != null) {
-            ModevSearchableChoiceSheet(
-                title = res.getString(profileFieldLabelRes(field)),
-                options = buildList {
-                    add(
-                        ChoiceOption(
-                            value = MANUAL_ENTRY,
-                            label = res.getString(R.string.profile_picker_manual),
-                            testTag = "profile-option-${field.name}-manual",
-                        ),
-                    )
-                    addAll(
-                        enumerated.map { value ->
-                            ChoiceOption(
-                                value = value,
-                                label = value,
-                                testTag = "profile-option-${field.name}-$value",
-                            )
-                        },
-                    )
-                },
-                selected = view.texts[field],
-                placeholder = stringResource(R.string.profile_device_search_hint),
-                emptyText = stringResource(R.string.profile_device_no_match),
-                truncatedText = { total ->
-                    res.getString(R.string.profile_device_truncated, SHEET_MAX_VISIBLE_ROWS, total)
-                },
-                onSelect = { value ->
-                    if (value == MANUAL_ENTRY) {
-                        manualEntryFor = field
-                    } else {
-                        viewModel.update(field, value)
-                        editingField = null
-                        manualEntryFor = null
-                    }
-                },
-                onDismiss = {
-                    editingField = null
-                    manualEntryFor = null
-                },
-                modifier = Modifier.testTag("profile-enum-${field.name}"),
-            )
-        } else {
-            when (field.type) {
-            // 布尔项 = 行内 Switch,无弹层(契约 #20 开关行形态;置 false 即取消该项干预)。
-            ProfileValueType.BOOL -> Unit
-
-            ProfileValueType.NETWORK_TYPE, ProfileValueType.SCREENSHOT_MODE -> ModevChoiceSheet(
-                title = res.getString(profileFieldLabelRes(field)),
-                options = ProfileEditorState.acceptedSlots(field).map { slot ->
-                    ChoiceOption(
-                        value = slot,
-                        label = slotLabel(res, field, slot),
-                        testTag = "profile-slot-${field.name}-$slot",
-                    )
-                },
-                selected = view.texts[field]?.toIntOrNull()
-                    ?: ProfileEditorState.unhookSlotOf(field),
-                onSelect = { slot ->
-                    viewModel.writeSlot(field, slot)
-                    editingField = null
-                },
-                onDismiss = { editingField = null },
-                modifier = Modifier.testTag("profile-choice-${field.name}"),
-            )
-
-            else -> ModevInputSheet(
-                title = res.getString(profileFieldLabelRes(field)),
-                label = res.getString(profileFieldLabelRes(field)),
-                initialValue = view.texts[field].orEmpty(),
-                hint = fieldHint(res, field),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = when (field.type) {
-                        ProfileValueType.INT -> KeyboardType.Number
-                        ProfileValueType.DOUBLE -> KeyboardType.Decimal
-                        else -> KeyboardType.Text
-                    },
-                ),
-                digitOnly = field.type == ProfileValueType.INT,
-                maxLength = maxInputLengthOf(field),
-                liveError = { text -> liveFieldError(res, field, text) },
-                validate = { true },
-                onSubmit = { text ->
-                    viewModel.update(field, text)
-                    editingField = null
-                },
-                onDismiss = { editingField = null },
-                modifier = Modifier.testTag("profile-input-${field.name}"),
-                inputTestTag = "profile-input-field",
-                confirmTestTag = "profile-input-confirm",
-                )
-            }
-        }
+        // 单字段弹层与每应用「画像微调」区共用同一控件(枚举表 + 手填逃生口 + 槽表 + 输入条)。
+        ProfileFieldEditSheet(
+            field = field,
+            view = view,
+            onCommit = { text ->
+                viewModel.update(field, text)
+                editingField = null
+            },
+            onDismiss = { editingField = null },
+        )
     }
 
     // 机型库两级选择:品牌 → 型号(同屏恒一个 sheet,型号表随品牌换)。
@@ -755,141 +667,6 @@ fun ProfileEditorScreen(
     }
 }
 
-/** 一行的全部呈现值(由 [ProfileEditorView] 快照派生,组合侧以值为参数)。 */
-private data class ProfileFieldSpec(
-    val field: ProfileField,
-    val label: String,
-    val value: String,
-    val filled: Boolean,
-    val error: String?,
-    val randomizable: Boolean,
-    val bool: Boolean,
-    val boolChecked: Boolean,
-) {
-    companion object {
-        fun of(
-            res: android.content.res.Resources,
-            field: ProfileField,
-            view: ProfileEditorView,
-        ): ProfileFieldSpec {
-            val text = view.texts[field].orEmpty()
-            val bool = field.type == ProfileValueType.BOOL
-            return ProfileFieldSpec(
-                field = field,
-                label = res.getString(profileFieldLabelRes(field)),
-                value = when {
-                    text.isEmpty() -> res.getString(R.string.profile_unset)
-                    field.type == ProfileValueType.NETWORK_TYPE ||
-                        field.type == ProfileValueType.SCREENSHOT_MODE -> slotLabel(res, field, text.toIntOrNull() ?: 0)
-
-                    else -> text
-                },
-                filled = text.isNotEmpty(),
-                error = view.errors[field]?.let { res.getString(profileFieldErrorRes(it)) },
-                randomizable = ProfileFieldCatalog.isRandomizable(field) && !bool,
-                bool = bool,
-                boolChecked = text.toBooleanStrictOrNull() == true,
-            )
-        }
-    }
-}
-
-/** 一行一参数:标签 + 当前值(或未设置)+ 就近随机 / 清除;BOOL 行走内 Switch。 */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun ProfileFieldRow(
-    spec: ProfileFieldSpec,
-    onOpen: () -> Unit,
-    onToggleBool: (Boolean) -> Unit,
-    onClear: () -> Unit,
-    onRandomize: () -> Unit,
-) {
-    val res = rememberLocaleAwareResources()
-    if (spec.bool) {
-        ToggleListItem(
-            label = spec.label,
-            checked = spec.boolChecked,
-            onCheckedChange = onToggleBool,
-            testTag = "profile-toggle-${spec.field.name}",
-        )
-        return
-    }
-    ListItem(
-        colors = ListItemDefaults.colors(
-            containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
-        ),
-        headlineContent = {
-            Text(
-                spec.label,
-                style = MaterialTheme.typography.bodyLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        supportingContent = {
-            Column {
-                Text(
-                    spec.value,
-                    style = MaterialTheme.typography.bodySmall,
-                    fontFamily = FontFamily.Monospace,
-                    color = if (spec.filled) {
-                        MaterialTheme.colorScheme.onSurface
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = Tokens.emptyIconHintAlpha)
-                    },
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.testTag("profile-value-${spec.field.name}"),
-                )
-                if (spec.error != null) {
-                    Text(
-                        spec.error,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                        modifier = Modifier.testTag("profile-error-${spec.field.name}"),
-                    )
-                }
-            }
-        },
-        trailingContent = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (spec.randomizable) {
-                    TipIconButton(
-                        tooltip = res.getString(R.string.profile_randomize_one),
-                        onClick = onRandomize,
-                        modifier = Modifier.testTag("profile-randomize-${spec.field.name}"),
-                    ) {
-                        Icon(
-                            Icons.Filled.Calculate,
-                            contentDescription = res.getString(R.string.profile_randomize_one),
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-                if (spec.filled) {
-                    TipIconButton(
-                        tooltip = res.getString(R.string.profile_clear_one),
-                        onClick = onClear,
-                        modifier = Modifier.testTag("profile-clear-${spec.field.name}"),
-                    ) {
-                        Icon(
-                            Icons.Filled.Delete,
-                            contentDescription = res.getString(R.string.profile_clear_one),
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(20.dp),
-                        )
-                    }
-                }
-            }
-        },
-        modifier = Modifier
-            .fillMaxWidth()
-            .testTag("profile-row-${spec.field.name}")
-            .clickable(onClick = onOpen),
-    )
-}
-
 /**
  * 目录选择行(V48 抽出):机型库 / 运营商库 / Android 版本表共用同一形态 ——
  * 「一句副标说清这次点选会写全哪几项」+「数据不可用时点名,不退化成空列表」。
@@ -992,44 +769,6 @@ private fun AndroidVersionRow(onPick: () -> Unit) {
         onPick = onPick,
     )
 }
-
-/** 枚举槽标签:未知槽回落裸数字(槽集由目录反推,UI 不留第二张槽表,也不可崩)。 */
-private fun slotLabel(res: android.content.res.Resources, field: ProfileField, slot: Int): String {
-    @StringRes val labelRes = profileSlotLabelRes(field, slot)
-    return if (labelRes == 0) slot.toString() else res.getString(labelRes)
-}
-
-/** 输入期实时校验:结论 → 四语文案(null = 当前输入合法)。 */
-private fun liveFieldError(res: android.content.res.Resources, field: ProfileField, text: String): String? =
-    ProfileFieldCatalog.validate(field, text)?.let { res.getString(profileFieldErrorRes(it)) }
-
-/** 输入框提示:数值项给有效域,有形态要求的给形态要求,自由文本不给噪音。 */
-private fun fieldHint(res: android.content.res.Resources, field: ProfileField): String? {
-    ProfileFieldCatalog.rangeOf(field)?.let { range ->
-        return res.getString(R.string.profile_range_hint, "${range.first}-${range.last}")
-    }
-    @StringRes val shapeRes = shapeHintResOf(field)
-    return if (shapeRes == 0) null else res.getString(shapeRes)
-}
-
-/** 该参数的形态要求(目录里确有格式校验的字段才有;其余返回 0 = 无提示)。 */
-@StringRes
-private fun shapeHintResOf(field: ProfileField): Int = when (field) {
-    ProfileField.SIM_OPERATOR -> R.string.profile_error_sim_operator_format
-    ProfileField.SIM_COUNTRY -> R.string.profile_error_sim_country_format
-    ProfileField.IMEI -> R.string.profile_error_imei_format
-    ProfileField.ANDROID_ID -> R.string.profile_error_android_id_format
-    ProfileField.WIFI_BSSID, ProfileField.WIFI_MAC_ADDRESS -> R.string.profile_error_mac_format
-    ProfileField.LANGUAGE -> R.string.profile_error_language_format
-    ProfileField.TIME_ZONE -> R.string.profile_error_time_zone_unknown
-    ProfileField.FINGERPRINT -> R.string.profile_error_fingerprint_structure
-    ProfileField.LONGITUDE, ProfileField.LATITUDE -> R.string.profile_error_number_out_of_range
-    else -> 0
-}
-
-/** 输入长度上限:数值项取有效域上界的位数(电池 3、小区标识 9),文本项不限。 */
-private fun maxInputLengthOf(field: ProfileField): Int? =
-    ProfileFieldCatalog.rangeOf(field)?.last?.toString()?.length
 
 /** 保存结果 → Snackbar 文案(VM 零资源感知,映射在本侧)。 */
 @StringRes
@@ -1328,4 +1067,3 @@ private fun ProfileSaveBar(
 
 private val IDENTITY_LABEL_WIDTH = 120.dp
 private const val GROUPS_PER_LINE = 3
-private const val MANUAL_ENTRY = "__manual__"

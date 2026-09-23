@@ -1,14 +1,20 @@
 package com.lioisme.modev.data.repo
 
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.core.content.edit
 import com.google.gson.Gson
 import com.lioisme.modev.core.codec.WireProtocol
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.ConfigKeys
+import com.lioisme.modev.core.model.DeviceProfile
 import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.FeatureConfig
 import com.lioisme.modev.core.model.HookSwitch
+import com.lioisme.modev.core.model.ProfileField
+import com.lioisme.modev.core.model.ProfileFieldCatalog
+import com.lioisme.modev.core.model.ProfileFieldDeviation
+import com.lioisme.modev.core.model.withText
 import com.lioisme.modev.domain.asset.KeywordLibraryService
 import com.lioisme.modev.domain.config.SpoofProfileService
 import com.lioisme.modev.domain.config.FeatureService
@@ -259,7 +265,7 @@ class SettingsRepository(
 
     /** 单一解析出口:偏差 → 关键词规则 → 画像快照(流与同步读同源,禁两侧各算一遍)。 */
     private fun resolveFor(global: HookSwitch, override: AppListenOverride?): HookSwitch =
-        expandProfile(withKeywordRules(EffectiveSwitch.resolve(global, override), override))
+        expandProfile(withKeywordRules(EffectiveSwitch.resolve(global, override), override), override)
 
     // ---- V47 T2.2 画像库接线 ----
 
@@ -271,18 +277,29 @@ class SettingsRepository(
     }
 
     /**
-     * 把生效的 `spoofProfileId` 展开为注入侧消费的 [FeatureConfig.deviceProfile] 快照。
+     * 把生效的 `spoofProfileId` 展开为注入侧消费的 [FeatureConfig.deviceProfile] 快照,
+     * 再叠上**该应用的字段级覆写**(V49 R-2:`AppListenOverride.profileOverrides`)。
      *
      * - 未装配画像库 ⇒ 原样返回(注入侧「直读两键 / 磁盘兜底」通路依赖来路已带的快照,
      *   绝不能用空快照把它清掉);
      * - 未知 id ⇒ 空画像(不伪装),**不回落任何档位**(GAP-02 的静默失效就是反面教材);
+     * - 覆写按 [ProfileField] 逐项落,值走 `withText` 同一桥接(空串即显式清掉该项 ——
+     *   「绑了档但这一项不要」必须可表达,否则用户只能改档或另存一档);
+     * - **非法覆写不落进快照**:值先过 catalog 校验,不合法就整项跳过并在日志点名
+     *   (静默丢弃会让用户存进一份与自己输入不同的画像,违反 #30 第二条;
+     *   写侧 UI/MCP 已挡,这里是仓库侧的第二道);
      * - 旧 `spoofOverrides` 原样透传,不映射进画像(其 `ro.*` 键无对应画像字段,
-     *   映射即有损;既有 hooker 仍按该表取值,直至 WP-3/WP-4 逐组接管)。
+     *   映射即有损;V49 WP-D6 随 `SpoofProfiles` 一并删除)。
      */
-    private fun expandProfile(switch: HookSwitch): HookSwitch {
+    private fun expandProfile(switch: HookSwitch, override: AppListenOverride?): HookSwitch {
         val service = spoofProfiles ?: return switch
         val feature = switch.feature
-        val profile = service.resolve(feature.spoofProfileId).profileOrEmpty()
+        val bound = service.resolve(feature.spoofProfileId).profileOrEmpty()
+        val merged = ProfileFieldDeviation.apply(bound, override?.profileOverrides)
+        merged.rejected.forEach { key ->
+            Log.w("Modev", "profile override rejected (unknown key or illegal value): $key")
+        }
+        val profile = merged.profile
         return if (profile == feature.deviceProfile) {
             switch
         } else {

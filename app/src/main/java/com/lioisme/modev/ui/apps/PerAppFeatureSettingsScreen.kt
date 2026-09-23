@@ -43,14 +43,20 @@ import com.lioisme.modev.R
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.CapabilityDomain
 import com.lioisme.modev.core.model.CategoryTaxonomy
+import com.lioisme.modev.core.model.DeviceProfile
 import com.lioisme.modev.core.model.DeviceProfileEntry
 import com.lioisme.modev.core.model.EffectiveSwitch
 import com.lioisme.modev.core.model.FeatureGroup
 import com.lioisme.modev.core.model.FeatureGroups
 import com.lioisme.modev.core.model.HookSwitch
 import com.lioisme.modev.core.model.KeywordEntry
+import com.lioisme.modev.core.model.ProfileField
+import com.lioisme.modev.core.model.ProfileFieldCatalog
+import com.lioisme.modev.core.model.ProfileFieldDeviation
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.core.model.SpoofProfiles
+import com.lioisme.modev.core.model.stringOf
+import com.lioisme.modev.core.model.withText
 import com.lioisme.modev.domain.asset.KeywordLibraryService
 import com.lioisme.modev.domain.config.ListenConfigService
 import com.lioisme.modev.domain.config.SpoofProfileService
@@ -62,8 +68,11 @@ import com.lioisme.modev.ui.components.ModevTopBar
 import com.lioisme.modev.ui.components.SettingsSection
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
 import com.lioisme.modev.ui.settings.profiles.ProfileBindingDisplay
+import com.lioisme.modev.ui.settings.profiles.ProfileEditorState
+import com.lioisme.modev.ui.settings.profiles.ProfileEditorView
 import com.lioisme.modev.ui.settings.profiles.profileDisplayNameFor
 import com.lioisme.modev.ui.settings.profiles.toBindingDisplay
+import com.lioisme.modev.ui.settings.profiles.toView
 import com.lioisme.modev.ui.theme.Dimens
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -163,6 +172,85 @@ class PerAppFeatureSettingsViewModel(
         update { it.copy(spoofProfileId = profileId) }
     }
 
+    // ---- V49 R-2 每应用画像微调(逐项可定制,不必为改一项而编辑整张画像) ----
+
+    /**
+     * 本应用**生效画像**的表单视图(所绑画像 ⊕ 本应用覆写,由仓库 `expandProfile` 单点展开)。
+     *
+     * 读的是 `settings.effectiveSwitchFlow` 而不是本地 `effective`:后者是
+     * `EffectiveSwitch.resolve` 的直接组合,**不经画像库展开** —— 用它画屏会出现
+     * 「屏上是画像正文、下发的是合并结果」的两套值。
+     */
+    val tunedView: StateFlow<ProfileEditorView> =
+        settings.effectiveSwitchFlow(packageName)
+            .map { ProfileEditorState(initial = it.feature.deviceProfile).toView() }
+            .stateIn(
+                viewModelScope,
+                SharingStarted.WhileSubscribed(5_000),
+                ProfileEditorState(
+                    initial = settings.effectiveSwitch(packageName).feature.deviceProfile,
+                ).toView(),
+            )
+
+    /** 本应用覆写了哪几项(呈现「已定制 N 项」与逐行的还原按钮锚点)。 */
+    val tunedOverrides: StateFlow<Map<String, String>> = override
+        .map { it.profileOverrides.orEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
+
+    /** 所绑画像正文(未绑定 = 空正文 ⇒ 覆写就是全部值)。同步读,供写侧反推覆写集。 */
+    private fun boundProfile(): DeviceProfile =
+        profiles.resolve(settings.overrideFor(packageName).spoofProfileId).profileOrEmpty()
+
+    /**
+     * 所绑画像正文的流形态(V49 R-2 微调区要用它点名「画像原值」)。
+     *
+     * 与 [tunedView] 是两件事:生效快照 = 画像 ⊕ 覆写(屏上那行大字),画像正文 = 未叠加覆写的
+     * 原值(行下那行小字)。合成一个就把「你改过」这个信息抹掉了。
+     */
+    val boundProfileFlow: StateFlow<DeviceProfile> =
+        combine(settings.overrides, profiles.profiles) { map, _ ->
+            profiles.resolve(map[packageName]?.spoofProfileId).profileOrEmpty()
+        }.stateIn(
+            viewModelScope,
+            SharingStarted.WhileSubscribed(5_000),
+            boundProfile(),
+        )
+
+    /**
+     * 写一项本应用覆写:合并到生效快照 → 反推稀疏覆写集 → 即写即推。
+     *
+     * 非法值在**写侧**就拒(信任边界):弹层的实时校验只是提示,`validate = { true }` 让提交
+     * 可达,所以这里不挡就会落一条「存了但下发时被丢掉」的幽灵偏差 —— 屏上显示已定制、
+     * 靶程序读到的却是画像值,正是本仓最忌的静默分叉。
+     */
+    fun setProfileField(field: ProfileField, raw: String) {
+        if (ProfileFieldCatalog.validate(field, raw) != null) return
+        val bound = boundProfile()
+        val merged = field.withText(
+            settings.effectiveSwitch(packageName).feature.deviceProfile,
+            raw,
+        )
+        val texts = ProfileField.entries.associateWith { it.stringOf(merged) }
+        val deviations = ProfileFieldDeviation.between(bound, texts)
+        update { it.copy(profileOverrides = deviations) }
+    }
+
+    /** 还原一项 = 删掉这条覆写,交回所绑画像(与「清除(写空)」是两件事)。 */
+    fun revertProfileField(field: ProfileField) {
+        update { current ->
+            val next = current.profileOverrides?.minus(ProfileFieldCatalog.jsonKeyOf(field))
+            current.copy(profileOverrides = next?.ifEmpty { null })
+        }
+    }
+
+    /** 就近随机一项(仅目录 RANDOMIZABLE 内生效);随机结果同样经 [setProfileField] 落覆写。 */
+    fun randomizeProfileField(field: ProfileField) {
+        val seeded = ProfileEditorState(
+            initial = settings.effectiveSwitch(packageName).feature.deviceProfile,
+        )
+        if (seeded.randomizeField(field)) setProfileField(field, seeded.textOf(field))
+    }
+
     /**
      * 一键恢复默认配置(V45 T3.5 / DUAL-12:**只清功能域**)。
      * 旧形态走全量删键,在功能页点恢复会连带抹掉监听页定制。
@@ -203,6 +291,7 @@ class PerAppFeatureSettingsViewModelFactory(
 fun PerAppFeatureSettingsScreen(
     viewModel: PerAppFeatureSettingsViewModel,
     onBack: () -> Unit,
+    onOpenProfileTune: () -> Unit = {},
     onOpenKeywordLibrary: () -> Unit,
 ) {
     val effective by viewModel.effective.collectAsStateWithLifecycle()
@@ -210,6 +299,7 @@ fun PerAppFeatureSettingsScreen(
     val keywordEntries by viewModel.keywordEntries.collectAsStateWithLifecycle()
     val profileLibrary by viewModel.profileLibrary.collectAsStateWithLifecycle()
     val binding by viewModel.binding.collectAsStateWithLifecycle()
+    val tunedOverrides by viewModel.tunedOverrides.collectAsStateWithLifecycle()
     var confirmReset by remember { mutableStateOf(false) }
     var showProfileSheet by remember { mutableStateOf(false) }
     val res = rememberLocaleAwareResources()
@@ -368,6 +458,48 @@ fun PerAppFeatureSettingsScreen(
                                     .fillMaxWidth()
                                     .testTag("feature-profile-picker")
                                     .clickable { showProfileSheet = true },
+                            )
+                            // V49 R-2:绑定只是「选一张档」;要改其中一项必须来这里,
+                            // 否则唯一的通路就是编辑整张共享画像(改一档波及所有绑它的包)。
+                            HorizontalDivider16()
+                            ListItem(
+                                colors = ListItemDefaults.colors(
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                                ),
+                                headlineContent = {
+                                    Text(
+                                        res.getString(R.string.profile_tune_row),
+                                        style = MaterialTheme.typography.bodyLarge,
+                                    )
+                                },
+                                supportingContent = {
+                                    Text(
+                                        text = if (tunedOverrides.isEmpty()) {
+                                            res.getString(R.string.profile_tune_row_hint)
+                                        } else {
+                                            res.getQuantityString(
+                                                R.plurals.profile_tune_hint_n,
+                                                tunedOverrides.size,
+                                                tunedOverrides.size,
+                                            )
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.testTag("feature-profile-tune-supporting"),
+                                    )
+                                },
+                                trailingContent = {
+                                    Text(
+                                        text = Integer.toString(tunedOverrides.size),
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.testTag("feature-profile-tune-count"),
+                                    )
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("feature-profile-tune")
+                                    .clickable(onClick = onOpenProfileTune),
                             )
                         }
                         else -> Unit

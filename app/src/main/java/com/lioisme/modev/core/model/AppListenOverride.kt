@@ -72,9 +72,21 @@ data class AppListenOverride(
     val spoofProfileId: String? = null,
     /**
      * 画像字段覆写偏差(**只读遗留通道**,见 [FeatureConfig.spoofOverrides] 与
-     * 决策 D-3 修订;无新写入路径,存量值仍生效)。
+     * 决策 D-3 修订;无新写入路径,存量值仍生效。V49 WP-D6 随 `SpoofProfiles` 一并删除)。
      */
     val spoofOverrides: Map<String, String>? = null,
+    /**
+     * **每应用逐项画像定制**(V49 R-2):所绑画像的字段级稀疏覆写。
+     *
+     * 键 = [ProfileFieldCatalog.jsonKeyOf](与画像正文同一套键,不是遗留 `build.MODEL` 语法),
+     * 值 = 该字段的编辑态字符串;**空串/缺省哨兵值 = 显式清掉画像里这一项**(覆写语义必须能
+     * 表达「绑了档但这项不要」,否则用户只能改档或另存一档 —— 那正是 R-2 要消灭的形态)。
+     * 只有出现在本表里的键才算覆写,缺键 = 跟随所绑画像。
+     *
+     * 归属 FEATURE 域(与 [spoofProfileId] 同域同清),计入 [deviationCount] 的条目数
+     * (逐字段计数,与 `kinds` 同一口径:一行一项就是用户定制的一项)。
+     */
+    val profileOverrides: Map<String, String>? = null,
     /**
      * 宿主展开后的画像快照偏差(V47 T2 / 决策 D-12):随 [spoofProfileId] 一起写入,
      * 供注入侧「直读两键 / 磁盘兜底」两条不经宿主的通路消费。
@@ -127,6 +139,7 @@ data class AppListenOverride(
             dialogKeywords.isNullOrEmpty() &&
             spoofProfileId == null &&
             spoofOverrides.isNullOrEmpty() &&
+            profileOverrides.isNullOrEmpty() &&
             extraRootPackages.isNullOrEmpty() &&
             extraXposedPrefixes.isNullOrEmpty() &&
             extraFridaPorts.isNullOrEmpty() &&
@@ -161,6 +174,7 @@ data class AppListenOverride(
             (if (!dialogKeywords.isNullOrEmpty()) 1 else 0) +
             (if (spoofProfileId != null) 1 else 0) +
             (if (!spoofOverrides.isNullOrEmpty()) 1 else 0) +
+            (profileOverrides?.size ?: 0) +
             (if (!extraRootPackages.isNullOrEmpty()) 1 else 0) +
             (if (!extraXposedPrefixes.isNullOrEmpty()) 1 else 0) +
             (if (!extraFridaPorts.isNullOrEmpty()) 1 else 0) +
@@ -210,6 +224,7 @@ data class AppListenOverride(
             dialogKeywords = if (!listen) null else dialogKeywords,
             spoofProfileId = if (!listen) null else spoofProfileId,
             spoofOverrides = if (!listen) null else spoofOverrides,
+            profileOverrides = if (!listen) null else profileOverrides,
             resolvedProfile = if (!listen) null else resolvedProfile,
             extraRootPackages = if (!listen) null else extraRootPackages,
             extraXposedPrefixes = if (!listen) null else extraXposedPrefixes,

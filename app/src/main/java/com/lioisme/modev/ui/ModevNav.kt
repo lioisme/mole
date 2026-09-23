@@ -24,6 +24,7 @@ import com.lioisme.modev.ui.apps.AppMonitorViewModelFactory
 import com.lioisme.modev.ui.apps.AppsScreen
 import com.lioisme.modev.ui.apps.AppsViewModelFactory
 import com.lioisme.modev.ui.apps.PerAppFeatureSettingsScreen
+import com.lioisme.modev.ui.apps.PerAppProfileTuneScreen
 import com.lioisme.modev.ui.apps.PerAppFeatureSettingsViewModelFactory
 import com.lioisme.modev.ui.apps.PerAppListenSettingsScreen
 import com.lioisme.modev.ui.apps.PerAppListenSettingsViewModelFactory
@@ -224,6 +225,28 @@ fun ModevNavHost(navController: NavHostController) {
                     onOpenKeywordLibrary = {
                         navController.navigateGuarded(ModevRoutes.KEYWORD_LIBRARY)
                     },
+                    onOpenProfileTune = {
+                        navController.navigateGuarded(ModevRoutes.appProfileTune(pkg))
+                    },
+                )
+            }
+        }
+        slideComposable(
+            route = ModevRoutes.APP_PROFILE_TUNE,
+            arguments = listOf(navArgument("packageName") { type = NavType.StringType }),
+        ) { entry ->
+            val pkg = ModevRoutes.dec(entry.arguments?.getString("packageName"))
+            if (pkg.isBlank()) {
+                LaunchedEffect(Unit) { navController.popWhenReady() }
+                return@slideComposable
+            }
+            BackGuarded(navController) {
+                PerAppProfileTuneScreen(
+                    viewModel = viewModel(
+                        key = "feature-settings-$pkg",
+                        factory = PerAppFeatureSettingsViewModelFactory(pkg, app.container),
+                    ),
+                    onBack = { navController.popGuarded() },
                 )
             }
         }

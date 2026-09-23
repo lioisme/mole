@@ -61,6 +61,8 @@ object ModevRoutes {
     const val APP_LISTEN_SETTINGS = "apps/{packageName}/listen-settings"
     /** 每应用功能设置页(V37 双域拆分:干预开关 + 关键词启用 + 画像选择)。 */
     const val APP_FEATURE_SETTINGS = "apps/{packageName}/feature-settings"
+    /** 每应用画像微调页(V49 R-2:41 项逐项覆写,改一项不必动整张共享画像)。 */
+    const val APP_PROFILE_TUNE = "apps/{packageName}/profile-tune"
     /** 全局关键词库管理页(V37 T3.5)。 */
     const val KEYWORD_LIBRARY = "settings/keywords"
     /** 全局伪装画像库管理页(V37 T3.5 三常量单选页;V47 WP-5 改为可视化画像库列表)。 */
@@ -93,6 +95,8 @@ object ModevRoutes {
     fun appListenSettings(packageName: String): String = "apps/${enc(packageName)}/listen-settings"
 
     fun appFeatureSettings(packageName: String): String = "apps/${enc(packageName)}/feature-settings"
+
+    fun appProfileTune(packageName: String): String = "apps/${enc(packageName)}/profile-tune"
 
     fun algorithmRecords(packageName: String): String = "records/algorithm/${enc(packageName)}"
 

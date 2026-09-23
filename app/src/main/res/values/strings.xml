@@ -872,6 +872,13 @@
     <string name="profile_kind_screenshot">Screenshot policy</string>
     <string name="profile_kind_blank_content">Blank content queries</string>
     <string name="profile_kind_blank_app_list">Blank app list</string>
+    <!-- V49 R-2 每应用画像微调:绑定只能整张选档,改一项必须来这里,不动共享画像 -->
+    <string name="profile_tune_title">Profile tweaks for this app</string>
+    <string name="profile_tune_row">Profile tweaks</string>
+    <string name="profile_tune_row_hint">Override any single field for this app only</string>
+    <string name="profile_tune_hint_none">No field tweaked yet</string>
+    <string name="profile_tune_following">Profile value: %1$s</string>
+    <string name="profile_revert_to_profile">Restore profile value</string>
     <string name="profile_field_brand">Brand</string>
     <string name="profile_field_manufacturer">Manufacturer</string>
     <string name="profile_field_model">Model</string>
@@ -937,6 +944,10 @@
     <plurals name="profile_summary_filled">
         <item quantity="one">%1$,d parameter filled</item>
         <item quantity="other">%1$,d parameters filled</item>
+    </plurals>
+    <plurals name="profile_tune_hint_n">
+        <item quantity="one">%1$,d field tweaked for this app</item>
+        <item quantity="other">%1$,d fields tweaked for this app</item>
     </plurals>
     <plurals name="profile_summary_bound">
         <item quantity="one">Bound in %1$,d app</item>

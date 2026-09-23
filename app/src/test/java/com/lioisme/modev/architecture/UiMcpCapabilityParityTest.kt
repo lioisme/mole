@@ -128,6 +128,11 @@ class UiMcpCapabilityParityTest {
                 "PerAppFeatureSettingsViewModel.setKeywordFollowGlobal",
                 "PerAppFeatureSettingsViewModel.toggleKeyword",
                 "PerAppFeatureSettingsViewModel.setSpoofProfile",
+                // V49 R-2 每应用画像逐项微调:同一可变上游(该包的 AppListenOverride),
+                // 因此并进本行而不是另立工具 —— 另立就会与 feature_settings_set 撞 R1。
+                "PerAppFeatureSettingsViewModel.setProfileField",
+                "PerAppFeatureSettingsViewModel.revertProfileField",
+                "PerAppFeatureSettingsViewModel.randomizeProfileField",
                 "PerAppFeatureSettingsViewModel.reset",
             ),
             tools = listOf("feature_settings_get", "feature_settings_set", "feature_settings_reset", "taxonomy_feature"),

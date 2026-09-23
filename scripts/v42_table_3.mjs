@@ -313,6 +313,13 @@ export const T3 = {
   profile_kind_screenshot: ['スクリーンショット方針', '스크린샷 정책'],
   profile_kind_blank_content: ['ブランクパス内容系', '빈 패스 내용 계열'],
   profile_kind_blank_app_list: ['ブランクパスアプリ一覧', '빈 패스 앱 목록'],
+  // V49 R-2 每应用画像微调
+  profile_tune_title: ['このアプリの画像上書き', '이 앱 프로필 조정'],
+  profile_tune_row: ['画像上書き', '프로필 조정'],
+  profile_tune_row_hint: ['このアプリだけ項目を上書き、画像自体は変更しません', '이 앱에서만 항목을 재정의하고 프로필은 바꾸지 않습니다'],
+  profile_tune_hint_none: ['まだ上書きなし', '아직 재정의 없음'],
+  profile_tune_following: ['画像値：%1$s', '프로필 값: %1$s'],
+  profile_revert_to_profile: ['画像値に戻す', '프로필 값으로 되돌리기'],
   profile_field_brand: ['ブランド', '브랜드'],
   profile_field_manufacturer: ['メーカー', '제조사'],
   profile_field_model: ['端末モデル名', '기기 모델명'],
@@ -389,6 +396,7 @@ export const PLURALS = {
   mcp_tokens_count: { ja: '%1$,d 個のトークン', ko: '%1$,d개 토큰' },
   // V47 WP-5 设备画像库
   profile_summary_filled: { ja: '%1$,d 項目を設定済み', ko: '%1$,d개 항목 설정' },
+  profile_tune_hint_n: { ja: 'このアプリで %1$,d 項目を上書き中', ko: '이 앱에서 %1$,d개 항목 재정의' },
   profile_summary_bound: { ja: '%1$,d 個のアプリでバインド済み', ko: '%1$,d개 앱에 바인딩됨' },
   profile_import_preview_msg: { ja: '%1$,d 件のプロフィールをインポートできます(%2$,d 件は重複、%3$,d 件は拒否)。今すぐインポートしますか?', ko: '%1$,d개 프로필을 가져올 수 있습니다(%2$,d개 중복, %3$,d개 거부). 지금 가져올까요?' },
   profile_import_done: { ja: '%1$,d 件のプロフィールをインポートしました', ko: '%1$,d개 프로필을 가져왔습니다' },

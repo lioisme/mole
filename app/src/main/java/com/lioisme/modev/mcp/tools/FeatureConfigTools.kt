@@ -7,6 +7,7 @@ import com.lioisme.modev.core.model.CategoryTaxonomy
 import com.lioisme.modev.core.model.FeatureGroup
 import com.lioisme.modev.core.model.FeatureGroups
 import com.lioisme.modev.core.model.HookSwitch
+import com.lioisme.modev.core.model.ProfileFieldCatalog
 import com.lioisme.modev.core.model.RecordType
 import com.lioisme.modev.domain.config.ListenConfigService
 
@@ -66,7 +67,11 @@ class FeatureConfigTools(private val settings: ListenConfigService) {
             "feature category keys (kindKey form '<recordType>:<kind>' from taxonomy_feature; bare ids " +
             "accepted and resolved via taxonomy). Feature data fields: spoofProfileId (a device-profile " +
             "library key, free-form since V47 WP-7 - see spoof_profiles_list; spoof_profile_apply is the " +
-            "validated single-purpose binding entry), spoofOverrides (legacy frozen override map, " +
+            "validated single-purpose binding entry), profileFieldEntries (per-app device-profile field " +
+            "deviations keyed by the catalog json key, values as strings - this is how one field is " +
+            "customized for one app without editing the shared profile; null per key clears that " +
+            "deviation, an empty value means 'do not spoof this field even if the profile sets it'), " +
+            "spoofOverrides (legacy frozen override map, " +
             "null resets), extraRootPackages/extraXposedPrefixes/extraMaskKeywords (string arrays), " +
             "extraFridaPorts (integer array), keywordIds (library entry ids), keywordFollowGlobal " +
             "(true = follow global enabled set; normalized to default). Empty arrays reset the field to default.",
@@ -77,6 +82,7 @@ class FeatureConfigTools(private val settings: ListenConfigService) {
             bool("masterValue", "true/false for the chosen master; omit key or JSON null to reset to default")
             obj("kindEntries", "Map of feature kindKey -> true/false/null")
             str("spoofProfileId", "Device profile library key (see spoof_profiles_list)")
+            obj("profileFieldEntries", "Map of profile field json key -> string value, or null to drop that deviation (V49 R-2)")
             obj("spoofOverrides", "Spoof field overrides map (optional; null resets)")
             array("extraRootPackages", "Root package blacklist appends (optional)")
             array("extraXposedPrefixes", "Xposed prefix blacklist appends (optional)")
@@ -125,6 +131,35 @@ class FeatureConfigTools(private val settings: ListenConfigService) {
             next = next.copy(kinds = kinds)
         }
         McpJson.str(args, "spoofProfileId")?.let { next = next.copy(spoofProfileId = it) }
+        args.get("profileFieldEntries")?.let { v ->
+            if (v.isJsonNull) {
+                next = next.copy(profileOverrides = null)
+            } else {
+                require(v.isJsonObject) { "profileFieldEntries must be object or null" }
+                val map = next.profileOverrides.orEmpty().toMutableMap()
+                v.asJsonObject.entrySet().forEach { (key, value) ->
+                    // 声明面即生效面:键必须认得、值必须过同一套校验,否则当场协议错误点名,
+                    // 绝不"收下但没生效"(仓库侧还有一道,但那道只该兜底不该当前线)。
+                    val field = ProfileFieldCatalog.fieldByJsonKey(key)
+                        ?: throw McpTool.McpToolException(
+                            "Unknown profile field key '$key'; valid keys from spoof_profile_catalog kind=fields",
+                        )
+                    if (value == null || value.isJsonNull) {
+                        map.remove(ProfileFieldCatalog.jsonKeyOf(field))
+                    } else {
+                        require(value.isJsonPrimitive) { "profileFieldEntries values must be strings or null" }
+                        val raw = value.asString
+                        ProfileFieldCatalog.validate(field, raw)?.let { error ->
+                            throw McpTool.McpToolException(
+                                "Profile field '${field.name}' rejected value \"$raw\": $error",
+                            )
+                        }
+                        map[ProfileFieldCatalog.jsonKeyOf(field)] = raw
+                    }
+                }
+                next = next.copy(profileOverrides = map.ifEmpty { null })
+            }
+        }
         args.get("spoofOverrides")?.let { v ->
             next = if (v.isJsonNull) {
                 next.copy(spoofOverrides = null)

@@ -858,6 +858,12 @@
     <string name="profile_kind_screenshot">截屏策略</string>
     <string name="profile_kind_blank_content">空白通行证内容</string>
     <string name="profile_kind_blank_app_list">空白通行证应用列表</string>
+    <string name="profile_tune_title">本应用画像微调</string>
+    <string name="profile_tune_row">画像微调</string>
+    <string name="profile_tune_row_hint">只为本应用覆写其中某一项，不改动画像本身</string>
+    <string name="profile_tune_hint_none">尚未定制任何一项</string>
+    <string name="profile_tune_following">画像值：%1$s</string>
+    <string name="profile_revert_to_profile">还原为画像值</string>
     <string name="profile_field_brand">品牌</string>
     <string name="profile_field_manufacturer">制造商</string>
     <string name="profile_field_model">机型型号</string>
@@ -922,6 +928,9 @@
     <string name="profile_slot_screenshot_allow">强制允许截屏</string>
     <plurals name="profile_summary_filled">
         <item quantity="other">已填 %1$,d 项参数</item>
+    </plurals>
+    <plurals name="profile_tune_hint_n">
+        <item quantity="other">本应用已定制 %1$,d 项</item>
     </plurals>
     <plurals name="profile_summary_bound">
         <item quantity="other">被 %1$,d 个应用绑定</item>

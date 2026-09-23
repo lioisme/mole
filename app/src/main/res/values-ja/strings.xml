@@ -868,6 +868,13 @@
     <string name="profile_kind_screenshot">スクリーンショット方針</string>
     <string name="profile_kind_blank_content">ブランクパス内容系</string>
     <string name="profile_kind_blank_app_list">ブランクパスアプリ一覧</string>
+    <!-- V49 R-2 每应用画像微调:绑定只能整张选档,改一项必须来这里,不动共享画像 -->
+    <string name="profile_tune_title">このアプリの画像上書き</string>
+    <string name="profile_tune_row">画像上書き</string>
+    <string name="profile_tune_row_hint">このアプリだけ項目を上書き、画像自体は変更しません</string>
+    <string name="profile_tune_hint_none">まだ上書きなし</string>
+    <string name="profile_tune_following">画像値：%1$s</string>
+    <string name="profile_revert_to_profile">画像値に戻す</string>
     <string name="profile_field_brand">ブランド</string>
     <string name="profile_field_manufacturer">メーカー</string>
     <string name="profile_field_model">端末モデル名</string>
@@ -932,6 +939,9 @@
     <string name="profile_slot_screenshot_allow">スクリーンショットを強制有効</string>
     <plurals name="profile_summary_filled">
         <item quantity="other">%1$,d 項目を設定済み</item>
+    </plurals>
+    <plurals name="profile_tune_hint_n">
+        <item quantity="other">このアプリで %1$,d 項目を上書き中</item>
     </plurals>
     <plurals name="profile_summary_bound">
         <item quantity="other">%1$,d 個のアプリでバインド済み</item>

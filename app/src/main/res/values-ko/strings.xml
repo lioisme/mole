@@ -868,6 +868,13 @@
     <string name="profile_kind_screenshot">스크린샷 정책</string>
     <string name="profile_kind_blank_content">빈 패스 내용 계열</string>
     <string name="profile_kind_blank_app_list">빈 패스 앱 목록</string>
+    <!-- V49 R-2 每应用画像微调:绑定只能整张选档,改一项必须来这里,不动共享画像 -->
+    <string name="profile_tune_title">이 앱 프로필 조정</string>
+    <string name="profile_tune_row">프로필 조정</string>
+    <string name="profile_tune_row_hint">이 앱에서만 항목을 재정의하고 프로필은 바꾸지 않습니다</string>
+    <string name="profile_tune_hint_none">아직 재정의 없음</string>
+    <string name="profile_tune_following">프로필 값: %1$s</string>
+    <string name="profile_revert_to_profile">프로필 값으로 되돌리기</string>
     <string name="profile_field_brand">브랜드</string>
     <string name="profile_field_manufacturer">제조사</string>
     <string name="profile_field_model">기기 모델명</string>
@@ -932,6 +939,9 @@
     <string name="profile_slot_screenshot_allow">스크린샷 강제 활성</string>
     <plurals name="profile_summary_filled">
         <item quantity="other">%1$,d개 항목 설정</item>
+    </plurals>
+    <plurals name="profile_tune_hint_n">
+        <item quantity="other">이 앱에서 %1$,d개 항목 재정의</item>
     </plurals>
     <plurals name="profile_summary_bound">
         <item quantity="other">%1$,d개 앱에 바인딩됨</item>
