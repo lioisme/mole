@@ -50,10 +50,10 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 | 监听域 Listen Domain | 被动采集能力域(算法/数据库/行为/偏好/WebView/系统信息 + 请求监控/检测监控/弹窗·控件·Activity 观测);`CategoryTaxonomy.domain = LISTEN` | 把干预功能称「××监听」 |
 | 功能域 Feature Domain | 主动干预能力域(退出拦截/崩溃预防/解除录屏/弹窗关键词拦截/SSL 绕过/代理 VPN 隐藏/Root·Xposed·模拟器伪装);`domain = FEATURE` | 伪装成监听类型 |
 | 关键词库 Keyword Library | 全局弹窗拦截关键词资产(Room `keyword_library`,text 唯一 + matchMode + 全局启停);每应用默认跟随全局,可显式子集 | 仅 override 扁平词表、无库 |
-| 伪装画像 Spoof Profile | **两套并存,以 V47 画像库为准**:①画像库 `spoof_profile` 表(Room v15)= 41 项 `DeviceProfile` 正文 + **九内置档账本(V48 D1:3→9 档,机型身份 13 项,D-7 只填身份不填现场)** + DIY + 草稿新建 + 绑定唯一入口 `spoofProfileId`(= 库主键或 `""`);①b **每应用逐项微调(V49 R-2)** = `AppListenOverride.profileOverrides`(键 = `ProfileFieldCatalog.jsonKeyOf`,值 = 编辑态串,空串 = 显式不伪装该项;缺键 = 跟随画像),UI 唯一入口 = 功能设置页「画像微调」区(`apps/{pkg}/profile-tune`,与编辑器**共用** `ProfileFieldControls` 的行与弹层),MCP 唯一入口 = `feature_settings_set.profileFieldEntries`(**不另立新工具**,同一可变上游撞 R1);合并与反推的**唯一实现点 = `core/model/ProfileFieldDeviation`**(`apply` 下发用 / `between` 写盘用,二者互逆由 `ProfileFieldDeviationTest` + `PerFieldIndependenceTest` 钉),**禁**在 UI 或仓库里再拼一遍「画像 ⊕ 覆写」;`还原`(删覆写)与 `清除`(写空)是两件事,少任一即半功能;②接管前遗留通路 `SpoofProfiles`(auto/pixel7pro/xiaomi13 常量档)+ `spoofOverrides` 字段覆写,仍是**当前实际生效**的取值源。机型字面量唯一事实源仍是 `SpoofProfiles` 与 `BuiltinDeviceProfiles` 各自承担的两层(钩子禁内置)。**当前边界(实至名归的分界,不是待办)**:画像库已完成「取值 / 校验 / 编辑 / **选型(选而非填,V48 R-3)** / 传输 / 绑定 / 下发」——即 `FeatureConfig.deviceProfile` 快照经 `SettingsRepository.expandProfile` 随有效配置推到注入进程;但 **`hook` 子树零消费者**,注入侧改写仍全部走 `SpoofProfiles.resolve(spoofProfileId, spoofOverrides)`。说「画像已生效于靶程序」即假;`SpoofProfileLibraryScreen` 顶部 `profile-takeover-status`(键 `profile_takeover_status_hint`)那一句**就是这条边界的 UI 兑现,撤掉它 = 撒谎** | 把画像库称已完成、把遗留档称退役(两者都还没)、`spoofOverrides` 称已合并(未合并,写面已冻结而已) |
-| 能力表 Capability Map | 前后端**逐类对照的唯一投影**(V48 R-2,`core/model/CapabilityMap.kt`):81 行 kind →(记录类型, 域, **分区资源键**, master 位名, 记录路由常量, 探针类名)。行集恒由 `CategoryTaxonomy.all()` 派生、功能域分区恒由 `FeatureGroups.kindRefs()` 派生 ⇒ 本文件**零 kind 字面量、不是第二份清单**;`CapabilityMapTest` 双向对账(表↔分类法/`R.string`/`ModevRoutes`/`hook/probes` 源文件)并冻结 81/44/37 与**三张跨域类型**(NETWORK / DEVICE_ENV / UI_INTERACTION 同类型内两域混居)。`sectionKey`/`routeKey` 存**名字**不存 `R.string` Int(core 子树零 android) | 在页面里再拼一份"哪些类归本页"(旧监听页自拼跨域清单即 V48-DFC-03 根因)、把表当文档不做门禁 |
+| 伪装画像 Spoof Profile | **两套并存,以 V47 画像库为准**:①画像库 `spoof_profile` 表(Room v15)= 41 项 `DeviceProfile` 正文 + **九内置档账本(V48 D1:3→9 档,机型身份 13 项,D-7 只填身份不填现场)** + DIY + 草稿新建 + 绑定唯一入口 `spoofProfileId`(= 库主键或 `""`);①b **每应用逐项微调(V49 R-2)** = `AppListenOverride.profileOverrides`(键 = `ProfileFieldCatalog.jsonKeyOf`,值 = 编辑态串,空串 = 显式不伪装该项;缺键 = 跟随画像),UI 唯一入口 = 功能设置页「画像微调」区(`apps/{pkg}/profile-tune`,与编辑器**共用** `ProfileFieldControls` 的行与弹层),MCP 唯一入口 = `feature_settings_set.profileFieldEntries`(**不另立新工具**,同一可变上游撞 R1);合并与反推的**唯一实现点 = `core/model/ProfileFieldDeviation`**(`apply` 下发用 / `between` 写盘用,二者互逆由 `ProfileFieldDeviationTest` + `PerFieldIndependenceTest` 钉),**禁**在 UI 或仓库里再拼一遍「画像 ⊕ 覆写」;`还原`(删覆写)与 `清除`(写空)是两件事,少任一即半功能;②接管前遗留通路 `SpoofProfiles`(auto/pixel7pro/xiaomi13 常量档)+ `spoofOverrides` 字段覆写,**仍是未接管族的实际取值源**。机型字面量唯一事实源仍是 `SpoofProfiles` 与 `BuiltinDeviceProfiles` 各自承担的两层(钩子禁内置)。**当前边界(实至名归的分界,不是待办)**:画像库已完成「取值 / 校验 / 编辑 / **选型(选而非填,V48 R-3)** / **逐项覆写(V49 R-2)** / 传输 / 绑定 / 下发」——即 `FeatureConfig.deviceProfile` 快照经 `SettingsRepository.expandProfile`(= `ProfileFieldDeviation.apply`)随有效配置推到注入进程;注入侧**自 V49 WP-D1 起按族逐个接管**(`DeviceEnvKind` 的 `PROFILE_` 项 ⇔ 该族有钩子,值源已是画像),**未接管的族仍走** `SpoofProfiles.resolve`。因此「画像已生效于靶程序」这句**只对已登记族为真**,对剩余族仍是假;`SpoofProfileLibraryScreen` 顶部 `profile-takeover-status`(键 `profile_takeover_status_hint`)那一句**就是这条边界的 UI 兑现,且其名单从 `DeviceEnvKind` 派生**(V49 D-3 保证登记 ⇔ 生效)—— 撤掉它 = 撒谎,写死它 = 另一种撒谎 | 把画像库称已完成、把遗留档称退役(两者都还没)、`spoofOverrides` 称已合并(未合并,写面已冻结而已)、**把接管说成整体完成(只有已登记族)** |
+| 能力表 Capability Map | 前后端**逐类对照的唯一投影**(V48 R-2,`core/model/CapabilityMap.kt`):83 行 kind(V48 定档时 81;V49 WP-D1 起随画像族递增)→(记录类型, 域, **分区资源键**, master 位名, 记录路由常量, 探针类名)。行集恒由 `CategoryTaxonomy.all()` 派生、功能域分区恒由 `FeatureGroups.kindRefs()` 派生 ⇒ 本文件**零 kind 字面量、不是第二份清单**;`CapabilityMapTest` 双向对账(表↔分类法/`R.string`/`ModevRoutes`/`hook/probes` 源文件)并冻结 83/44/39 与**三张跨域类型**(NETWORK / DEVICE_ENV / UI_INTERACTION 同类型内两域混居)。`sectionKey`/`routeKey` 存**名字**不存 `R.string` Int(core 子树零 android) | 在页面里再拼一份"哪些类归本页"(旧监听页自拼跨域清单即 V48-DFC-03 根因)、把表当文档不做门禁 |
 | 画像选型库 Profile Picker 库 | 41 字段中**取值域有限的每一项都不许让用户凭记忆打字**,四本目录各有唯一通路:①**机型库**`devices.json`(见下行)写身份四项;②**运营商库** `assets/carriers.json`(1597 条,MIT,`carriers.NOTICE.txt` 记上游 revision,禁改文件):`core/model/CarrierCatalog.kt` 纯数据 + `parseCarrierCatalog` 唯一解码口 + `applyCarrierPreset` 一次写全 SIM_OPERATOR/SIM_OPERATOR_NAME/SIM_COUNTRY,**国家码恰两字母才写**(数据集实有 77 条 `"AU/CC/CX"` 多地区串,拆/猜即自造非法值 ⇒ 恒留空);③**平台表** `ProfileOptionSource.optionsFor`(语言/SIM 国家/时区 + **V48 新增密度档与核数档**);④**事实表** `core/model/ProfileValueSets`(Android release↔SDK **37 对**,表尾恒与基线同尾 = Android 17 / API 37,V49 D-6 以「内置数据照搬基线」反转了 V48「止于已知最高 API 36」定档,逐行同源由 `BaselineDataParityTest` 直读 `third_party/.../res/raw/presets.json` 钉;**唯一不照搬的是基线 release 字面量**(`6` 之类),因真机 API 23 上报 `6.0`,照搬即自造检测点,差异逐条登记在 `releaseLiteralDeltas`;13 密度档与基线零差异 / 6 核数档为 Modev 超基线项)。**成对字段走复合动作、不走 `optionsFor`**:`pickAndroidRelease`(release+SDK 同写)、`pickCarrier`、`pickDevice`。**`CarrierCatalogRepository` 与 `DeviceCatalogRepository` 共用 `data/repo/CachedAssetReader<T>`**(一次读盘 / null 不缓存 / 冷却窗 / `attempts` 计数)——加第三本随包目录时必须复用它,禁再抄一份 reader | 让任一有限域字段只可手填、把 countryCode 直写进画像、为运营商/密度另建第二张清单、把 SDK_INT 单独可写而与 release 脱钩 |
-| 作用域 Scope（V48 R-1） | 本产品**唯一的顶层闸**:框架级 Xposed 作用域成员资格。动作行文案恒为「作用域此应用」(`app_monitor_scope_row`,四语同轴),它管辖两域共 81 类开关 + 全部干预;状态呈现词 = 已作用域 / 未作用域(`detail_listening`/`detail_not_listening`,键名保留历史形态、值已迁)。禁用旧词:**监听此应用**(把管辖干预的动作称作监听,`DomainVocabularyTest` 四语常驻拦截);第二控件(应用列表行尾 Checkbox)与监控页开关共享同一状态、同一名词、同一写路径(`app-row-scope` testTag + contentDescription)。移出作用域无独立确认入口(恒由开关的 off 分支承担),`removeScope()` 与 `danger_remove_scope_msg` 已随死路删除,**禁止复活** | 「监听此应用」再版、给行尾 Checkbox 换个名词、恢复移出作用域二次确认 |
+| 作用域 Scope（V48 R-1） | 本产品**唯一的顶层闸**:框架级 Xposed 作用域成员资格。动作行文案恒为「作用域此应用」(`app_monitor_scope_row`,四语同轴),它管辖两域共 83 类开关 + 全部干预;状态呈现词 = 已作用域 / 未作用域(`detail_listening`/`detail_not_listening`,键名保留历史形态、值已迁)。禁用旧词:**监听此应用**(把管辖干预的动作称作监听,`DomainVocabularyTest` 四语常驻拦截);第二控件(应用列表行尾 Checkbox)与监控页开关共享同一状态、同一名词、同一写路径(`app-row-scope` testTag + contentDescription)。移出作用域无独立确认入口(恒由开关的 off 分支承担),`removeScope()` 与 `danger_remove_scope_msg` 已随死路删除,**禁止复活** | 「监听此应用」再版、给行尾 Checkbox 换个名词、恢复移出作用域二次确认 |
 | 机型库 Device Catalog | 随包 `assets/devices.json`(源自 KHwang9883/MobileModels-csv,**CC BY-NC-SA 4.0**,修订号与出处逐字记在 `devices.NOTICE.txt`,禁改文件 / 禁minify;**且与基线 `third_party/Guise_Reborn-main` 同目录文件逐字节相同,MD5 由 `BaselineDataParityTest` 钉** —— 「照搬基线内置数据」是可被静默违反的事,只能靠对账测试维持):品牌 → 型号的**身份选择器**唯一数据源(`core/model/DeviceCatalog.kt` 纯数据 + `domain/config/DeviceCatalogService` 契约 + `data/repo/DeviceCatalogRepository` 唯一读者与进程内缓存)。**非 Android 平台在 `parseDeviceCatalog` 一处剔除**(V49 R-3:上游收全平台机型,`apple` 品牌 458 条含 iPhone/iPad/Apple Watch/Apple TV,写进 `Build.BRAND` 就是造一台从不存在的设备;资产不动、可达集剔,`DeviceBrandEntry.isNonAndroidPlatform()` 是唯一谓词,`AndroidOnlyDataTest` 五面扫「解码集 / 逐条机型记录 / 9 内置档 41 字段 / 随机源 2000 种子 / 遗留 `SpoofProfiles`」——**判据是可达即违规,不是「文件里没有」**)。可达集实测 **25 品牌 / 8,075 机型**(= 基线 26/8,533 减 apple)。扫描面两条显式豁免:`pineapple` = 骁龙 8 Gen 3 板级代号、`darwin` = 锤子 `hardware` 与荣耀机型代号(V49 WP-B 首跑被这两条真 Android 数据判成假阳性,别再往 token 表里加常见词)。编辑器「选择真实机型」行一次写全 BRAND/MANUFACTURER/MODEL/DEVICE;**PRODUCT / BOARD / HARDWARE 恒不猜**(上游数据不提供这三个值,凑一个就是自造真实机型从不存在的字段组合);读不到资产 = `Unavailable` 上屏点名,禁退化成「库里没机型」。**另三项枚举字段(语言 / SIM 国家 / 时区)候选表唯一来源 = `core/model/ProfileOptionSource`**(直接取 `Locale.getISOLanguages` / `Locale.getISOCountries` / `TimeZone.getAvailableIDs` 平台表,**禁再随包或再手抄第三份清单**;`ProfileOptionSourceTest` 逐值断言平台表恒过 catalog 校验,选择器 sheet 首项恒留「改为手动填写」—— 做列表不得顺手夺走手填)| 拿 MODEL 或 DEVICE 猜 PRODUCT、把 devices.json 当画像正文来源、UI 侧再拼一份 `model (name)` 呈现串、为语言/时区另建一张本地清单、**把 Apple 记录当可选机型(或在 UI 侧过滤而不收口在解码口)** |
 | 检测黑名单追加项 extra* | Root 包名/Xposed 前缀/Frida 端口/掩码词的用户追加项(内置基线 ∪ 追加,只增不删) | 覆盖内置基线 |
 | MCP 服务 MCP Server | 进程内常驻 Streamable HTTP(spec 2025-06-18,V39 起端口默认 **1510**(wire 迁 1511 让位),单端点 POST /mcp,偏好 `mcp_port` 可改);监听绑定随**统一外部访问开关**(V41 D-1,见 #19);令牌认证独立开关(V39,默认停用)启用后**全接口强制**(含回环),服务端是否鉴权仅由 `tokenAuthEnabled` 决定(`McpServer` 无 externalAccess 耦合);多令牌 `McpTokenEntry`(SecureRandom 32 hex,宿主本地 `mcp_tokens` 不镜像,V38 单键惰性迁移);与 wire ConfigServer 完全独立生命周期(独立端口/开关/restart,互不触碰,VERSION 恒 4 零感知) | 把 MCP 当 wire 通道扩展、恢复 resources/prompts 双通道、令牌暴露为 MCP 工具(引导悖论 + PII)、恢复外部访问↔认证级联、恢复 mcp_external_access 独立键 |
@@ -534,12 +534,24 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       内置档账本:`BuiltinDeviceProfiles.BUILTINS` 为首装/升级补档源,`builtinSeedId` +
       `builtinFingerprint`(catalog 序派生,**不含 name/summary** —— 基线把呈现算进指纹导致切语言即
       「用户改过」误判,是反面教材)+ `managed`/`deleted` 墓碑列;用户改过即脱离管辖,删过即不复活。
-      **当前接管边界(改任何一侧都要回访这条,别按想象写)**:画像库已覆盖取值/校验/编辑/传输/
-      绑定/下发(`FeatureConfig.deviceProfile` 随 `expandProfile` 推到注入进程),但 `hook` 子树
-      **零消费者** ⇒ 靶程序实际值仍出自 `SpoofProfiles.resolve(spoofProfileId, spoofOverrides)`;
-      逐组接管须按「kind 登记 + 操作枚举 + 发射该操作的钩子 + 冻结计数快照 + MCP enum」**同一提交原子落**
-      (`DeviceEnvKindTest` 要求每 kind 有 operation、声明面即生效面要求 enum 与钩子一致),
-      这也是 `ProfileKind`(V49 R-1 后 **20**,画像层)与 `DeviceEnvKind`(21,taxonomy 层)目前**故意不合并**的原因 ——
+      **当前接管边界(V49 WP-D1 起是「部分接管」,改任何一侧都要回访这条)**:画像库已覆盖取值/校验/编辑/传输/
+      绑定/下发(`FeatureConfig.deviceProfile` 随 `expandProfile` 推到注入进程);注入侧**已接管的族** =
+      `DeviceEnvKind` 里 `PROFILE_` 前缀项(当前 = `PROFILE_BUILD_IDENTITY` 8 字段 +
+      `PROFILE_BUILD_VERSION` 的 ID/RELEASE/SDK_INT,由 `hook/hooks/ProfileBuildHooker.kt` 执行,
+      值源恒为 `feature.deviceProfile`,**不再**经 `SpoofProfiles`);**未接管的族仍全部走**
+      `SpoofProfiles.resolve(spoofProfileId, spoofOverrides)`。
+      **这条边界的 UI 兑现是 `SpoofProfileLibraryScreen` 顶部的 `profile_takeover_status_hint`,
+      其名单自 V49 起从 `DeviceEnvKind` 的 `PROFILE_` 项派生**(`takenOverProfileFamilies`,
+      依赖 D-3「kind 登记与钩子同一提交」⇒ 登记 ⇔ 生效),**禁**改回写死散文、也禁整段撤掉
+      —— 写死的名单每接一批就过期一次,两个方向的过期都是谎报。
+      逐组接管须按「kind 登记 + 操作枚举 + 发射该操作的钩子 + 冻结计数快照 + MCP enum +
+      图标/色板/标签四语 + `FeatureGroups` 组」**同一提交原子落**
+      (`DeviceEnvKindTest` 要求每 kind 有 operation、声明面即生效面要求 enum 与钩子一致;
+      V49 WP-D1 已把这条十站链走通一遍,计数快照五处 = `DeviceEnvKind` 23 / taxonomy device_env 23 /
+      FEATURE 39 / 能力表 83 / MCP `taxonomy_feature` 39 kinds in 6 groups)。
+      **画像族默认开**(与条件档默认 false 相反)是定档而非疏漏:真闸是「该项是否被填」,空 ⇒ 一族零安装。
+      这也是 `ProfileKind`(V49 R-1 后 **20**,画像层)与 `DeviceEnvKind`(V49 WP-D1 后 **23**,taxonomy 层)
+      目前**故意不合并**的原因 —— 两者基数不同且画像族仍在逐批登记,
       合并只能在批量登记那一轮做,半合并即把仓库留在红色(实测链见 `TASK-V47-SPOOF-PLAN.md` §WP-3c)。
       **V49 R-1 的分类单轴(改画像分组前必读)**:`底层来源 API 族 ≡ ProfileKind ≡ UI 分区 ≡ 钩子族 ≡
       MCP enum 值`,五者 1:1,由 `ProfileKind.sourceApi`(纯 ASCII 代码标识符,不进四语表)在屏上点名,
@@ -554,7 +566,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 31. **分类与词汇契约(V48,前后端逐类对齐)**:
     **① 一层一名词。** 域名词恒为 **监听(LISTEN,被动采集)/ 功能(FEATURE,主动干预)**;「总开关/Masters/マスター/마스터」在四语的**分区标题与行标签**里全部退役(本产品有 12 个层级的上级闸:1 作用域 + 10 类型 master + 3 服务开关,该词不携带信息);「作用域此应用」是唯一的顶层闸文案。以上由 `DomainVocabularyTest` 常驻拦截(四语禁把作用域称作监听/监视、两页标题在四语必须互异、两页重置确认同动词同句式、退役词不得复现、跨域提示必须点名那个闸)。
     **② 一个概念一个键。** 一个记录类型**只有一个**标题键(`××_records_title`;`settings_records_*` 十键已删,数据管理页与监控页入口共用);一条遗留通路只有一个名字(画像库三段 = 画像库(编辑·校验·绑定) / 旧内置档(仍生效中) / 旧字段覆写(仍生效中))。
-    **③ 页面不许自拼分类清单。** 跨域行集合、分区归属、master 归属一律读 `CapabilityMap`(`crossDomainListen` / `of(type)`);kind→master 标签走 `KindLabelRes.masterLabelRes(type)`、master 现值走 `HookSwitch.masterFor(type)`,两处都是穷尽 `when`(新增类型编译期点名)。`CapabilityMapTest` 冻结 81/44/37 与三张跨域类型,并把表钉到 `R.string` / `ModevRoutes` / `hook/probes` 真实存在物上。
+    **③ 页面不许自拼分类清单。** 跨域行集合、分区归属、master 归属一律读 `CapabilityMap`(`crossDomainListen` / `of(type)`);kind→master 标签走 `KindLabelRes.masterLabelRes(type)`、master 现值走 `HookSwitch.masterFor(type)`,两处都是穷尽 `when`(新增类型编译期点名)。`CapabilityMapTest` 冻结 83/44/39 与三张跨域类型,并把表钉到 `R.string` / `ModevRoutes` / `hook/probes` 真实存在物上。
     **④ 跨域闸必须可见。** 监听页「环境监听」里 kind 已开而外来 master 关 ⇒ 行 `supporting` 点名该 master 的名字与所在页(`listen_kind_master_off_hint`);**禁**回到"勾了什么都不发生"的静默形态,也**禁**为此把 FEATURE kind 移到监听页(#23 双域闸与 DUAL-12 按域清除不破)。
     **⑤ 配对字段不得分开可写。** Android release↔SDK 由 `pickAndroidRelease` 一次写全,`ProfileValueSets` 是唯一配对表(`ProfileEditorForm` 原私有 `ANDROID_GENERATIONS` 与"认不出就硬写 34"已删);内置画像恒只填机型身份 13 项(D-7),新档的 MODEL/代号取自 `devices.json` 实测条目而非记忆书写。
     **⑥ 删键的 grep 面 = 键名。** V48 实锤:改文案时只搜了中文值、漏了 `DataSettingsScreenTest` 里的 `R.string.settings_records_algorithm` 引用 ⇒ androidTest 编译才炸。删/改任何资源键前先 `grep -rn "<key>" app/src scripts`。
@@ -596,6 +608,15 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
   (`repeat(30) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(5) }` 后再
   `waitForIdle()`),形态同 `KeywordLibraryRepositoryTest` / `ConfigServer*Test`;
   且**先断数据面再断呈现面**(两者同败 = 写路径问题;只有呈现败 = 锚点/语义树问题)。
+- **注入侧「改 `static final` 平台字段」在 JVM 档不可证(V49 WP-D1 实测,别再把测试写歪)**:
+  Robolectric 跑在 HotSpot 上,`Field.set` 对 `static final` 恒抛 `IllegalAccessException`
+  ⇒ `ProfileBuildHookerTest` 实测 0/11 落地。这不是产品缺陷:基线 `ktx-xposed` 的
+  `setStaticField` 用的就是同一句 `field.set(null, value)`,而 Guise 在野外确实改得动 `Build`
+  (ART 的反射语义与 HotSpot 不同)。因此这类钩子的 JVM 档**只能钉两条**:①纯函数计划表
+  (`plannedWrites`:画像填了哪项 ⇒ 计划哪项,空 ⇒ 零计划);②「全写或全不写、绝不半途」的
+  审计不变量。**真值生效的唯一证据是靶程序读回(WP-F 设备档)**,任何「单测绿了所以伪装生效」
+  的推论都是假绿(本轮曾把它写成 `assertEquals(11, records.size)`,在 Robolectric 下必红 ——
+  那只会把 JVM 语义误读成产品坏了)。
 - **插桩档四种「静默不生效」形态(V48 设备档实锤,四种都红过一整轮才被抓出)**:
   ① **懒列表点不到** —— `ModevSearchableChoiceSheet` = LazyColumn + `heightIn(max=420.dp)`
   + 120 行截断 ⇒ 第 8 行之后的行**压根没组合**,`performScrollTo` 对未组合节点无能为力

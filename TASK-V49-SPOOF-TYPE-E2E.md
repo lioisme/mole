@@ -290,7 +290,30 @@ V48 实测并三次登记：靶机 LDPlayer 的 Magisk/Zygisk 整场未运行 �
 
 **出口达成：** 数据面 + 组合面 + MCP 声明面 + 能力对账四组全绿。**仍欠（诚实登记，不记 ✅）**：R-2 验收第 1 条里「任一单项生效」的**设备面**证据 —— 那要等 WP-D 的强制档钩子存在才能测（今天下发快照里有了值，但 `hook/` 还不读它）。
 
-### WP-D · 注入侧接管（R-4 的**前置**，按批次原子提交）
+### WP-D · 注入侧接管（R-4 的**前置**，按批次原子提交）　🔵 D1 已落地，D2…D7 待做
+
+**D1 已完成（2026-09-24，commit `94277e0` + 契约同步 `AGENTS.md`）**：`PROFILE_BUILD_IDENTITY`(8)+
+`PROFILE_BUILD_VERSION`(ID/RELEASE/SDK_INT) 两族登记 + `ProfileBuildHooker` 落地。十站原子链实测一遍，
+**后面六批照此形，不必再试探**：
+`DeviceEnvKind` +N → `DeviceEnvOperation` +N（每 kind ≥1 操作，`DeviceEnvKindTest` 硬要求）→
+`CategoryTaxonomy` +N（FEATURE、**画像族默认 true**、SIGNAL、order 续号）→ `HookSwitch` 布尔位 +
+`deviceEnvEnabled` + `anyDeviceEnvEnabled` → `EffectiveSwitch.readKind`/`applyKinds` 双臂（**测试里还有一份
+镜像 `when`，`EffectiveSwitchTest` 也必须补**，否则编译红）→ `FeatureGroups.DEVICE_SPOOF` 组 →
+`RecordRow.deviceEnvKindLabelRes` + `op_device_env_*` 操作标签 + `KindIcons` + `DeviceEnvColorTokens`
+亮/暗两张色板 → 四语（kind + op 各一键，回写表跑生成器看 DONE）→ 冻结计数五处
+（`DeviceEnvKindTest` 23 / `CategoryTaxonomyTest` 三处 + device_env 默认集例外名单 /
+`CapabilityMapTest` 83/44/39 / `McpToolsTest` `taxonomy_feature` 39 kinds）→
+`UiMcpCapabilityParityTest` 能力行 → 钩子本体 + `DeviceEnvProbe` 注册 → 行为测试。
+
+D1 另外三处**顺带清偿的旧账**：① `EmulatorBuildHooker` 的画像取值分支删除，退为纯条件档，
+并按 R-D 让位（`maskActive() = featureOn(EMULATOR_BUILD) && !adaptiveMaskShouldYield(画像)`，
+判据唯一落在 `ProfileHookPlan`）；② 接管边界文案改为**从 `DeviceEnvKind` 的 `PROFILE_` 项派生**
+（`takenOverProfileFamilies`），写死必然每批过期一次；③ 实测并登记「Robolectric/HotSpot 拒写
+`static final` ⇒ JVM 档只能钉计划表与全有全无不变量，生效由 WP-F 判决」（AGENTS 新坑一条）。
+
+**D1 未做（诚实）**：MCP `feature_settings_set.kindEntries` 的 enum 若为硬抄表则需同步 —— 实测该 enum
+由 `CategoryTaxonomy` 派生，无第二份清单，故零改动；设备档 `SP-#1..#2` 读回断言属 WP-E/WP-F。
+
 
 每批的原子清单（D-3，缺一即不提交）：`DeviceEnvKind` +N、`CategoryTaxonomy` +N（FEATURE 域、默认 false、SIGNAL）、`DeviceEnvOperation` +N + 四语操作标签、`HookSwitch` 布尔位 + `deviceEnvEnabled`/`anyDeviceEnvEnabled`、`EffectiveSwitch.readKind`/`applyKinds` 双臂、`FeatureGroups` 组、`KindLabelRes`、`KindIcons`、`RecordRow.deviceEnvKindLabelRes`、`InterventionGateConventionTest.gatedFields`、`HotPathGateConventionTest` 名单、冻结计数（`DeviceEnvKindTest` 21→、`CategoryTaxonomyTest` 三条、`McpToolsTest`）、MCP `feature_settings_set.kindEntries` enum、二态行为测试、**靶机读回用例**。
 
