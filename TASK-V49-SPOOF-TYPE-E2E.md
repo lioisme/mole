@@ -236,19 +236,20 @@ V48 实测并三次登记：靶机 LDPlayer 的 Magisk/Zygisk 整场未运行 �
 
 **出口：** 四判据全真 + `logcat -s HookInstaller` 出现「探针已安装」= 框架活。
 
-### WP-A · 单轴分类（R-1）
+### WP-A · 单轴分类（R-1）　✅ 已完成（2026-09-24，commit `c7afdd9`）
 
-**Files:** Modify `core/model/ProfileField.kt:8-38`（删 `ProfileSection`）、`:73-240`（41 条目去 `section` 参）、`core/model/ProfileKind.kt`（18→20）、`core/model/ProfileFieldCatalog.kt:57-67`（`bySection`→`byKind` 唯一分组）、`core/model/CapabilityMap.kt`、`ui/settings/profiles/ProfileEditorScreen.kt:491-527`、`ProfileEditorState.kt:41,201`、`ProfileEditorForm.kt`（`rowsBySection`→`rowsByKind`）、`ProfileLabels.kt`、`values*/strings.xml`（10 键退役、20 键新增）、`scripts/v42_table_*.mjs` + `node scripts/v42_generate.mjs`、`app/src/test/.../core/model/{ProfileFieldCatalogTest,DeviceProfilePropertyParityTest,ProfileLabelsTest,CapabilityMapTest,ProfileEditorFormTest,ProfileEditorStateTest}.kt`
+**实际落点（与写文时的预测有两处不同，都更省）：** 分区标题**不新增 20 个四语键**，而是复用既有 `profile_kind_*` 一套键 + 一条组装格式串 `profile_section_title(本地化名, sourceApi)`；`sourceApi` 是**代码标识符不是文案**，故不进翻译表（否则要为 20 串 ASCII 养 80 条译文）。分类信息落为 `ProfileKind.sourceApi: String`，**没有**新增 `ProfileSourceFamily` 枚举 —— 两个 1:1 的枚举就是第二事实源，正是本包要消灭的东西。
 
-- [ ] **Step 1（红）** 在 `ProfileFieldCatalogTest` 加三条穷尽断言：每个 `ProfileField` 的 `kind` 恰属于一个来源族；**同一 `kind` 内所有字段的来源族相同**（按新增的 `ProfileKind.sourceFamily` 声明）；分区标题资源键存在且四语齐。跑 `:app:testModernDebugUnitTest --tests "*ProfileFieldCatalog*"` 确认因缺 `sourceFamily` / 缺新 kind 而**编译红**。
-- [ ] **Step 2** `ProfileKind` 拆两组：新增 `PROFILE_BUILD_IDENTITY`（8 字段）与 `PROFILE_BUILD_VERSION`（`BUILD_ID`/`ANDROID_VERSION`/`SDK_INT`），删 `PROFILE_BUILD`；`PROFILE_UNIQUE_ID` 拆为 `PROFILE_ANDROID_ID`（1）与 `PROFILE_TELEPHONY_ID`（`IMEI`/`PHONE_NUM`），删旧。每条目挂 `sourceFamily: ProfileSourceFamily`（新枚举，20 值，值即「要钩的 API 族」的字符串事实，如 `"android.os.Build"`、`"Settings.Secure/System.getString"`）。
-- [ ] **Step 3** 删 `ProfileSection`：`ProfileField` 构造器去 `section` 参；`ProfileFieldCatalog.byKind` 成为唯一分组出口；`ProfileEditorForm.rowsByKind()` 直接委派 catalog（**禁**在 UI 侧再排一次顺序，#31③）。
-- [ ] **Step 4** 四语：20 个 `profile_kind_<NAME>` 分区键（标题含来源括号），10 个旧 `profile_section_*` 键退役；先回写 `scripts/v42_table_*.mjs`，跑生成器直到控制台 **DONE**（#1；直写 `values-ja/ko` = V46 静默失效根因）。
-- [ ] **Step 5（绿）** 全量单测 + `CapabilityMapTest`（此时画像仍不在 81 行内，D-3 决定它在 WP-D 进；本步只保证既有 81 行零漂移）。
-- [ ] **Step 6** `grep -rn "ProfileSection\|profile_section_" app/src scripts` → 零命中（V48 强约束 #31⑥：删键的 grep 面 = 键名，含 androidTest）。
-- [ ] **Step 7** 提交 `v49: single classification axis = source family = kind = section (R-1)`。
+- [x] **拆两组、删一轴**：`PROFILE_BUILD`→`PROFILE_BUILD_IDENTITY`(8 字段)+`PROFILE_BUILD_VERSION`(3)；`PROFILE_UNIQUE_ID`→`PROFILE_ANDROID_ID`(1，Settings 读口)+`PROFILE_TELEPHONY_ID`(2，Telephony 读口)；`ProfileKind` 18→**20**。`ProfileSection` 枚举与 `ProfileField.section` 参数、`ProfileFieldCatalog.bySection`、`ProfileEditorForm.rowsBySection`、`ProfileEditorView.rowsBySection` 全部删除，`byKind` 成为唯一分组出口（新增 `populatedKinds` 只作序的对账面）。
+- [x] **来源点名**：20 个 `sourceApi`（`android.os.Build` / `android.os.Build.VERSION` / `Settings.Secure / System` / `TelephonyManager / SubscriptionManager` / `ContentResolver.query` …）；`ProfileKind` 每一项的 KDoc 说明「为什么这是一族」（如 `PROFILE_LOCALE` 有钩子 vs `PROFILE_TIME_ZONE` 是 `setDefault` 零钩子，故不并项）。
+- [x] **R-D 让位裁决补全**：`adaptiveMaskShouldYield` 原只认 `PROFILE_BUILD` 一族，拆分后**恒覆盖两族**（本文件私有 `buildFieldFamilies`，不构成新轴）—— 只认其一会出现「改了 Build.ID 但 MODEL 仍被条件档后写」的半让位形态。
+- [x] **四语**：`profile_section_*` 10 键退役，`profile_kind_build`/`profile_kind_unique_id` 改名为四项；新键全部回写 `scripts/v42_table_3.mjs` 后跑 `node scripts/v42_generate.mjs` → 控制台 **DONE**（837 串 / ja、ko 各 766 译 + 71 同形）；`profile_kind_android_id` 因四语同形（平台标识符本名）同轮登记进生成器 `IDENTICAL_OK` **与** `StringResourceParityTest.IDENTICAL_ALLOWED`（两处同源，漏一处即抛「possible missing translation」—— 本轮实抛一次）。
+- [x] **MCP 面同轴**：`spoof_profile_catalog` 的 `sections` + `kinds` 两数组合并为 `groups`（每项带 `kind` / `sourceApi` / `keys`），字段行 `"section"` 改 `"sourceApi"`；工具描述同步（「广告了但不生效」与「生效了但没广告」同一提交消除）。
+- [x] **门禁**：`ProfileFieldCatalogTest#everyKind_namesItsSourceApiAndTheGroupingIsOneTable`（20 计数 + sourceApi 非空且互异 + `populatedKinds ≡ byKind.keys`）；`ProfileLabelsTest` 由四表改三表并断言「20 类别 = 20 互异标签」；`ProfileEditorRenderRoboTest#everyParameter_rendersExactlyOneRowInItsSection` 从「锚点在屏」升级为**「标题文本含来源 API 那半句」逐段断言**（用户可见结果，不是代理指标）；`SpoofProfileToolsTest` 的分组并集断言改为「groups 数 ≡ 类别数 ≡ 20，且每行 sourceApi 与枚举一致」，并顺手把抄死的 `"PROFILE_UNIQUE_ID"`/`"IDENTITY"` 字面量改成 `ProfileField.IMEI.kind.name` 派生（V48 坑④的同族化石）。
+- [x] **回归**：全量单测 **159 类 / 1,127 用例 / 0 失败 / 0 错误 / 0 跳过**；`:app:lintModernRelease` **0e/43w/1h**；`:app:compileModernDebugAndroidTestKotlin` 成功（退役键在 androidTest 零引用，实测 grep 空输出 —— #31⑥ 的 grep 面已核）。
+- [x] **提交**：`c7afdd9`，`AGENTS.md` #30 同轮改写（分区轴退役事实 + 新类别的连带站点 + 「禁止为 UI 方便再引入分组枚举」）。
 
-**出口：** 41 字段全部可经 `ProfileField.kind.sourceFamily` 追溯；屏上 20 个分区标题四语点名来源 API；`DeviceProfilePropertyParityTest` 四视图对账绿（第 5 视图 = 分区标题，新增断言）。
+**过程中的一次环境故障（不是代码问题，登记以免下一轮误判）**：全量单测第一次跑在 `:app:bundleModernDebugClassesToRuntimeJar` 处报 `Gradle build daemon disappeared`（`hs_err_pid31944.log` 落盘），当时空闲物理内存 3.6 GB / 可用提交 8.3 GB；处置 = 按 `AGENTS`「守护进程」条用 `--no-daemon --max-workers=1 -Dorg.gradle.jvmargs=-Xmx2048m` 重跑，之后所有全量轮均用该形态。
 
 ### WP-B · 内置数据：去 Apple + 照搬基线（R-3）　✅ 已完成（2026-09-24，commit `3583026`）
 
@@ -384,6 +385,13 @@ V48 实测并三次登记：靶机 LDPlayer 的 Magisk/Zygisk 整场未运行 �
 | 09-24 | WP-B 全量 | `:app:testModernDebugUnitTest --no-build-cache --max-workers=1` | **159 类 / 1,128 用例 / 0 失败 / 0 错误 / 0 跳过**(净 +2 类 +14 用例) | ✅ |
 | 09-24 | WP-B lint | `:app:lintModernRelease --max-workers=1` | **0 errors, 43 warnings, 1 hint**(基线零新增) | ✅ |
 | 09-24 | WP-B 提交 | `git commit` | `3583026` 代码与测试;任务书 `18426d3` | ✅ |
+| 09-24 | WP-A 红 | `:app:compileModernDebugUnitTestKotlin` | 20 条编译错(退役 `ProfileSection` / `bySection` / 抄死的 `PROFILE_UNIQUE_ID`)⇒ 站点清单与实际一致 | ✅ 按预期红 |
+| 09-24 | WP-A 全量 1 | `:app:testModernDebugUnitTest --no-build-cache` | **守护进程消失**(`hs_err_pid31944.log`),非代码失败 ⇒ 改 `--no-daemon -Dorg.gradle.jvmargs=-Xmx2048m` 重跑 | ⛔→已恢复 |
+| 09-24 | WP-A 全量 2 | 同上(no-daemon 形态) | 2 红:`profile_kind_android_id` 四语同形未登记白名单 + MCP 抽查断言抄死旧枚举名 ⇒ 各自修 | ❌→已归因 |
+| 09-24 | WP-A 全量 3 | 同上 | **159 类 / 1,127 用例 / 0 失败 / 0 错误 / 0 跳过** | ✅ |
+| 09-24 | WP-A lint+插桩编译 | `:app:lintModernRelease :app:compileModernDebugAndroidTestKotlin` | 0 errors / 43 warnings / 1 hint;插桩编译成功(androidTest 对退役键零引用) | ✅ |
+| 09-24 | WP-A 四语 | `node scripts/v42_generate.mjs` | `ja/ko: strings=837 (translated 766, same 71) plurals=12` + **DONE** | ✅ |
+| 09-24 | WP-A 提交 | `git commit` | `c7afdd9` + `AGENTS.md` #30 同轮改写 | ✅ |
 | | WP-0 | `00-env-verify.ps1 -Mode runtime` | 四判据逐条 | ⬜ |
 | | WP-A | `:app:testModernDebugUnitTest --tests "*ProfileFieldCatalog*"` | | ⬜ |
 | | WP-C | `PerFieldIndependenceTest` | 41/41 | ⬜ |

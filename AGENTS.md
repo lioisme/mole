@@ -518,9 +518,10 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       (`ProfileFieldCatalogTest` / `DeviceProfilePropertyParityTest` / `ProfileLabelsTest` 穷尽性锁 +
       `SpoofProfileToolsTest` 反扫取值域;**第四视图即 `v47-spoof-expectations.json` 尚未落地,属 WP-8 出口**)。
       新增一个 `ProfileField` 的**手工**站点只有:
-      `ProfileField` 条目(kind/section/type/baselineKey)、`DeviceProfile` 字段 + 三条穷尽桥接臂
+      `ProfileField` 条目(kind/type/baselineKey —— **V49 R-1 起没有 section 轴**,分区就是 kind)、
+      `DeviceProfile` 字段 + 三条穷尽桥接臂
       (`stringOf`/`isSetIn`/`withText`)、catalog `validate`(有格式约束时)、`RANDOMIZABLE` 与对应生成器、
-      `profileFieldLabelRes` + 四语键 —— 其余(`byKind`/`bySection`/`jsonKeyOf`/codec 字段序/编辑器行序)
+      `profileFieldLabelRes` + 四语键 —— 其余(`byKind`/`populatedKinds`/`jsonKeyOf`/codec 字段序/编辑器行序)
       **全部由 `ProfileField.entries` 派生,再抄一份就是第二事实源**(漏抄由穷尽 `when` 与 parity 测试当场拦)。三条不可退让的语义:
       ① **零静默**:`ProfileResolution` 三态(`Unbound`/`Bound`/`Missing`)必须可区分并在屏上点名
       (GAP-02 旧形态:任何非内置 id 被吞成 auto = 用户选了而伪装不发生且零提示);
@@ -538,8 +539,17 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       **零消费者** ⇒ 靶程序实际值仍出自 `SpoofProfiles.resolve(spoofProfileId, spoofOverrides)`;
       逐组接管须按「kind 登记 + 操作枚举 + 发射该操作的钩子 + 冻结计数快照 + MCP enum」**同一提交原子落**
       (`DeviceEnvKindTest` 要求每 kind 有 operation、声明面即生效面要求 enum 与钩子一致),
-      这也是 `ProfileKind`(18,画像层)与 `DeviceEnvKind`(21,taxonomy 层)目前**故意不合并**的原因 ——
+      这也是 `ProfileKind`(V49 R-1 后 **20**,画像层)与 `DeviceEnvKind`(21,taxonomy 层)目前**故意不合并**的原因 ——
       合并只能在批量登记那一轮做,半合并即把仓库留在红色(实测链见 `TASK-V47-SPOOF-PLAN.md` §WP-3c)。
+      **V49 R-1 的分类单轴(改画像分组前必读)**:`底层来源 API 族 ≡ ProfileKind ≡ UI 分区 ≡ 钩子族 ≡
+      MCP enum 值`,五者 1:1,由 `ProfileKind.sourceApi`(纯 ASCII 代码标识符,不进四语表)在屏上点名,
+      分区标题 = `profile_section_title(本地化名, sourceApi)` 组装。V48 的 `ProfileSection`(10 值)与
+      `profile_section_*`(10 键)已整体退役 —— 与类别 1:1 的第二条轴就是第二事实源,而它的 `OTHER`
+      (电池 + 截屏)与 `LOCALE`(有钩子 + 零钩子)把两种不同机制混在一段,正是 R-1 要消灭的形态。
+      拆分的两组:`PROFILE_BUILD`→`_IDENTITY`/`_VERSION`、`PROFILE_UNIQUE_ID`→`PROFILE_ANDROID_ID`
+      (Settings 读口)/`PROFILE_TELEPHONY_ID`(Telephony 读口)。新增类别的连带站点:
+      `ProfileKind.sourceApi` + `profileKindLabelRes` 臂 + 四语一键 + `ProfileFieldCatalogTest`
+      的 20 计数与「sourceApi 互异」断言。**禁止**为 UI 方便再引入分组枚举。
 
 31. **分类与词汇契约(V48,前后端逐类对齐)**:
     **① 一层一名词。** 域名词恒为 **监听(LISTEN,被动采集)/ 功能(FEATURE,主动干预)**;「总开关/Masters/マスター/마스터」在四语的**分区标题与行标签**里全部退役(本产品有 12 个层级的上级闸:1 作用域 + 10 类型 master + 3 服务开关,该词不携带信息);「作用域此应用」是唯一的顶层闸文案。以上由 `DomainVocabularyTest` 常驻拦截(四语禁把作用域称作监听/监视、两页标题在四语必须互异、两页重置确认同动词同句式、退役词不得复现、跨域提示必须点名那个闸)。
