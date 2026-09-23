@@ -2,19 +2,27 @@ package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.DeviceEnvOperation
+import com.lioisme.modev.core.model.ProfileHookPlan
+import com.lioisme.modev.core.model.ProfileKind
 import com.lioisme.modev.core.model.activeSpoofProfile
 import com.lioisme.modev.hook.Invocation
-import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
+import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
- * 模拟器 CPU 信息伪造 Hooker(V34):拦截 Runtime.availableProcessors 和
- * /proc/cpuinfo 读取,伪造 CPU 核心数和架构信息,防止模拟器检测框架
- * 通过 CPU 信息识别环境(模拟器通常为 1 核)。
+ * 模拟器 CPU 信息掩蔽 Hooker(V34,**条件档**):拦截 `Runtime.availableProcessors`,
+ * 仅在真实核数多于目标时压平(V49 WP-D2 起本类**只**负责这一条通路)。
  *
- * 覆盖 API:
- * - Runtime.availableProcessors():返回 8(模拟器通常 1)
- * - /proc/cpuinfo 读取:过滤并伪造核心信息
+ * 两条登记:
+ *  1. **`/proc/cpuinfo` 正文改写自始未生效**(V49-DFC-13):旧实装查的是
+ *     `java.io.File.getMethod("readText", Charset)`,而 `readText` 是 `kotlin.io` 的
+ *     **扩展函数**(编译成静态 `TextStreamsKt.readText(File, Charset)`),`File` 上根本
+ *     没有这个成员 ⇒ `NoSuchMethodException` 被 `getOrNull() ?: return` 咽掉,钩子从未注册。
+ *     本批把这条死路整体删除(留着就是「文档说掩蔽 cpuinfo、实装零钩子」的漂移本体);
+ *     真正可用的钩点(`TextStreamsKt` 经 app classloader,或 `FileInputStream`)属设计题,
+ *     归 V49-DFC-13,须连同时机/开销一起定档,不在画像批次里顺手猜。
+ *  2. **与画像强制档共享读口**:[ProfileCpuHooker] 无条件写同一个 `availableProcessors`,
+ *     所以画像填了核数时本类让位(V49 R-D),两侧经 [SharedMethodBroadcast] 共用单一注册点。
  */
 class DeviceCpuHooker(
     context: ProbeContext,
@@ -23,85 +31,42 @@ class DeviceCpuHooker(
     /** 假核数(V37 T2.3):取自生效伪装画像。 */
     private fun fakeCores(): Int = config().activeSpoofProfile().cpuCores
 
-    override fun install() {
-        hookAvailableProcessors()
-        hookProcCpuInfo()
-    }
+    /** 条件档是否生效 = 自身门控开 **且** 画像核数不在场(V49 WP-D2)。 */
+    private fun maskActive(): Boolean =
+        featureOn(DeviceEnvKind.EMULATOR_CPU) &&
+            !ProfileHookPlan.adaptiveMaskShouldYield(
+                config().feature.deviceProfile,
+                ProfileKind.PROFILE_CPU,
+            )
 
-    private fun hookAvailableProcessors() {
+    override fun install() {
         val method = runCatching {
             Runtime::class.java.getMethod("availableProcessors")
-        }.getOrNull() ?: return
-
-        engine.hook(method, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                if (!config().deviceEnvEnabled(DeviceEnvKind.EMULATOR_CPU)) return
-                val current = invocation.result as? Int ?: return
-                val cores = fakeCores()
-                if (current <= cores) return
-                invocation.setResult(cores)
-                emit(
-                    kind = DeviceEnvKind.EMULATOR_CPU,
-                    operation = DeviceEnvOperation.CPU_AVAILABLE_PROCESSORS,
-                    originalValue = current.toString(),
-                    maskedValue = cores.toString(),
-                    interventionAction = ACTION_BLOCKED,
-                    targetClass = "Runtime",
-                    targetProperty = "availableProcessors",
-                )
-            }
-        })
-    }
-
-    private fun hookProcCpuInfo() {
-        val fileClass = runCatching { java.io.File::class.java }.getOrNull() ?: return
-        val readText = runCatching {
-            fileClass.getMethod("readText", java.nio.charset.Charset::class.java)
         }.getOrNull()
-        if (readText != null) {
-            engine.hook(readText, object : MethodHook() {
-                override fun after(invocation: Invocation) {
-                    if (!config().deviceEnvEnabled(DeviceEnvKind.EMULATOR_CPU)) return
-                    val path = runCatching {
-                        val thisObj = invocation.thisObject ?: return@runCatching null
-                        thisObj.javaClass.getMethod("getPath").invoke(thisObj) as? String
-                    }.getOrNull()
-                    if (path != PROC_CPUINFO) return
-                    val original = invocation.result as? String ?: return
-                    if (original.contains("processor")) return
+        broadcast.subscribe(
+            method,
+            object : SharedMethodBroadcast.Sub {
+                override fun after(invocation: Invocation, result: Any?) {
+                    if (!maskActive()) return
+                    val current = result as? Int ?: return
                     val cores = fakeCores()
-                    invocation.setResult(buildFakeCpuInfo(cores))
+                    if (current <= cores) return
+                    invocation.setResult(cores)
                     emit(
                         kind = DeviceEnvKind.EMULATOR_CPU,
-                        operation = DeviceEnvOperation.CPU_PROC_INFO,
-                        originalValue = "empty",
-                        maskedValue = "$cores cores",
+                        operation = DeviceEnvOperation.CPU_AVAILABLE_PROCESSORS,
+                        originalValue = current.toString(),
+                        maskedValue = cores.toString(),
                         interventionAction = ACTION_BLOCKED,
-                        targetPath = PROC_CPUINFO,
+                        targetClass = "Runtime",
+                        targetProperty = "availableProcessors",
                     )
                 }
-            })
-        }
-    }
-
-    private fun buildFakeCpuInfo(cores: Int): String {
-        val sb = StringBuilder()
-        for (i in 0 until cores) {
-            sb.appendLine("processor\t: $i")
-            sb.appendLine("BogoMIPS\t: 38.40")
-            sb.appendLine("Features\t: fp asimd evtstrm aes pmull sha1 sha2 crc32")
-            sb.appendLine("CPU implementer\t: 0x51")
-            sb.appendLine("CPU architecture: 8")
-            sb.appendLine("CPU variant\t: 0x6")
-            sb.appendLine("CPU part\t: 0x805")
-            sb.appendLine("CPU revision\t: 13")
-            sb.appendLine()
-        }
-        return sb.toString()
+            },
+        )
     }
 
     companion object {
-        private const val PROC_CPUINFO = "/proc/cpuinfo"
         private const val ACTION_BLOCKED = "BLOCKED"
     }
 }

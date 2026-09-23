@@ -54,6 +54,13 @@ class HotPathGateConventionTest {
         "NioFilesHooker.kt",
         "DialogKeywordInterceptHooker.kt",
         "DialogLocationHooker.kt",
+        // V49 WP-D2:`Resources.getConfiguration` / `Intent.getIntExtra` 是视图与 Intent 读取的
+        // 极热路径,画像档与条件档又共享同一注册点 ⇒ 回调首句必须是自己的闸门。
+        "ProfileDensityHooker.kt",
+        "ProfileCpuHooker.kt",
+        "ProfileBatteryHooker.kt",
+        "DeviceCpuHooker.kt",
+        "DeviceBatteryHooker.kt",
     )
 
     /** 门控谓词/守卫标记(出现于回调首条有效语句即合规)。 */
@@ -84,7 +91,7 @@ class HotPathGateConventionTest {
     private val hookHelperOpen = Pattern.compile(
         "(?<!fun )\\b(?:hook(?:Before|After|CtorAfter|CtorBefore)|interceptBefore)\\s*[({]",
     )
-    private val overrideOpen = Pattern.compile("override fun (?:before|after)\\(invocation: Invocation\\)")
+    private val overrideOpen = Pattern.compile("override fun (?:before|after)\\(invocation: Invocation")
 
     @Test
     fun hotPathCallbacksGateBeforeAnyWork() {

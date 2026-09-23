@@ -86,6 +86,9 @@ object FeatureGroups {
             // 也能开「按画像无条件改写」,两者互不隐含 —— FeatureGate 红线要求各自独立可关)
             DeviceEnvKind.PROFILE_BUILD_IDENTITY.name,
             DeviceEnvKind.PROFILE_BUILD_VERSION.name,
+            DeviceEnvKind.PROFILE_DENSITY.name,
+            DeviceEnvKind.PROFILE_CPU.name,
+            DeviceEnvKind.PROFILE_BATTERY.name,
         )
     }
 

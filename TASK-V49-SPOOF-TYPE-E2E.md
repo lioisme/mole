@@ -125,7 +125,7 @@ SettingsRepository.expandProfile()                          ├─ imei/imsi/icc
 | 1 | `android.os.Build` 静态字段 + OEM getter | BRAND, MANUFACTURER, MODEL, PRODUCT, DEVICE, BOARD, HARDWARE, FINGERPRINT | ◐ `EmulatorBuildHooker` 值源=遗留 | **D1** `ProfileBuildHooker` | `brand/manufacturer/model/product/device/board/hardware/fingerprint`（反射 `getField` + 直读 `Build.X` 双通路） |
 | 2 | `android.os.Build.VERSION` + `Build.ID` | BUILD_ID, ANDROID_VERSION, SDK_INT | ∅ | **D1** 同上 | `buildId/release/sdkInt` |
 | 3 | `Resources`/`DisplayMetrics`/`Configuration` | DENSITY_DPI | ∅ | **D2** `ProfileDensityHooker` | `dpi_sys/dpi_app/density/scaled/widthDp/realDpi`（6 通路，基线 `DisplayDensityHook` 同集） |
-| 4 | `Runtime` + `/proc/cpuinfo` | CPU_CORES | ◐ `DeviceCpuHooker` | **D2** `ProfileCpuHooker` | `availProcessors/cpuinfoProcessors` |
+| 4 | `Runtime` + `/proc/cpuinfo` | CPU_CORES | ◐ `DeviceCpuHooker`（仅 `availableProcessors` 有钩；cpuinfo 那条从未注册 ⇒ V49-DFC-13） | **D2** `ProfileCpuHooker` | `availProcessors/cpuinfoProcessors` |
 | 5 | `Settings.Secure`/`Settings.System.getString` | ANDROID_ID | ◐ `EmulatorNetworkHooker` **自生成值**，且缺 System 分支 | **D3** `ProfileAndroidIdHooker` | `androidIdSecure/androidIdSystem` |
 | 6 | `TelephonyManager` ID 族 + `SubscriptionManager` | IMEI, PHONE_NUM | ◐ `DeviceTelephonyHooker`（前缀派生、仅模拟器形态） | **D3** `ProfileUniqueIdHooker` | `imei0/imei1/deviceId/tac/line1/subPhone` |
 | 7 | `TelephonyManager` SIM 族 + `SubscriptionInfo` + `CellIdentity` MCC/MNC | SIM_OPERATOR, SIM_OPERATOR_NAME, SIM_COUNTRY | ∅ | **D3** `ProfileSimHooker` | `simOperator/networkOperator/simOpName/netOpName/simCountry/netCountry/subMccMnc` |
@@ -162,6 +162,7 @@ SettingsRepository.expandProfile()                          ├─ imei/imsi/icc
 | **V49-DFC-10** | Wi-Fi MAC 生成器与钩子双侧都在吐 `02:42:ac:11:*`（Docker 前缀）= 自造检测点，V47 登记 GAP-07/DFC-04 未清偿 | `EmulatorNetworkHooker.kt:90-93`（`02:42:ac:11:` 硬拼）、`ProfileGenerators.kt:13-14`（注释已点名） | WP-D3（发射器与生成器同处收口，禁两处各修一半） |
 | **V49-DFC-11** | 许可与出处债务：`devices.json` 上游 **CC BY-NC-SA 4.0**（非商业 + ShareAlike）、基线代码 **GPLv3**，而 Modev 根目录**零 LICENSE**、`README.md` 零数据出处鸣谢（`LicensesScreen` 只列 Gradle 依赖，不含数据资产） | `assets/devices.NOTICE.txt:1-14`、基线 `LICENSE`/`README.md:354-356`、`ui/settings/LicensesScreen.kt:39-41` | **登记为 RISK-1，待使用者定夺**（非本文自修范围，见 §7） |
 | **V49-DFC-12** | 画像相关 kind 未进分类法 ⇒ `ProfileKind` 是第四份「清单」，与 #31③「页面不许自拼分类清单」的精神冲突（它没有 `CapabilityMap` 行、没有 master 位、没有记录路由） | `CategoryTaxonomy.kt` 内 `ProfileKind` 零命中 | WP-A + WP-D（逐批登记 kind 时并入，见 D-3） |
+| **V49-DFC-13** | `/proc/cpuinfo` 掩蔽**从未注册成功**：`java.io.File.getMethod("readText", Charset)` 查的是 `kotlin.io` 扩展（真身 = 静态 `TextStreamsKt.readText(File, Charset)`），必抛 `NoSuchMethodException` 并被 `getOrNull() ?: return` 咽掉 ⇒ §2.2 第 4 行的 ◐ 实为 ∅。同一形态还波及任何「反射查 Kotlin 扩展」的钩点 | `DeviceCpuHooker.kt`（V49 WP-D2 删除前的实装）＋ JDK 反射事实（`java.io.File` 无 `readText` 成员） | WP-D2 已删除死路（新钩子不抄同一句查找）；正确钩点（`TextStreamsKt` 经 `appClassLoader` vs `FileInputStream`）**待设计**，由 WP-E 的 `cpuinfoProcessors` 读回是否变化判决 |
 
 ### 2.4 R-2 侧现状（实测，决定工作量）
 
@@ -290,7 +291,7 @@ V48 实测并三次登记：靶机 LDPlayer 的 Magisk/Zygisk 整场未运行 �
 
 **出口达成：** 数据面 + 组合面 + MCP 声明面 + 能力对账四组全绿。**仍欠（诚实登记，不记 ✅）**：R-2 验收第 1 条里「任一单项生效」的**设备面**证据 —— 那要等 WP-D 的强制档钩子存在才能测（今天下发快照里有了值，但 `hook/` 还不读它）。
 
-### WP-D · 注入侧接管（R-4 的**前置**，按批次原子提交）　🔵 D1 已落地，D2…D7 待做
+### WP-D · 注入侧接管（R-4 的**前置**，按批次原子提交）　🔵 D1+D2 已落地，D3…D7 待做
 
 **D1 已完成（2026-09-24，commit `94277e0` + 契约同步 `AGENTS.md`）**：`PROFILE_BUILD_IDENTITY`(8)+
 `PROFILE_BUILD_VERSION`(ID/RELEASE/SDK_INT) 两族登记 + `ProfileBuildHooker` 落地。十站原子链实测一遍，
@@ -314,6 +315,38 @@ D1 另外三处**顺带清偿的旧账**：① `EmulatorBuildHooker` 的画像�
 **D1 未做（诚实）**：MCP `feature_settings_set.kindEntries` 的 enum 若为硬抄表则需同步 —— 实测该 enum
 由 `CategoryTaxonomy` 派生，无第二份清单，故零改动；设备档 `SP-#1..#2` 读回断言属 WP-E/WP-F。
 
+**D2 已完成（2026-09-24）**：`PROFILE_DENSITY`(1) + `PROFILE_CPU`(1) + `PROFILE_BATTERY`(1) 三族登记 +
+`ProfileDensityHooker` / `ProfileCpuHooker` / `ProfileBatteryHooker` 落地。十站链照 D1 形走完，另外三处是本批实发现：
+
+① **`/proc/cpuinfo` 掩蔽自始是死路 ⇒ 新登记 V49-DFC-13**。旧 `DeviceCpuHooker.hookProcCpuInfo` 查的是
+`java.io.File.getMethod("readText", Charset)` —— `readText` 是 `kotlin.io` 的**扩展函数**（编译成静态
+`TextStreamsKt.readText(File, Charset)`），`java.io.File` 上根本没有这个成员 ⇒ `NoSuchMethodException`
+被 `getOrNull() ?: return` 咽掉，钩子从未注册（§2.2 第 4 行把 CPU 记成 ◐「有钩子」因此也只对一半）。
+本批把这条死路整体删除，**没有**在新钩子里抄一份同样永不安装的查找；正确钩点（`TextStreamsKt` 须经
+`appClassLoader` 装载，还是 `FileInputStream`/`RandomAccessFile`）是设计题，连时机与热路径开销一起归
+V49-DFC-13，留待靶机读回（`cpuinfoProcessors`）判决。
+
+② **让位裁决分两种形状，不能一刀切**：核数族与条件档**共享同一读口** ⇒ 整族让位
+（`ProfileHookPlan.adaptiveMaskShouldYield(profile, family)` 新重载）；电池族只占
+`BATTERY_PROPERTY_CAPACITY` 一个键，计数器/电流/充电状态仍归条件档 ⇒ **按键空间**分工而非整族让位。
+写死成一种形状会出现「画像填了电量，充电状态也一并没人管了」的过度让位。
+
+③ **同读口的两个 hooker 必须共用单一注册点**：`DeviceCpuHooker`/`DeviceBatteryHooker.getIntProperty`
+原先直连 `engine.hook`，画像档另注册同一方法 ⇒ 按 AGENTS 已知坑「第二个 hook 不执行」，后注册的一侧
+静默失声。本批把两侧一并迁到 `broadcast.subscribe`（V43 T3/D-4 既有机制），并加
+`profileFamilies_shareOneRegistrationPerPlatformMethod` 断言「每读口恰一次注册」把它变成红线。
+顺带修 `HotPathGateConventionTest` 的扫描盲区：`overrideOpen` 只匹配 `after(invocation: Invocation)`，
+而 `SharedMethodBroadcast.Sub` 的签名是 `after(invocation, result)` ⇒ 全部订阅者回调此前**不在**热路径
+门禁的扫描面内；放宽后把密度/电池（`Resources.getConfiguration`、`Intent.getIntExtra` = 极热）等五个文件
+列入名单，全绿。
+
+④ **D1 的一条「实测结论」是假的，已在 `AGENTS.md` 就地更正**：`RecordSink.emit` 首句
+`if (!running) return`，而 D1 的测试夹具从未 `start()` ⇒ 记录恒零，被读成「Robolectric/HotSpot 拒写
+`static final`（0/11）」。启动 sink 后实测 **11 项里 10 项真写得进**，唯 `Build.VERSION.ID` 被拒。
+本批把该断言改成「字段现值 ⇔ 审计记录」一一对应（读字段判落地，不再数记录），并加
+`emptyProfileEmitsNothingAtAll`（空画像 + 已启动 sink ⇒ 零记录，这条与反射语义无关，故可证）。
+教训入 AGENTS：**数记录前先确认 sink 启动，判「写没写成」要读字段现值**。
+
 
 每批的原子清单（D-3，缺一即不提交）：`DeviceEnvKind` +N、`CategoryTaxonomy` +N（FEATURE 域、默认 false、SIGNAL）、`DeviceEnvOperation` +N + 四语操作标签、`HookSwitch` 布尔位 + `deviceEnvEnabled`/`anyDeviceEnvEnabled`、`EffectiveSwitch.readKind`/`applyKinds` 双臂、`FeatureGroups` 组、`KindLabelRes`、`KindIcons`、`RecordRow.deviceEnvKindLabelRes`、`InterventionGateConventionTest.gatedFields`、`HotPathGateConventionTest` 名单、冻结计数（`DeviceEnvKindTest` 21→、`CategoryTaxonomyTest` 三条、`McpToolsTest`）、MCP `feature_settings_set.kindEntries` enum、二态行为测试、**靶机读回用例**。
 
@@ -324,7 +357,7 @@ D1 另外三处**顺带清偿的旧账**：① `EmulatorBuildHooker` 的画像�
 - 安装幂等 + 进程内一次（`EmulatorBuildHooker.kt:52-57` 的 idempotent 形态照搬）；冷启动早于 `Application` 时**不得**在构造期求 Context（V38 seq 续号事故的规约）。
 
 - [ ] **D1 · `PROFILE_BUILD_IDENTITY`(8) + `PROFILE_BUILD_VERSION`(3)**：新 `ProfileBuildHooker` —— `Build` 静态字段写 + `Build.getSerial()/getRadioVersion()` 系 OEM getter + `Class.getField/getDeclaredField` 观测，值源恒为画像快照、**无条件**。**`EmulatorBuildHooker` 同批降级**：删其 `getRealisticValue`/`SpoofProfiles` 取值分支（`:136-155`），只保留「画像未填 且 `isEmulatorIndicator(current)` 才掩蔽」的纯条件档职责（与 `ProfileKind.kt:11-13` 自己划的界一致），两族不共享任一字段写入路径 —— 禁止在两个类里各写一份 `Build.MODEL`。红→绿判据：Robolectric 二态 + 设备档 `SP-#1..#2`。
-- [ ] **D2 · `PROFILE_DENSITY`(1) + `PROFILE_CPU`(1) + `PROFILE_BATTERY`(1)**：`ProfileDensityHooker`（`Resources.getSystem().displayMetrics/configuration` 原地改 + `getDisplayMetrics`/`getConfiguration`/`Display.getMetrics`/`getRealMetrics` 四通路，重算 `density/scaledDensity/三 *WidthDp`，72–1000 钳制；基线 `DisplayDensityHook.kt:16-70` 为清单）、`ProfileCpuHooker`（`Runtime.availableProcessors` + `/proc/cpuinfo` 正文，**无条件**）、`ProfileBatteryHooker`（`BatteryManager.getIntProperty` + sticky Intent `EXTRA_LEVEL/EXTRA_SCALE→100`，**值来自画像**，删硬编码 67）。
+- [x] **D2 · `PROFILE_DENSITY`(1) + `PROFILE_CPU`(1) + `PROFILE_BATTERY`(1)**：`ProfileDensityHooker`（`Resources.getSystem().displayMetrics/configuration` 原地改 + `getDisplayMetrics`/`getConfiguration`/`Display.getMetrics`/`getRealMetrics` 四通路，重算 `density/scaledDensity/三 *WidthDp`，界取 `ProfileFieldCatalog.rangeOf` 而非本地字面量；基线 `DisplayDensityHook.kt:16-70` 为清单）、`ProfileCpuHooker`（`Runtime.availableProcessors`，**无条件**；`/proc/cpuinfo` 见 ①与 V49-DFC-13）、`ProfileBatteryHooker`（`BatteryManager.getIntProperty(CAPACITY)` + `Intent.getIntExtra(EXTRA_LEVEL/EXTRA_SCALE→100)`，**值来自画像**；条件档的硬编码 67 让位于该键）。
 - [ ] **D3 · `PROFILE_ANDROID_ID`(1) + `PROFILE_TELEPHONY_ID`(2) + `PROFILE_SIM`(3)**：`Settings.Secure`**与**`Settings.System` 双分支 `getStringForUser`（基线 `UniquelyIdHook.kt:37-44` 有 System 分支，Modev 缺）、`getImei/getImei(int)/getDeviceId/getAll/getTypeAllocationCode(=imei.take(8))/getLine1Number/SubscriptionManager`、SIM 三族 + `SubscriptionInfo` + 六类 `CellIdentity` 的 MCC/MNC 派生（基线 `SimHook.kt:22-107` 为清单）。**同批清偿 V49-DFC-10**：MAC/SSAID 发射器与 `ProfileGenerators` 同一处收口（GAP-07）。
 - [ ] **D4 · `PROFILE_NETWORK_TYPE`(1) + `PROFILE_WIFI`(3)**：`NetworkInfo.getType/getTypeName/getSubtype/getSubtypeName` + `NetworkCapabilities.hasTransport` + `getActiveNetworkInfo/getAllNetworks`（「无网络」档语义）、`WifiInfo.getSSID/BSSID/MacAddress` + `getScanResults`（只改命中当前 BSSID 的那条，基线 `WifiHook.kt:17-59` 同裁决）。
 - [ ] **D5 · `PROFILE_CELL`(2) + `PROFILE_LOCATION`(3) + `PROFILE_WIFI_LOC_HIDE`(1) + `PROFILE_CELL_LOC_HIDE`(1)**：`GsmCellLocation` + 六类 identity（基线 `CellLocationHook.kt:17-33`）、`Location.getLongitude/Latitude`(+`set*` 忠实回写)、`getLastKnownLocation/getLastLocation` + 每进程 `RANDOM_OFFSET`（基线 `LocationHook.kt:39-95`）、两个隐藏档按 `ProfileHookPlan` 的 R-B/R-C 优先序（裁决唯一落基类，基线把同一裁决写两处的反面教材不得重演）。
@@ -427,7 +460,15 @@ D1 另外三处**顺带清偿的旧账**：① `EmulatorBuildHooker` 的画像�
 | 09-24 | WP-C lint+插桩 | `:app:lintModernRelease :app:compileModernDebugAndroidTestKotlin` | 0 errors / 43 warnings / 1 hint;插桩编译成功 | ✅ |
 | 09-24 | WP-C 四语 | `node scripts/v42_generate.mjs` | `strings=843 (translated 772, same 71) plurals=13` + **DONE** | ✅ |
 | 09-24 | WP-C 提交 | `git commit` | `b2832e4`(代码+测试);AGENTS/任务书随后 | ✅ |
-| | WP-0 | `00-env-verify.ps1 -Mode runtime` | 四判据逐条 | ⬜ |
+| 09-24 | WP-D1 十站链 | D1 提交 `94277e0` + 契约 `779b65b` | `PROFILE_BUILD_IDENTITY`/`_VERSION` 登记 + `ProfileBuildHooker` | ✅ |
+| 09-24 | WP-D2 红→绿 | `--tests ProfileDeviceValueHookerTest`(首跑) | 11 用例 2 红:两条「记录数」断言恒 0 ⇒ 根因**不是**产品,是夹具未 `RecordSink.start()`(`emit` 首句 `if (!running) return` 丢记录) | ❌→已归因 |
+| 09-24 | WP-D2 假结论翻案 | 同夹具启动 sink 后探针轮 | `Build` 静态字段 **11 项里 10 项真写得进**(唯 `VERSION.ID` 被拒);D1 记的「JVM 0/11 拒写」由此作废,AGENTS 与钩子注释同轮更正,断言改成「字段现值 ⇔ 审计记录」一一对应 | ✅ 更正落地 |
+| 09-24 | WP-D2 死钩实锤 | JDK 反射事实 + 删除前后编译对账 | `java.io.File` 无 `readText` 成员(`kotlin.io` 扩展 = 静态 `TextStreamsKt`)⇒ cpuinfo 掩蔽自始未注册 ⇒ 新登记 **V49-DFC-13**,死路整体删除 | ✅ |
+| 09-24 | WP-D2 门禁盲区 | `HotPathGateConventionTest` | `overrideOpen` 不匹配 `Sub.after(invocation, result)` ⇒ 全部广播订阅者回调此前不在热路径扫描面内;放宽 + 五文件入名单后全绿 | ✅ |
+| 09-24 | WP-D2 全量 | `:app:testModernDebugUnitTest --no-build-cache --no-daemon` | **164 类 / 1,163 用例 / 0 失败 / 0 错误 / 0 跳过**(WP-C 后 161/1,145) | ✅ |
+| 09-24 | WP-D2 lint+插桩 | `:app:lintModernRelease :app:compileModernDebugAndroidTestKotlin` | **0 errors, 43 warnings, 1 hint**(基线零新增);插桩编译成功 | ✅ |
+| 09-24 | WP-D2 四语 | `node scripts/v42_generate.mjs` | `ja/ko: strings=854 (translated 783, same 71) plurals=13` + **DONE**(kind 3 + op 3 = 6 串) | ✅ |
+| 09-24 | WP-D2 计数快照 | `DeviceEnvKindTest` / `CategoryTaxonomyTest` / `CapabilityMapTest` / `McpToolsTest` | 26 / device_env 26(feature 默认开 5 项) / FEATURE 42 / 能力表 86 / `taxonomy_feature` 42 kinds in 6 groups | ✅ |
 | | WP-A | `:app:testModernDebugUnitTest --tests "*ProfileFieldCatalog*"` | | ⬜ |
 | | WP-C | `PerFieldIndependenceTest` | 41/41 | ⬜ |
 | | WP-D1..D7 | 逐批：全量单测 / lint / smoke | | ⬜ |

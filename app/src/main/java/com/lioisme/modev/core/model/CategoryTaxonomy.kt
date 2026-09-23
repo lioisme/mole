@@ -139,6 +139,10 @@ object CategoryTaxonomy {
         // 都不安装);沿用条件档的默认 false 会让「绑了档」与「档生效」之间隔 20 个开关。
         add(RecordCategory(DeviceEnvKind.PROFILE_BUILD_IDENTITY.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 21))
         add(RecordCategory(DeviceEnvKind.PROFILE_BUILD_VERSION.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 22))
+        // V49 WP-D2:密度 / 核数 / 电池三族(同「填了即无条件改写」语义,默认开理由同上)
+        add(RecordCategory(DeviceEnvKind.PROFILE_DENSITY.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 23))
+        add(RecordCategory(DeviceEnvKind.PROFILE_CPU.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 24))
+        add(RecordCategory(DeviceEnvKind.PROFILE_BATTERY.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 25))
         // V33 UI 交互类别(V37 D-0:DIALOG_KEYWORD 为功能域拦截,其余为监听域观测;
         // 默认态与 HookSwitch.DEFAULT 对齐)
         add(RecordCategory(UiInteractionKind.DIALOG_SHOW.name, RecordType.UI_INTERACTION, L, true, NoiseTier.SIGNAL, 0))

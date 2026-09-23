@@ -208,6 +208,9 @@ object EffectiveSwitch {
                 DeviceEnvKind.DETECT_EMULATOR -> switch.detectEmulator
                 DeviceEnvKind.PROFILE_BUILD_IDENTITY -> switch.profileBuildIdentity
                 DeviceEnvKind.PROFILE_BUILD_VERSION -> switch.profileBuildVersion
+                DeviceEnvKind.PROFILE_DENSITY -> switch.profileDensity
+                DeviceEnvKind.PROFILE_CPU -> switch.profileCpu
+                DeviceEnvKind.PROFILE_BATTERY -> switch.profileBattery
             }
         }
 
@@ -362,6 +365,9 @@ object EffectiveSwitch {
                     DeviceEnvKind.DETECT_EMULATOR -> switch.copy(detectEmulator = value)
                     DeviceEnvKind.PROFILE_BUILD_IDENTITY -> switch.copy(profileBuildIdentity = value)
                     DeviceEnvKind.PROFILE_BUILD_VERSION -> switch.copy(profileBuildVersion = value)
+                    DeviceEnvKind.PROFILE_DENSITY -> switch.copy(profileDensity = value)
+                    DeviceEnvKind.PROFILE_CPU -> switch.copy(profileCpu = value)
+                    DeviceEnvKind.PROFILE_BATTERY -> switch.copy(profileBattery = value)
                 }
             } ?: switch
 

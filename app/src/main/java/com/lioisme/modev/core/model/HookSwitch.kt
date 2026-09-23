@@ -269,6 +269,13 @@ data class HookSwitch(
     /** 画像强制档 · `Build.VERSION` / `Build.ID` 族(V49 WP-D1,默认开;语义同上)。 */
     val profileBuildVersion: Boolean = true,
 
+    /** 画像强制档 · 屏幕密度族(V49 WP-D2,默认开;未填 dpi ⇒ 一处都不改)。 */
+    val profileDensity: Boolean = true,
+    /** 画像强制档 · CPU 核数族(V49 WP-D2,默认开;无条件写,不像条件档那样只在真实核数更多时改)。 */
+    val profileCpu: Boolean = true,
+    /** 画像强制档 · 电池读数族(V49 WP-D2,默认开;值来自画像,不再是硬编码常量)。 */
+    val profileBattery: Boolean = true,
+
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
     val maxHexChars: Int = RecordLimits.DEFAULT_MAX_HEX_CHARS,
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
@@ -324,7 +331,8 @@ data class HookSwitch(
             emulatorTelephony || emulatorCpu || emulatorBattery ||
             systemProperties || procStatus || procMountInfo || procCgroup || procNet ||
             detectRoot || detectEmulator ||
-            profileBuildIdentity || profileBuildVersion)
+            profileBuildIdentity || profileBuildVersion ||
+            profileDensity || profileCpu || profileBattery)
 
     /** UI 交互监听相关类别是否任一启用(含全局总开关投影,供 UI 交互监听能力判定)。 */
     val anyUiEnabled: Boolean
@@ -451,6 +459,9 @@ data class HookSwitch(
         DeviceEnvKind.DETECT_EMULATOR -> detectEmulator
         DeviceEnvKind.PROFILE_BUILD_IDENTITY -> profileBuildIdentity
         DeviceEnvKind.PROFILE_BUILD_VERSION -> profileBuildVersion
+        DeviceEnvKind.PROFILE_DENSITY -> profileDensity
+        DeviceEnvKind.PROFILE_CPU -> profileCpu
+        DeviceEnvKind.PROFILE_BATTERY -> profileBattery
     }
 
     /** UI 交互类别有效开关(master 门控;与 [CategoryTaxonomy] 默认态对齐由测试强制)。 */

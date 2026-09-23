@@ -576,6 +576,9 @@
     <string name="kind_device_env_DETECT_EMULATOR">에뮬레이터 감지 모니터링</string>
     <string name="kind_device_env_PROFILE_BUILD_IDENTITY">프로필: Build 신원</string>
     <string name="kind_device_env_PROFILE_BUILD_VERSION">프로필: Build 버전</string>
+    <string name="kind_device_env_PROFILE_DENSITY">프로필: 화면 밀도</string>
+    <string name="kind_device_env_PROFILE_CPU">프로필: CPU 코어 수</string>
+    <string name="kind_device_env_PROFILE_BATTERY">프로필: 배터리 잔량</string>
     <string name="detail_device_env_masked">가려짐</string>
     <string name="detail_device_env_target_path">대상 경로</string>
     <string name="detail_device_env_target_class">대상 클래스</string>
@@ -643,6 +646,9 @@
     <string name="op_device_env_emulator_check_prop">에뮬레이터 속성 확인</string>
     <string name="op_device_env_build_identity_write">Build 신원 재작성</string>
     <string name="op_device_env_build_version_write">Build 버전 재작성</string>
+    <string name="op_device_env_density_write">화면 밀도 재작성</string>
+    <string name="op_device_env_cpu_write">CPU 코어 수 재작성</string>
+    <string name="op_device_env_battery_write">배터리 잔량 재작성</string>
     <string name="op_device_env_sys_prop_get">SystemProperties.get</string>
     <string name="op_device_env_proc_status_read">/proc/self/status read</string>
     <string name="op_device_env_proc_mount_read">/proc/self/mountinfo read</string>

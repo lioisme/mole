@@ -92,13 +92,16 @@ class CategoryTaxonomyTest {
         // V33:所有 DeviceEnv **条件档** defaultEnabled = false(安全优先,与 HookSwitch.DEFAULT 对齐)
         val off = CategoryTaxonomy.forType(RecordType.DEVICE_ENV).filter { !it.defaultEnabled }.map { it.id }.toSet()
         assertEquals(21, off.size)
-        // V49 WP-D1:画像强制档默认开 —— 它真正的闸是「画像里这一项是否被填」
+        // V49 WP-D1/D2:画像强制档默认开 —— 它真正的闸是「画像里这一项是否被填」
         // (空 ⇒ 一族钩子都不装),所以默认开不会造成「没想伪装却被改写」。
         val on = CategoryTaxonomy.forType(RecordType.DEVICE_ENV).filter { it.defaultEnabled }.map { it.id }.toSet()
         assertEquals(
             setOf(
                 DeviceEnvKind.PROFILE_BUILD_IDENTITY.name,
                 DeviceEnvKind.PROFILE_BUILD_VERSION.name,
+                DeviceEnvKind.PROFILE_DENSITY.name,
+                DeviceEnvKind.PROFILE_CPU.name,
+                DeviceEnvKind.PROFILE_BATTERY.name,
             ),
             on,
         )
@@ -166,8 +169,8 @@ class CategoryTaxonomyTest {
     }
 
     @Test
-    fun `DeviceEnv taxonomy has 23 entries`() {
-        assertEquals(23, CategoryTaxonomy.forType(RecordType.DEVICE_ENV).size)
+    fun `DeviceEnv taxonomy has 26 entries`() {
+        assertEquals(26, CategoryTaxonomy.forType(RecordType.DEVICE_ENV).size)
     }
 
     /**
@@ -261,7 +264,7 @@ class CategoryTaxonomyTest {
     @Test
     fun `feature domain snapshot matches D-0 baseline`() {
         val featureCats = CategoryTaxonomy.forDomain(CapabilityDomain.FEATURE)
-        assertEquals(39, featureCats.size)
+        assertEquals(42, featureCats.size)
         val feature = featureCats.map { it.id }.toSet()
         val expected = setOf(
             // 进程控制 3
@@ -286,8 +289,9 @@ class CategoryTaxonomyTest {
             DeviceEnvKind.EMULATOR_BATTERY.name, DeviceEnvKind.SYSTEM_PROPERTIES.name,
             DeviceEnvKind.PROC_STATUS.name, DeviceEnvKind.PROC_MOUNT_INFO.name,
             DeviceEnvKind.PROC_CGROUP.name, DeviceEnvKind.PROC_NET.name,
-            // V49 WP-D1 画像强制档(Build 身份 / Build 版本)
+            // V49 WP-D1/D2 画像强制档(Build 身份与版本 / 密度 / 核数 / 电池)
             DeviceEnvKind.PROFILE_BUILD_IDENTITY.name, DeviceEnvKind.PROFILE_BUILD_VERSION.name,
+            DeviceEnvKind.PROFILE_DENSITY.name, DeviceEnvKind.PROFILE_CPU.name, DeviceEnvKind.PROFILE_BATTERY.name,
         )
         assertEquals(expected, feature)
     }
@@ -320,6 +324,9 @@ class CategoryTaxonomyTest {
                 UiInteractionKind.DIALOG_KEYWORD.name,
                 DeviceEnvKind.PROFILE_BUILD_IDENTITY.name,
                 DeviceEnvKind.PROFILE_BUILD_VERSION.name,
+                DeviceEnvKind.PROFILE_DENSITY.name,
+                DeviceEnvKind.PROFILE_CPU.name,
+                DeviceEnvKind.PROFILE_BATTERY.name,
             ),
             enabledFeature.map { it.id }.toSet(),
         )

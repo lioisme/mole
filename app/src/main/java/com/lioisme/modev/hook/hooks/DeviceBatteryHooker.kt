@@ -1,10 +1,14 @@
 package com.lioisme.modev.hook.hooks
 
+import android.os.BatteryManager
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.DeviceEnvOperation
+import com.lioisme.modev.core.model.ProfileHookPlan
+import com.lioisme.modev.core.model.ProfileKind
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
+import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
  * 模拟器电池信息伪造 Hooker(V34):拦截 BatteryManager API,
@@ -29,28 +33,40 @@ class DeviceBatteryHooker(
         val clazz = runCatching { Class.forName("android.os.BatteryManager") }.getOrNull() ?: return
         val method = runCatching {
             clazz.getMethod("getIntProperty", Int::class.javaPrimitiveType)
-        }.getOrNull() ?: return
-
-        engine.hook(method, object : MethodHook() {
-            override fun after(invocation: Invocation) {
-                if (!config().deviceEnvEnabled(DeviceEnvKind.EMULATOR_BATTERY)) return
-                val propId = invocation.getArg(0) as? Int ?: return
-                val currentValue = invocation.result as? Int ?: return
-                val fakeValue = getFakeBatteryValue(propId, currentValue)
-                if (fakeValue != currentValue) {
-                    invocation.setResult(fakeValue)
-                    emit(
-                        kind = DeviceEnvKind.EMULATOR_BATTERY,
-                        operation = DeviceEnvOperation.BATTERY_INT_PROPERTY,
-                        originalValue = currentValue.toString(),
-                        maskedValue = fakeValue.toString(),
-                        interventionAction = ACTION_BLOCKED,
-                        targetClass = "BatteryManager",
-                        targetProperty = "prop_$propId",
-                    )
+        }.getOrNull()
+        // V49 WP-D2:与画像强制档 ProfileBatteryHooker 共写同一方法 ⇒ 单一注册点(二次注册
+        // 在 Vector 上静默失声)。两侧按**键空间**分工:电量百分比归画像,其余属性仍归本档。
+        broadcast.subscribe(
+            method,
+            object : SharedMethodBroadcast.Sub {
+                override fun after(invocation: Invocation, result: Any?) {
+                    if (!featureOn(DeviceEnvKind.EMULATOR_BATTERY)) return
+                    val propId = invocation.getArg(0) as? Int ?: return
+                    if (propId == BatteryManager.BATTERY_PROPERTY_CAPACITY &&
+                        ProfileHookPlan.adaptiveMaskShouldYield(
+                            config().feature.deviceProfile,
+                            ProfileKind.PROFILE_BATTERY,
+                        )
+                    ) {
+                        return
+                    }
+                    val currentValue = result as? Int ?: return
+                    val fakeValue = getFakeBatteryValue(propId, currentValue)
+                    if (fakeValue != currentValue) {
+                        invocation.setResult(fakeValue)
+                        emit(
+                            kind = DeviceEnvKind.EMULATOR_BATTERY,
+                            operation = DeviceEnvOperation.BATTERY_INT_PROPERTY,
+                            originalValue = currentValue.toString(),
+                            maskedValue = fakeValue.toString(),
+                            interventionAction = ACTION_BLOCKED,
+                            targetClass = "BatteryManager",
+                            targetProperty = "prop_$propId",
+                        )
+                    }
                 }
-            }
-        })
+            },
+        )
     }
 
     private fun hookIsCharging() {

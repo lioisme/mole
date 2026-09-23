@@ -361,12 +361,12 @@ class McpToolsTest {
     }
 
     @Test
-    fun taxonomy_feature_has_39_kinds_in_6_groups() = kotlinx.coroutines.runBlocking {
+    fun taxonomy_feature_has_42_kinds_in_6_groups() = kotlinx.coroutines.runBlocking {
         val taxonomy = featureTools.tools.first { it.name == "taxonomy_feature" }
         val groups = taxonomy.execute(JsonObject()).get("groups").asJsonArray
         assertEquals(6, groups.size())
         // V49 WP-D1:画像强制档两类并入「设备伪装」组(同一卡内条件档与强制档并列)
-        assertEquals(39, groups.sumOf { it.asJsonObject.get("kinds").asJsonArray.size() })
+        assertEquals(42, groups.sumOf { it.asJsonObject.get("kinds").asJsonArray.size() })
     }
 
     // ---- 全局资产组 ----

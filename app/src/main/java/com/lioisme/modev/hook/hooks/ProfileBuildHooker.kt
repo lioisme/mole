@@ -21,9 +21,10 @@ import com.lioisme.modev.hook.ProbeContext
  *     「填了」才是意图,开关只是撤销手段;
  *  2. **改配置可重放**:不用一次性 `AtomicBoolean`。用户改画像会推来新快照,一次性标记
  *     会让「改了但没生效」成为常态;这里按字段记 `lastApplied`,值没变不动手、动了手才发记录;
- *  3. **写是否被 ART 接受,JVM 档不可证**:`Build` 的静态字段是 `static final`,
- *     Robolectric/JVM 的反射语义与 ART 不同,所以本类把「该写什么」([plannedWrites],纯函数)
- *     与「怎么写」(反射)分开 —— 前者逐字段直测,后者由 WP-F 设备档在真靶程序里判决。
+ *  3. **写入是否被接受要读字段现值对账,不能数记录**:`Build` 的静态字段是 `static final`,
+ *     HotSpot 与 ART 的反射语义不同(实测 JVM 侧 11 项里 10 项写得进、`Build.ID` 被拒),
+ *     所以本类把「该写什么」([plannedWrites],纯函数)与「怎么写」(反射)分开 —— 前者逐字段直测,
+ *     后者由测试里的「现值 ⇔ 审计记录」对应关系钉,真值生效由 WP-F 设备档在真靶程序里判决。
  *     写失败(反射抛异常)时**不发记录**:宁缺条目,也不留下「自称改了」的假审计。
  */
 class ProfileBuildHooker(

@@ -26,6 +26,8 @@ class InterventionGateConventionTest {
         "emulatorTelephony", "emulatorCpu", "emulatorBattery",
         "systemProperties", "procStatus", "procMountInfo", "procCgroup", "procNet",
         "detectRoot", "detectEmulator", "networkRequest",
+        // V49 WP-D 画像强制档布尔位(D1 漏登记这两项,D2 起补齐 —— 直读即须过 featureOn)
+        "profileBuildIdentity", "profileBuildVersion", "profileDensity", "profileCpu", "profileBattery",
         "dialogKeyword", "dialogShow", "widgetText", "activityStart", "activityResume",
     )
 

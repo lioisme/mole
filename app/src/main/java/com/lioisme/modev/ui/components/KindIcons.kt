@@ -1,6 +1,8 @@
 package com.lioisme.modev.ui.components
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AspectRatio
+import androidx.compose.material.icons.outlined.BatteryStd
 import androidx.compose.material.icons.outlined.Casino
 import androidx.compose.material.icons.outlined.Code
 import androidx.compose.material.icons.outlined.Construction
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.outlined.IntegrationInstructions
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.LockOpen
 import androidx.compose.material.icons.outlined.ManageSearch
+import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Public
@@ -148,6 +151,9 @@ object KindIcons {
             DeviceEnvKind.DETECT_ROOT, DeviceEnvKind.DETECT_EMULATOR -> Icons.Outlined.ManageSearch
             // 画像强制档:改写而非遮掩,故与条件档不同图标
             DeviceEnvKind.PROFILE_BUILD_IDENTITY, DeviceEnvKind.PROFILE_BUILD_VERSION -> Icons.Outlined.PhoneAndroid
+            DeviceEnvKind.PROFILE_DENSITY -> Icons.Outlined.AspectRatio
+            DeviceEnvKind.PROFILE_CPU -> Icons.Outlined.Memory
+            DeviceEnvKind.PROFILE_BATTERY -> Icons.Outlined.BatteryStd
         }
 
     /** UI 交互监听族(V33 一等公民)。 */

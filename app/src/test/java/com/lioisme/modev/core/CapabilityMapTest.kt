@@ -42,9 +42,9 @@ class CapabilityMapTest {
     /** 分类快照:域数量与跨域类型集合是本次重整的根据,改动必须是有意的。 */
     @Test
     fun frozenClassificationSnapshot() {
-        assertEquals(83, CapabilityMap.entries.size)
+        assertEquals(86, CapabilityMap.entries.size)
         assertEquals(44, CapabilityMap.entries.count { it.domain == CapabilityDomain.LISTEN })
-        assertEquals(39, CapabilityMap.entries.count { it.domain == CapabilityDomain.FEATURE })
+        assertEquals(42, CapabilityMap.entries.count { it.domain == CapabilityDomain.FEATURE })
         assertEquals(
             "跨域类型 = 同一记录类型里两域混居,这正是 V48 要治理的形态",
             setOf(RecordType.NETWORK, RecordType.DEVICE_ENV, RecordType.UI_INTERACTION),

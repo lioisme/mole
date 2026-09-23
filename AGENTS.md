@@ -534,12 +534,15 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       内置档账本:`BuiltinDeviceProfiles.BUILTINS` 为首装/升级补档源,`builtinSeedId` +
       `builtinFingerprint`(catalog 序派生,**不含 name/summary** —— 基线把呈现算进指纹导致切语言即
       「用户改过」误判,是反面教材)+ `managed`/`deleted` 墓碑列;用户改过即脱离管辖,删过即不复活。
-      **当前接管边界(V49 WP-D1 起是「部分接管」,改任何一侧都要回访这条)**:画像库已覆盖取值/校验/编辑/传输/
-      绑定/下发(`FeatureConfig.deviceProfile` 随 `expandProfile` 推到注入进程);注入侧**已接管的族** =
-      `DeviceEnvKind` 里 `PROFILE_` 前缀项(当前 = `PROFILE_BUILD_IDENTITY` 8 字段 +
-      `PROFILE_BUILD_VERSION` 的 ID/RELEASE/SDK_INT,由 `hook/hooks/ProfileBuildHooker.kt` 执行,
-      值源恒为 `feature.deviceProfile`,**不再**经 `SpoofProfiles`);**未接管的族仍全部走**
-      `SpoofProfiles.resolve(spoofProfileId, spoofOverrides)`。
+      **当前接管边界(V49 WP-D 起是「部分接管」,改任何一侧都要回访这条)**:画像库已覆盖取值/校验/编辑/传输/
+      绑定/下发(`FeatureConfig.deviceProfile` 随 `expandProfile` 推到注入进程);注入侧**已接管的族 =
+      `DeviceEnvKind` 里 `PROFILE_` 前缀的全部项**(V49 WP-D2 时点 = 5 族:Build 身份、Build 版本、密度、
+      核数、电量;逐批递增,故本文件**不逐条抄名单** —— 抄了就是一份会过期的第三清单),
+      执行体 = `hook/hooks/Profile*Hooker.kt`,值源恒为 `feature.deviceProfile`,**不再**经 `SpoofProfiles`;
+      **未接管的族仍全部走** `SpoofProfiles.resolve(spoofProfileId, spoofOverrides)`。
+      同读口的两档(核数、电池电量)按 V49 R-D 让位:**画像填了 ⇒ 条件档退让**,判据唯一落在
+      `ProfileHookPlan.adaptiveMaskShouldYield`(整族形与按键空间形两种,新增档时选对那一形,
+      一刀切会造出「过度让位 = 条件档该管的东西没人管」)。
       **这条边界的 UI 兑现是 `SpoofProfileLibraryScreen` 顶部的 `profile_takeover_status_hint`,
       其名单自 V49 起从 `DeviceEnvKind` 的 `PROFILE_` 项派生**(`takenOverProfileFamilies`,
       依赖 D-3「kind 登记与钩子同一提交」⇒ 登记 ⇔ 生效),**禁**改回写死散文、也禁整段撤掉
@@ -547,10 +550,10 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       逐组接管须按「kind 登记 + 操作枚举 + 发射该操作的钩子 + 冻结计数快照 + MCP enum +
       图标/色板/标签四语 + `FeatureGroups` 组」**同一提交原子落**
       (`DeviceEnvKindTest` 要求每 kind 有 operation、声明面即生效面要求 enum 与钩子一致;
-      V49 WP-D1 已把这条十站链走通一遍,计数快照五处 = `DeviceEnvKind` 23 / taxonomy device_env 23 /
-      FEATURE 39 / 能力表 83 / MCP `taxonomy_feature` 39 kinds in 6 groups)。
+      V49 WP-D1 已把这条十站链走通一遍,WP-D2 时点的计数快照五处 = `DeviceEnvKind` 26 /
+      taxonomy device_env 26 / FEATURE 42 / 能力表 86 / MCP `taxonomy_feature` 42 kinds in 6 groups)。
       **画像族默认开**(与条件档默认 false 相反)是定档而非疏漏:真闸是「该项是否被填」,空 ⇒ 一族零安装。
-      这也是 `ProfileKind`(V49 R-1 后 **20**,画像层)与 `DeviceEnvKind`(V49 WP-D1 后 **23**,taxonomy 层)
+      这也是 `ProfileKind`(V49 R-1 后 **20**,画像层)与 `DeviceEnvKind`(V49 WP-D2 后 **26**,taxonomy 层)
       目前**故意不合并**的原因 —— 两者基数不同且画像族仍在逐批登记,
       合并只能在批量登记那一轮做,半合并即把仓库留在红色(实测链见 `TASK-V47-SPOOF-PLAN.md` §WP-3c)。
       **V49 R-1 的分类单轴(改画像分组前必读)**:`底层来源 API 族 ≡ ProfileKind ≡ UI 分区 ≡ 钩子族 ≡
@@ -608,15 +611,21 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
   (`repeat(30) { shadowOf(Looper.getMainLooper()).idle(); Thread.sleep(5) }` 后再
   `waitForIdle()`),形态同 `KeywordLibraryRepositoryTest` / `ConfigServer*Test`;
   且**先断数据面再断呈现面**(两者同败 = 写路径问题;只有呈现败 = 锚点/语义树问题)。
-- **注入侧「改 `static final` 平台字段」在 JVM 档不可证(V49 WP-D1 实测,别再把测试写歪)**:
-  Robolectric 跑在 HotSpot 上,`Field.set` 对 `static final` 恒抛 `IllegalAccessException`
-  ⇒ `ProfileBuildHookerTest` 实测 0/11 落地。这不是产品缺陷:基线 `ktx-xposed` 的
-  `setStaticField` 用的就是同一句 `field.set(null, value)`,而 Guise 在野外确实改得动 `Build`
-  (ART 的反射语义与 HotSpot 不同)。因此这类钩子的 JVM 档**只能钉两条**:①纯函数计划表
-  (`plannedWrites`:画像填了哪项 ⇒ 计划哪项,空 ⇒ 零计划);②「全写或全不写、绝不半途」的
-  审计不变量。**真值生效的唯一证据是靶程序读回(WP-F 设备档)**,任何「单测绿了所以伪装生效」
-  的推论都是假绿(本轮曾把它写成 `assertEquals(11, records.size)`,在 Robolectric 下必红 ——
-  那只会把 JVM 语义误读成产品坏了)。
+- **`RecordSink` 未 `start()` ⇒ 审计断言恒绿在空列表上(V49 WP-D2 实锤,已污染过一条 D1 结论)**:
+  `RecordSink.emit` 首句 `if (!running) return`,而 `start()` 由装配层调用 ⇒ 测试夹具里直接构造的
+  sink **静默丢弃全部记录**。`ProfileBuildHookerTest` 因此把「记录数 = 0」读成「JVM 拒写
+  `static final`」,并把这个假结论写进了本文件(见下一条的更正)。凡断言「发没发记录」,夹具必须
+  `.also { it.start() }`,且**捕获列表用 `CopyOnWriteArrayList` + 有界等待**(出口在工作线程上
+  异步回调,0 条的断言没有沉淀窗就是恒真)。判据:同一用例里既数记录又读字段现值,两边必须一
+  一对应 —— 只有一边时,另一边才是被测对象。
+- **注入侧「改 `static final` 平台字段」在 JVM 档**大部分真的改得动**(V49 WP-D2 更正,原条目为假):
+  原记「`Field.set` 对 `static final` 恒抛 `IllegalAccessException` ⇒ 实测 0/11 落地」,那是上一条
+  未启动 sink 造出来的**零记录**,与写入成功与否无关。启动后实测:`Build` 身份八项 + `VERSION.RELEASE`
+  + `VERSION.SDK_INT` **11 项里 10 项落地**,仅 `Build.VERSION.ID` 被拒;且落地的每一项恰发一条
+  `BLOCKED` 审计、被拒的那项零记录(对应关系由 `appliedWritesAreAuditedForExactlyTheFieldsThatLanded`
+  钉住)。**结论不变但理由换了**:JVM 绿仍然不等于靶程序生效(ART 侧另有缓存/内联/直读 `GETSTATIC`
+  漂移),所以生效判据依旧是靶程序读回(WP-F);改这类钩子时**别再用「记录条数」当写入证据**,
+  要读字段现值对账。
 - **插桩档四种「静默不生效」形态(V48 设备档实锤,四种都红过一整轮才被抓出)**:
   ① **懒列表点不到** —— `ModevSearchableChoiceSheet` = LazyColumn + `heightIn(max=420.dp)`
   + 120 行截断 ⇒ 第 8 行之后的行**压根没组合**,`performScrollTo` 对未组合节点无能为力

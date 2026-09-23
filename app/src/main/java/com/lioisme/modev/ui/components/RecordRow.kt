@@ -1011,6 +1011,9 @@ fun deviceEnvKindLabelRes(kind: DeviceEnvKind): Int = when (kind) {
     DeviceEnvKind.DETECT_EMULATOR -> R.string.kind_device_env_DETECT_EMULATOR
     DeviceEnvKind.PROFILE_BUILD_IDENTITY -> R.string.kind_device_env_PROFILE_BUILD_IDENTITY
     DeviceEnvKind.PROFILE_BUILD_VERSION -> R.string.kind_device_env_PROFILE_BUILD_VERSION
+    DeviceEnvKind.PROFILE_DENSITY -> R.string.kind_device_env_PROFILE_DENSITY
+    DeviceEnvKind.PROFILE_CPU -> R.string.kind_device_env_PROFILE_CPU
+    DeviceEnvKind.PROFILE_BATTERY -> R.string.kind_device_env_PROFILE_BATTERY
 }
 
 /** 设备环境监听操作标签资源(V31)。 */
@@ -1075,6 +1078,9 @@ fun deviceEnvOperationLabelRes(operation: DeviceEnvOperation): Int = when (opera
     DeviceEnvOperation.EMULATOR_CHECK_PROP -> R.string.op_device_env_emulator_check_prop
     DeviceEnvOperation.BUILD_IDENTITY_WRITE -> R.string.op_device_env_build_identity_write
     DeviceEnvOperation.BUILD_VERSION_WRITE -> R.string.op_device_env_build_version_write
+    DeviceEnvOperation.DENSITY_WRITE -> R.string.op_device_env_density_write
+    DeviceEnvOperation.CPU_WRITE -> R.string.op_device_env_cpu_write
+    DeviceEnvOperation.BATTERY_WRITE -> R.string.op_device_env_battery_write
     DeviceEnvOperation.SYS_PROP_GET -> R.string.op_device_env_sys_prop_get
     DeviceEnvOperation.PROC_STATUS_READ -> R.string.op_device_env_proc_status_read
     DeviceEnvOperation.PROC_MOUNT_READ -> R.string.op_device_env_proc_mount_read

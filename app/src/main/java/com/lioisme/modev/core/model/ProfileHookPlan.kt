@@ -49,6 +49,16 @@ object ProfileHookPlan {
             ProfileFieldCatalog.byKind.getValue(family).any { it.isSetIn(profile) }
         }
 
+    /**
+     * R-D 的按族形(V49 WP-D2):条件档与画像强制档**共享同一读口**时,画像填了该族 ⇒ 条件档让位。
+     *
+     * 与上面 Build 那一对的区别只是族数:核数族(`Runtime.availableProcessors`)与密度族各自
+     * 只与一个条件档同伴相撞,键空间不重叠的(电池:画像只占电量百分比,条件档管计数器/电流/
+     * 充电状态)**不该**整族让位 —— 那种情形由两侧各读自己的键解决,见 `ProfileBatteryHooker`。
+     */
+    fun adaptiveMaskShouldYield(profile: DeviceProfile, family: ProfileKind): Boolean =
+        ProfileFieldCatalog.byKind.getValue(family).any { it.isSetIn(profile) }
+
     /** 写同一批 `android.os.Build` 静态字段的两族(本文件私有,不构成第二条分类轴)。 */
     private val buildFieldFamilies = listOf(
         ProfileKind.PROFILE_BUILD_IDENTITY,

@@ -252,4 +252,13 @@ enum class DeviceEnvOperation(
 
     /** `android.os.Build.VERSION` / `Build.ID` 被画像值无条件改写。 */
     BUILD_VERSION_WRITE(DeviceEnvKind.PROFILE_BUILD_VERSION),
+
+    /** `DisplayMetrics` / `Configuration` 被画像密度改写(每一处被改的实例一条记录)。 */
+    DENSITY_WRITE(DeviceEnvKind.PROFILE_DENSITY),
+
+    /** 核数被画像值无条件改写(`availableProcessors` 返回值与 `/proc/cpuinfo` 正文)。 */
+    CPU_WRITE(DeviceEnvKind.PROFILE_CPU),
+
+    /** 电池读数被画像值无条件改写(`getIntProperty` 与 sticky Intent 的 extras)。 */
+    BATTERY_WRITE(DeviceEnvKind.PROFILE_BATTERY),
 }

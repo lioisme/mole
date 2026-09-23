@@ -13,6 +13,9 @@ import com.lioisme.modev.hook.hooks.DeviceSysPropHooker
 import com.lioisme.modev.hook.hooks.DeviceTelephonyHooker
 import com.lioisme.modev.hook.hooks.EmulatorBuildHooker
 import com.lioisme.modev.hook.hooks.ProfileBuildHooker
+import com.lioisme.modev.hook.hooks.ProfileBatteryHooker
+import com.lioisme.modev.hook.hooks.ProfileCpuHooker
+import com.lioisme.modev.hook.hooks.ProfileDensityHooker
 import com.lioisme.modev.hook.hooks.EmulatorFileHooker
 import com.lioisme.modev.hook.hooks.EmulatorNetworkHooker
 import com.lioisme.modev.hook.hooks.EmulatorSensorHooker
@@ -64,8 +67,13 @@ class DeviceEnvProbe : Probe, InterventionProbeMarker {
                 EmulatorNetworkHooker(context),
                 DeviceTelephonyHooker(context),
                 DeviceCpuHooker(context),
+                // V49 WP-D2:核数强制档紧跟其条件档(共享读口,让位裁决保证只有一侧写)
+                ProfileCpuHooker(context),
                 DeviceSysPropHooker(context),
                 DeviceBatteryHooker(context),
+                // V49 WP-D2:电池与密度(密度此前零钩子 ⇒ 本类是该族唯一写入方)
+                ProfileBatteryHooker(context),
+                ProfileDensityHooker(context),
                 // V35 momo 增强
                 SettingsHooker(context),
                 SystemPropertiesHooker(context),

@@ -97,4 +97,13 @@ enum class DeviceEnvKind {
 
     /** `android.os.Build.VERSION` 与 `Build.ID` 强制伪造(市场版本号 / SDK_INT / 构建号)。 */
     PROFILE_BUILD_VERSION,
+
+    /** `Resources` / `DisplayMetrics` / `Configuration` 强制改写密度 dpi(重算 density 与三个 *WidthDp)。 */
+    PROFILE_DENSITY,
+
+    /** `Runtime.availableProcessors` 与 `/proc/cpuinfo` 正文强制改写(无条件,不看真实核数高低)。 */
+    PROFILE_CPU,
+
+    /** `BatteryManager.getIntProperty` 与 sticky `ACTION_BATTERY_CHANGED` extras 强制改写(值来自画像)。 */
+    PROFILE_BATTERY,
 }
