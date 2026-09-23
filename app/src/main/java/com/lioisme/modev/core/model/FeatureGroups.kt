@@ -89,6 +89,9 @@ object FeatureGroups {
             DeviceEnvKind.PROFILE_DENSITY.name,
             DeviceEnvKind.PROFILE_CPU.name,
             DeviceEnvKind.PROFILE_BATTERY.name,
+            DeviceEnvKind.PROFILE_ANDROID_ID.name,
+            DeviceEnvKind.PROFILE_TELEPHONY_ID.name,
+            DeviceEnvKind.PROFILE_SIM.name,
         )
     }
 

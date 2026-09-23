@@ -261,4 +261,13 @@ enum class DeviceEnvOperation(
 
     /** 电池读数被画像值无条件改写(`getIntProperty` 与 sticky Intent 的 extras)。 */
     BATTERY_WRITE(DeviceEnvKind.PROFILE_BATTERY),
+
+    /** `Settings.Secure` / `Settings.System` 的 `android_id` 被画像值改写。 */
+    ANDROID_ID_WRITE(DeviceEnvKind.PROFILE_ANDROID_ID),
+
+    /** IMEI / TAC / 手机号读口被画像值改写(方法名在载荷里)。 */
+    TELEPHONY_ID_WRITE(DeviceEnvKind.PROFILE_TELEPHONY_ID),
+
+    /** 运营商码 / 名称 / 国家码及其派生 MCC/MNC 被画像值改写。 */
+    SIM_WRITE(DeviceEnvKind.PROFILE_SIM),
 }

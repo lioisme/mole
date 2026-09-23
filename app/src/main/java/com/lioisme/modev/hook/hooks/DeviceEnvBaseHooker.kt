@@ -4,8 +4,10 @@ import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.DeviceEnvOperation
 import com.lioisme.modev.core.model.DeviceEnvRecord
 import com.lioisme.modev.core.util.StackTraceFilter
+import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.RecordSink
+import com.lioisme.modev.hook.SharedMethodBroadcast
 import com.lioisme.modev.hook.ProcessIdentity
 
 /**
@@ -86,5 +88,75 @@ abstract class DeviceEnvBaseHooker(
             stack = if (switch.logStack) StackTraceFilter.capture(switch.maxStackDepth) else emptyList(),
         )
         sink.emit(record)
+    }
+
+    /**
+     * [hookReturn] 未能解析到的钩点(`类#方法`),供测试钉住。
+     *
+     * 为什么要在屏上留这个名单:V49-DFC-13 的实锤形态就是「反射查一个不存在的方法
+     * (`java.io.File.readText`,真身在静态 `TextStreamsKt` 上)⇒ `NoSuchMethodException`
+     * 被 `getOrNull() ?: return` 咽掉 ⇒ 那条通路自始没装钩,而文档写着已掩蔽」。
+     * 查不到方法本身是对的(平台缺该方法就该跳过),不对的是**没人知道跳过了**。
+     */
+    val unresolvedHookPoints: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+
+    /**
+     * 画像强制档的共用形(V49 WP-D3):把 `className#methodName` 的返回值改写为画像值。
+     *
+     * 三条一次性写清,免得每个画像族各抄一遍:
+     *  - 经 [SharedMethodBroadcast.subscribe] 注册(同一方法二次注册在 Vector 上静默失声);
+     *  - 回调首句门控,其后才算值(`HotPathGateConventionTest` 的形态要求);
+     *  - 留痕按「方法 + 值」去重(`Settings.Secure.getString` / `getImei` 一类读口会被反复调用)。
+     *
+     * [produce] 每次调用现算:安装期画像可能还是空的,后续配置推送才带来值。返回 null
+     * (未填/非法)⇒ 一次 setResult 都不发。字符串与整数值共用本函数(`result?.toString()`
+     * 只做对账比较,改写传回原对象)。
+     */
+    protected fun hookReturn(
+        kind: DeviceEnvKind,
+        operation: DeviceEnvOperation,
+        className: String,
+        methodName: String,
+        vararg argTypes: Class<*>,
+        produce: (Invocation) -> Any?,
+    ) {
+        val clazz = runCatching { Class.forName(className) }.getOrNull()
+        val method = runCatching {
+            if (argTypes.isEmpty() && clazz != null) clazz.getMethod(methodName)
+            else clazz?.getMethod(methodName, *argTypes)
+        }.getOrNull()
+        if (clazz == null || method == null) {
+            unresolvedHookPoints += "$className#$methodName" + argTypes.joinToString("") { "#${it.name}" }
+            return
+        }
+        broadcast.subscribe(
+            method,
+            object : SharedMethodBroadcast.Sub {
+                override fun after(invocation: Invocation, result: Any?) {
+                    if (!featureOn(kind)) return
+                    val desired = produce(invocation) ?: return
+                    val current = result?.toString()
+                    if (current != desired.toString()) invocation.setResult(desired)
+                    if (profileAudits.putIfAbsent("$className#$methodName", desired.toString()) == null) {
+                        emit(
+                            kind = kind,
+                            operation = operation,
+                            originalValue = current,
+                            maskedValue = desired.toString(),
+                            targetClass = className,
+                            targetProperty = methodName,
+                            interventionAction = ACTION_BLOCKED,
+                        )
+                    }
+                }
+            },
+        )
+    }
+
+    /** 已留痕的「类#方法 → 值」;并发回调,故用并发容器。 */
+    private val profileAudits = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    companion object {
+        protected const val ACTION_BLOCKED = "BLOCKED"
     }
 }

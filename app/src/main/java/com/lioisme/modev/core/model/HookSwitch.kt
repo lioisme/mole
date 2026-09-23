@@ -276,6 +276,13 @@ data class HookSwitch(
     /** 画像强制档 · 电池读数族(V49 WP-D2,默认开;值来自画像,不再是硬编码常量)。 */
     val profileBattery: Boolean = true,
 
+    /** 画像强制档 · `android_id`(V49 WP-D3,默认开;Secure 与 System 两条读口同写)。 */
+    val profileAndroidId: Boolean = true,
+    /** 画像强制档 · IMEI / TAC / 手机号(V49 WP-D3,默认开)。 */
+    val profileTelephonyId: Boolean = true,
+    /** 画像强制档 · SIM 运营商族(V49 WP-D3,默认开;MCC/MNC 由运营商码派生,不另填)。 */
+    val profileSim: Boolean = true,
+
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
     val maxHexChars: Int = RecordLimits.DEFAULT_MAX_HEX_CHARS,
     /** @deprecated 由 [maxBytesPerField] 表达;保留字段兼容旧配置 JSON。 */
@@ -332,7 +339,8 @@ data class HookSwitch(
             systemProperties || procStatus || procMountInfo || procCgroup || procNet ||
             detectRoot || detectEmulator ||
             profileBuildIdentity || profileBuildVersion ||
-            profileDensity || profileCpu || profileBattery)
+            profileDensity || profileCpu || profileBattery ||
+            profileAndroidId || profileTelephonyId || profileSim)
 
     /** UI 交互监听相关类别是否任一启用(含全局总开关投影,供 UI 交互监听能力判定)。 */
     val anyUiEnabled: Boolean
@@ -462,6 +470,9 @@ data class HookSwitch(
         DeviceEnvKind.PROFILE_DENSITY -> profileDensity
         DeviceEnvKind.PROFILE_CPU -> profileCpu
         DeviceEnvKind.PROFILE_BATTERY -> profileBattery
+        DeviceEnvKind.PROFILE_ANDROID_ID -> profileAndroidId
+        DeviceEnvKind.PROFILE_TELEPHONY_ID -> profileTelephonyId
+        DeviceEnvKind.PROFILE_SIM -> profileSim
     }
 
     /** UI 交互类别有效开关(master 门控;与 [CategoryTaxonomy] 默认态对齐由测试强制)。 */

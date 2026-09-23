@@ -102,6 +102,9 @@ class CategoryTaxonomyTest {
                 DeviceEnvKind.PROFILE_DENSITY.name,
                 DeviceEnvKind.PROFILE_CPU.name,
                 DeviceEnvKind.PROFILE_BATTERY.name,
+                DeviceEnvKind.PROFILE_ANDROID_ID.name,
+                DeviceEnvKind.PROFILE_TELEPHONY_ID.name,
+                DeviceEnvKind.PROFILE_SIM.name,
             ),
             on,
         )
@@ -169,8 +172,8 @@ class CategoryTaxonomyTest {
     }
 
     @Test
-    fun `DeviceEnv taxonomy has 26 entries`() {
-        assertEquals(26, CategoryTaxonomy.forType(RecordType.DEVICE_ENV).size)
+    fun `DeviceEnv taxonomy has 29 entries`() {
+        assertEquals(29, CategoryTaxonomy.forType(RecordType.DEVICE_ENV).size)
     }
 
     /**
@@ -264,7 +267,7 @@ class CategoryTaxonomyTest {
     @Test
     fun `feature domain snapshot matches D-0 baseline`() {
         val featureCats = CategoryTaxonomy.forDomain(CapabilityDomain.FEATURE)
-        assertEquals(42, featureCats.size)
+        assertEquals(45, featureCats.size)
         val feature = featureCats.map { it.id }.toSet()
         val expected = setOf(
             // 进程控制 3
@@ -292,6 +295,7 @@ class CategoryTaxonomyTest {
             // V49 WP-D1/D2 画像强制档(Build 身份与版本 / 密度 / 核数 / 电池)
             DeviceEnvKind.PROFILE_BUILD_IDENTITY.name, DeviceEnvKind.PROFILE_BUILD_VERSION.name,
             DeviceEnvKind.PROFILE_DENSITY.name, DeviceEnvKind.PROFILE_CPU.name, DeviceEnvKind.PROFILE_BATTERY.name,
+            DeviceEnvKind.PROFILE_ANDROID_ID.name, DeviceEnvKind.PROFILE_TELEPHONY_ID.name, DeviceEnvKind.PROFILE_SIM.name,
         )
         assertEquals(expected, feature)
     }
@@ -327,6 +331,9 @@ class CategoryTaxonomyTest {
                 DeviceEnvKind.PROFILE_DENSITY.name,
                 DeviceEnvKind.PROFILE_CPU.name,
                 DeviceEnvKind.PROFILE_BATTERY.name,
+                DeviceEnvKind.PROFILE_ANDROID_ID.name,
+                DeviceEnvKind.PROFILE_TELEPHONY_ID.name,
+                DeviceEnvKind.PROFILE_SIM.name,
             ),
             enabledFeature.map { it.id }.toSet(),
         )

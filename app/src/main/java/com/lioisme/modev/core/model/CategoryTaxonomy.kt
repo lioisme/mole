@@ -143,6 +143,10 @@ object CategoryTaxonomy {
         add(RecordCategory(DeviceEnvKind.PROFILE_DENSITY.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 23))
         add(RecordCategory(DeviceEnvKind.PROFILE_CPU.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 24))
         add(RecordCategory(DeviceEnvKind.PROFILE_BATTERY.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 25))
+        // V49 WP-D3:标识与 SIM 三族(同一「填了才生效」语义)
+        add(RecordCategory(DeviceEnvKind.PROFILE_ANDROID_ID.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 26))
+        add(RecordCategory(DeviceEnvKind.PROFILE_TELEPHONY_ID.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 27))
+        add(RecordCategory(DeviceEnvKind.PROFILE_SIM.name, RecordType.DEVICE_ENV, F, true, NoiseTier.SIGNAL, 28))
         // V33 UI 交互类别(V37 D-0:DIALOG_KEYWORD 为功能域拦截,其余为监听域观测;
         // 默认态与 HookSwitch.DEFAULT 对齐)
         add(RecordCategory(UiInteractionKind.DIALOG_SHOW.name, RecordType.UI_INTERACTION, L, true, NoiseTier.SIGNAL, 0))

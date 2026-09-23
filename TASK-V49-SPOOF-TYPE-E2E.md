@@ -159,10 +159,11 @@ SettingsRepository.expandProfile()                          ├─ imei/imsi/icc
 | **V49-DFC-07** | 靶机不能证明任何事：`testtarget` 只读 8 个 Build 字段 + MAC + deviceId + 电池 + 2 个 ro 属性；**无 ANDROID_ID / locale / timezone / density / location / SIM / SSID / 包版本** 探针；缺 6 项权限使 location/contacts/media/包枚举探针物理不可测 | `cases/DeviceEnvCases.kt:38-195`、`AndroidManifest.xml:3-7`、`10-build-install.ps1:28` | WP-E（读回档 41 字段 × 多通路，基线 `guise-test` 为设计参照） |
 | **V49-DFC-08** | 设备档从不验画像值：唯一「值变了」的 `E-EMU-01` 断言**被 SKIP 掉了**（拿 LDPlayer 预伪装当真值），`run-acceptance.ps1` 无 spoof 阶段，`28-run-spoof.ps1` 不存在 | `21-run-enhance.ps1:223-224`（两条 Skip 原文）、`run-acceptance.ps1:20,255-349` 阶段集 | WP-F（D-8：SKIP 集对画像恒空 + `-Stage spoof`） |
 | **V49-DFC-09** | 环境门禁是代理指标：`00-env-verify.ps1:67-68` 用 `pm list packages \| grep magisk` 判「Magisk installed」，V47 基线轮报 7 PASS / 0 FAIL，次日框架被证明**整场未运行** | `docs/test-reports/v47-baseline-20260922.md:35` vs `TEST-V48-ACCEPTANCE.md:132` | WP-0（换成运行期四判据硬闸） |
-| **V49-DFC-10** | Wi-Fi MAC 生成器与钩子双侧都在吐 `02:42:ac:11:*`（Docker 前缀）= 自造检测点，V47 登记 GAP-07/DFC-04 未清偿 | `EmulatorNetworkHooker.kt:90-93`（`02:42:ac:11:` 硬拼）、`ProfileGenerators.kt:13-14`（注释已点名） | WP-D3（发射器与生成器同处收口，禁两处各修一半） |
+| **V49-DFC-10** | Wi-Fi MAC 生成器与钩子双侧都在吐 `02:42:ac:11:*`（Docker 前缀）= 自造检测点，V47 登记 GAP-07/DFC-04 未清偿 | `EmulatorNetworkHooker.kt:90-93`（`02:42:ac:11:` 硬拼）、`ProfileGenerators.kt:13-14`（注释已点名） | **V49 WP-D3 已清偿**：发射器改走 `ProfileGenerators.randomMacAddress`（唯一 MAC 产出点），并由 `wifiMac_maskedValueIsNeverAVirtualizedOui` 逐位钉「本地管理置位 / 单播清零 / 不落虚拟化 OUI」 |
 | **V49-DFC-11** | 许可与出处债务：`devices.json` 上游 **CC BY-NC-SA 4.0**（非商业 + ShareAlike）、基线代码 **GPLv3**，而 Modev 根目录**零 LICENSE**、`README.md` 零数据出处鸣谢（`LicensesScreen` 只列 Gradle 依赖，不含数据资产） | `assets/devices.NOTICE.txt:1-14`、基线 `LICENSE`/`README.md:354-356`、`ui/settings/LicensesScreen.kt:39-41` | **登记为 RISK-1，待使用者定夺**（非本文自修范围，见 §7） |
 | **V49-DFC-12** | 画像相关 kind 未进分类法 ⇒ `ProfileKind` 是第四份「清单」，与 #31③「页面不许自拼分类清单」的精神冲突（它没有 `CapabilityMap` 行、没有 master 位、没有记录路由） | `CategoryTaxonomy.kt` 内 `ProfileKind` 零命中 | WP-A + WP-D（逐批登记 kind 时并入，见 D-3） |
 | **V49-DFC-13** | `/proc/cpuinfo` 掩蔽**从未注册成功**：`java.io.File.getMethod("readText", Charset)` 查的是 `kotlin.io` 扩展（真身 = 静态 `TextStreamsKt.readText(File, Charset)`），必抛 `NoSuchMethodException` 并被 `getOrNull() ?: return` 咽掉 ⇒ §2.2 第 4 行的 ◐ 实为 ∅。同一形态还波及任何「反射查 Kotlin 扩展」的钩点 | `DeviceCpuHooker.kt`（V49 WP-D2 删除前的实装）＋ JDK 反射事实（`java.io.File` 无 `readText` 成员） | WP-D2 已删除死路（新钩子不抄同一句查找）；正确钩点（`TextStreamsKt` 经 `appClassLoader` vs `FileInputStream`）**待设计**，由 WP-E 的 `cpuinfoProcessors` 读回是否变化判决 |
+| **V49-DFC-14** | 基线 `SimHook` 的六类 `CellIdentity` mcc/mnc 名单**在公开 SDK 里不存在**（@SystemApi/@hide）：24 条反射查找全抛 `NoSuchMethodException`；同一批还抓到 `SubscriptionManager.getPhoneNumber()` 无参形不存在。照抄上游钩点名单 = 抄进一批永不生效的死钩子 | `ProfileSimHooker` 首版 + `everyDeclaredHookPoint_resolvesToARealMethod` 输出（24 条未解析名单） | V49 WP-D3 已删该组钩点并反向钉住「不在公开 API」；要覆盖系统级读取方须连 hidden-API 豁免一起另批定档；机制化收口 = `DeviceEnvBaseHooker.unresolvedHookPoints` |
 
 ### 2.4 R-2 侧现状（实测，决定工作量）
 
@@ -291,7 +292,7 @@ V48 实测并三次登记：靶机 LDPlayer 的 Magisk/Zygisk 整场未运行 �
 
 **出口达成：** 数据面 + 组合面 + MCP 声明面 + 能力对账四组全绿。**仍欠（诚实登记，不记 ✅）**：R-2 验收第 1 条里「任一单项生效」的**设备面**证据 —— 那要等 WP-D 的强制档钩子存在才能测（今天下发快照里有了值，但 `hook/` 还不读它）。
 
-### WP-D · 注入侧接管（R-4 的**前置**，按批次原子提交）　🔵 D1+D2 已落地，D3…D7 待做
+### WP-D · 注入侧接管（R-4 的**前置**，按批次原子提交）　🔵 D1+D2+D3 已落地（8 / 20 族），D4…D7 待做
 
 **D1 已完成（2026-09-24，commit `94277e0` + 契约同步 `AGENTS.md`）**：`PROFILE_BUILD_IDENTITY`(8)+
 `PROFILE_BUILD_VERSION`(ID/RELEASE/SDK_INT) 两族登记 + `ProfileBuildHooker` 落地。十站原子链实测一遍，
@@ -358,13 +359,50 @@ V49-DFC-13，留待靶机读回（`cpuinfoProcessors`）判决。
 
 - [ ] **D1 · `PROFILE_BUILD_IDENTITY`(8) + `PROFILE_BUILD_VERSION`(3)**：新 `ProfileBuildHooker` —— `Build` 静态字段写 + `Build.getSerial()/getRadioVersion()` 系 OEM getter + `Class.getField/getDeclaredField` 观测，值源恒为画像快照、**无条件**。**`EmulatorBuildHooker` 同批降级**：删其 `getRealisticValue`/`SpoofProfiles` 取值分支（`:136-155`），只保留「画像未填 且 `isEmulatorIndicator(current)` 才掩蔽」的纯条件档职责（与 `ProfileKind.kt:11-13` 自己划的界一致），两族不共享任一字段写入路径 —— 禁止在两个类里各写一份 `Build.MODEL`。红→绿判据：Robolectric 二态 + 设备档 `SP-#1..#2`。
 - [x] **D2 · `PROFILE_DENSITY`(1) + `PROFILE_CPU`(1) + `PROFILE_BATTERY`(1)**：`ProfileDensityHooker`（`Resources.getSystem().displayMetrics/configuration` 原地改 + `getDisplayMetrics`/`getConfiguration`/`Display.getMetrics`/`getRealMetrics` 四通路，重算 `density/scaledDensity/三 *WidthDp`，界取 `ProfileFieldCatalog.rangeOf` 而非本地字面量；基线 `DisplayDensityHook.kt:16-70` 为清单）、`ProfileCpuHooker`（`Runtime.availableProcessors`，**无条件**；`/proc/cpuinfo` 见 ①与 V49-DFC-13）、`ProfileBatteryHooker`（`BatteryManager.getIntProperty(CAPACITY)` + `Intent.getIntExtra(EXTRA_LEVEL/EXTRA_SCALE→100)`，**值来自画像**；条件档的硬编码 67 让位于该键）。
-- [ ] **D3 · `PROFILE_ANDROID_ID`(1) + `PROFILE_TELEPHONY_ID`(2) + `PROFILE_SIM`(3)**：`Settings.Secure`**与**`Settings.System` 双分支 `getStringForUser`（基线 `UniquelyIdHook.kt:37-44` 有 System 分支，Modev 缺）、`getImei/getImei(int)/getDeviceId/getAll/getTypeAllocationCode(=imei.take(8))/getLine1Number/SubscriptionManager`、SIM 三族 + `SubscriptionInfo` + 六类 `CellIdentity` 的 MCC/MNC 派生（基线 `SimHook.kt:22-107` 为清单）。**同批清偿 V49-DFC-10**：MAC/SSAID 发射器与 `ProfileGenerators` 同一处收口（GAP-07）。
+- [x] **D3 · `PROFILE_ANDROID_ID`(1) + `PROFILE_TELEPHONY_ID`(2) + `PROFILE_SIM`(3)**：
+  `Settings.Secure` **与** `Settings.System` 的 `getString` + `getStringForUser` 四条读口（基线
+  `UniquelyIdHook.kt:37-44` 的 System 分支 Modev 此前缺）；`getImei / getImei(int) / getDeviceId /
+  getDeviceId(int) / getPrimaryImei / getTypeAllocationCode(= imei.take(8) 派生) / getLine1Number(±int) /
+  `SubscriptionManager.getPhoneNumber(int)` / `SubscriptionInfo.getNumber`；SIM 三族 +
+  `SubscriptionInfo` 的 `getMcc/getMnc/getMccString/getMncString/getCountryIso/getCarrierName/getDisplayName`，
+  **MCC/MNC 由运营商码 `take(3)`/`drop(3)` 派生**（基线同式；非法码不派生，也不另立可写字段）。
+  **同批清偿 V49-DFC-10**：`EmulatorNetworkHooker` 的假 MAC 改走 `ProfileGenerators.randomMacAddress`，
+  不再硬拼 `02:42:ac:11:`（Docker OUI 恰好命中本仓自己的模拟器判据）。
+  **六类 `CellIdentity` 的 mcc/mnc 取口不钩**（见 V49-DFC-14）：它们是 @SystemApi/@hide，公开
+  android.jar 里反射解析恒抛 `NoSuchMethodException`（本批首版照抄基线名单写了 24 条，被
+  「钩点必须解析得到」断言当场全量抓出），靶程序也调不到 ⇒ 钩了就是零读者的死代码。
 - [ ] **D4 · `PROFILE_NETWORK_TYPE`(1) + `PROFILE_WIFI`(3)**：`NetworkInfo.getType/getTypeName/getSubtype/getSubtypeName` + `NetworkCapabilities.hasTransport` + `getActiveNetworkInfo/getAllNetworks`（「无网络」档语义）、`WifiInfo.getSSID/BSSID/MacAddress` + `getScanResults`（只改命中当前 BSSID 的那条，基线 `WifiHook.kt:17-59` 同裁决）。
 - [ ] **D5 · `PROFILE_CELL`(2) + `PROFILE_LOCATION`(3) + `PROFILE_WIFI_LOC_HIDE`(1) + `PROFILE_CELL_LOC_HIDE`(1)**：`GsmCellLocation` + 六类 identity（基线 `CellLocationHook.kt:17-33`）、`Location.getLongitude/Latitude`(+`set*` 忠实回写)、`getLastKnownLocation/getLastLocation` + 每进程 `RANDOM_OFFSET`（基线 `LocationHook.kt:39-95`）、两个隐藏档按 `ProfileHookPlan` 的 R-B/R-C 优先序（裁决唯一落基类，基线把同一裁决写两处的反面教材不得重演）。
 - [ ] **D6 · `PROFILE_LOCALE`(1) + `PROFILE_TIME_ZONE`(1) + `PROFILE_APP_VERSION`(2) + `PROFILE_SCREENSHOT`(1)**：`Locale.setDefault/LocaleList/Configuration.getLocales/Resources.getConfiguration/LocaleManager.getApplicationLocales`（基线 `LocalHook.kt:15-81` 清单，含 per-app 分支）；`TimeZone.setDefault` 双次（即时 + 一次 main-looper post，基线 `TimeZoneHook.kt:12-27` 的既有形态照搬，**零钩子**要在屏上说清）；`getPackageInfo` 四签名（仅目标自身包）；截屏三态**复用** `ScreenRecordHooker` 引擎补「强制禁止」方向（V47 D-14 同引擎，源码扫描锁「禁第二份实现」）。
 - [ ] **D7 · `PROFILE_BLANK_CONTENT`(4) + `PROFILE_APP_LIST`(1)**：`ContentResolver.query`/`ContentProviderClient.query` 全重载 → 保留列名的空 `MatrixCursor`（基线 `BlankPass.kt:14-48`）；`PackageManager` 枚举族含 `getPackagesHoldingPermissions` 与 `ParceledListSlice` 就地过滤（基线 `ApplicationListPass.kt:28-203`），白名单记忆集行为测试。
 - [ ] **D6x · 遗留通路删除（随 D1..D7 最后一批同提交）**：删 `SpoofProfiles`（含 `BUILTINS`/`resolve`/`activeSpoofProfile`/`SpoofProfile` 类）、`spoofOverrides` 全链、`ProfileHookPlan`（裁决迁基类）、`profile_takeover_status_hint` 键与 `BuiltinEditingHint` 旁的未接管 banner、`SpoofProfilesTest`；`EmulatorBuildHooker`/`DeviceSysPropHooker`/`SystemPropertiesHooker`/`DeviceCpuHooker`/`DeviceBatteryHooker`/`ProxyHideHooker`/`EmulatorNetworkHooker` 的取值改读画像快照或退为纯掩蔽。
 - [ ] **每批收尾**：`:app:testModernDebugUnitTest --no-build-cache` 全量 + `:app:lintModernRelease`（基线 0e/43w/1h 零新增）+ 提交 `v49 D<n>: <kinds> profile-driven hookers + kind registration (atomic)`。
+
+**D3 已完成（2026-09-24）**：android_id / 电话标识 / SIM 三族登记 + `ProfileAndroidIdHooker` /
+`ProfileTelephonyIdHooker` / `ProfileSimHooker` 落地。三处本批实发现：
+
+① **钩点存在性成了门禁**（`ProfileIdentitySimHookerTest.everyDeclaredHookPoint_resolvesToARealMethod`）。
+   首版照基线名单写了六类 `CellIdentity` × 四个 mcc/mnc 取口(24 条)与 `SubscriptionManager.getPhoneNumber()`
+   无参形 ⇒ **全部 `NoSuchMethodException`**，被这条断言一次性抓出（`unresolvedHookPoints` 恒空）。
+   这就是 V49-DFC-13 的机制化收口：`hookReturn` 查不到方法不再静默咽掉，而是记名。
+   裁决：`CellIdentity` 那一族**故意不钩**并反向钉住「它们不在公开 API 里」
+   （`cellIdentityMccAccessors_areNotPublicApi_soTheyAreDeliberatelyNotHooked`）——靶程序调不到的方法，
+   钩上也没有读者；要覆盖系统级读取方须连同 hidden-API 豁免另批定档（登记 V49-DFC-14）。
+
+② **让位第三形：按方法**。`DeviceTelephonyHooker` 与画像族共享 `getImei`/`getDeviceId`/`getLine1Number`
+   ⇒ 这三个方法按画像字段让位（填 IMEI 不牵连手机号）；`getSubscriberId`(IMSI) 与
+   `getSimSerialNumber`(ICCID) **不在画像字段表里** ⇒ 条件档继续独占，整族让位会把它们一起丢掉。
+   至此 R-D 有三种形状：整族(D2 核数)、按键(D2 电量)、按方法(D3 电话)。
+   五档(`DeviceCpuHooker`/`DeviceBatteryHooker`/`DeviceTelephonyHooker`/`EmulatorNetworkHooker` 等)一律
+   迁到 `broadcast.subscribe`，并由 `profileFamilies_shareOneRegistrationPerPlatformMethod` 钉「每读口恰一次注册」。
+
+③ **两处共用实现取代两处各抄**：`DeviceEnvBaseHooker.hookReturn(kind, op, class, method, vararg types) { value }`
+   （门控先行 + 单一注册点 + 按「方法+值」去重留痕）为 D3 三族与后续 D4–D7 的同一形状；
+   测试夹具 `DeviceHookerTestSupport`(假平台 / 假调用 / **已 start 的 sink**) 由 D3 抽出，
+   D2 那份内联夹具待并（下一提交），免留两份「静默不生效」温床。
+
+**GAP-07 / V49-DFC-10 清偿**：掩蔽 MAC 的发射器不再自吐 Docker OUI；`ProfileGenerators.randomMacAddress`
+成为唯一 MAC 产出点（本地管理 + 单播位由测试逐位断言）。
 
 **出口（R-4 的前置）：** 20 组 / 41 字段各有「画像驱动无条件写入」的执行体；`InterventionGateConventionTest`/`HotPathGateConventionTest` 名单同步；**开关全关 = 零副作用**（含安装期 Build 静态字段）行为门禁绿；分类法 FEATURE 37→57、`DeviceEnvKind` 21→41（20 画像 kind + `ProfileKind` 并入，数字以实际批次为准并同步冻结快照的 5 处）。
 
@@ -469,9 +507,14 @@ V49-DFC-13，留待靶机读回（`cpuinfoProcessors`）判决。
 | 09-24 | WP-D2 lint+插桩 | `:app:lintModernRelease :app:compileModernDebugAndroidTestKotlin` | **0 errors, 43 warnings, 1 hint**(基线零新增);插桩编译成功 | ✅ |
 | 09-24 | WP-D2 四语 | `node scripts/v42_generate.mjs` | `ja/ko: strings=854 (translated 783, same 71) plurals=13` + **DONE**(kind 3 + op 3 = 6 串) | ✅ |
 | 09-24 | WP-D2 计数快照 | `DeviceEnvKindTest` / `CategoryTaxonomyTest` / `CapabilityMapTest` / `McpToolsTest` | 26 / device_env 26(feature 默认开 5 项) / FEATURE 42 / 能力表 86 / `taxonomy_feature` 42 kinds in 6 groups | ✅ |
-| | WP-A | `:app:testModernDebugUnitTest --tests "*ProfileFieldCatalog*"` | | ⬜ |
+| 09-24 | WP-D3 红 | `--tests ProfileIdentitySimHookerTest`(首跑) | 3 红:①**钩点存在性**抓出 24 条 `CellIdentity` mcc/mnc + 无参 `getPhoneNumber` 全部 `NoSuchMethodException`;②③夹具形态(条件档走 `before`;幂等短路下「原值==目标值」不改写 ⇒ 断言必须喂异值) | ❌→已归因 |
+| 09-24 | WP-D3 裁决 | 反射解析 + 反向断言 | `CellIdentity` mcc/mnc = @SystemApi/@hide(公开 android.jar 无) ⇒ **故意不钩**,登记 **V49-DFC-14**;机制化收口 = `DeviceEnvBaseHooker.unresolvedHookPoints` 恒空 | ✅ |
+| 09-24 | WP-D3 GAP-07 | `wifiMac_maskedValueIsNeverAVirtualizedOui` | 掩蔽值不再命中 Docker OUI(`02:42:ac`),本地管理/单播两位逐位断言 ⇒ **V49-DFC-10 清偿** | ✅ |
+| 09-24 | WP-D3 全量 | `:app:testModernDebugUnitTest --no-build-cache --no-daemon` | **165 类 / 1,174 用例 / 0 失败 / 0 错误 / 0 跳过**(WP-D2 后 164/1,163) | ✅ |
+| 09-24 | WP-D3 lint+插桩 | `:app:lintModernRelease :app:compileModernDebugAndroidTestKotlin` | **0 errors, 43 warnings, 1 hint**(基线零新增);插桩编译成功 | ✅ |
+| 09-24 | WP-D3 四语+计数 | `node scripts/v42_generate.mjs` | `strings=860 (translated 789, same 71) plurals=13` + **DONE**;计数快照 = `DeviceEnvKind` 29 / device_env 29 / FEATURE 45 / 能力表 89 / `taxonomy_feature` 45 kinds in 6 groups | ✅ |
 | | WP-C | `PerFieldIndependenceTest` | 41/41 | ⬜ |
-| | WP-D1..D7 | 逐批：全量单测 / lint / smoke | | ⬜ |
+| | WP-D4..D7 | 逐批：全量单测 / lint / smoke | | ⬜ |
 | | WP-E | `L-ENV-DUMP-01` 基线 dump | key 数 = | ⬜ |
 | | G5 41 条 | `28-run-spoof.ps1` | 41/41 单轮 | ⬜ |
 | | G6 4 条 | 同上 | | ⬜ |

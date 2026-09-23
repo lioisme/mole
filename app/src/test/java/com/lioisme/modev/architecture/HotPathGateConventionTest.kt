@@ -61,6 +61,10 @@ class HotPathGateConventionTest {
         "ProfileBatteryHooker.kt",
         "DeviceCpuHooker.kt",
         "DeviceBatteryHooker.kt",
+        "DeviceTelephonyHooker.kt",
+        "ProfileAndroidIdHooker.kt",
+        "ProfileTelephonyIdHooker.kt",
+        "ProfileSimHooker.kt",
     )
 
     /** 门控谓词/守卫标记(出现于回调首条有效语句即合规)。 */

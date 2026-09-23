@@ -106,4 +106,13 @@ enum class DeviceEnvKind {
 
     /** `BatteryManager.getIntProperty` 与 sticky `ACTION_BATTERY_CHANGED` extras 强制改写(值来自画像)。 */
     PROFILE_BATTERY,
+
+    /** `Settings.Secure` 与 `Settings.System` 的 `android_id` 读口强制改写(基线两条读口都钩)。 */
+    PROFILE_ANDROID_ID,
+
+    /** `TelephonyManager` / `SubscriptionManager` / `SubscriptionInfo` 的 IMEI 与手机号读口强制改写。 */
+    PROFILE_TELEPHONY_ID,
+
+    /** SIM 运营商族:运营商码/名称/国家码 + 由运营商码派生的 MCC/MNC(含六类 `CellIdentity`)。 */
+    PROFILE_SIM,
 }

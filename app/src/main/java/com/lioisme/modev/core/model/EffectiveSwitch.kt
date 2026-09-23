@@ -211,6 +211,9 @@ object EffectiveSwitch {
                 DeviceEnvKind.PROFILE_DENSITY -> switch.profileDensity
                 DeviceEnvKind.PROFILE_CPU -> switch.profileCpu
                 DeviceEnvKind.PROFILE_BATTERY -> switch.profileBattery
+                DeviceEnvKind.PROFILE_ANDROID_ID -> switch.profileAndroidId
+                DeviceEnvKind.PROFILE_TELEPHONY_ID -> switch.profileTelephonyId
+                DeviceEnvKind.PROFILE_SIM -> switch.profileSim
             }
         }
 
@@ -368,6 +371,9 @@ object EffectiveSwitch {
                     DeviceEnvKind.PROFILE_DENSITY -> switch.copy(profileDensity = value)
                     DeviceEnvKind.PROFILE_CPU -> switch.copy(profileCpu = value)
                     DeviceEnvKind.PROFILE_BATTERY -> switch.copy(profileBattery = value)
+                    DeviceEnvKind.PROFILE_ANDROID_ID -> switch.copy(profileAndroidId = value)
+                    DeviceEnvKind.PROFILE_TELEPHONY_ID -> switch.copy(profileTelephonyId = value)
+                    DeviceEnvKind.PROFILE_SIM -> switch.copy(profileSim = value)
                 }
             } ?: switch
 

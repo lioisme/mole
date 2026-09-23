@@ -2,6 +2,9 @@ package com.lioisme.modev.hook.hooks
 
 import com.lioisme.modev.core.model.DeviceEnvKind
 import com.lioisme.modev.core.model.DeviceEnvOperation
+import com.lioisme.modev.core.model.ProfileField
+import com.lioisme.modev.core.model.ProfileGenerators
+import com.lioisme.modev.core.model.isSetIn
 import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
@@ -31,7 +34,7 @@ class EmulatorNetworkHooker(
             method,
             object : SharedMethodBroadcast.Sub {
                 override fun after(invocation: Invocation, result: Any?) {
-                    if (!config().deviceEnvEnabled(DeviceEnvKind.EMULATOR_NETWORK)) return
+                    if (!featureOn(DeviceEnvKind.EMULATOR_NETWORK)) return
                     val original = result as? String ?: return
                     if (isEmulatorMac(original)) {
                         invocation.setResult(stableMac)
@@ -60,6 +63,8 @@ class EmulatorNetworkHooker(
                     if (!config().deviceEnvEnabled(DeviceEnvKind.EMULATOR_NETWORK)) return
                     val key = invocation.getArg(1) as? String ?: return
                     if (key != ANDROID_ID_KEY) return
+                    // V49 WP-D3:画像填了 android_id ⇒ 本档在该键上让位(强制档优先,同键不双写)
+                    if (ProfileField.ANDROID_ID.isSetIn(config().feature.deviceProfile)) return
                     val original = result as? String ?: return
                     if (isEmulatorAndroidId(original)) {
                         invocation.setResult(stableAndroidId)
@@ -87,10 +92,12 @@ class EmulatorNetworkHooker(
         return EMULATOR_ANDROID_ID_PATTERNS.any { lower.startsWith(it) }
     }
 
-    private fun generateStableMac(): String {
-        val r = Random(seed + 1)
-        return MAC_PREFIX + List(3) { "%02x".format(r.nextInt(256)) }.joinToString(":")
-    }
+    private fun generateStableMac(): String =
+        // V49-DFC-10(GAP-07 清偿):旧实装硬拼 `02:42:ac:11:` = Docker 网段 OUI,
+        // 而本仓自己的 `EMULATOR_MAC_PREFIXES` 就把 `02:42:ac` 判为模拟器痕迹
+        // ⇒ 掩蔽器自己吐出一个可被检出的前缀。改为复用画像随机源(本地管理单播、避开虚拟化 OUI),
+        // 一处实现两档共用,不再有「发射器与生成器各修一半」的形态。
+        ProfileGenerators.randomMacAddress(kotlin.random.Random(seed + 1))
 
     private fun generateStableAndroidId(): String {
         val r = Random(seed + 2)
@@ -101,8 +108,6 @@ class EmulatorNetworkHooker(
 
     companion object {
         private const val ANDROID_ID_KEY = "android_id"
-        private const val MAC_PREFIX = "02:42:ac:11:"
-
         private val EMULATOR_MAC_PREFIXES = listOf(
             "00:00:00", "08:00:27", "52:54:00", "02:42:ac",
         )

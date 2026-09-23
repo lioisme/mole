@@ -52,6 +52,9 @@ private val deviceEnvLightPalette: Map<DeviceEnvKind, Color> =
         DeviceEnvKind.PROFILE_DENSITY to Color(0xFF0F766E),
         DeviceEnvKind.PROFILE_CPU to Color(0xFF0F766E),
         DeviceEnvKind.PROFILE_BATTERY to Color(0xFF0F766E),
+        DeviceEnvKind.PROFILE_ANDROID_ID to Color(0xFF0F766E),
+        DeviceEnvKind.PROFILE_TELEPHONY_ID to Color(0xFF0F766E),
+        DeviceEnvKind.PROFILE_SIM to Color(0xFF0F766E),
     )
 
 /** 深色模式设备环境类别色。 */
@@ -90,6 +93,9 @@ private val deviceEnvDarkPalette: Map<DeviceEnvKind, Color> =
         DeviceEnvKind.PROFILE_DENSITY to Color(0xFF5EEAD4),
         DeviceEnvKind.PROFILE_CPU to Color(0xFF5EEAD4),
         DeviceEnvKind.PROFILE_BATTERY to Color(0xFF5EEAD4),
+        DeviceEnvKind.PROFILE_ANDROID_ID to Color(0xFF5EEAD4),
+        DeviceEnvKind.PROFILE_TELEPHONY_ID to Color(0xFF5EEAD4),
+        DeviceEnvKind.PROFILE_SIM to Color(0xFF5EEAD4),
     )
 
 /** 设备环境类别语义色(非 Composable 访问器,UI 与对比度门禁测试同源)。 */

@@ -579,6 +579,9 @@
     <string name="kind_device_env_PROFILE_DENSITY">プロフィール:画面密度</string>
     <string name="kind_device_env_PROFILE_CPU">プロフィール:CPU コア数</string>
     <string name="kind_device_env_PROFILE_BATTERY">プロフィール:バッテリー残量</string>
+    <string name="kind_device_env_PROFILE_ANDROID_ID">プロフィール:Android ID</string>
+    <string name="kind_device_env_PROFILE_TELEPHONY_ID">プロフィール:IMEI と電話番号</string>
+    <string name="kind_device_env_PROFILE_SIM">プロフィール:SIM 事業者</string>
     <string name="detail_device_env_masked">隠蔽済み</string>
     <string name="detail_device_env_target_path">対象パス</string>
     <string name="detail_device_env_target_class">対象クラス</string>
@@ -649,6 +652,9 @@
     <string name="op_device_env_density_write">画面密度を書き換え</string>
     <string name="op_device_env_cpu_write">CPU コア数を書き換え</string>
     <string name="op_device_env_battery_write">バッテリー残量を書き換え</string>
+    <string name="op_device_env_android_id_write">Android ID を書き換え</string>
+    <string name="op_device_env_telephony_id_write">電話識別子を書き換え</string>
+    <string name="op_device_env_sim_write">SIM 事業者を書き換え</string>
     <string name="op_device_env_sys_prop_get">SystemProperties.get</string>
     <string name="op_device_env_proc_status_read">/proc/self/status read</string>
     <string name="op_device_env_proc_mount_read">/proc/self/mountinfo read</string>

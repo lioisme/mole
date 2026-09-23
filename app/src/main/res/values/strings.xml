@@ -583,6 +583,9 @@
     <string name="kind_device_env_PROFILE_DENSITY">Profile: Screen density</string>
     <string name="kind_device_env_PROFILE_CPU">Profile: CPU cores</string>
     <string name="kind_device_env_PROFILE_BATTERY">Profile: Battery level</string>
+    <string name="kind_device_env_PROFILE_ANDROID_ID">Profile: Android ID</string>
+    <string name="kind_device_env_PROFILE_TELEPHONY_ID">Profile: IMEI and phone number</string>
+    <string name="kind_device_env_PROFILE_SIM">Profile: SIM operator</string>
     <string name="detail_device_env_masked">Masked</string>
     <string name="detail_device_env_target_path">Target Path</string>
     <string name="detail_device_env_target_class">Target Class</string>
@@ -653,6 +656,9 @@
     <string name="op_device_env_density_write">Density rewritten</string>
     <string name="op_device_env_cpu_write">Core count rewritten</string>
     <string name="op_device_env_battery_write">Battery level rewritten</string>
+    <string name="op_device_env_android_id_write">android_id rewritten</string>
+    <string name="op_device_env_telephony_id_write">Telephony id rewritten</string>
+    <string name="op_device_env_sim_write">SIM operator rewritten</string>
     <string name="op_device_env_sys_prop_get">SystemProperties.get</string>
     <string name="op_device_env_proc_status_read">/proc/self/status read</string>
     <string name="op_device_env_proc_mount_read">/proc/self/mountinfo read</string>

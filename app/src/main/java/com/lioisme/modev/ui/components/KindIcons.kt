@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.Public
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.SimCard
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.SwapHoriz
@@ -154,6 +155,9 @@ object KindIcons {
             DeviceEnvKind.PROFILE_DENSITY -> Icons.Outlined.AspectRatio
             DeviceEnvKind.PROFILE_CPU -> Icons.Outlined.Memory
             DeviceEnvKind.PROFILE_BATTERY -> Icons.Outlined.BatteryStd
+            DeviceEnvKind.PROFILE_ANDROID_ID -> Icons.Outlined.Password
+            DeviceEnvKind.PROFILE_TELEPHONY_ID -> Icons.Outlined.SimCard
+            DeviceEnvKind.PROFILE_SIM -> Icons.Outlined.SimCard
         }
 
     /** UI 交互监听族(V33 一等公民)。 */

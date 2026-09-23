@@ -536,13 +536,17 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       「用户改过」误判,是反面教材)+ `managed`/`deleted` 墓碑列;用户改过即脱离管辖,删过即不复活。
       **当前接管边界(V49 WP-D 起是「部分接管」,改任何一侧都要回访这条)**:画像库已覆盖取值/校验/编辑/传输/
       绑定/下发(`FeatureConfig.deviceProfile` 随 `expandProfile` 推到注入进程);注入侧**已接管的族 =
-      `DeviceEnvKind` 里 `PROFILE_` 前缀的全部项**(V49 WP-D2 时点 = 5 族:Build 身份、Build 版本、密度、
-      核数、电量;逐批递增,故本文件**不逐条抄名单** —— 抄了就是一份会过期的第三清单),
+      `DeviceEnvKind` 里 `PROFILE_` 前缀的全部项**(V49 WP-D3 时点 = 8 族;逐批递增,故本文件**不逐条抄名单** ——
+      抄了就是一份会过期的第三清单),
       执行体 = `hook/hooks/Profile*Hooker.kt`,值源恒为 `feature.deviceProfile`,**不再**经 `SpoofProfiles`;
       **未接管的族仍全部走** `SpoofProfiles.resolve(spoofProfileId, spoofOverrides)`。
-      同读口的两档(核数、电池电量)按 V49 R-D 让位:**画像填了 ⇒ 条件档退让**,判据唯一落在
-      `ProfileHookPlan.adaptiveMaskShouldYield`(整族形与按键空间形两种,新增档时选对那一形,
-      一刀切会造出「过度让位 = 条件档该管的东西没人管」)。
+      同读口的两档按 V49 R-D 让位:**画像填了 ⇒ 条件档退让**,判据唯一落在
+      `ProfileHookPlan.adaptiveMaskShouldYield`。让位有**三种形状**,新增档时必须选对那一形,
+      一刀切会造出「过度让位 = 条件档该管的东西没人管」:① **整族**(核数:两侧写同一读口);
+      ② **按键**(电池电量:画像只占 `BATTERY_PROPERTY_CAPACITY`,计数器/电流/充电状态仍归条件档);
+      ③ **按方法**(电话标识:画像填 IMEI 不得牵连手机号,而 IMSI/ICCID **根本不在画像字段表里**,
+      整族让位会把它们一起丢)。另:画像族与条件档共享方法时**必须同经 `SharedMethodBroadcast`**
+      (二次注册在 Vector 上静默失声),由 `profileFamilies_shareOneRegistrationPerPlatformMethod` 钉住。
       **这条边界的 UI 兑现是 `SpoofProfileLibraryScreen` 顶部的 `profile_takeover_status_hint`,
       其名单自 V49 起从 `DeviceEnvKind` 的 `PROFILE_` 项派生**(`takenOverProfileFamilies`,
       依赖 D-3「kind 登记与钩子同一提交」⇒ 登记 ⇔ 生效),**禁**改回写死散文、也禁整段撤掉
@@ -550,10 +554,10 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       逐组接管须按「kind 登记 + 操作枚举 + 发射该操作的钩子 + 冻结计数快照 + MCP enum +
       图标/色板/标签四语 + `FeatureGroups` 组」**同一提交原子落**
       (`DeviceEnvKindTest` 要求每 kind 有 operation、声明面即生效面要求 enum 与钩子一致;
-      V49 WP-D1 已把这条十站链走通一遍,WP-D2 时点的计数快照五处 = `DeviceEnvKind` 26 /
-      taxonomy device_env 26 / FEATURE 42 / 能力表 86 / MCP `taxonomy_feature` 42 kinds in 6 groups)。
+      V49 WP-D1 已把这条十站链走通一遍,WP-D3 时点的计数快照五处 = `DeviceEnvKind` 29 /
+      taxonomy device_env 29 / FEATURE 45 / 能力表 89 / MCP `taxonomy_feature` 45 kinds in 6 groups)。
       **画像族默认开**(与条件档默认 false 相反)是定档而非疏漏:真闸是「该项是否被填」,空 ⇒ 一族零安装。
-      这也是 `ProfileKind`(V49 R-1 后 **20**,画像层)与 `DeviceEnvKind`(V49 WP-D2 后 **26**,taxonomy 层)
+      这也是 `ProfileKind`(V49 R-1 后 **20**,画像层)与 `DeviceEnvKind`(V49 WP-D3 后 **29**,taxonomy 层)
       目前**故意不合并**的原因 —— 两者基数不同且画像族仍在逐批登记,
       合并只能在批量登记那一轮做,半合并即把仓库留在红色(实测链见 `TASK-V47-SPOOF-PLAN.md` §WP-3c)。
       **V49 R-1 的分类单轴(改画像分组前必读)**:`底层来源 API 族 ≡ ProfileKind ≡ UI 分区 ≡ 钩子族 ≡
@@ -618,6 +622,14 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
   `.also { it.start() }`,且**捕获列表用 `CopyOnWriteArrayList` + 有界等待**(出口在工作线程上
   异步回调,0 条的断言没有沉淀窗就是恒真)。判据:同一用例里既数记录又读字段现值,两边必须一
   一对应 —— 只有一边时,另一边才是被测对象。
+- **反射查不到方法 = 永不生效的死钩子,而文档会替它撒谎(V49 WP-D2/D3 两连实锤,登记 V49-DFC-13/14)**:
+  两种查不到的形态都真实存在过 ——①`java.io.File.getMethod("readText", Charset)`:`readText` 是
+  `kotlin.io` 的**扩展函数**(编译成静态 `TextStreamsKt.readText(File, Charset)`),`File` 上没有这个成员;
+  ②`CellIdentity` 的四个 mcc/mnc 取口与 `SubscriptionManager.getPhoneNumber()` 无参形:它们是
+  **@SystemApi/@hide**,公开 android.jar 里根本没有(靶程序也调不到 ⇒ 钩了零读者)。两者都因
+  `getOrNull() ?: return` 咽掉 `NoSuchMethodException` 而静默空装,而 AGENTS/§2.2 写着"已掩蔽"。
+  收口 = `DeviceEnvBaseHooker.unresolvedHookPoints`(记录每个解析失败的 `类#方法#参数`)
+  + 每族一条「列出的钩点必须全部解析得到」断言;照抄上游钩点名单前,先在测试里证明它存在。
 - **注入侧「改 `static final` 平台字段」在 JVM 档**大部分真的改得动**(V49 WP-D2 更正,原条目为假):
   原记「`Field.set` 对 `static final` 恒抛 `IllegalAccessException` ⇒ 实测 0/11 落地」,那是上一条
   未启动 sink 造出来的**零记录**,与写入成功与否无关。启动后实测:`Build` 身份八项 + `VERSION.RELEASE`

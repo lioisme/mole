@@ -579,6 +579,9 @@
     <string name="kind_device_env_PROFILE_DENSITY">프로필: 화면 밀도</string>
     <string name="kind_device_env_PROFILE_CPU">프로필: CPU 코어 수</string>
     <string name="kind_device_env_PROFILE_BATTERY">프로필: 배터리 잔량</string>
+    <string name="kind_device_env_PROFILE_ANDROID_ID">프로필: Android ID</string>
+    <string name="kind_device_env_PROFILE_TELEPHONY_ID">프로필: IMEI 및 전화번호</string>
+    <string name="kind_device_env_PROFILE_SIM">프로필: SIM 통신사</string>
     <string name="detail_device_env_masked">가려짐</string>
     <string name="detail_device_env_target_path">대상 경로</string>
     <string name="detail_device_env_target_class">대상 클래스</string>
@@ -649,6 +652,9 @@
     <string name="op_device_env_density_write">화면 밀도 재작성</string>
     <string name="op_device_env_cpu_write">CPU 코어 수 재작성</string>
     <string name="op_device_env_battery_write">배터리 잔량 재작성</string>
+    <string name="op_device_env_android_id_write">Android ID 재작성</string>
+    <string name="op_device_env_telephony_id_write">전화 식별자 재작성</string>
+    <string name="op_device_env_sim_write">SIM 통신사 재작성</string>
     <string name="op_device_env_sys_prop_get">SystemProperties.get</string>
     <string name="op_device_env_proc_status_read">/proc/self/status read</string>
     <string name="op_device_env_proc_mount_read">/proc/self/mountinfo read</string>
