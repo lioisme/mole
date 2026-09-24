@@ -169,6 +169,7 @@ function WaitTt([string]$case, [int]$timeoutSec = 15) {
     while ((Get-Date) -lt $deadline) {
         $r = GetTt $case
         if ($r) { return $r }
+        Reconnect   # 同上:掉线时不重新 connect,轮询永远拿不到 TT_RESULT(空值 ⇒ 下游判成"未生效")
         Start-Sleep -Seconds 2
     }
     return $null
@@ -187,6 +188,10 @@ function CountChecked([string]$sql) {
     for ($i = 0; $i -lt 6; $i++) {
         $rows = @(Q $sql)
         if ($rows.Count -ge 1 -and $rows[0] -match "^\d+$") { return [int]$rows[0] }
+        # TCP 序列掉线时,单纯重跑 adb 命令永远拿回设备("device '127.0.0.1:5555' not found"
+        # 会耗尽全部重试后抛异常,把整阶段打成零断言 —— V49 验收轮 enhance 步两轮实测形态)。
+        # 重试前必须重新 connect;WaitDevice 的自愈只在建轮时跑一次,救不了中途掉线。
+        Reconnect
         Start-Sleep -Seconds 2
     }
     throw "count query non-numeric after retries: $($rows -join '|')"

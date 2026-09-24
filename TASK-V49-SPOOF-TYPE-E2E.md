@@ -441,6 +441,8 @@ D3 就是靠它抓出 25 条死钩点）：`NetworkInfo.getType/getTypeName/getS
 - `ui` 步被 Z4 双序列门禁挡住（`127.0.0.1:5555` + `emulator-5554` 同场）；`mcp` 步一次独立跑出 46/0，
   但不在同一轮内，不满足 §6.1「单轮一次性」口径。
 
+| 09-24 | WP-D3 设备轮 | `-Stage all` / `-Stage inject` 两轮 | 107/27/10 与 104/16/9;preflight/install/**scope 2/0**/listen 70/0/smoke 10/0/backpressure 2/0 全过 ⇒ 注入通了(此前我按手搓判据误判环境,已在 AGENTS 反向登记) | ✅ 环境判定更正 |
+| 09-24 | 设备档根因修复 | `tt-lib.ps1` `CountChecked`/`GetTt` 轮询前调既有 `Reconnect` | `enhance` 从**两轮零断言崩溃**(`adb: device not found` 耗尽 6 次重试后抛异常)变为跑完并出 **34 PASS / 14 FAIL / 7 SKIP** —— 功能域 E-* 矩阵重新可观测,14 条真缺陷第一次暴露出来而不是被 harness 崩掩盖 | ✅ 机制修好,缺陷待治 |
 ### WP-E · 靶机读回（R-4）
 
 **Files:** Modify `testtarget/src/main/AndroidManifest.xml`（+ `ACCESS_FINE_LOCATION`、`ACCESS_COARSE_LOCATION`、`READ_CONTACTS`、`READ_MEDIA_IMAGES`、`READ_MEDIA_VIDEO`、`READ_MEDIA_AUDIO`、`QUERY_ALL_PACKAGES`）、`cases/EnvCases.kt`（新）、`EnvDumpActivity`（新，参照基线 `guise-test` 的 50 key × 10 段）、`cases/TestCases.kt`（注册 `env` 域）、`scripts/test-integration/10-build-install.ps1:28`（授权清单）、`tt-lib.ps1`（+ `Get-EnvDump` 解析）
