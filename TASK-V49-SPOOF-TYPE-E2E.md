@@ -416,6 +416,31 @@ V49-DFC-13，留待靶机读回（`cpuinfoProcessors`）判决。
 
 **出口（R-4 的前置）：** 20 组 / 41 字段各有「画像驱动无条件写入」的执行体；`InterventionGateConventionTest`/`HotPathGateConventionTest` 名单同步；**开关全关 = 零副作用**（含安装期 Build 静态字段）行为门禁绿；分类法 FEATURE 37→57、`DeviceEnvKind` 21→41（20 画像 kind + `ProfileKind` 并入，数字以实际批次为准并同步冻结快照的 5 处）。
 
+**D4 起步清单（下一批照此形，站点与 D3 一一对应，勿再重新推导）**：`PROFILE_NETWORK_TYPE`(1) + `PROFILE_WIFI`(3)。
+kind = `PROFILE_NETWORK_TYPE` / `PROFILE_WIFI`；op = `NETWORK_TYPE_WRITE` / `WIFI_WRITE`；
+读口（基线 `NetworkHook.kt:83` / `WifiHook.kt:17-59` 为清单，且**每个钩点都要过「解析得到」断言**，
+D3 就是靠它抓出 25 条死钩点）：`NetworkInfo.getType/getTypeName/getSubtype/getSubtypeName`、
+`ConnectivityManager.getActiveNetworkInfo/getAllNetworks`、`NetworkCapabilities.hasTransport(int)`、
+`WifiInfo.getSSID/getBSSID/getMacAddress`、`WifiManager.getScanResults`（只改命中当前 BSSID 的那条）。
+三处必须先定的裁决，不要边写边猜：① 「无网络」档与「伪装网络类型」互斥，裁决唯一落 `ProfileHookPlan`
+（基线把同一裁决写进 NetworkHook 与 HookPlan 两处是反面教材）；② Wi-Fi MAC 的**发射器与生成器同一处收口**
+（`EmulatorNetworkHooker` 已改用 `ProfileGenerators.randomMacAddress`，本批画像值直接落 `getMacAddress`）；
+③ `hasTransport` 与 `getActiveNetworkInfo` 都是热路径 ⇒ 新文件要进 `HotPathGateConventionTest` 名单，
+回调首句恒为 `featureOn`。计数快照续号：`DeviceEnvKind` 29→31、device_env 29→31、FEATURE 45→47、
+能力表 89→91、`taxonomy_feature` 45→47 kinds in 6 groups。
+
+**设备侧遗留（2026-09-24 全量轮实测，见 `docs/test-reports/v49-full-test-20260924.md`）**：
+- `enhance` 步两轮零断言崩在 `tt-lib.ps1:192`（adb 端点丢失）⇒ 功能域 E-* 矩阵今日无一次完整通过；**修它优先于任何新批次**，
+  否则「所有功能确实生效」无从取证。定位方向：是该阶段的 force-stop/`install -r` 序列把 5038 server 上的 TCP 序列打掉，
+  还是宿主 VM 资源把 adb 打挂（`[VM] device lost, cold relaunching dnplayer` 已在日志里出现过）。
+- `env-runtime` 三条（Twilight 未运行 ⇒ 宿主 records(0) / spool 不存在）是**前置缺失**，不是产品判据误报；
+  轮首应把「第三方靶 App 已运行且已作用域」做成硬步骤，否则 listen/enhance 的红与绿都不可解释。
+- 9 条 masking-type SKIP（含 `EMULATOR_CPU`/`EMULATOR_BATTERY`）**不许直接登记进 allowlist**：V49 之后「零记录」
+  有两种因（无脏可掩 / 画像已接管而让位），登记豁免等于把这个歧义抹掉。正确修法是先让矩阵**二选一地点名**
+  是哪一种（读该应用有效配置的画像快照即可判定），再决定 SKIP 是否合法。
+- `ui` 步被 Z4 双序列门禁挡住（`127.0.0.1:5555` + `emulator-5554` 同场）；`mcp` 步一次独立跑出 46/0，
+  但不在同一轮内，不满足 §6.1「单轮一次性」口径。
+
 ### WP-E · 靶机读回（R-4）
 
 **Files:** Modify `testtarget/src/main/AndroidManifest.xml`（+ `ACCESS_FINE_LOCATION`、`ACCESS_COARSE_LOCATION`、`READ_CONTACTS`、`READ_MEDIA_IMAGES`、`READ_MEDIA_VIDEO`、`READ_MEDIA_AUDIO`、`QUERY_ALL_PACKAGES`）、`cases/EnvCases.kt`（新）、`EnvDumpActivity`（新，参照基线 `guise-test` 的 50 key × 10 段）、`cases/TestCases.kt`（注册 `env` 域）、`scripts/test-integration/10-build-install.ps1:28`（授权清单）、`tt-lib.ps1`（+ `Get-EnvDump` 解析）
