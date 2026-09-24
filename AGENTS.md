@@ -721,6 +721,13 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
   `apk_path`/`enabled`/`scope` 三项即使全对,靶进程 `/proc/<pid>/maps` 里也只有自身 APK
   ⇒ 注入矩阵与 MCP 记录组必然红。**冷重启不恢复**(V48 实测一次无效),
   恢复属宿主 VM 的 Magisk/root 档位改动 = 共享设备侧操作,须先与使用者确认。
+  **但反向同样错(V49 WP-D3 实锤):凭上面四条 grep 判「框架死了」不可靠。** 同一台机器在使用者
+  调整档位后,`11-vector-scope.ps1` 报 scope 2/0、`listen` 70/0、`smoke` 10/0,注入确实发生;
+  而其中 `ps -A | grep -c magisk` 会匹配到**管理器 App** `io.github.huskydg.magisk`(不是 `magiskd`),
+  `/dev/.magisk` 与 zygote maps 在 shell 的挂载命名空间里也可能不可见。
+  **唯一裁判是框架自身证据**:scope 步的模块映射 + 靶进程真的产出了记录。
+  写「环境阻塞 ⛔」之前必须拿 scope 步说话,并先问使用者,不许拿手搓探测当结论(本轮就这么误判了一次,
+  还把 ⛔ 写进了任务书)。
 - **PowerShell 管道处理含中文源码会毁文件**:`Get-Content | -replace |
   Set-Content` 以系统 ANSI 解码 UTF-8,中文注释乱码且尾字节可吞换行把下一行
   代码并入注释(V23 实锤)。改文件一律用 edit 工具或 .NET API 字节级读写
