@@ -1,7 +1,7 @@
 package com.lioisme.modev.ui.theme
 
 /**
- * 视觉语义 token(V37 T4.2):全 App 复用的 alpha/尺寸魔法数单一事实源,
+ * 视觉语义 token:全 App 复用的 alpha/尺寸魔法数单一事实源,
  * 消灭散落字面量。取值经亮/暗双主题人工走查定档。
  */
 object Tokens {

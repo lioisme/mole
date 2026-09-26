@@ -22,7 +22,7 @@ import java.util.concurrent.CopyOnWriteArrayList
  *
  * 收编模型(镜像 [SharedMethodBroadcast]/[LoadClassWatcher] 单一监视器先例):
  * - 三方法全进程各注册**一次**(经 [SharedMethodBroadcast.subscribe]);
- * - 门控先行:三回调首条语句 = `config().deviceEnvListen`(单 volatile)∧ 订阅表非空,
+ * - 门控先行:三回调首条语句 = `config.deviceEnvListen`(单 volatile)∧ 订阅表非空,
  *   关闭态宿主 IO 热路径**零成本**(仅一次 volatile 读 + 一次 isEmpty);
  * - 廉价路径判定:仅 `startsWith("/proc/")` 直配;间接形态(含 "/proc/" 但非绝对)才
  *   付一次 canonicalPath;其余路径直接放过(旧实现每次构造都 canonicalPath);
@@ -31,8 +31,8 @@ import java.util.concurrent.CopyOnWriteArrayList
  * - 行事件按 [ProcPath] 分发给已登记 [Handler];各 Handler 自判自身 kind 门控
  *   (干预 featureOn(kind)/监控 DETECT_* kind),协调器只承载 master 粗门。
  *
- * 登记序:由 [com.lioisme.modev.hook.probes.DeviceEnvProbe] 先 `install()` 本协调器,
- * 再装各 proc Hooker(其 install() 仅 addHandler)。
+ * 登记序:由 [com.lioisme.modev.hook.probes.DeviceEnvProbe] 先 `install` 本协调器,
+ * 再装各 proc Hooker(其 install 仅 addHandler)。
  */
 class ProcScanBroadcaster(
     context: ProbeContext,

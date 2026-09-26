@@ -9,7 +9,7 @@ import com.lioisme.modev.hook.SharedMethodBroadcast
 import java.io.File
 
 /**
- * 检测行为监控 Hooker(V31):被动监控 root/emulator 检测行为,仅记录不干预。
+ * 检测行为监控 Hooker:被动监控 root/emulator 检测行为,仅记录不干预。
  *
  * 设计决策:当干预型 Hooker 已覆盖同一 API 时,让位判定改**运行时**(读当前配置),
  * V44 T2.6 修复旧「安装期一次性快照」缺陷(DETECT_* 后开不补装 = 永不监控);
@@ -42,7 +42,7 @@ class DetectionMonitorHooker(
     }
 
     /**
-     * 装钩决策(V44 T2.6,幂等):按**当前**有效配置决定各监控点是否安装。
+     * 装钩决策:按**当前**有效配置决定各监控点是否安装。
      * 让位判定(干预型已覆盖同一 API)同样按当前配置,故干预关闭后监控可补装。
      */
     private fun applyInstallDecisions() {
@@ -63,7 +63,7 @@ class DetectionMonitorHooker(
     }
 
     /**
-     * maps 行监控(V44 T2.1):经协调器分发,运行时让位判定——
+     * maps 行监控:经协调器分发,运行时让位判定——
      * XPOSED_MAPS 干预启用时其已记录被滤行,监控不重复申报。
      */
     override fun onLine(invocation: Invocation, path: ProcScanBroadcaster.ProcPath, line: String) {
@@ -201,7 +201,7 @@ class DetectionMonitorHooker(
     }
 
     /**
-     * Build 字段反射读取监控(V50 死钩整改)。
+     * Build 字段反射读取监控。
      *
      * **旧实装是一条永不生效的死钩**:它用 `clazz.getMethod(field)` 找
      * `getFINGERPRINT` / `getMODEL` / `getPRODUCT` / `getMANUFACTURER` —— 而

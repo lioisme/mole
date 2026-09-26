@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * markdown 工厂纯函数契约(V26):
+ * markdown 工厂纯函数契约:
  * - 围栏安全:内容含连续反引号 → 围栏长度 = 最长 run+1(≥3),内容零破坏;
  * - 表格转义:管道符/换行不破坏 GFM 结构;
  * - 字节区块:多表示 = 连续 text/base64/hex 围栏(顺序稳定、空行分隔),

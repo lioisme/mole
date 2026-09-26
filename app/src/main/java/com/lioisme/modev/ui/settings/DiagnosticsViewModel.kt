@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 
 /**
- * 诊断页 VM(V39 拆分):纯运行时观测——框架状态 + 连接数 + 捕获管线统计 +
+ * 诊断页 VM:纯运行时观测——框架状态 + 连接数 + 捕获管线统计 +
  * 复制快照所需的 wire 端口/地址(只读)。
  * 服务配置动作(开关/端口/令牌)全部迁至 [ServicesViewModel],本页零写路径。
  * M18:传输常量与绑定地址经 VM 出口暴露,UI 零传输层 import(P5-1 包边界门禁)。
@@ -43,7 +43,7 @@ class DiagnosticsViewModel(
     val port: StateFlow<Int> = serverConfig.serverPort
 
     /**
-     * 监听地址展示口径(V26):绑定地址非空取实测值,未绑定回退默认回环语义;
+     * 监听地址展示口径:绑定地址非空取实测值,未绑定回退默认回环语义;
      * UI 不感知 data.server 实现(包边界)。
      */
     val listeningAddress: StateFlow<String> =

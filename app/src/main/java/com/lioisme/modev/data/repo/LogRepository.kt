@@ -70,10 +70,10 @@ import java.util.concurrent.TimeUnit
  * - 落库最终失败:不 ACK,注入侧 WAL 保留重放(唯一索引幂等吸收);
  * - 管道统计(丢弃/写失败/裁剪/通道拒绝)汇入 [statsFlow]。
  *
- * 读写门面:实现 [RecordService](V22),所有查询/增删改查经其暴露,
+ * 读写门面:实现 [RecordService],所有查询/增删改查经其暴露,
  * DAO 不对外暴露,UI 与未来 MCP 共用同一契约。
  *
- * 接线:显式 [start]()(宿主 AppContainer 启动时调用),不依赖构造副作用。
+ * 接线:显式 [start](宿主 AppContainer 启动时调用),不依赖构造副作用。
  */
 class LogRepository(
     private val dao: CryptoRecordDao,
@@ -169,7 +169,7 @@ class LogRepository(
             bumpStats { it.copy(dropped = it.dropped + 1) }
             return
         }
-        // 载荷预算闸门(V45 T1.6):两类拒绝语义不同 ——
+        // 载荷预算闸门:两类拒绝语义不同 ——
         // ① 结构性超大(单条即超整条预算):永不可容,必须回执,
         //    否则注入侧 WAL 从该游标永久重放(死循环 + 记录永不到达);
         // ② 在途占满(本条可容,只是当下排队已满):不回执,让 WAL 稍后重放,
@@ -426,7 +426,7 @@ class LogRepository(
 
     /**
      * 按 [RecordFilter] 批量删除(候选 id 与 [count] 走同一 [RecordQueryFactory] 谓词
-     * → 「删 = 筛」口径单一;V45 T1.1 起 `@RawQuery` 不做 DML,故先取 id 再按主键分片删)。
+     * → 「删 = 筛」口径单一; `@RawQuery` 不做 DML,故先取 id 再按主键分片删)。
      * 全字段空 = 无约束,拒绝整表误删(显式整清请用 [clearAll])。
      */
     override suspend fun deleteByFilter(filter: RecordFilter): Long {
@@ -461,7 +461,7 @@ class LogRepository(
     }
 
     /**
-     * 存储占用(V23):主库 + `-wal` + `-shm` 三文件字节和,单一出口供
+     * 存储占用:主库 + `-wal` + `-shm` 三文件字节和,单一出口供
      * 数据管理页/诊断消费(UI 禁止直触 [com.lioisme.modev.data.db.ModevDatabase])。
      * 未装配 databaseFile 时返回 0。
      */
@@ -480,7 +480,7 @@ class LogRepository(
     override fun observeTypeCounts(): Flow<List<RecordTypeCount>> = dao.observeRecordTypeCounts()
 
     /**
-     * 单包按类型分组计数(V45 ST-6):与 [count] 同一 [RecordQueryFactory] 谓词,
+     * 单包按类型分组计数:与 [count] 同一 [RecordQueryFactory] 谓词,
      * 一次 `GROUP BY` 出全部类型(旧形态 = 监控页/MCP 各发 10 次 `observeRecordCounts`)。
      */
     override fun observeTypeCountsForPackage(packageName: String): Flow<Map<String, Long>> =

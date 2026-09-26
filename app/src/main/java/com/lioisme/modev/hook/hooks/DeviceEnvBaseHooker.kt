@@ -11,7 +11,7 @@ import com.lioisme.modev.hook.SharedMethodBroadcast
 import com.lioisme.modev.hook.ProcessIdentity
 
 /**
- * 设备环境 Hooker 基类(V31):统一开关判断(deviceEnv 类别,master+kind 双门控)、
+ * 设备环境 Hooker 基类:统一开关判断(deviceEnv 类别,master+kind 双门控)、
  * 栈 denylist 与记录组装;所有子类拦截逻辑均在 engine 的 PROTECTIVE 模式下执行,
  * 异常不影响宿主。
  *
@@ -32,7 +32,7 @@ abstract class DeviceEnvBaseHooker(
     protected val packageName = context.packageName
 
     /**
-     * 目标进程名(V44 T2.6):经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
+     * 目标进程名:经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
      * 旧形态每个 Hooker 基类各自 `by lazy` 读一次 `/proc/self/cmdline`,冷启动期
      * 约 50 个实例 = 50 次文件读 + 字节解码,而进程身份在进程内恒定不变。
      */
@@ -95,13 +95,13 @@ abstract class DeviceEnvBaseHooker(
      *
      * 为什么要在屏上留这个名单:V49-DFC-13 的实锤形态就是「反射查一个不存在的方法
      * (`java.io.File.readText`,真身在静态 `TextStreamsKt` 上)⇒ `NoSuchMethodException`
-     * 被 `getOrNull() ?: return` 咽掉 ⇒ 那条通路自始没装钩,而文档写着已掩蔽」。
+     * 被 `getOrNull ?: return` 咽掉 ⇒ 那条通路自始没装钩,而文档写着已掩蔽」。
      * 查不到方法本身是对的(平台缺该方法就该跳过),不对的是**没人知道跳过了**。
      */
     val unresolvedHookPoints: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
 
     /**
-     * 画像强制档的共用形(V49 WP-D3):把 `className#methodName` 的返回值改写为画像值。
+     * 画像强制档的共用形:把 `className#methodName` 的返回值改写为画像值。
      *
      * 三条一次性写清,免得每个画像族各抄一遍:
      *  - 经 [SharedMethodBroadcast.subscribe] 注册(同一方法二次注册在 Vector 上静默失声);
@@ -109,7 +109,7 @@ abstract class DeviceEnvBaseHooker(
      *  - 留痕按「方法 + 值」去重(`Settings.Secure.getString` / `getImei` 一类读口会被反复调用)。
      *
      * [produce] 每次调用现算:安装期画像可能还是空的,后续配置推送才带来值。返回 null
-     * (未填/非法)⇒ 一次 setResult 都不发。字符串与整数值共用本函数(`result?.toString()`
+     * (未填/非法)⇒ 一次 setResult 都不发。字符串与整数值共用本函数(`result?.toString`
      * 只做对账比较,改写传回原对象)。
      */
     protected fun hookReturn(

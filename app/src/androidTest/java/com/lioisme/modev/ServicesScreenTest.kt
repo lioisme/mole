@@ -87,7 +87,7 @@ class ServicesScreenTest {
     fun unifiedExternalAccess_defaultOff_toggleOnRebindsAllInterfaces() {
         setContent()
 
-        // 旧双行退役断言:双键分裂形态不得复活(V41 D-1)。
+        // 旧双行退役断言:双键分裂形态不得复活。
         rule.onAllNodesWithTag("services-wire-external").assertCountEquals(0)
         rule.onAllNodesWithTag("services-mcp-external").assertCountEquals(0)
 
@@ -132,7 +132,7 @@ class ServicesScreenTest {
     @Test
     fun unifiedExternalAccess_toggleOn_keepsTokenAuthIndependent() {
         // V40 D-4 解耦红线(V41 统一开关同体适用):开外部访问不级联启用认证、
-        // 不自动派生令牌。令牌跨进程持久(V38 契约),设备上起点数量可能 >0 →
+        // 不自动派生令牌。令牌跨进程持久,设备上起点数量可能 >0 →
         // 以「数量不变」断言。
         setContent()
 

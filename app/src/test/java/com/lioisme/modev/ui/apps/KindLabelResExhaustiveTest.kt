@@ -28,7 +28,7 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 /**
- * 标签映射唯一表门禁(V44 D3):
+ * 标签映射唯一表门禁:
  * - [KindLabelRes.resolve] 对全部 taxonomy (type,id) 恒命中真标签,不落 unknown_error 兜底;
  * - resolve 与各枚举穷尽表(列表行/详情共用)逐类别等值——双端同文案的结构保证;
  * - 跨类型碰撞 id(OPEN/SIGNATURE)按类型解析到各自资源键(裸 id 表形态下 SIGNATURE 的

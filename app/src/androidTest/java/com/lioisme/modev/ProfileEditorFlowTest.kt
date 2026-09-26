@@ -124,7 +124,7 @@ class ProfileEditorFlowTest {
     }
 
     /**
-     * 机型库整条点选通路(V47 WP-5b):行 → 品牌 sheet → 型号 sheet → 四项身份同时落值,
+     * 机型库整条点选通路:行 → 品牌 sheet → 型号 sheet → 四项身份同时落值,
      * 且原有 PRODUCT 不被猜写(库里没有该项)。
      */
     @Test

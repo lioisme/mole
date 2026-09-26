@@ -8,7 +8,7 @@ import java.util.Collections
  * 记录解码注册表(ADR-1):宿主侧按 [WireRecord.recordType] 类型化分发,
  * 新增监听能力 = 注册一个解码器,协议/传输/存储管线零改动。
  *
- * 值类型收口 [MonitoredRecord](V45 T2.5):返回 `Any?` 曾迫使摄入侧写路径手抄
+ * 值类型收口 [MonitoredRecord]:返回 `Any?` 曾迫使摄入侧写路径手抄
  * 10 臂 `when`(每新增记录类型要同步一处,漏臂 = 静默丢档);类型化后
  * 「解码 → 落库」一条分派即够。
  *

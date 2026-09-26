@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * 功能域数据段(V37 T1.2):与监听布尔开关(HookSwitch 平铺位)分离的
+ * 功能域数据段:与监听布尔开关(HookSwitch 平铺位)分离的
  * **「干预参数」承载体**——此前功能域只有布尔开关,干预数据仅 dialogKeywords 一项
  * 且无 UI 入口;本段扩展为完整的功能数据面:
  *
@@ -22,11 +22,11 @@ data class FeatureConfig(
     val dialogKeywords: List<String> = emptyList(),
     /** 弹窗拦截有效规则(文本 + 匹配模式;非空时优先于 [dialogKeywords])。 */
     val dialogKeywordRules: List<KeywordRule> = emptyList(),
-    /** 伪装画像档位 id(V47 T2 起 = **画像库主键**,不再是内置档位名;null/空 = 不伪装)。 */
+    /** 伪装画像档位 id( = **画像库主键**,不再是内置档位名;null/空 = 不伪装)。 */
     val spoofProfileId: String = "",
     /**
      * 画像字段覆写(V47 T2 起为**只读遗留通道**:无 UI 入口、MCP 声明面已移除,
-     * 存量用户值仍生效。裁决见 TASK-V47-SPOOF-PLAN 决策 D-3 修订)。
+     * 存量用户值仍生效。裁决沿革见 docs/history/TASK-V47-SPOOF-PLAN.md 决策 D-3 修订)。
      * 生效顺序:先取 [deviceProfile] 展开快照,再以本表逐项覆盖。
      */
     val spoofOverrides: Map<String, String> = emptyMap(),
@@ -52,7 +52,7 @@ data class FeatureConfig(
      * 且画像解绑,以免一次升级把「条件档」静默升级成「无条件改写」。
      */
     val adaptiveMask: Boolean = false,
-    /** Root 包名黑名单追加项(与内置 28 项并集)。 */
+    /** Root 包名黑名单追加项(与内置基线并集,只增不删)。 */
     val extraRootPackages: List<String> = emptyList(),
     /** Xposed 类名前缀追加项(与内置前缀并集)。 */
     val extraXposedPrefixes: List<String> = emptyList(),

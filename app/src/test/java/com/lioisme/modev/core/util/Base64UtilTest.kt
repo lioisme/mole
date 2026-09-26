@@ -7,7 +7,7 @@ import org.junit.Test
 import java.util.Base64
 
 /**
- * Base64Util 契约(V19):RFC 4648 标准字母表 + 填充 + 无换行;
+ * Base64Util 契约:RFC 4648 标准字母表 + 填充 + 无换行;
  * 与 JDK 基准(Base64.getEncoder/Decoder)逐字节对拍。
  */
 class Base64UtilTest {

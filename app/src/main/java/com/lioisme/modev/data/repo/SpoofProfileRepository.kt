@@ -24,8 +24,8 @@ import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
 /**
- * 设备画像库仓库(V47 T2):**`spoof_profile` 表唯一写者**(AGENTS #18 单一写入口径,
- * 由 `RecordDaoAccessGateTest` 把 `spoofProfileDao()` 列入本类白名单强制)。
+ * 设备画像库仓库:**`spoof_profile` 表唯一写者**(AGENTS #18 单一写入口径,
+ * 由 `RecordDaoAccessGateTest` 把 `spoofProfileDao` 列入本类白名单强制)。
  *
  * - DAO 全量流 → 内存快照([profiles]),UI 列表、每应用绑定解析、MCP 出参同一份;
  * - **每次写后立即同步回读**([refresh]),不等 Flow 发射 ⇒ 「创建完立刻解析」

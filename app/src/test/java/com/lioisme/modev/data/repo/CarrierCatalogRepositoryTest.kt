@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * 运营商目录仓库测试(V48):口径与 `DeviceCatalogRepositoryTest` 同族 —— 测**资产通路 + 缓存闸**,
+ * 运营商目录仓库测试:口径与 `DeviceCatalogRepositoryTest` 同族 —— 测**资产通路 + 缓存闸**,
  * 解析细节归 `CarrierCatalogTest`。两个仓库共用 [CachedAssetReader],所以这四条只需在这一处
  * 再跑一遍真实资产,就能证明「抽公共闸」没有把机型目录的语义改坏(那一份的回归由它自己的测试盯)。
  */

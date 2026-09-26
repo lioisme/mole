@@ -36,7 +36,7 @@ interface ServerConfigService {
  * MCP 服务配置契约(端口/启停/令牌认证/多令牌)。
  *
  * 令牌值是宿主本地秘密:只经本接口读写,**恒不出现在 MCP 工具输出与诊断快照**
- * (AGENTS #26 PII 纪律)。认证与外部访问互相独立(V40 D-4):是否要求 Bearer
+ * (AGENTS #26 PII 纪律)。认证与外部访问互相独立:是否要求 Bearer
  * 仅由 [mcpTokenAuth] 决定。
  */
 interface McpServiceConfig {
@@ -83,7 +83,7 @@ interface McpServiceConfig {
  *
  * 抛出即代表「偏好零写入、服务零改绑」——UI 据此渲染分型错误行,MCP 侧
  * [com.lioisme.modev.mcp] 据 [check] 映射业务错误,两侧共享同一判定,
- * 不再出现「UI 硬拒、MCP 静默 clamp」的强度分叉(V45 DUAL-3)。
+ * 不再出现「UI 硬拒、MCP 静默 clamp」的强度分叉。
  */
 class PortRejectedException(val check: PortValidator.PortCheck) :
     Exception("port rejected: $check")

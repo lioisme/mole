@@ -65,7 +65,7 @@ import com.lioisme.modev.ui.components.TipIconButton
 import com.lioisme.modev.ui.common.rememberLocaleAwareResources
 import kotlinx.coroutines.launch
 
-/** 关键词库管理 VM(V37 T3.5)。 */
+/** 关键词库管理 VM。 */
 class KeywordLibraryViewModel(container: AppContainer) : ViewModel() {
 
     private val library = container.keywordLibrary
@@ -98,7 +98,7 @@ class KeywordLibraryViewModelFactory(
 }
 
 /**
- * 全局弹窗拦截关键词库管理页(V37 T3.5):
+ * 全局弹窗拦截关键词库管理页:
  * 条目 = 文本 + 匹配模式标签 + 全局启停 Switch + 删除;
  * 新增/编辑经底部 sheet(契约 4);空态引导。
  */

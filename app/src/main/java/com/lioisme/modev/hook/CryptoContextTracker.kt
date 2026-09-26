@@ -28,7 +28,7 @@ object CryptoContextTracker {
         entries.getOrPut(instance) { Entry(idCounter.getAndIncrement(), CryptoContext()) }.id
 
     /**
-     * clone()/copy() 上下文传播:新实例继承算法/provider/密钥/IV/salt/AAD/参数等,标识重新分配。
+     * clone/copy 上下文传播:新实例继承算法/provider/密钥/IV/salt/AAD/参数等,标识重新分配。
      * BytesView 为不可变对象,可直接共享。
      */
     fun cloneContext(from: Any, to: Any) {
@@ -55,7 +55,7 @@ object CryptoContextTracker {
         entries[to] = Entry(idCounter.getAndIncrement(), copy)
     }
 
-    /** reset():重置累计量,保留密钥等初始化信息。 */
+    /** reset:重置累计量,保留密钥等初始化信息。 */
     fun reset(instance: Any) {
         entries[instance]?.context?.let {
             it.inputTotal = 0L

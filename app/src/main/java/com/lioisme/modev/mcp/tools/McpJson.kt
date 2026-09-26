@@ -9,10 +9,10 @@ import com.google.gson.JsonObject
 import com.lioisme.modev.core.model.RecordType
 
 /**
- * MCP JSON 基础设施(V38):
+ * MCP JSON 基础设施:
  * - [gson]:serializeNulls 专用实例 —— SQL NULL 等空值必须落 `null`(Gson 2.13 实锤:
  *   默认省略 JsonNull 会静默丢键),与注入侧 wire 的 `core/codec/Json` 单例隔离;
- * - **Kotlin 默认值优先实例化**(V45 T3.2):记录模型族经 [InstanceCreator] 走
+ * - **Kotlin 默认值优先实例化**:记录模型族经 [InstanceCreator] 走
  *   「合成默认值构造器」而非 Unsafe,缺省的可选字段因此取 Kotlin 默认值而不是 null
  *   (旧形态 `stack` 缺席 = null → 写路径 NPE;`timestamp` 缺席 = 0 → 记录落在 1970 年);
  * - 参数取值助手:统一「缺参 → null」语义,类型不符抛 [McpTool.McpToolException]。

@@ -42,7 +42,7 @@ class BehaviorMethodRegistry private constructor(
     companion object {
 
         /**
-         * 类名 → 注册表缓存(V44 T2.4):枚举结果按类复用。
+         * 类名 → 注册表缓存:枚举结果按类复用。
          * 旧形态 10+ 调用点各自 `forName` → 每次都做「`methods` ∪ 整条父类链
          * `declaredMethods`」全量反射 + 去重(Activity/TextView 等宽类链上有数百个
          * 方法),同一类在冷启动期被反复枚举;缓存后每类仅枚举一次。

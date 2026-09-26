@@ -1,9 +1,9 @@
 package com.lioisme.modev.core.model
 
 /**
- * 设备环境监听类别(V31;V35 momo 增强扩展至 21 项):
+ * 设备环境监听类别:
  * 覆盖 Root 检测干预 / Xposed 检测干预 / 模拟器检测干预 /
- * 系统属性 Hook / 进程文件过滤 / 检测行为监控六大子域。
+ * 系统属性 Hook / 进程文件过滤 / 检测行为监控,以及画像驱动改写族。
  *
  * 默认启用态与 [CategoryTaxonomy] 噪点分级一致:
  * - 干预类(Root/Xposed/Emulator/SysProp/Proc)默认关(安全优先,需显式启用);
@@ -58,9 +58,9 @@ enum class DeviceEnvKind {
     /** 模拟器电池信息伪造(电量/状态)。 */
     EMULATOR_BATTERY,
 
-    // ---- 系统属性 / 进程文件检测干预(V35 momo 增强) ----
+    // ---- 系统属性 / 进程文件检测干预 ----
 
-    /** android.os.SystemProperties.get() 拦截(ro.debuggable/ro.build.tags 等)。 */
+    /** android.os.SystemProperties.get 拦截(ro.debuggable/ro.build.tags 等)。 */
     SYSTEM_PROPERTIES,
 
     /** /proc/self/status 行过滤(TracerPid/Frida 检测)。 */
@@ -85,7 +85,7 @@ enum class DeviceEnvKind {
 
     // ---- 画像驱动的强制档(V49 R-1 分类轴 = 底层来源族;WP-D 逐批登记) ----
     //
-    // 与上面 21 项的根本差别:上面是**条件档**(只在检出脏值时掩蔽,值源为内置基线),
+    // 与上面各条件档的根本差别:上面是**条件档**(只在检出脏值时掩蔽,值源为内置基线),
     // 本组是**强制档**(画像填了该项就无条件改写,值源恒为 `FeatureConfig.deviceProfile`)。
     // 默认 **true** 的理由:用户往画像里填值这一步本身就是显式意图,真正的闸是
     // 「该项是否被填」(`ProfileField.isSetIn` 为空 ⇒ 钩子一族都不安装);

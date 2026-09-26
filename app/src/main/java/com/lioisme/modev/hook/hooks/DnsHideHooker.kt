@@ -7,13 +7,13 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * DNS 查询监控 Hooker(V34):拦截 DNS 解析 API,记录 DNS 查询行为,
+ * DNS 查询监控 Hooker:拦截 DNS 解析 API,记录 DNS 查询行为,
  * 为网络环境分析提供 DNS 层面的可见性。
  *
  * 覆盖 API:
  * - InetAddress.getByName(String):主机名→IP 解析
  * - InetAddress.getAllByName(String):主机名→所有 IP 解析
- * - InetAddress.getHostName():IP→主机名反解析
+ * - InetAddress.getHostName:IP→主机名反解析
  *
  * 设计决策:仅记录不干预(观测型),DNS 劫持检测属于安全审计范畴,
  * 不应干预正常 DNS 解析流程。

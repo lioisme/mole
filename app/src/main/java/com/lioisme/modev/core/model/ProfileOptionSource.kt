@@ -4,11 +4,11 @@ import java.util.Locale
 import java.util.TimeZone
 
 /*
- * 可枚举字段的候选值来源(V47 WP-5c):语言 / 国家 / 时区这三项的合法取值**不在本项目里维护**,
+ * 可枚举字段的候选值来源:语言 / 国家 / 时区这三项的合法取值**不在本项目里维护**,
  * 直接向平台常量表要(`Locale.getISOLanguages` / `Locale.getISOCountries` /
  * `TimeZone.getAvailableIDs`)—— 自己抄一张 ISO/IANA 清单就是造第二事实源,
  * 而且是一张会过期的。选出来的值恒过 `ProfileFieldCatalog` 校验,
- * 因为校验器判时区用的正是同一张 `TimeZone.getAvailableIDs()`。
+ * 因为校验器判时区用的正是同一张 `TimeZone.getAvailableIDs`。
  *
  * 只覆盖「取值即枚举、形态无歧义」的三项。运营商 PLMN / SIM 运营商名**不在这里** ——
  * 那需要 MCC/MNC 数据资产(基线 `carriers.json`),留到 WP-4 与设备资产同轮引入;

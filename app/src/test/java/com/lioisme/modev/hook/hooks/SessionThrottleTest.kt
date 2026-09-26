@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 会话节流契约(V27):同键窗口内去重、窗口过期放行、LRU 容量淘汰、空键直通。
+ * 会话节流契约:同键窗口内去重、窗口过期放行、LRU 容量淘汰、空键直通。
  */
 class SessionThrottleTest {
 

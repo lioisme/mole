@@ -7,7 +7,7 @@ import java.lang.reflect.Method
  * 反射定位系统加密门面类方法/构造器,结果缓存。
  * 目标类均由 boot classloader 加载,直接 [Class.forName] 即可。
  *
- * 线程契约(V43 T1 固化):仅安装线程串行访问;缓存仍用 ConcurrentHashMap——
+ * 线程契约:仅安装线程串行访问;缓存仍用 ConcurrentHashMap——
  * 契约被破坏时退化为弱一致读而非 HashMap 结构性损坏(坏表/死循环)。
  */
 object MethodFinder {

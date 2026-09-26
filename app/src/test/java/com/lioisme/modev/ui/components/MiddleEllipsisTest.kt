@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 
 /**
- * 中缀省略纯函数契约(V27 M1-T1):路径/命令「保头掐腰」单一事实源。
+ * 中缀省略纯函数契约:路径/命令「保头掐腰」单一事实源。
  */
 class MiddleEllipsisTest {
 

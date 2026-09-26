@@ -44,7 +44,7 @@ interface AppCatalogService {
  *
  * AGENTS #7/#18 纪律:UI 零 import 持久化实现,变更一律经 ViewModel 下发到本契约;
  * MCP `applist_prefs_get/set` 与 UI 筛选菜单读写**同一** StateFlow 事实源,
- * 故「MCP 默认值 = 用户 UI 持久值」可被门禁断言(V45 DUAL 一致性)。
+ * 故「MCP 默认值 = 用户 UI 持久值」可被门禁断言。
  */
 interface AppListPreferences {
 

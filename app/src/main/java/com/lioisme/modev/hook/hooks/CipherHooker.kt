@@ -292,7 +292,7 @@ class CipherHooker(
         private const val CIPHER = "javax.crypto.Cipher"
 
         /**
-         * 提取密钥:优先 getEncoded();AndroidKeyStore 硬件密钥返回 null 时标记不可导出并记录别名。
+         * 提取密钥:优先 getEncoded;AndroidKeyStore 硬件密钥返回 null 时标记不可导出并记录别名。
          */
         internal fun extractKey(key: Key?, ctx: CryptoContext, toView: (ByteArray?) -> BytesView? = { BytesView.of(it) }) {
             if (key == null) {

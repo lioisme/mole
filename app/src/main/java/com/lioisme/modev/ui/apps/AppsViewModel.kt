@@ -212,7 +212,7 @@ class AppsViewModel(
     }
 
     /**
-     * 列表偏好变更(V23 R4 解耦契约):UI 不直触持久化实现,
+     * 列表偏好变更:UI 不直触持久化实现,
      * 读经 [uiState] 投影、写统一经本组方法下发到注入的 [AppListPreferences]。
      */
     fun setPinScoped(value: Boolean) {

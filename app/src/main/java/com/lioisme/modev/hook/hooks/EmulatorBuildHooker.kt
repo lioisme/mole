@@ -9,7 +9,7 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * 模拟器 Build 属性伪造 Hooker(V34 增强):覆盖全 Build 字段伪造,
+ * 模拟器 Build 属性伪造 Hooker:覆盖全 Build 字段伪造,
  * 通过反射修改 android.os.Build 静态字段 + OEM getter 双路径。
  *
  * 标准 AOSP Build 字段为 static final String, Xposed 无法直接 hook 字段访问,

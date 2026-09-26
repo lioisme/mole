@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * 行为监听类别(V27):文件系统 / Assets / Shell 三域,粒度对齐用户可感知操作。
+ * 行为监听类别:文件系统 / Assets / Shell 三域,粒度对齐用户可感知操作。
  *
  * 默认启用态与 [CategoryTaxonomy] 噪点分级一致(决策 2026-08-26):
  * - 高信号默认开:写/删/重命名/Shell(低频高价值);

@@ -1,8 +1,8 @@
 package com.lioisme.modev.hook.hooks
 
 /**
- * SharedPreferences 实例索引(V28):
- * OPEN 构造器时刻登记 impl→路径、edit() 时刻登记 editor→路径,
+ * SharedPreferences 实例索引:
+ * OPEN 构造器时刻登记 impl→路径、edit 时刻登记 editor→路径,
  * 后续 get/put 事件经接收者实例反查配置文件路径。
  *
  * 被动红线:仅以 `System.identityHashCode` 键控的有界 LRU 承载,
@@ -14,7 +14,7 @@ class PrefsInstanceIndex(private val capacity: Int = DEFAULT_CAPACITY) {
     /** impl 实例 → 配置文件绝对路径。 */
     private val implToPath = lru()
 
-    /** editor 实例 → 配置文件绝对路径(edit() 时由 impl 解析固化)。 */
+    /** editor 实例 → 配置文件绝对路径(edit 时由 impl 解析固化)。 */
     private val editorToPath = lru()
 
     fun rememberImpl(impl: Any?, path: String) {

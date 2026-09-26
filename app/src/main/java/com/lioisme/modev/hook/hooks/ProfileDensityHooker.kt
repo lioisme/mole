@@ -72,7 +72,7 @@ class ProfileDensityHooker(
         )
     }
 
-    /** 框架单例 `Resources.getSystem()` 的两处缓存(基线同一动作)。 */
+    /** 框架单例 `Resources.getSystem` 的两处缓存(基线同一动作)。 */
     internal fun applySystemResources() {
         if (!featureOn(DeviceEnvKind.PROFILE_DENSITY)) return
         val dpi = targetDpi(config().feature.deviceProfile) ?: return

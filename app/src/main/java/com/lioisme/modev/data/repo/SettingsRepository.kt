@@ -136,7 +136,7 @@ class MirroredConfigWriter(
     private fun parse(json: String): HookSwitch? = HookSwitch.fromJson(gson, json)
 
     companion object {
-        /** 全局捕获配置键(V10):全应用共享一份,注入侧与宿主侧同键读写。 */
+        /** 全局捕获配置键:全应用共享一份,注入侧与宿主侧同键读写。 */
         const val KEY = ConfigKeys.GLOBAL_SWITCH
 
         private const val PREFIX = ConfigKeys.SWITCH_PREFIX
@@ -145,7 +145,7 @@ class MirroredConfigWriter(
 
 /**
  * 捕获配置仓库:
- * - 默认配置(V25 收敛):内置最佳推荐值([HookSwitch.DEFAULT]),**无任何 UI 写入路径**;
+ * - 默认配置:内置最佳推荐值([HookSwitch.DEFAULT]),**无任何 UI 写入路径**;
  *   `switch_global` 键仅作注入侧兜底种子(init 强制重置,清除 V24 及更早的全局自定义遗留);
  * - 单应用监听自定义(V24 二态偏差 + V25 采集微调项):每包一键 `override_{pkg}`
  *   惰性创建,[EffectiveSwitch] 将默认配置 ⊕ 偏差解析为有效配置后经 ConfigServer
@@ -171,7 +171,7 @@ class SettingsRepository(
     private val _serverExternalAccess = MutableStateFlow(false)
 
     /**
-     * 统一外部访问(V41 T2,D-1):wire ConfigServer 与 MCP McpServer **双服务消费**
+     * 统一外部访问:wire ConfigServer 与 MCP McpServer **双服务消费**
      * 的单一开关——false(默认)= 127.0.0.1 仅本机;true = 0.0.0.0 所有接口
      * (同网段设备可连)。宿主本地偏好,不经远程镜像(注入侧零感知)。
      * V41 起取代 V26/V38 的 wire/MCP 双键分裂(`MCP_EXTERNAL_ACCESS` 仅迁移输入)。
@@ -199,7 +199,7 @@ class SettingsRepository(
 
     private val _serverPort = MutableStateFlow(WireProtocol.PORT)
 
-    /** 服务监听端口(V29):默认 1511(V39:1510 让位 MCP),可自定义。 */
+    /** 服务监听端口:默认 1511(V39:1510 让位 MCP),可自定义。 */
     override val serverPort: StateFlow<Int> = _serverPort
 
     /**
@@ -285,7 +285,7 @@ class SettingsRepository(
     }
 
     /**
-     * 落盘快照的取值规则(V50 S4)—— 三条,缺一不可:
+     * 落盘快照的取值规则—— 三条,缺一不可:
      *  - **画像库未装配** ⇒ 保持来路值:外部推送方自带的快照是它唯一的输入,
      *    用空画像覆盖 = 把「绑了档」变成「什么都没伪装」;
      *  - **显式绑档或带逐项覆写** ⇒ 一律按库重算:TCP 下发的就是这个值,
@@ -368,7 +368,7 @@ class SettingsRepository(
     }
 
     /**
-     * 有效配置叠加关键词规则(V37 T2.2):
+     * 有效配置叠加关键词规则:
      * keywordIds=null 跟随全局启用集;非 null 取其子集;库未装配时恒空规则
      * (旧扁平词表经 activeKeywordRules 降级兜底,兼容语义不变)。
      */
@@ -431,32 +431,32 @@ class SettingsRepository(
 
     private val _mcpEnabled = MutableStateFlow(true)
 
-    /** MCP 服务启用(V38):默认 true = 随宿主进程常驻(V39:默认回环 127.0.0.1:1510,令牌认证默认停用)。 */
+    /** MCP 服务启用:默认 true = 随宿主进程常驻(V39:默认回环 127.0.0.1:1510,令牌认证默认停用)。 */
     override val mcpEnabled: StateFlow<Boolean> = _mcpEnabled
 
     private val _mcpPort = MutableStateFlow(ConfigKeys.MCP_DEFAULT_PORT)
 
-    /** MCP 监听端口(V39):默认 1510,与 wire 1511 区隔。 */
+    /** MCP 监听端口:默认 1510,与 wire 1511 区隔。 */
     override val mcpPort: StateFlow<Int> = _mcpPort
 
     private val _mcpTokenAuth = MutableStateFlow(false)
 
-    /** MCP 令牌认证(V39):默认停用;启用后**全接口**(含回环 adb forward)必须携带 Bearer 令牌。 */
+    /** MCP 令牌认证:默认停用;启用后**全接口**(含回环 adb forward)必须携带 Bearer 令牌。 */
     override val mcpTokenAuth: StateFlow<Boolean> = _mcpTokenAuth
 
     private val _mcpTokens = MutableStateFlow<List<com.lioisme.modev.core.model.McpTokenEntry>>(emptyList())
 
-    /** MCP 令牌列表(V39):多令牌;创建/撤销即时生效(原地更新校验集,不重启 socket、不踢会话)。 */
+    /** MCP 令牌列表:多令牌;创建/撤销即时生效(原地更新校验集,不重启 socket、不踢会话)。 */
     override val mcpTokens: StateFlow<List<com.lioisme.modev.core.model.McpTokenEntry>> = _mcpTokens
 
     /** MCP 回调:端口/绑定/启停变更后由仓库驱动服务端重启(setter 装配,AppContainer 接线)。 */
     var mcpRestarter: (() -> Unit)? = null
 
     /**
-     * MCP 重启统一收口(V41 V1.4):**恒异步**——调用方多为 Main 调度的 VM 写路径,
+     * MCP 重启统一收口:**恒异步**——调用方多为 Main 调度的 VM 写路径,
      * 回调链直达 NanoHTTPD start(主线程开 ServerSocket,曾致 jank/StrictMode 违规、
      * NetworkOnMainThreadException 被服务端 catch-all 吞掉后静默 bind 失败)。
-     * 与 wire 侧 `scope.launch { server.restart() }` 模式对齐。
+     * 与 wire 侧 `scope.launch { server.restart }` 模式对齐。
      */
     private fun restartMcpAsync() {
         scope.launch { mcpRestarter?.invoke() }
@@ -579,8 +579,8 @@ class SettingsRepository(
                 pkg to AppListenOverride.fromJson(gson, writer.getLocal(key))
             }
             .filterValues { !it.isDefault }
-        // 镜像覆盖到 RemotePreferences:注入侧 install() 在 TCP 推送前读 Remote,
-        // 未镜像的覆盖键对注入侧不可见(仅本地 SP 有值 → effectiveFromRemote() 返回 null)。
+        // 镜像覆盖到 RemotePreferences:注入侧 install 在 TCP 推送前读 Remote,
+        // 未镜像的覆盖键对注入侧不可见(仅本地 SP 有值 → effectiveFromRemote 返回 null)。
         _overrides.value.forEach { (pkg, override) ->
             writer.put(ConfigKeys.overrideKey(pkg), override.toJson(gson))
         }

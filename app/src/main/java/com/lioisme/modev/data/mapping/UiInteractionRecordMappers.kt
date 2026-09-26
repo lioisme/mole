@@ -12,7 +12,7 @@ import com.lioisme.modev.domain.record.UiInteractionRow
 import com.lioisme.modev.domain.record.RowModel
 
 /**
- * UI 交互记录映射(V33):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
+ * UI 交互记录映射:wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
  * 与 [BehaviorRecordMappers] 同构;枚举严格解析(未知返回 null,绝不误标)。
  */
 

@@ -31,7 +31,7 @@ object AppListSettings : com.lioisme.modev.domain.app.AppListPreferences {
 
     private val _showSystem = MutableStateFlow(true)
 
-    /** 显示系统应用(V14 R8 持久化)。 */
+    /** 显示系统应用。 */
     override val showSystem: StateFlow<Boolean> = _showSystem.asStateFlow()
 
     private val _showModules = MutableStateFlow(false)

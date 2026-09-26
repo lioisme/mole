@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /*
- * 画像字段的标准取值集(V48 R-3):Android release ↔ SDK、屏幕密度档、CPU 核数档。
+ * 画像字段的标准取值集:Android release ↔ SDK、屏幕密度档、CPU 核数档。
  *
  * 为什么这三张表留在仓里而不是找「平台权威表」:语言 / 国家 / 时区那三项平台真的给了枚举
  * (`ProfileOptionSource` 走 Locale/TimeZone 表,禁再抄一份),而 **Android release 与 API level

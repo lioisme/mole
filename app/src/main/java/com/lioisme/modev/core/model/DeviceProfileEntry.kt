@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * 画像库条目(V47 T2):一行 = 一份**可复用画像**。
+ * 画像库条目:一行 = 一份**可复用画像**。
  *
  * 内置档的**展示名不进存储**([name] 对内置行恒为空串),由 ui 侧按 [builtinSeedId]
  * 取四语资源:基线把 name/summary 一起算进内容指纹,于是切换语言会让「用户未改过」
@@ -35,7 +35,7 @@ data class DeviceProfileEntry(
 }
 
 /**
- * 每应用画像绑定的解析结论(V47 T2)。
+ * 每应用画像绑定的解析结论。
  *
  * 三态必须可区分,**禁止把「未绑定」与「绑了但库里没有」合并为一个 null** ——
  * 后者若静默按「不伪装」处理,就是旧 [SpoofProfiles.resolve] 把未知 id 回落成 auto

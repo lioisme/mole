@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
- * 应用信息 Hooker(V33):hook PackageManager.getPackageInfo(String, int),
+ * 应用信息 Hooker:hook PackageManager.getPackageInfo(String, int),
  * 拦截 GET_SIGNATURES/GET_SIGNING_CERTIFICATES 标记的调用并记录版本号。
  */
 class AppInfoHooker(
@@ -17,7 +17,7 @@ class AppInfoHooker(
     private val registry = BehaviorMethodRegistry.forName("android.app.ApplicationPackageManager")
 
     /**
-     * 字段句柄按类缓存(V44 T2.5):旧形态每次 getPackageInfo 做 4~6 次
+     * 字段句柄按类缓存:旧形态每次 getPackageInfo 做 4~6 次
      * `getField` + 异常构造(getPackageInfo 是应用高频 API)。
      * [com.lioisme.modev.hook.ClassValueCache] 语义 = 每类一份缓存、随类卸载回收,无泄漏;
      * 类内 map 同步包装,允许 null 值(字段缺失同样缓存,避免反复抛 NoSuchFieldException)。

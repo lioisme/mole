@@ -7,7 +7,7 @@ import org.junit.Test
 import java.io.File
 
 /**
- * 框架入口与模块元数据契约(V50,交付物 3 `docs/v50-xposed-api-compat.md` 的机器面)。
+ * 框架入口与模块元数据契约(V50,交付物 3 `docs/xposed-api-compat.md` 的机器面)。
  *
  * 本模块同时面向两套 Xposed 加载协议:
  *  - **现代**(libxposed API 102):`META-INF/xposed/java_init.list` → [ModevModule];
@@ -131,7 +131,7 @@ class FrameworkEntrypointContractTest {
             "Platform 契约的 registerInterventional 必须保留默认实现(legacy 无须覆写)",
             Regex("""fun registerInterventional\([^)]*\)\s*:\s*Boolean\s*=\s*""").containsMatchIn(contract),
         )
-        // V43 T3 实锤:API 82 的 MethodHookParam 无 hasResult(),短路判定只能近似 + 反射兜底。
+        // V43 T3 实锤:API 82 的 MethodHookParam 无 hasResult,短路判定只能近似 + 反射兜底。
         assertTrue(
             "legacy 适配器必须保留 returnEarly 反射判定(否则 setResult(null) 型干预失明)",
             legacy.contains("returnEarly"),

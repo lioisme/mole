@@ -1,7 +1,7 @@
 package com.lioisme.modev.mcp.protocol
 
 /**
- * MCP 协议常量(V38):Model Context Protocol 2025-06-18,Streamable HTTP 传输。
+ * MCP 协议常量:Model Context Protocol 2025-06-18,Streamable HTTP 传输。
  * 独立于注入侧 wire 协议(VERSION 恒 4),零共享消息形态。
  */
 object McpProtocol {

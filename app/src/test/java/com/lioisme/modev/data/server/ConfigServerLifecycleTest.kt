@@ -19,7 +19,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * ConfigServer 生命周期与外部访问契约(V26):
+ * ConfigServer 生命周期与外部访问契约:
  * - 默认绑定回环(127.0.0.1),boundAddress 观测点同步;
  * - externalAccess = true + restart → 立即改绑 0.0.0.0,本地 ping/pong 往返正常;
  * - 回切(默认语义)→ 重启后 boundAddress 复位为 127.0.0.1;

@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.Color
 import com.lioisme.modev.core.model.NetworkKind
 
 /*
- * 网络环境监听类别色 token(V30 一等公民):
+ * 网络环境监听类别色 token:
  * SSL 类别 = 深蓝,代理 = 橙色,VPN = 紫色,请求 = 青色。
  */
 

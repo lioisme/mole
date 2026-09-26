@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * 画像取值域常量与哨兵(V47 T1)。语义与基线 `HooksValue` 一致:
+ * 画像取值域常量与哨兵。语义与基线 `HooksValue` 一致:
  * **「字段等于缺省值」即「该干预组不安装」**,模型内不存在 per-field 布尔开关。
  *
  * 截屏方向沿用基线编号(零 = 强制禁止,一 = 强制允许),避免与基线配置互换时语义倒置。
@@ -58,7 +58,7 @@ object ProfileValues {
 }
 
 /**
- * 设备画像值对象(V47 T1):**伪装配置的唯一模型**,41 个字段逐项对齐基线能力
+ * 设备画像值对象:**伪装配置的唯一模型**,41 个字段逐项对齐基线能力
  * (见 [ProfileField.baselineKey])。
  *
  * 与旧 [SpoofProfile] 的根本差别:

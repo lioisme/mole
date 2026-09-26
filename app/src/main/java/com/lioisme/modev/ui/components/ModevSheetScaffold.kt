@@ -51,12 +51,12 @@ import com.lioisme.modev.domain.server.PortValidator
 import kotlinx.coroutines.launch
 
 /**
- * 统一底部弹层脚手架(V39 R7):全 App ModalBottomSheet 唯一出口,
+ * 统一底部弹层脚手架:全 App ModalBottomSheet 唯一出口,
  * 收编此前散落的输入 sheet / 单选 sheet / 端口 sheet / 详情 sheet 手写复制。
  *
  * 契约(AGENTS 强约束 #4,V21 T2 双内边距缺陷防线):
  * - 显式 `containerColor = surfaceContainerHigh`;
- * - 内容 Column **仅** `.imePadding()`,禁叠 `navigationBarsPadding`(M3 已内部消费);
+ * - 内容 Column **仅** `.imePadding`,禁叠 `navigationBarsPadding`(M3 已内部消费);
  * - **hide 动画完成后才回调关闭**(收口闪黑;此前 Language/Appearance/Color/
  *   DiagnosticsDetail 四处直连偏差经本组件统一修复);
  * - 标题恒 titleLarge SemiBold @horizontal 24;内容区自管水平 padding

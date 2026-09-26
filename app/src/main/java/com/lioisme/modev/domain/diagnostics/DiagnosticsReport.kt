@@ -4,7 +4,7 @@ import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.domain.server.ConnectionMonitor
 
 /**
- * 诊断报告装配(V38 D2 解耦):原困在 `DiagnosticsScreen.copyDiagnostics` 的
+ * 诊断报告装配:原困在 `DiagnosticsScreen.copyDiagnostics` 的
  * 文案装配抽取为纯函数,诊断页「复制诊断信息」与 MCP `diagnostics` 工具双端同源。
  *
  * - 数据入参(framework/port/统计)+ 标签入参([Labels],UI 侧由资源解析注入,

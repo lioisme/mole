@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * WebView 监听操作枚举(V29):映射到 wire 记录的 operation 字段。
+ * WebView 监听操作枚举:映射到 wire 记录的 operation 字段。
  * 操作名与注入侧 Hooker 一一对应,新增操作必须同步 HookSwitch / EffectiveSwitch。
  */
 enum class WebViewOperation {

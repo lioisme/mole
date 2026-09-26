@@ -15,7 +15,7 @@ import java.util.Locale
  *   语言切换后无需重建;
  * - [pinScoped]:已作用域置顶稳定分区——置顶组前置,组内保持既有名称序,
  *   O(n) 无比较器,不改变全序稳定性;
- * - 排序阶段仅依赖 label/packageName,与计数、连接态解耦(V11 S2)。
+ * - 排序阶段仅依赖 label/packageName,与计数、连接态解耦。
  */
 object AppSort {
 

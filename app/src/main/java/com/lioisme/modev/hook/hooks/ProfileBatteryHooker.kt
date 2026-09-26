@@ -32,7 +32,7 @@ class ProfileBatteryHooker(
 ) : DeviceEnvBaseHooker(context) {
 
     /**
-     * 节流集(V50):旧形态 `audited: Int?` 只按电量值去重 ⇒ 两条读口互相吞记录
+     * 节流集:旧形态 `audited: Int?` 只按电量值去重 ⇒ 两条读口互相吞记录
      * (getIntProperty 先发过 80,则 sticky Intent 的 80 永不发射 = BATTERY_CHANGED
      * 换了操作名仍然恒零发射)。键 = `操作名:值`,每口各自节流。
      */
@@ -89,7 +89,7 @@ class ProfileBatteryHooker(
     }
 
     /**
-     * 审计发射。操作名按**读口**分派(V50 孤儿整改):sticky `ACTION_BATTERY_CHANGED` 的
+     * 审计发射。操作名按**读口**分派:sticky `ACTION_BATTERY_CHANGED` 的
      * extras 读取是一条独立且靶程序更常用的通路(旧 `DeviceBatteryHooker` 的类注释至今
      * 广告着这条通路),此前两条读口都发 BATTERY_WRITE ⇒ 枚举里的 BATTERY_CHANGED
      * 恒零发射、筛选恒空。分派后「改的是哪张读口」在记录里可读。

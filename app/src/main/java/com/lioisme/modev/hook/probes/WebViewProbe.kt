@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.hooks.WebViewHooker
 
 /**
- * WebView 监听探针(V29 一等公民):装配 WebView 全生命周期 Hooker。
+ * WebView 监听探针:装配 WebView 全生命周期 Hooker。
  *
  * 新增监听能力 = 在 [com.lioisme.modev.hook.HookInstaller] 注册本 Probe,
  * 传输/存储/UI 管线零改动。

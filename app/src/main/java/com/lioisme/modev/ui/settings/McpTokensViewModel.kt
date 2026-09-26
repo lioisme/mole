@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
- * MCP 访问令牌管理页 VM(V39):多令牌列表 + 认证开关。
+ * MCP 访问令牌管理页 VM:多令牌列表 + 认证开关。
  * 令牌值仅在本页显隐/复制消费,恒不进 MCP 工具输出与诊断快照(PII 纪律);
  * 创建/撤销经 [McpServiceConfig] 原地更新服务端校验集(不重启、不踢会话)。
  * V45 T2.2:依赖面为契约接口(与 MCP 令牌面「仅 UI」排除项同一上游)。

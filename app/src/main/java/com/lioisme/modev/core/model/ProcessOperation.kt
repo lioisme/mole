@@ -1,12 +1,12 @@
 package com.lioisme.modev.core.model
 
 /**
- * 进程控制监听操作(V33):具体 API 动作,[kind] 归属到类别。
+ * 进程控制监听操作:具体 API 动作,[kind] 归属到类别。
  *
  * 操作枚举名保持不变(与数据库 wire 协议兼容),但 KDoc 明确标注实际行为:
- * - EXIT_INTERCEPT 子类:before() 中 setResult(null) 阻止执行。
+ * - EXIT_INTERCEPT 子类:before 中 setResult(null) 阻止执行。
  * - CRASH_PREVENT 子类:通道 A 注入 wrapper handler,通道 B 吞掉异常。
- * - SCREEN_RECORD 子类:before() 中清除 FLAG_SECURE 位。
+ * - SCREEN_RECORD 子类:before 中清除 FLAG_SECURE 位。
  */
 enum class ProcessOperation(
     val kind: ProcessKind,

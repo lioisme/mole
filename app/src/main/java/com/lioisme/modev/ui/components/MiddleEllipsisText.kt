@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 
 /**
- * 中缀省略(V27 M1-T1):路径/命令等「保头掐腰」文本的单一事实源。
+ * 中缀省略:路径/命令等「保头掐腰」文本的单一事实源。
  *
  * 纯函数层 [MiddleEllipsis.ellipsize] 字符预算截断(JVM 直测,确定性);
  * 组合层 [MiddleEllipsisText] 在单行溢出时经 `TextUtils.ellipsize(MIDDLE)`

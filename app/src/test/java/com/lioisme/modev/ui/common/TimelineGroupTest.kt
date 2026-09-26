@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * 时间线分组纯函数契约(V17 R3):
+ * 时间线分组纯函数契约:
  * secondKey 跨秒边界;dayKey 跨日/跨月;formatSecond 12/24h;formatDay en/zh;
  * 组头决策:同秒 null / 分页边界 null / 跨日带日期前缀。
  * 时间戳经本地时区 Calendar 构造(格式化走默认时区,确定性不锁时区)。

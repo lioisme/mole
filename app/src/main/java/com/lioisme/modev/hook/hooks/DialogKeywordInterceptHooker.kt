@@ -10,10 +10,10 @@ import com.lioisme.modev.hook.ProbeContext
 
 /**
  * 对话框关键词拦截 Hooker(V33,V34 审计修复;V37 T0.1 闸门收口):
- * hook AlertDialog.Builder 构造后的 show(),在 before() 中检查 title/message
+ * hook AlertDialog.Builder 构造后的 show,在 before 中检查 title/message
  * 是否命中配置中的 dialogKeywords 列表,命中则调用 setResult(null) 阻止弹窗显示。
  *
- * 干预机制:before() 中经 [matchedKeywords] 统一闸门(uiListen master ∧ DIALOG_KEYWORD
+ * 干预机制:before 中经 [matchedKeywords] 统一闸门(uiListen master ∧ DIALOG_KEYWORD
  * ∧ 词表非空)判定,命中才 setResult(null) 阻止弹窗显示——开关关闭时即使词表命中
  * 也一律放行(V37 FeatureGate 红线,修复「只压记录不压干预」旁路)。
  * 干预结果通过 [UiInteractionRecord.interventionAction] 记录("BLOCKED"|"DETECTED"|null)。

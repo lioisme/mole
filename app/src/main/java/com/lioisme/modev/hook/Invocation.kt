@@ -21,7 +21,7 @@ abstract class Invocation {
     abstract val result: Any?
 
     /**
-     * 本次调用的底层句柄(V43 T3):before/after 两次视图共享同一 token,
+     * 本次调用的底层句柄:before/after 两次视图共享同一 token,
      * [HookerSupport] 据此做**按调用配对**的入参暂存——原方法抛异常跳过 after 时,
      * 残留条目受容量上限回收,不再依赖 ThreadLocal 栈的时序配对(V4.4:数据错位与
      * 驻留泄漏双修)。
@@ -85,7 +85,7 @@ abstract class MethodHook {
 
     /**
      * 原方法正常返回后调用;仅当原方法无异常时触发
-     * (与 libxposed 的 proceed() 抛出即跳过的既有行为一致)。
+     * (与 libxposed 的 proceed 抛出即跳过的既有行为一致)。
      */
     open fun after(invocation: Invocation) {}
 }

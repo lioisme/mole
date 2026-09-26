@@ -30,7 +30,7 @@ import org.robolectric.annotation.Config
  * 在落地断言下完全隐形。故本测试直接持 [NavHostController],以与生产同款的
  * 路由常量与参数声明驱动,逐点断言**栈深**与真实 pop 的结果。
  *
- * 注:`NavHostController.canPop()` 在本仓锁定的 navigation 2.8.9 上不存在
+ * 注:`NavHostController.canPop` 在本仓锁定的 navigation 2.8.9 上不存在
  * (javap 实锤:NavController 只有 popBackStack / currentBackStack:StateFlow<List<NavBackStackEntry>>),
  * 故 [depth] 取 `currentBackStack` 长度 —— 与 canPop 同一个事实,且更的诊断信息(能看到几层)。
  *

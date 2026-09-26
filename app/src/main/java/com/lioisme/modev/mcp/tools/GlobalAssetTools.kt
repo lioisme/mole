@@ -57,7 +57,7 @@ class GlobalAssetTools(
     }
 
     /**
-     * 等待库快照反映变更(V38):[KeywordLibraryService.entries] 由 Room 失效追踪
+     * 等待库快照反映变更:[KeywordLibraryService.entries] 由 Room 失效追踪
      * 异步刷新,写后立即读存在竞态;超时 3s 仍不满足则放行(读侧自会反映现状)。
      */
     private suspend fun awaitSnapshot(predicate: (List<KeywordEntry>) -> Boolean) {
@@ -168,7 +168,7 @@ class GlobalAssetTools(
     }
 
     /**
-     * 画像条目 → 出参(V47 WP-7):身份 + 账本元数据 + 整张字段表。
+     * 画像条目 → 出参:身份 + 账本元数据 + 整张字段表。
      *
      * 字段表键序**派生自** [ProfileFieldCatalog](`jsonKeyOf` 即 wire/MCP 唯一键名),
      * 值经 [stringOf] 取**编辑态文本**(未生效项 = 空串)⇒ 与 `spoof_profile_save`

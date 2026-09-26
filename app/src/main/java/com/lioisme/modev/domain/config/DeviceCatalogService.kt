@@ -3,7 +3,7 @@ package com.lioisme.modev.domain.config
 import com.lioisme.modev.core.model.DeviceCatalog
 
 /**
- * 真机目录契约(V47):品牌 → 机型选择器的唯一数据源(UI 与将来的工具面同经本契约,
+ * 真机目录契约:品牌 → 机型选择器的唯一数据源(UI 与将来的工具面同经本契约,
  * AGENTS #18 方法层契约族;实现 = `data.repo.DeviceCatalogRepository`,容器出口 = `AppContainer.deviceCatalog`)。
  *
  * [catalog] 的 null **不等于空目录**:它表示随包资产读不出或解不开(打包缺失 / JSON 破损 /

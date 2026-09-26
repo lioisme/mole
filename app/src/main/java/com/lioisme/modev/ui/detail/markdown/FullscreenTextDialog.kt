@@ -36,7 +36,7 @@ import com.lioisme.modev.core.util.ChunkedText
 import com.lioisme.modev.ui.components.TipIconButton
 
 /**
- * 全屏文本查看器(V31 修复):
+ * 全屏文本查看器:
  * - Dialog 全屏覆盖(usePlatformDefaultWidth = false),正文经 [ChunkedText]
  *   O(1) 分块惰性虚拟化——多 MB 全量文本仅组合可视块;
  * - 文本自动换行(softWrap=true),纵向 LazyColumn 滚动浏览完整内容;

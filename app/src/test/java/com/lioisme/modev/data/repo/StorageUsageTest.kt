@@ -16,7 +16,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * 存储占用出口契约(V23 T1.5):主库 + `-wal` + `-shm` 三文件字节和;
+ * 存储占用出口契约:主库 + `-wal` + `-shm` 三文件字节和;
  * 未装配 databaseFile 提供者时返回 0(UI 禁止绕过仓库直触 DB 文件)。
  */
 @RunWith(RobolectricTestRunner::class)

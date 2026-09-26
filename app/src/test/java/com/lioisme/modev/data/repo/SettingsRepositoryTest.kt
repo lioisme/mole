@@ -17,7 +17,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * SettingsRepository 默认配置契约(V25 D2):
+ * SettingsRepository 默认配置契约:
  * - 旧按包键迁移链路保留(migrateLegacy 清理残留);
  * - **init 无条件重置 `switch_global` 为内置推荐值**——清除 V24 及更早全局设置页
  *   遗留的用户自定义(默认配置自此无 UI 写入路径,陈旧安装自愈);

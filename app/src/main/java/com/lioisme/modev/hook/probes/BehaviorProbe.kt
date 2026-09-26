@@ -12,7 +12,7 @@ import com.lioisme.modev.hook.hooks.NioFilesHooker
 import com.lioisme.modev.hook.hooks.ShellHooker
 
 /**
- * 行为监听探针(V27 一等公民):装配五 Hooker——文件元操作(File.delete/rename/
+ * 行为监听探针:装配五 Hooker——文件元操作(File.delete/rename/
  * mkdir/list)、文件流(FileInputStream/FileOutputStream 构造器)、NIO 门面
  * (java.nio.file.Files,API 26+,类缺失静默零安装)、Assets 资源、Shell 命令。
  * 装配清单即能力边界;recordType = [RecordTypes.BEHAVIOR]。

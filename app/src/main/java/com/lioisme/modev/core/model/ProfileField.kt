@@ -24,7 +24,7 @@ enum class ProfileValueType {
 }
 
 /**
- * 画像字段枚举(V47 T1):**伪装配置面的唯一事实源**。
+ * 画像字段枚举:**伪装配置面的唯一事实源**。
  *
  * 41 项 = 基线 `ModuleConfig` 的 40 项逐字段对齐([baselineKey] 一一映射,拼写沿用基线
  * 以保 wire 兼容)+ Modev 超基线的 [ProfileKind.PROFILE_CPU] 核数一项([baselineKey] 为 null)。
@@ -33,9 +33,8 @@ enum class ProfileValueType {
  * 都必须经本枚举与 [DeviceProfile] 的穷尽 `when` 桥接取值,
  * **禁止反射、禁止字符串键散落、禁止任何一处手抄字段清单**。
  *
- * **分类只有一轴(V49 R-1)**:[kind] 即底层来源族,同时就是 UI 分区、钩子族与 MCP enum 值;
- * V48 那条与之并存的 `ProfileSection` 呈现轴已整体退役(两条 1:1 的轴 = 第二事实源,
- * 且它的 `OTHER` / `LOCALE` 两组把两种不同机制混在一起,正是本需求要消灭的困惑)。
+ * **分类只有一轴**:[kind] 即底层来源族,同时就是 UI 分区、钩子族与 MCP enum 值;
+ * (为什么只允许一条轴,见 [ProfileKind]。)
  */
 enum class ProfileField(
 

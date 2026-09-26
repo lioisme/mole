@@ -7,7 +7,7 @@ import com.lioisme.modev.core.model.BehaviorRecord
 import com.lioisme.modev.core.model.RecordTypes
 
 /**
- * BehaviorRecord 载荷编解码器(V27 行为监听):v4 泛型信封下宿主侧以 [RECORD_TYPE]
+ * BehaviorRecord 载荷编解码器:v4 泛型信封下宿主侧以 [RECORD_TYPE]
  * 分发到本编解码器,编码侧(注入)与解码侧(宿主)共用同一 Gson([Json.gson])
  * 保证双端形状一致。
  *

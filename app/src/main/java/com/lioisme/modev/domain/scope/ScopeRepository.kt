@@ -94,7 +94,7 @@ class ScopeRepository(
     }
 
     /**
-     * 前台同步策略(V10):进入前台立即同步一次,此后每 [FOREGROUND_SYNC_INTERVAL_MS]
+     * 前台同步策略:进入前台立即同步一次,此后每 [FOREGROUND_SYNC_INTERVAL_MS]
      * 静默兜底(内容判等,无变化不发射 → UI 零重组零闪烁)。
      * 框架侧无公开变更回调,外部勾选(LSPosed 管理器)以低频兜底感知;
      * 本应用内变更([toggle]/[remove])已由各自 refresh 即时同步。

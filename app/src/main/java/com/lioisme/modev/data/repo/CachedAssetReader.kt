@@ -7,7 +7,7 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * 随包 JSON 资产的「读一次、缓存住、失败冷却」闸(V48 抽出)。
+ * 随包 JSON 资产的「读一次、缓存住、失败冷却」闸。
  *
  * 存在的理由 = 现在真有两个同形状的读者:`devices.json`(约 1.9 MB / 8533 机型)与
  * `carriers.json`(134 KB / 1597 运营商)。把 [DeviceCatalogRepository] 原样再抄一份

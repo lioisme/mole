@@ -19,11 +19,11 @@ import java.util.Collections
 import java.util.WeakHashMap
 
 /**
- * WebView 全生命周期监听(V29 一等公民):捕获页面加载/JS 执行/桥注册/调试开关,
- * 经 [WebViewJsBridge] 回传 JS Crypto 事件(V12 迁移)。
+ * WebView 全生命周期监听:捕获页面加载/JS 执行/桥注册/调试开关,
+ * 经 [WebViewJsBridge] 回传 JS Crypto 事件。
  *
  * 不继承 [BaseHooker](后者绑定 [CryptoKind])——本类完全使用 [WebViewKind] 体系,
- * 自行管理 enabled() 判断与 sink.emit(WebViewRecord) 路径。
+ * 自行管理 enabled 判断与 sink.emit(WebViewRecord) 路径。
  *
  * 注入面:
  * 1. WebViewClient.onPageFinished —— 页面加载完成(PAGE_LOAD/PAGE_FINISHED);
@@ -45,7 +45,7 @@ class WebViewHooker(
     protected val packageName = context.packageName
 
     /**
-     * 目标进程名(V44 T2.6):经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
+     * 目标进程名:经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
      * 旧形态每个 Hooker 基类各自 `by lazy` 读一次 `/proc/self/cmdline`,冷启动期
      * 约 50 个实例 = 50 次文件读 + 字节解码,而进程身份在进程内恒定不变。
      */

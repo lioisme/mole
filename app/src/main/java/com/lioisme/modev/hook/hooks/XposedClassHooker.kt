@@ -57,7 +57,7 @@ class XposedClassHooker(
         }
     }
 
-    /** Xposed 类名判定(V37 T2.4):内置前缀基线 ∪ 用户追加前缀(extraXposedPrefixes)。 */
+    /** Xposed 类名判定:内置前缀基线 ∪ 用户追加前缀(extraXposedPrefixes)。 */
     private fun isXposedClassName(name: String): Boolean {
         return XPOSED_PREFIXES.any { name.startsWith(it) } ||
             config().feature.extraXposedPrefixes.any { it.isNotBlank() && name.startsWith(it) }

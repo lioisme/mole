@@ -6,7 +6,7 @@ import androidx.compose.ui.graphics.Color
 import com.lioisme.modev.core.model.ProcessKind
 
 /**
- * 进程控制监听类别色(V33):亮/暗主题各 3 色,与 KindColorTokens 同构;
+ * 进程控制监听类别色:亮/暗主题各 3 色,与 KindColorTokens 同构;
  * 统计比例条 + 列表徽章共用。
  */
 internal fun processKindColorForMode(kind: ProcessKind, isDark: Boolean): Color =

@@ -6,7 +6,7 @@ import com.lioisme.modev.hook.Invocation
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * NIO 文件 Hooker(V27):java.nio.file.Files 静态门面(API 26+;类缺失静默零安装)。
+ * NIO 文件 Hooker:java.nio.file.Files 静态门面(API 26+;类缺失静默零安装)。
  *
  * 内容预览边界(被动红线 #11):仅「随调用即可得」的整读/整写 API 采集正文——
  * readAllBytes/readAllLines 的返回值与 write 的实参即内容本体,零额外 I/O;

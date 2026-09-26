@@ -16,11 +16,10 @@ import kotlinx.coroutines.flow.Flow
 /**
  * 统一记录表存取(表承载 10 类记录,名 = [CryptoRecordEntity.TABLE_NAME])。
  *
- * 查询形态(V45 T1.1 起,R1「底层数据架构高效」):
+ * 查询形态(,R1「底层数据架构高效」):
  * - **谓词不写在 SQL 里**——列表 / 计数 / 删除候选 id / 详情邻接四路的谓词一律由
  *   [RecordQueryFactory] 从 [com.lioisme.modev.domain.record.RecordFilter] 派生
- *   (缺省维度不出列,使 SQLite 能选索引;旧 `(:xCount = 0 OR col IN (:xs))` 哨兵
- *   片段与 `WHERE_FILTER` 常量已删除),DAO 侧只留 `@RawQuery` 执行位;
+ *   (缺省维度不出列,SQLite 才可能选到索引),DAO 侧只留 `@RawQuery` 执行位;
  * - 「删 = 筛 = 计数」口径单一由「同一生成器 + 同一投影列」保证;`@RawQuery` 不承担
  *   DML,故删除 = [idsByQuery] 取同谓词 id → [deleteByIds] 按主键分片删;
  * - 列表投影列([ROW_SELECT])为分页与切片共用,保证两者列集一致,
@@ -121,9 +120,8 @@ interface CryptoRecordDao {
     )
     fun observeCategoryCounts(type: String): Flow<List<KindCount>>
 
-    // V45 T1.8:死查询 observePackages(recordType) 已删除(生产零调用点,
-    // 仅测试自用);包维度观测出口 = [packagesOver](容量治理)与
-    // [observeRecordCounts](列表徽标),二者已覆盖旧语义。
+    // 包维度观测出口恒为 [packagesOver](容量治理)与 [observeRecordCounts](列表徽标)
+    // 两处;不要再补「按类型枚举有哪些包」的第三条查询(生产零调用点,只会长出死代码)。
 
     @Query("DELETE FROM ${CryptoRecordEntity.TABLE_NAME} WHERE packageName = :packageName")
     suspend fun clearPackage(packageName: String)
@@ -167,7 +165,7 @@ interface CryptoRecordDao {
     suspend fun deleteBefore(timestamp: Long, id: Long): Int
 
     /**
-     * 保留最近 [keep] 条,其余删除(全局容量治理入口,V45 T1.6 起 = 截断点 + 范围删两段);
+     * 保留最近 [keep] 条,其余删除(全局容量治理入口, = 截断点 + 范围删两段);
      * 两步之间即使被并发写入插入更新行,下一治理周期自会纠正,故不必包事务。
      */
     suspend fun trim(keep: Int): Int = globalTrimCutoff(keep)?.let { deleteBefore(it.timestamp, it.id) } ?: 0
@@ -252,7 +250,7 @@ data class RecordCount(
 )
 
 /**
- * 容量治理截断点(V45 T1.6):第 keep+1 行的 `(timestamp, id)`,
+ * 容量治理截断点:第 keep+1 行的 `(timestamp, id)`,
  * 与列表排序键同构 ⇒ 「保留集 = 列表首屏所见」在并列同戳下仍精确。
  */
 data class TrimCutoff(
@@ -298,10 +296,10 @@ data class CryptoRecordRow(
     val fileSize: Long? = null,
     // 偏好监听投影列(V28;prefs 行承载配置键,其余 NULL)
     val prefKey: String? = null,
-    // 网络环境监听投影列(V30)
+    // 网络环境监听投影列
     val proxyHost: String? = null,
     val vpnActive: Int? = null,
-    // UI 交互监听投影列(V33)
+    // UI 交互监听投影列
     val dialogTitle: String? = null,
     val dialogMessage: String? = null,
     val dialogKeywords: String? = null,
@@ -313,12 +311,12 @@ data class CryptoRecordRow(
     val intentData: String? = null,
     val intentExtrasJson: String? = null,
     val intentFlags: Int? = null,
-    // 系统信息监听投影列(V33)
+    // 系统信息监听投影列
     val logcatTag: String? = null,
     val logcatLevel: String? = null,
     val logcatMessage: String? = null,
     val signatureHash: String? = null,
-    // 进程控制投影列(V33)
+    // 进程控制投影列
     val exitCode: Int? = null,
     val processPid: Int? = null,
     val crashType: String? = null,

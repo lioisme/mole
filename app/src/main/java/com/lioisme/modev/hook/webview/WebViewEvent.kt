@@ -5,7 +5,7 @@ import com.lioisme.modev.core.codec.Json
 /**
  * WebView 探针事件(V12→V29):JS 侧经 [WebviewProbe.BRIDGE_NAME] 桥接回传的结构化载荷。
  * 字段名与探针 JSON 键一一对应(Gson 直接映射);hex 数据已在 JS 侧按
- * `maxHexChars()` 预截断,Java 侧 [WebViewEventMapper] 再经 [BytesView.of] 保险丝。
+ * `maxHexChars` 预截断,Java 侧 [WebViewEventMapper] 再经 [BytesView.of] 保险丝。
  */
 data class JsEvent(
     val op: String? = null,

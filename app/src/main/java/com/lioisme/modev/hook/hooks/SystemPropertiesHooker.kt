@@ -8,7 +8,7 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * android.os.SystemProperties.get() 拦截 Hooker(V35 momo 增强):
+ * android.os.SystemProperties.get 拦截 Hooker:
  * 拦截 framework 层 SystemProperties.get(String) 和 get(String, String),
  * 对 root/emulator 指示属性返回安全值。
  *

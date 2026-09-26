@@ -9,7 +9,7 @@ import com.lioisme.modev.core.model.stringOf
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * 画像强制档 · `android.os.Build` 一族(V49 WP-D1)。
+ * 画像强制档 · `android.os.Build` 一族。
  *
  * 与 [EmulatorBuildHooker] 的分工是**两种不同语义**,不合并:
  *  - 条件档:仅在检出模拟器脏值时掩蔽,值来自内置基线;

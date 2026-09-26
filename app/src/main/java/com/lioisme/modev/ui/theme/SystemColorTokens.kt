@@ -6,7 +6,7 @@ import androidx.compose.ui.graphics.Color
 import com.lioisme.modev.core.model.SystemKind
 
 /**
- * 系统信息监听类别色(V33):亮/暗主题各 3 色,与 KindColorTokens 同构;
+ * 系统信息监听类别色:亮/暗主题各 3 色,与 KindColorTokens 同构;
  * 统计比例条 + 列表徽章共用。
  */
 internal fun systemKindColorForMode(kind: SystemKind, isDark: Boolean): Color =

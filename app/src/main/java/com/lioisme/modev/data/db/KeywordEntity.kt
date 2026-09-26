@@ -6,7 +6,7 @@ import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * 全局弹窗拦截关键词库条目(V37 T2.1):
+ * 全局弹窗拦截关键词库条目:
  * 库为全局资产,每应用经 [com.lioisme.modev.core.model.AppListenOverride.keywordIds]
  * 选择启用子集;宿主端解析为规则表下发,注入侧零感知本表。
  *

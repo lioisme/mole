@@ -20,7 +20,7 @@ class LibxposedPlatform(private val xposed: XposedInterface) : Platform {
     /**
      * 干预型注册(V43 T3/D-5):PASSTHROUGH 使回调显式 [Invocation.setThrowable] 设置的
      * 异常抵达调用方;回调体内业务代码全程 runSafely 隔离——缺陷异常绝不外泄,
-     * 唯有受控的短路异常(以及原方法自身 proceed() 抛出的真实业务异常)向上传播。
+     * 唯有受控的短路异常(以及原方法自身 proceed 抛出的真实业务异常)向上传播。
      */
     override fun registerInterventional(executable: Executable?, hook: MethodHook): Boolean =
         doRegister(executable, hook, interventional = true)
@@ -90,7 +90,7 @@ class LibxposedPlatform(private val xposed: XposedInterface) : Platform {
     }
 
     /**
-     * 调用视图。注意:libxposed 的 getThisObject() 对静态方法会抛异常,
+     * 调用视图。注意:libxposed 的 getThisObject 对静态方法会抛异常,
      * 统一捕获转为 null,保证业务层空安全。
      *
      * [setResult] 通过拦截器短路实现:记录短路值并标记,
@@ -110,7 +110,7 @@ class LibxposedPlatform(private val xposed: XposedInterface) : Platform {
         var shortCircuitResult: Any? = null
             private set
 
-        /** 干预型注册的异常短路通道(V43 T3):非空 = 以该异常结束调用(仅 interventional 生效)。 */
+        /** 干预型注册的异常短路通道:非空 = 以该异常结束调用(仅 interventional 生效)。 */
         var pendingThrowable: Throwable? = null
             private set
 

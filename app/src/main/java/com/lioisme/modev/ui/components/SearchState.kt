@@ -60,7 +60,7 @@ class SearchController<T>(
     /**
      * 输入框的激活意图回调(SearchInputField.onExpandedChange 直通)。
      * 焦点驱动的 true 仅在「当前已收起」时接受:展开/收起动画期间(currentValue 仍为
-     * Expanded)忽略,防止 collapse() 后 M3 InputField 的延迟焦点回调(+~100ms)把
+     * Expanded)忽略,防止 collapse 后 M3 InputField 的延迟焦点回调(+~100ms)把
      * 收起意图反向顶回——实机回归:进程重建恢复全屏搜索后按返回,搜索又自动重开。
      */
     fun onInputActiveChange(value: Boolean) {

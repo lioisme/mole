@@ -6,7 +6,7 @@ import com.lioisme.modev.core.model.PrefsOperation
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * 偏好读取 Hooker(V28):SharedPreferencesImpl 的 get* 全家桶 + contains/getAll。
+ * 偏好读取 Hooker:SharedPreferencesImpl 的 get* 全家桶 + contains/getAll。
  * after 捕获键与返回值(「随调用即可得」);值域受 fileContentCapture 闸门
  * (决策 D6),contains 仅记存在性不产值。
  *

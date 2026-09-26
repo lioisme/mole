@@ -18,17 +18,17 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  * v4 → v5:新增 timestamp 单列索引(时间倒序热路径:全局裁剪/每包裁剪/邻接/分页)。
  * v5 → v6:数据库监听(T17)新增 8 个可空列:sql / dbPath / bindArgsJson / rowsJson /
  *   rowCount / affectedCount / rowId / resultText,recordType='db' 行承载。
- * v6 → v7:三态视图(V19)7 个字节字段各增 Base64 列(keyB64/ivB64/inputB64/outputB64/
+ * v6 → v7:三态视图7 个字节字段各增 Base64 列(keyB64/ivB64/inputB64/outputB64/
  *   saltB64/aadB64/publicKeyB64),存量行 NULL = 旧记录降级双态。
  * v7 → v8:多维筛选复合索引([recordType]+[kind]、[recordType]+[packageName]+[timestamp]),
  *   纯 CREATE INDEX,不触碰存量数据(与实体声明索引命名一致,运行时 schema 校验通过)。
- * v8 → v9:行为监听(V27)新增 10 个可空列:path / destPath / command / fileSize +
+ * v8 → v9:行为监听新增 9 个可空列:path / destPath / command / fileSize +
  *   content 五元组(contentHex/contentB64/contentText/contentLength/contentTruncated),
  *   recordType='behavior' 行承载;纯 ALTER TABLE,不触碰存量行(与 v5→v6 同先例)。
- * v9 → v10:偏好监听(V28)新增 1 个可空列 prefKey(配置键),
+ * v9 → v10:偏好监听新增 1 个可空列 prefKey(配置键),
  *   recordType='prefs' 行承载(值域复用 content 五元组、路径复用 path 列);
  *   纯 ALTER TABLE ADD COLUMN,不触碰存量行。
- * v10 → v11:网络环境监听(V30)新增 11 个可空列:url / method / statusCode /
+ * v10 → v11:网络环境监听新增 11 个可空列:url / method / statusCode /
  *   requestHeadersJson / responseHeadersJson / sslProtocol / cipherSuite /
  *   peerCertificatesJson / proxyHost / proxyPort / vpnActive,
  *   recordType='network' 行承载;纯 ALTER TABLE ADD COLUMN,不触碰存量行。
@@ -41,7 +41,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
  *   进程控制(6):exitCode / processPid / crashType / crashMessage / crashBlocked /
  *     screenRecordBlocked;
  *   recordType='ui'/'system'/'process' 行承载;纯 ALTER TABLE ADD COLUMN,不触碰存量行。
- * v12 → v13:V34 审计增强新增 3 个可空列:
+ * v12 → v13:增强新增 1 个可空列:
  *   interventionAction(TEXT,干预动作标记:"BLOCKED"/"DETECTED"/null);
  *   同时覆盖进程控制/设备环境/UI交互三类记录;纯 ALTER TABLE ADD COLUMN,不触碰存量行。
  * v13 → v14:V37 T2.1 功能域数据层新增 `keyword_library` 表
@@ -73,7 +73,7 @@ abstract class ModevDatabase : RoomDatabase() {
     /**
      * 执行 PRAGMA。
      *
-     * **必须走 `query()` 而不是 `execSQL()`**:Android `SQLiteDatabase.execSQL` 只接受
+     * **必须走 `query` 而不是 `execSQL`**:Android `SQLiteDatabase.execSQL` 只接受
      * DML/DDL,`PRAGMA …` 会抛 `Queries can be performed using SQLiteDatabase query or
      * rawQuery methods only`(V45 T1.7 首版在此踩实);而 SQLite 的赋值型 PRAGMA 本就
      * 回一行结果,用 query 消费即可。
@@ -127,7 +127,7 @@ abstract class ModevDatabase : RoomDatabase() {
      * 而 Room 的 `onCreate` 回调在建表后、**事务内**(VACUUM 不能在事务里跑);
      * 实测 Room 2.7.2 + FrameworkSQLite 下改档不落地(读回恒 0,V45 T1.7 三轮取证)。
      * 既然回收动作与档位转换用的是同一条 VACUUM,直连 VACUUM + 有界判据就是最短路径,
-     * 不留一个永远不生效的配置面(另注:`PRAGMA`/`VACUUM` 都必须走 `query()` 通道,
+     * 不留一个永远不生效的配置面(另注:`PRAGMA`/`VACUUM` 都必须走 `query` 通道,
      * Android 的 `execSQL` 按语句类型白名单直接拒绝)。
      */
     fun reclaimIfCheap(): Boolean {
@@ -225,7 +225,7 @@ abstract class ModevDatabase : RoomDatabase() {
         }
 
         /**
-         * v6 → v7:三态视图(V19)7 个字节字段各增 Base64 列;
+         * v6 → v7:三态视图7 个字节字段各增 Base64 列;
          * 纯 ALTER TABLE ADD COLUMN,存量行 NULL = 旧记录降级双态(不触碰数据)。
          */
         val MIGRATION_6_7 = object : Migration(6, 7) {
@@ -261,7 +261,7 @@ abstract class ModevDatabase : RoomDatabase() {
         }
 
         /**
-         * v8 → v9:行为监听(V27)新增 10 个可空列,recordType='behavior' 行承载;
+         * v8 → v9:行为监听新增 9 个可空列,recordType='behavior' 行承载;
          * 纯 ALTER TABLE ADD COLUMN,不触碰存量 crypto/db 行(v5→v6 同先例)。
          */
         val MIGRATION_8_9 = object : Migration(8, 9) {
@@ -280,7 +280,7 @@ abstract class ModevDatabase : RoomDatabase() {
         }
 
         /**
-         * v9 → v10:偏好监听(V28)新增 1 个可空列 prefKey,recordType='prefs' 行承载;
+         * v9 → v10:偏好监听新增 1 个可空列 prefKey,recordType='prefs' 行承载;
          * 纯 ALTER TABLE ADD COLUMN,不触碰存量行(v8→v9 同先例)。
          */
         val MIGRATION_9_10 = object : Migration(9, 10) {
@@ -290,7 +290,7 @@ abstract class ModevDatabase : RoomDatabase() {
         }
 
         /**
-         * v10 → v11:网络环境监听(V30)新增 11 个可空列,recordType='network' 行承载;
+         * v10 → v11:网络环境监听新增 11 个可空列,recordType='network' 行承载;
          * 纯 ALTER TABLE ADD COLUMN,不触碰存量行(v9→v10 同先例)。
          */
         val MIGRATION_10_11 = object : Migration(10, 11) {
@@ -420,7 +420,7 @@ abstract class ModevDatabase : RoomDatabase() {
         }
 
         /**
-         * 迁移清单**唯一事实源**(V47 T2 收敛):`builder()` 与全部迁移测试一律引用本数组,
+         * 迁移清单**唯一事实源**:`builder` 与全部迁移测试一律引用本数组,
          * 不再各自枚举 `MIGRATION_x_y`。
          *
          * 收敛动因:此前生产侧三处(version / 定义 / addMigrations)由
@@ -483,7 +483,7 @@ abstract class ModevDatabase : RoomDatabase() {
         private var instance: ModevDatabase? = null
 
         /**
-         * 损坏自愈标记(V45 T1.7):写路径抛出损坏类异常时由 [noteSqliteError] 置位,
+         * 损坏自愈标记:写路径抛出损坏类异常时由 [noteSqliteError] 置位,
          * 下次 [get] 直接重建文件(不等 quick_check)。运行中不换实例 ——
          * 仓库/DAO 持有的是构造期快照,进程内换实例会让旧引用打到已关闭的库上
          * (V38「注入早于 Application」同型教训:定档必须在路径可见时做)。
@@ -502,7 +502,7 @@ abstract class ModevDatabase : RoomDatabase() {
         /**
          * 测试口:释放单例(下次 [get] 重新建库 + 重跑首开体检)。
          * 生产路径永不调用 —— 仓库/DAO 持的是构造期快照,进程内换实例等于给旧引用一把
-         * 已关闭的库(V38 同源教训),因此「运行中自愈」被刻意设计成「下次打开自愈」。
+         * 已关闭的库,因此「运行中自愈」被刻意设计成「下次打开自愈」。
          */
         internal fun resetInstanceForTest() {
             synchronized(this) {

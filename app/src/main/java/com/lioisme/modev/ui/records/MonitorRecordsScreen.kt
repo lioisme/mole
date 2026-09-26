@@ -121,7 +121,7 @@ fun DatabaseRecordsScreen(
 }
 
 /**
- * 单应用行为记录列表(V27 一等公民):同两兄弟结构,
+ * 单应用行为记录列表:同两兄弟结构,
  * 固定记录类型 = 行为,类别单选 7 项。
  */
 @Composable
@@ -140,7 +140,7 @@ fun BehaviorRecordsScreen(
 }
 
 /**
- * 单应用偏好记录列表(V28 一等公民):同三兄弟结构,
+ * 单应用偏好记录列表:同三兄弟结构,
  * 固定记录类型 = 偏好,类别单选 5 项。
  */
 @Composable
@@ -159,7 +159,7 @@ fun PrefsRecordsScreen(
 }
 
 /**
- * 单应用 WebView 记录列表(V29 一等公民):同四兄弟结构,
+ * 单应用 WebView 记录列表:同四兄弟结构,
  * 固定记录类型 = WebView,类别单选 5 项。
  */
 @Composable
@@ -192,7 +192,7 @@ fun NetworkRecordsScreen(
     )
 }
 
-/** 单应用设备环境记录列表(V31 一等公民)。 */
+/** 单应用设备环境记录列表。 */
 @Composable
 fun DeviceEnvRecordsScreen(
     viewModel: RecordsViewModel,
@@ -208,7 +208,7 @@ fun DeviceEnvRecordsScreen(
     )
 }
 
-/** 单应用 UI 交互记录列表(V33 一等公民)。 */
+/** 单应用 UI 交互记录列表。 */
 @Composable
 fun UiInteractionRecordsScreen(
     viewModel: RecordsViewModel,
@@ -224,7 +224,7 @@ fun UiInteractionRecordsScreen(
     )
 }
 
-/** 单应用系统信息记录列表(V33 一等公民)。 */
+/** 单应用系统信息记录列表。 */
 @Composable
 fun SystemRecordsScreen(
     viewModel: RecordsViewModel,
@@ -240,7 +240,7 @@ fun SystemRecordsScreen(
     )
 }
 
-/** 单应用进程控制记录列表(V33 一等公民)。 */
+/** 单应用进程控制记录列表。 */
 @Composable
 fun ProcessControlRecordsScreen(
     viewModel: RecordsViewModel,
@@ -470,7 +470,7 @@ private fun MonitorRecordsContent(
 }
 
 /**
- * 「清空本类」动作(V39 R5):搜索条动作槽形态,折叠/展开两态同 testTag
+ * 「清空本类」动作:搜索条动作槽形态,折叠/展开两态同 testTag
  * `records-clear-type`(Appbar 排他规范下页面动作不入 Appbar);
  * 点击唤起居中确认对话框(契约 4/13/24)。
  */

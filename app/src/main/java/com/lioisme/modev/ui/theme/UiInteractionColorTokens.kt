@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.Color
 import com.lioisme.modev.core.model.UiInteractionKind
 
 /**
- * UI 交互监听类别色(V33):亮/暗主题各 5 色,与 KindColorTokens 同构;
+ * UI 交互监听类别色:亮/暗主题各 5 色,与 KindColorTokens 同构;
  * 统计比例条 + 列表徽章共用。
  */
 internal fun uiInteractionKindColorForMode(kind: UiInteractionKind, isDark: Boolean): Color =

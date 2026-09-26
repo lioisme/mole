@@ -16,10 +16,10 @@ import org.junit.Test
  *     直接点名 —— 门面被实现类型旁路的根因)。
  *  R2:domain 子树不得依赖 android 框架(文案/资源)、ui 层与 data 实现
  *     (V43 T7/V5.3:模型族上移 domain 后,逆向依赖零容忍)。
- *  R3(V23):ui 子树不得依赖 data.db(Room 实体/DAO/库名;R1 已含,单列保留诊断信息)。
- *  R4(V43):hook 子树不得依赖 ui/compose(注入侧与宿主 UI 完全隔离)。
- *  R5(V43):data.repo 不得依赖 mcp(装配在 ModevApp,仓库不反控服务层)。
- *  R6(V45):mcp 子树不得依赖任何 data 实现(与 UI 同 = 只经 domain 契约)。
+ *  R3:ui 子树不得依赖 data.db(Room 实体/DAO/库名;R1 已含,单列保留诊断信息)。
+ *  R4:hook 子树不得依赖 ui/compose(注入侧与宿主 UI 完全隔离)。
+ *  R5:data.repo 不得依赖 mcp(装配在 ModevApp,仓库不反控服务层)。
+ *  R6:mcp 子树不得依赖任何 data 实现(与 UI 同 = 只经 domain 契约)。
  *
  * 全部通过才允许新增豁免(注释说明理由)。
  * V45 T2.3:原「兼容 typealias 迁移层」豁免名单清空 —— RowModelCompat/

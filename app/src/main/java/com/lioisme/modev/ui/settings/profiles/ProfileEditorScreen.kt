@@ -102,7 +102,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 /**
- * 画像参数编辑器 VM(V47 WP-5)。
+ * 画像参数编辑器 VM。
  *
  * 状态本体 = [ProfileEditorState](纯 Kotlin、可注入随机源 ⇒ JVM 直测);VM 只做两件事:
  *  1. 每次变更后把表单投影成一帧 [ProfileEditorView] 快照并推送 —— 组合侧以**值**为参数,
@@ -155,7 +155,7 @@ class ProfileEditorViewModel(
 
     val lastSaveResult: StateFlow<ProfileSaveResult?> = _lastSaveResult
 
-    // -------------------------------------------------------------- 机型库(V47 WP-5b)
+    // -------------------------------------------------------------- 机型库
 
     private val _catalog = MutableStateFlow<DeviceCatalogState>(DeviceCatalogState.Idle)
 
@@ -224,7 +224,7 @@ class ProfileEditorViewModel(
         bump()
     }
 
-    // ---------------------------------------------------------- 成对选型(V48 R-3)
+    // ---------------------------------------------------------- 成对选型
 
     /**
      * 选 Android 版本:**release 与 SDK_INT 一次写全**。
@@ -347,7 +347,7 @@ sealed interface DeviceCatalogState {
 }
 
 /**
- * 运营商库加载态(V48 R-3):与 [DeviceCatalogState] 同四态同语义。
+ * 运营商库加载态:与 [DeviceCatalogState] 同四态同语义。
  * 没抽成一个泛型 `CatalogState<T>` 是因为那要改名三处已绿的测试锚点,换来的只是少九行;
  * 真正会腐烂的重复(选择行的渲染)已经收口在 [CatalogPickerRow]。
  */
@@ -373,7 +373,7 @@ sealed interface CarrierChoiceState {
  *    BOOL → 行内 Switch(零弹层)、枚举槽 → [ModevChoiceSheet]
  *    (槽集由 `ProfileFieldCatalog.validate` 反推,与 MCP 目录工具同一手法 ⇒ 两侧不可能分叉);
  *  - RANDOMIZABLE 参数行带就近随机;整组随机 = 同品牌世代同运营商同源派生;
- *  - 保存闸 = `isDirty() && canSave`,非法输入由 sheet 实时硬闸在前、保存闸在后。
+ *  - 保存闸 = `isDirty && canSave`,非法输入由 sheet 实时硬闸在前、保存闸在后。
  *
  * 本页无搜索 ⇒ Appbar actions 合法(排他规范不触发);「从真机读取当前值」不在本包范围。
  */
@@ -668,7 +668,7 @@ fun ProfileEditorScreen(
 }
 
 /**
- * 目录选择行(V48 抽出):机型库 / 运营商库 / Android 版本表共用同一形态 ——
+ * 目录选择行:机型库 / 运营商库 / Android 版本表共用同一形态 ——
  * 「一句副标说清这次点选会写全哪几项」+「数据不可用时点名,不退化成空列表」。
  * 状态文案只有 Loading / Unavailable 两句要换名词,故整段 ListItem 只留一份。
  */
@@ -735,7 +735,7 @@ private fun DevicePresetRow(state: DeviceCatalogState, onPick: () -> Unit) {
     )
 }
 
-/** 运营商选择行(V48 R-3)。 */
+/** 运营商选择行。 */
 @Composable
 private fun CarrierPresetRow(state: CarrierChoiceState, onPick: () -> Unit) {
     val carriers = stringResource(R.string.profile_catalog_carriers)
@@ -755,7 +755,7 @@ private fun CarrierPresetRow(state: CarrierChoiceState, onPick: () -> Unit) {
 }
 
 /**
- * Android 版本选择行(V48 R-3):值表在仓内([ProfileValueSets]),无外部资产
+ * Android 版本选择行:值表在仓内([ProfileValueSets]),无外部资产
  * ⇒ 无 Loading / Unavailable 态,恒可点。
  */
 @Composable

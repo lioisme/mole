@@ -11,7 +11,7 @@ import com.lioisme.modev.core.model.BehaviorOperation
 import com.lioisme.modev.domain.record.BehaviorRow
 
 /**
- * 行为监听标签资源(V27):类别/操作显示名单一事实源,
+ * 行为监听标签资源:类别/操作显示名单一事实源,
  * 与 [sqlKindLabelRes]/[kindLabelRes] 同规(筛选菜单 / 列表行 / 详情页共用)。
  */
 

@@ -40,7 +40,7 @@ class ProcMountInfoHooker(
         }
     }
 
-    /** 生效掩码词表(V37 T2.4):内置基线 ∪ 用户追加关键词(extraMaskKeywords)。 */
+    /** 生效掩码词表:内置基线 ∪ 用户追加关键词(extraMaskKeywords)。 */
     private fun maskKeywords(): List<String> =
         if (config().feature.extraMaskKeywords.isEmpty()) {
             MAGISK_MOUNT_KEYWORDS

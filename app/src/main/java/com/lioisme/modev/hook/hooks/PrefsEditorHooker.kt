@@ -6,7 +6,7 @@ import com.lioisme.modev.core.model.PrefsOperation
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * 偏好写入 Hooker(V28):SharedPreferencesImpl$EditorImpl 的 put* 全家桶 +
+ * 偏好写入 Hooker:SharedPreferencesImpl$EditorImpl 的 put* 全家桶 +
  * remove/clear。after 捕获键与暂存值(「随调用即可得」实参);
  * 值域受 fileContentCapture 闸门(决策 D6);commit/apply 不挂钩(决策 D5)。
  *

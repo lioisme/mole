@@ -7,7 +7,7 @@ import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 
 /**
- * JSON-RPC 2.0 编解码(V38):MCP 传输层专用,与注入侧 wire 协议([com.lioisme.modev.core.codec])
+ * JSON-RPC 2.0 编解码:MCP 传输层专用,与注入侧 wire 协议([com.lioisme.modev.core.codec])
  * 完全隔离 —— 那一侧 VERSION 恒 4 且双端共源,禁止复用其消息形态。
  *
  * 纪律(2025-06-18 spec):

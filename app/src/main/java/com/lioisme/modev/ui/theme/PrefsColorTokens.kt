@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.Color
 import com.lioisme.modev.core.model.PrefsKind
 
 /*
- * 偏好类别色 token(V28):与算法/SQL/行为色板同规——浅/深两套,基于 Material
+ * 偏好类别色 token:与算法/SQL/行为色板同规——浅/深两套,基于 Material
  * 扩展色板选取,保证类别色文本与淡底徽章在对应表面上的对比度 ≥ AA(≥4.5:1)。
  * 用法:prefsKindColor(kind) 经 LocalIsDarkTheme 自动取浅/深;
  * 徽章底 = 语义色 @13% alpha(V27 RecordRow 统一透明度)。

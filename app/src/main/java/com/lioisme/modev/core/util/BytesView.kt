@@ -4,7 +4,7 @@ import androidx.compose.runtime.Immutable
 import com.lioisme.modev.core.model.RecordLimits
 
 /**
- * 字节数组的三态视图:hex 与 UTF-8 文本与 Base64(V19 起),均支持超限截断。
+ * 字节数组的三态视图:hex 与 UTF-8 文本与 Base64,均支持超限截断。
  * 设计为不可变值对象,可直接跨进程序列化。
  *
  * V15 契约变更:截断不再向 hex 内烧入 `…(+N bytes)` 硬编码英文后缀 ——
@@ -104,7 +104,7 @@ data class BytesView(
         const val HARD_MAX_B64_CHARS = HARD_MAX_HEX_CHARS * 2 / 3
 
         /**
-         * 内容物化上限(V44 T2.3):输入字节数超过此值即「保元弃内容」——
+         * 内容物化上限:输入字节数超过此值即「保元弃内容」——
          * 见 [of] 与 [RecordLimits.MAX_CONTENT_MATERIALIZE_BYTES]。
          */
         const val CONTENT_MATERIALIZE_MAX_BYTES = RecordLimits.MAX_CONTENT_MATERIALIZE_BYTES

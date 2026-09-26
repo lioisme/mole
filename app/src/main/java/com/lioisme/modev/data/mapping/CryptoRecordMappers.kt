@@ -37,7 +37,7 @@ import com.lioisme.modev.domain.record.WebViewDetail
  * 枚举解析严格:未知枚举值返回 null 而非报错(防止乱码 MESSAGE_DIGEST),
  * 由调用方负责降级处理(枚举漂移或 Schema 演进时,DB 内部兼容)。
  *
- * 数据库监听(V17):[SqlRecord] 与 [CryptoRecord] 共存于 crypto_records
+ * 数据库监听:[SqlRecord] 与 [CryptoRecord] 共存于 crypto_records
  * (ADR-1),投影按 [RecordType] 分派为 [RowModel];详情按 [RecordDetailModel]。
  */
 /** 模型 → 实体(宿主落库唯一写路径)。 */

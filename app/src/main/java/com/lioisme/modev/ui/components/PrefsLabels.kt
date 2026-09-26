@@ -10,7 +10,7 @@ import com.lioisme.modev.core.model.PrefsOperation
 import com.lioisme.modev.domain.record.PrefsRow
 
 /**
- * 偏好监听标签资源(V28):类别/操作显示名单一事实源,
+ * 偏好监听标签资源:类别/操作显示名单一事实源,
  * 与 [behaviorKindLabelRes]/[sqlKindLabelRes] 同规(筛选菜单 / 列表行 / 详情页共用)。
  */
 

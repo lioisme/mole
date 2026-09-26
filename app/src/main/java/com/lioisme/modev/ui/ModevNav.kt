@@ -127,7 +127,7 @@ fun ModevNavHost(navController: NavHostController) {
             transitions = NavTransitions.QUARTER,
         ) {
             // 根页面兜底:导航忙碌(转场/队列)时返回键入队弹栈,杜绝「排队窗口内误退出」;
-            // 空闲时首次返回提示「再按一次退出程序」,窗口内再按才 finish(V39 R8)。
+            // 空闲时首次返回提示「再按一次退出程序」,窗口内再按才 finish。
             BackHandler(enabled = true) {
                 if (!navController.popGuarded()) {
                     if (doubleBackExit.press()) {
@@ -692,7 +692,7 @@ fun ModevNavHost(navController: NavHostController) {
 
 /**
  * 页面级返回键统一过门控:替代每目的地一行
- * `BackHandler(enabled = true) { navController.popGuarded() }`,
+ * `BackHandler(enabled = true) { navController.popGuarded }`,
  * 转场未完成时入队、完成后执行(杜绝「转场中弹栈」失步)。
  */
 @Composable

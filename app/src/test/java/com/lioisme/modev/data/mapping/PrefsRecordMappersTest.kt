@@ -18,7 +18,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * 偏好记录映射契约(V28):wire ↔ 实体 ↔ 投影行往返对称;
+ * 偏好记录映射契约:wire ↔ 实体 ↔ 投影行往返对称;
  * 枚举严格解析(未知返回 null);导出 JSON 含关键键。
  */
 @RunWith(RobolectricTestRunner::class)

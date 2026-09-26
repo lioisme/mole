@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * 对话框位置与返回键拦截 Hooker(V33):hook AlertDialog.show()/Dialog.show()
+ * 对话框位置与返回键拦截 Hooker:hook AlertDialog.show/Dialog.show
  * 获取窗口位置;hook Activity.onBackPressed / DialogInterface.dismiss 捕获返回键。
  * 需 targetSdk < 33(后弹窗自动取消)。
  */
@@ -24,7 +24,7 @@ class DialogLocationHooker(
     }
 
     /**
-     * `Dialog.cancel()` 观测(V50 孤儿整改):`DIALOG_CANCEL` 在枚举、四语标签与筛选菜单里
+     * `Dialog.cancel` 观测:`DIALOG_CANCEL` 在枚举、四语标签与筛选菜单里
      * 都存在,但从未挂钩 ⇒ 恒空选项。用户主动取消与点按钮关闭在风控语义上不同,值得单列。
      */
     private fun hookDialogCancel() {
@@ -45,7 +45,7 @@ class DialogLocationHooker(
     }
 
     private fun hookDialogShow() {
-        // AlertDialog.show() 调用 Activity.showDialog,可从此处获取 dialog 引用
+        // AlertDialog.show 调用 Activity.showDialog,可从此处获取 dialog 引用
         val methods = registry?.named("show").orEmpty()
         if (methods.isEmpty()) return
         for (method in methods) {

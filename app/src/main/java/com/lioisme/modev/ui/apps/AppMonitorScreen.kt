@@ -373,7 +373,7 @@ private fun TooltipAction(
 }
 
 /**
- * Hero 头卡(V23 T5.2):AppIcon 56dp + 名称(titleLarge Medium)+ 包名 +
+ * Hero 头卡:AppIcon 56dp + 名称(titleLarge Medium)+ 包名 +
  * 连接/作用域双状态胶囊([connectionStatus]/[scopeStatus] 单一语义源)+
  * 作用域 Switch 行(pending 态禁用;框架不可用时禁用并保持原状)。
  */
@@ -435,7 +435,7 @@ private fun HeroCard(
 }
 
 /**
- * 状态胶囊(V40 T5.2):圆点 = 标准 M3 [Badge](自研 StatusDot 退役)+
+ * 状态胶囊:圆点 = 标准 M3 [Badge](自研 StatusDot 退役)+
  * 文案的 tonal Surface(StatusColorTokens AA 语义色);语义经 contentDescription。
  */
 @Composable
@@ -511,7 +511,7 @@ private fun ScopeToggleRow(
 }
 
 /**
- * 双段统计卡(V37 T3.3):监听域/功能域各自「计数 + 比例条 + FlowRow 图例」,
+ * 双段统计卡:监听域/功能域各自「计数 + 比例条 + FlowRow 图例」,
  * 替代 V33 十段单条不可读形态;零记录域隐藏比例条与图例。
  */
 @OptIn(ExperimentalLayoutApi::class)

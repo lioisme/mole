@@ -70,14 +70,14 @@ class ConfigChannel(
     private val writerLock = Object()
 
     /**
-     * 测试 seam(V43 T1 背压回归):连接端口 / 写判死超时 / 心跳间隔。
+     * 测试 seam:连接端口 / 写判死超时 / 心跳间隔。
      * 生产路径恒为伴生对象默认值;仅单测缩短看门狗窗口以秒级验证「阻塞写被解阻」。
      */
     internal var port = WireProtocol.PORT
     internal var writeTimeoutMs = WRITE_TIMEOUT_MS
     internal var heartbeatMs = HEARTBEAT_MS
 
-    /** watchdog 无锁读取判定「连接对象是否仍为 s」,故必须 volatile(V43 T1)。 */
+    /** watchdog 无锁读取判定「连接对象是否仍为 s」,故必须 volatile。 */
     @Volatile
     private var socket: Socket? = null
     private var writer: BufferedWriter? = null

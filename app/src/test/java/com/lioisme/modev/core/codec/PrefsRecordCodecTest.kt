@@ -10,7 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * PrefsRecordCodec 契约(V28):Gson 往返对称;值域 BytesView 往返;
+ * PrefsRecordCodec 契约:Gson 往返对称;值域 BytesView 往返;
  * 未知枚举/空包名/缺关键字段丢弃(与 BehaviorRecordCodec 同规)。
  */
 class PrefsRecordCodecTest {

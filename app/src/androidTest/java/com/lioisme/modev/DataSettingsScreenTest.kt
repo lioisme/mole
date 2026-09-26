@@ -37,9 +37,9 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 数据管理页验收(V19 T7;V40 T4 双维度;V41 T5 收敛):
+ * 数据管理页验收:
  * - 分类计数(可点 → 全局列表回调);
- * - 「按应用浏览」已退役(V41)——`data-app-*` 行与入口回调不复存在,
+ * - 「按应用浏览」已退役——`data-app-*` 行与入口回调不复存在,
  *   应用维度唯一入口 = 主界面应用列表;
  * - 按类型危险清理行退役(清理并入各记录列表),仅保留「清空全部」(确认/取消路径);
  * - 存储占用 = 与生产同源计算值。
@@ -109,7 +109,7 @@ class DataSettingsScreenTest {
         }
     }
 
-    /** 类型计数可点回调 + 按应用浏览退役红线(V41 T5)。 */
+    /** 类型计数可点回调 + 按应用浏览退役红线。 */
     @Test
     fun typeCounts_clickableRows_andAppBrowseRetired() {
         val robot = Robot()
@@ -184,7 +184,7 @@ class DataSettingsScreenTest {
         db.close()
     }
 
-    /** 真实容器壳:存储占用值与生产同源(V23 契约保留)。 */
+    /** 真实容器壳:存储占用值与生产同源。 */
     @Test
     fun storageValue_sameSourceAsProduction() {
         val container = (ctx.applicationContext as ModevApp).container

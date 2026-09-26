@@ -20,7 +20,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * MCP DTO 映射门禁(V38 D3):统一信封形态、NULL 语义(serializeNulls)、大字段截断守卫。
+ * MCP DTO 映射门禁:统一信封形态、NULL 语义(serializeNulls)、大字段截断守卫。
  */
 class McpDtosTest {
 

@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * 系统信息监听类别(V33):覆盖 Logcat/App 元数据/签名三大子域。
+ * 系统信息监听类别:覆盖 Logcat/App 元数据/签名三大子域。
  *
  * 默认启用态与 [CategoryTaxonomy] 噪点分级一致:
  * - 高信号默认开:APP_INFO/SIGNATURE;

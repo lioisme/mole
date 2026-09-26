@@ -15,7 +15,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * 画像编辑器的**新建 / 落库**通路回归(V47 WP-5)。
+ * 画像编辑器的**新建 / 落库**通路回归。
  *
  * 新建必须走草稿而不是「先落一行空画像」:`SpoofProfileService.create` 按契约拒绝零字段
  * 正文(库里的一行至少要装一个钩子,否则绑定它等于绑空气),所以旧形态的「填名字 → 建空档」

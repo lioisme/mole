@@ -12,7 +12,7 @@ import kotlin.random.Random
  *     `updateConfigFromState` 显式映射里,新增字段极易漏接一侧);
  *  2. 本类不认得 Compose、资源与 Android ⇒ 注入侧预览、宿主诊断页与单测可共用;
  *  3. 行序、分区、生效组预览全部向 [ProfileFieldCatalog] 与 [ProfileHookPlan] 委派,
- *     UI 里不再出现第二份字段清单(§2.1 四视图对账的「UI 表单视图」这一路由此可证)。
+ *     UI 里不再出现第二份字段清单(四视图对账(取值 / 校验 / 编辑 / 下发)的「UI 表单视图」这一路由此可证)。
  *
  * 不变式:[snapshot] **忠实反映输入,绝不静默改写**;是否可持久化由 [hasErrors] 决定,
  * 仓库层再原子拒绝一次([ProfileCodec.isValid]) —— 两道防线都不是唯一防线,
@@ -242,7 +242,7 @@ class ProfileEditorForm(
 }
 
 /**
- * 随机派生的**样本来源**契约(V47 T3):品牌机型与运营商样本从本接口取,
+ * 随机派生的**样本来源**契约:品牌机型与运营商样本从本接口取,
  * 不在表单里硬编码 —— 否则 WP-4 引入 `devices.json`/`carriers.json` 目录时
  * 会凭空多出第二份机型事实源。
  *

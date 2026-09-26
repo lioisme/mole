@@ -52,7 +52,7 @@ class SqlDatabaseHooker(
      * 这里**不按游标类名各挂一次**:`moveToFirst/moveToNext/move/close` 实际声明在
      * `AbstractCursor` 上,`DatabaseMethodRegistry.methods` 取到的就是同一个 Method 对象 ——
      * 按类名去重会对同一方法重复注册,而 Vector 2.2 上「同一方法的第二个 hook 静默不执行」
-     * (V38 实锤),重复注册等于把已有的钩子弄没。
+     * ,重复注册等于把已有的钩子弄没。
      */
     @Volatile
     private var cursorHooksInstalled: Boolean = false
@@ -397,7 +397,7 @@ class SqlDatabaseHooker(
     }
 
     /**
-     * 游标钩子的**惰性补装**(V50):注入期 `SQLiteCursor` 常尚未被加载(它要等第一次
+     * 游标钩子的**惰性补装**:注入期 `SQLiteCursor` 常尚未被加载(它要等第一次
      * 真正建游标才加载),所以「装一次失败就永久没有结果集采集」是死路 ——
      * 与 SSL 域 `installSslHooksFor` 同一病形。这里以**首次见到游标实例**为触发点:
      * `afterQuery` 已拿到 result,按实例真实类名补装(该类移动方法的声明类是 AbstractCursor,
@@ -497,7 +497,7 @@ class SqlDatabaseHooker(
     }
 
     /**
-     * `mCount` 私有字段句柄按类缓存(V44 T2.5):旧形态每次游标行数探测
+     * `mCount` 私有字段句柄按类缓存:旧形态每次游标行数探测
      * `getDeclaredField` + `setAccessible`(反射解析 + 权限检查),而该探测在
      * 查询注册与结果补发两处都调用。[com.lioisme.modev.hook.ClassValueCache] =
      * 每类一份、随类卸载回收(`null` 也缓存,缺失字段不反复付异常构造)。
@@ -525,7 +525,7 @@ class SqlDatabaseHooker(
     }
 
     /** ContentValues 同构序列化(键序稳定;值按原始类型分派——getAs* 归一化会误判,如
-     *  getAsBoolean("alice") 返回 false。原始值经 get() 直取,类型精确)。 */
+     *  getAsBoolean("alice") 返回 false。原始值经 get 直取,类型精确)。 */
     private fun contentValuesToBinds(cv: ContentValues?): List<SqlBindValue>? {
         if (cv == null) return null
         val keys = runCatching { cv.keySet().toList() }.getOrNull() ?: return null
@@ -535,8 +535,8 @@ class SqlDatabaseHooker(
             out.add(
                 when (raw) {
                     is ByteArray -> valueToBind(i + 1, raw)!!
-                    // 跨进程转换后 blob 为 ByteBuffer(可含 direct buffer,get() 的
-                    // array() 拷贝会抛异常;hasArray 兜底手工读入)
+                    // 跨进程转换后 blob 为 ByteBuffer(可含 direct buffer,get 的
+                    // array 拷贝会抛异常;hasArray 兜底手工读入)
                     is ByteBuffer -> {
                         val bytes =
                             if (raw.hasArray()) raw.array()

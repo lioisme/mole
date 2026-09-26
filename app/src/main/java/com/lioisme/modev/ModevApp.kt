@@ -125,7 +125,7 @@ class AppContainer(private val context: Context) {
         }
     }
 
-    /** 设备画像库(V47 T2):装配进设置仓库作展开源,变更即全量重推,首装补内置三档。 */
+    /** 设备画像库:装配进设置仓库作展开源,变更即全量重推,首装补内置三档。 */
     private val spoofProfileRepo: SpoofProfileRepository by lazy {
         SpoofProfileRepository(database.spoofProfileDao(), appScope).also { profiles ->
             settingsRepo.attachSpoofProfiles(profiles)
@@ -222,9 +222,9 @@ class AppContainer(private val context: Context) {
     }
 
     /**
-     * MCP 服务器(V38):Agent 一等公民能力面,与 wire ConfigServer 独立生命周期。
+     * MCP 服务器:Agent 一等公民能力面,与 wire ConfigServer 独立生命周期。
      * 工具面数量/名单唯一事实源 = [com.lioisme.modev.mcp.tools.McpTools.create]
-     * (冻结快照见 `McpToolParityTest`;消费方一律经 `McpServer.toolCount()` 派生,V45 T0.1 禁写死数字)。
+     * (冻结快照见 `McpToolParityTest`;消费方一律经 `McpServer.toolCount` 派生,V45 T0.1 禁写死数字)。
      * 自引用快照 lambda 在请求期才解析(server_status 消费),装配期无递归。
      * 工具装配入参一律取方法层出口属性(V45 T2.2:工具组不见实现类型)。
      */

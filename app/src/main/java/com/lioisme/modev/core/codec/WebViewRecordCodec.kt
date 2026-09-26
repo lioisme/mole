@@ -7,7 +7,7 @@ import com.lioisme.modev.core.model.WebViewOperation
 import com.lioisme.modev.core.model.WebViewRecord
 
 /**
- * WebViewRecord 载荷编解码器(V29 WebView 一等公民):v4 泛型信封下宿主侧以 [RECORD_TYPE]
+ * WebViewRecord 载荷编解码器:v4 泛型信封下宿主侧以 [RECORD_TYPE]
  * 分发到本编解码器,编码侧(注入)与解码侧(宿主)共用同一 Gson([Json.gson])
  * 保证双端形状一致。
  *

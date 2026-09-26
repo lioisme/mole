@@ -9,7 +9,7 @@ import kotlinx.coroutines.withTimeout
 import com.lioisme.modev.mcp.protocol.McpProtocol
 
 /**
- * 工具注册表(V38):工具清单 / schema 校验 / 分发 / 错误包装的唯一入口。
+ * 工具注册表:工具清单 / schema 校验 / 分发 / 错误包装的唯一入口。
  * - schema 校验:required 缺失或参数类型不符 → -32602(协议错误);
  * - 工具执行异常/超时 → `result.isError=true`(业务错误,分型不混淆);
  * - 未知工具 → -32602 + 消息(2025-06-18 对 tools/call 未知工具的推荐语义);

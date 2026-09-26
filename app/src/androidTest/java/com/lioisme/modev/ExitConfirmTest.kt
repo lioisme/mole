@@ -14,7 +14,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 根页双击返回退出验收(V39 R8):
+ * 根页双击返回退出验收:
  * 首次返回 → Snackbar「再按一次退出程序」且 Activity 存活;窗口(2s)内再按 → finish。
  *
  * 单用例设计:finish 会销毁 Activity 而进程因 MCP 常驻存活,若拆成多用例,

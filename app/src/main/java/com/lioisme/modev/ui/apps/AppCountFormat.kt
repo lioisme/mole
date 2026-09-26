@@ -18,7 +18,7 @@ import java.util.Locale
  */
 object AppCountFormat {
 
-    /** 万进位(10^4 组)语言集:zh/ja/ko 的 CJK 计数惯例(V42 T5)。 */
+    /** 万进位(10^4 组)语言集:zh/ja/ko 的 CJK 计数惯例。 */
     private val CJK_10_4_LANGUAGES = setOf("zh", "ja", "ko")
 
     /**

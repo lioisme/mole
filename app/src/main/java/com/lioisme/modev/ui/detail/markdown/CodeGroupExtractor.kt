@@ -49,7 +49,7 @@ class MarkdownFenceIndex(entries: List<FenceEntry>) {
     private val entries: List<FenceEntry> = entries
     val size: Int get() = entries.size
 
-    /** 偏移量→条目映射,locate() O(1) 查找(Long key 避免 Pair boxing)。 */
+    /** 偏移量→条目映射,locate O(1) 查找(Long key 避免 Pair boxing)。 */
     private val offsetMap: Map<Long, FenceEntry> =
         entries.associateBy {
             (it.node.startOffset.toLong() shl 32) or (it.node.endOffset.toLong() and 0xFFFFFFFFL)

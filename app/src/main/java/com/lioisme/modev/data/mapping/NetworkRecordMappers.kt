@@ -11,7 +11,7 @@ import com.lioisme.modev.domain.record.NetworkRow
 import com.lioisme.modev.domain.record.RowModel
 
 /**
- * 网络环境监听记录映射(V30 一等公民):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
+ * 网络环境监听记录映射:wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
  * 与 [WebViewRecordMappers]/[PrefsRecordMappers] 同构;枚举严格解析(未知返回 null,绝不误标)。
  *
  * 列复用(ADR-1 单表):algorithm=kind.name;path=url;command=method;

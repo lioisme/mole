@@ -16,7 +16,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * 统一外部访问迁移契约(V41 T2,D-1,Robolectric):
+ * 统一外部访问迁移契约:
  * - `SERVER_EXTERNAL_ACCESS` 为唯一事实源(wire + MCP 双服务消费);
  * - V38 遗留 `mcp_external_access` 读后 OR 合并进统一键并**删除旧键**(幂等);
  * - 迁移重放:合并结果跨仓库实例持久;统一开关写路径不触碰令牌/认证态。

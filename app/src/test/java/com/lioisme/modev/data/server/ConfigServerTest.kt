@@ -42,7 +42,7 @@ class ConfigServerTest {
     }
 
     private fun connect(): Pair<Socket, BufferedReader> {
-        // start() 异步绑定:轮询直到服务就绪(最多 3s)
+        // start 异步绑定:轮询直到服务就绪(最多 3s)
         var lastError: Throwable? = null
         val deadline = System.currentTimeMillis() + 3000
         while (System.currentTimeMillis() < deadline) {

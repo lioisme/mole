@@ -16,7 +16,7 @@ import com.lioisme.modev.hook.ProbeContext
  * - Window.addFlags(flags):入参清除 FLAG_SECURE 位
  * - Window.clearFlags(flags):若 FLAG_SECURE 已被本模块清除,抑制冗余清除调用
  *
- * 干预机制(D-11 根因):此前版本在 before() 反射清 mFlags,但原方法随即
+ * 干预机制(D-11 根因):此前版本在 before 反射清 mFlags,但原方法随即
  * `mFlags |= flags` 把位设回 → 绕过无效;且 getDeclaredField 在 PhoneWindow 上
  * 找不到声明于父类 Window 的 mFlags。现改为改写实参,原方法正常执行但位已被剔除。
  */

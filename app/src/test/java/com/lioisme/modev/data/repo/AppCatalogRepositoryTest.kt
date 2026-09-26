@@ -28,7 +28,7 @@ import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
 
 /**
- * AppCatalogRepository 契约(V16 R4 性能整改):
+ * AppCatalogRepository 契约:
  * 全量/系统标记/label 兜底/加载态(loading 时序)/启动入口按需惰性解析 + 缓存;
  * enabled / 逐包 launchable 字段已移除(getInstalledApplications(0) 恒为 enabled 应用,
  * 启动入口改按需单次解析,列表扫描零 binder 往返)。

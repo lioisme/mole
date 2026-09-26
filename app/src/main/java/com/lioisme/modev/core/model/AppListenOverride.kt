@@ -68,7 +68,7 @@ data class AppListenOverride(
     /** 弹窗关键字清单偏差(V33;null = 取默认,非空整表替换)。 */
     val dialogKeywords: List<String>? = null,
     // ---- V37 T1.2 功能域数据偏差 ----
-    /** 伪装画像档位偏差(V47 T2 起 = 画像库主键;null = 取默认,"" = 显式不伪装)。 */
+    /** 伪装画像档位偏差( = 画像库主键;null = 取默认,"" = 显式不伪装)。 */
     val spoofProfileId: String? = null,
     /**
      * 画像字段覆写偏差(**只读遗留通道**,见 [FeatureConfig.spoofOverrides] 与
@@ -76,7 +76,7 @@ data class AppListenOverride(
      */
     val spoofOverrides: Map<String, String>? = null,
     /**
-     * **每应用逐项画像定制**(V49 R-2):所绑画像的字段级稀疏覆写。
+     * **每应用逐项画像定制**:所绑画像的字段级稀疏覆写。
      *
      * 键 = [ProfileFieldCatalog.jsonKeyOf](与画像正文同一套键,不是遗留 `build.MODEL` 语法),
      * 值 = 该字段的编辑态字符串;**空串/缺省哨兵值 = 显式清掉画像里这一项**(覆写语义必须能
@@ -364,12 +364,12 @@ data class AppListenOverride(
             return entries.ifEmpty { null }
         }
 
-        /** 单值字符串偏差解析(V37 画像档位):仅接受字符串原样;缺失/空串 → 取默认。 */
+        /** 单值字符串偏差解析:仅接受字符串原样;缺失/空串 → 取默认。 */
         private fun stringOf(obj: JsonObject, field: String): String? =
             obj.get(field)?.takeIf { it.isJsonPrimitive && it.asJsonPrimitive.isString }
                 ?.asString?.takeIf { it.isNotEmpty() }
 
-        /** 字符串映射偏差解析(V37 画像覆写):仅接受字符串→字符串对象;缺失/空对象 → 取默认。 */
+        /** 字符串映射偏差解析:仅接受字符串→字符串对象;缺失/空对象 → 取默认。 */
         private fun stringMapOf(obj: JsonObject, field: String): Map<String, String>? {
             val map = obj.get(field)?.takeIf { it.isJsonObject }?.asJsonObject ?: return null
             if (map.entrySet().isEmpty()) return null
@@ -382,7 +382,7 @@ data class AppListenOverride(
                 .ifEmpty { null }
         }
 
-        /** 整型清单偏差解析(V37 Frida 端口追加):仅接受数值数组;缺失/空表 → 取默认。 */
+        /** 整型清单偏差解析:仅接受数值数组;缺失/空表 → 取默认。 */
         private fun intListOf(obj: JsonObject, field: String): List<Int>? {
             val array = obj.get(field)?.takeIf { it.isJsonArray } ?: return null
             val entries = array.asJsonArray

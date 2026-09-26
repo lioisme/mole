@@ -87,7 +87,7 @@ class GlobalTypeRecordsTest {
                     record(victimPackage, "CIPHER", "DES", "ENCRYPT", now - 30_000),
                 ),
             )
-            // 本例先 clearAll() 且种子跨两包(全局列表聚合语境)⇒ 不变量 = 「全表恰为我种的这些行」,
+            // 本例先 clearAll 且种子跨两包(全局列表聚合语境)⇒ 不变量 = 「全表恰为我种的这些行」,
             // 计数必须按全局口径(仅 clearPackage 的用例才按包scoped)。
             val seeded = dao.countByQuery(RecordQueryFactory.count(RecordFilter())).first()
             assertEquals("种子写入须在读回中可见", 2L, seeded)

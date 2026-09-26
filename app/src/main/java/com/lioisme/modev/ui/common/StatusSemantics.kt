@@ -6,7 +6,7 @@ import com.lioisme.modev.domain.scope.ScopeState
 import com.lioisme.modev.ui.theme.StatusKind
 
 /**
- * 状态语义投影(V23 R4 消重):连接态/作用域态 → [StatusKind] + 文案资源的
+ * 状态语义投影:连接态/作用域态 → [StatusKind] + 文案资源的
  * 分派唯一事实源。此前该映射在 AppsScreen 行内与 AppMonitorScreen 头部各写一份,
  * 语义漂移风险高;文案资源仍由渲染处 stringResource 解析(domain 零硬编码契约不变)。
  */

@@ -8,10 +8,10 @@ import com.lioisme.modev.hook.ProbeContext
 import java.io.IOException
 
 /**
- * Root 命令执行干预 Hooker(V31,V34 审计修复):拦截 Runtime.exec(String[]) 和 ProcessBuilder.start(),
+ * Root 命令执行干预 Hooker(V31,V34 审计修复):拦截 Runtime.exec(String[]) 和 ProcessBuilder.start,
  * 当命令包含 su 时阻止执行,防止应用通过命令执行检测 root。
  *
- * 干预机制(V43 T3):before() 中经 setThrowable(IOException) 以契约内异常拦截 su/getenforce/
+ * 干预机制:before 中经 setThrowable(IOException) 以契约内异常拦截 su/getenforce/
  * setenforce/getprop/which su 等命令执行——Runtime.exec 与 ProcessBuilder.start 的失败契约
  * 本就是 IOException,宿主既有 catch 分支正常消化(V2.5:旧 setResult(null) 致 waitFor NPE)。
  * 干预结果通过 [DeviceEnvRecord.interventionAction] 记录("BLOCKED"|"DETECTED"|null)。
@@ -164,7 +164,7 @@ class RootExecHooker(
             )
         }
         // V43 T3 契约忠实化(V2.5):exec 失败契约 = IOException(宿主 catch 分支);
-        // 旧 setResult(null) 令宿主 `.waitFor()`/流读取直接 NPE = 模块引入的宿主崩溃
+        // 旧 setResult(null) 令宿主 `.waitFor`/流读取直接 NPE = 模块引入的宿主崩溃
         invocation.setThrowable(IOException("Command blocked by Modev: $pattern"))
     }
 

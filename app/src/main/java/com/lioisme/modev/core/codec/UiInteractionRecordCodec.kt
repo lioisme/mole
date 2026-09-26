@@ -7,7 +7,7 @@ import com.lioisme.modev.core.model.UiInteractionOperation
 import com.lioisme.modev.core.model.UiInteractionRecord
 
 /**
- * UiInteractionRecord 载荷编解码器(V33 UI 交互监听):v4 泛型信封下宿主侧以 [RECORD_TYPE]
+ * UiInteractionRecord 载荷编解码器:v4 泛型信封下宿主侧以 [RECORD_TYPE]
  * 分发到本编解码器,编码侧(注入)与解码侧(宿主)共用同一 Gson([Json.gson])。
  *
  * 解码校验与 [BehaviorRecordCodec] 同规:kind/operation 缺失或未知、

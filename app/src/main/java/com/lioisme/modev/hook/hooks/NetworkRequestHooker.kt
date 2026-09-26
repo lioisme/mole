@@ -10,7 +10,7 @@ import com.lioisme.modev.hook.ProbeContext
  * 网络请求监控 Hooker(V30;V36 D-8/D-9 重写):捕获 HTTP 请求/响应元数据。
  *
  * 设计原则:
- * - OkHttp newCall():D-9 修复 —— 安装期 okhttp3 类尚未加载(应用侧类加载器),
+ * - OkHttp newCall:D-9 修复 —— 安装期 okhttp3 类尚未加载(应用侧类加载器),
  *   直接 Class.forName 必失败静默零安装;改为 loadClass 监视器,目标类首次加载时
  *   惰性安装(幂等);
  * - HttpURLConnection:D-8 修复 —— 抽象类的 getInputStream/getOutputStream 无方法体,

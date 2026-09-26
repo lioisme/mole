@@ -61,7 +61,7 @@ class MethodFinderTest {
 
     @Test
     fun inherited_method_is_not_resolved_on_the_declaring_class() {
-        // `wait()` 声明在 Object 而非 String ⇒ getDeclaredMethod 语义下必须为 null。
+        // `wait` 声明在 Object 而非 String ⇒ getDeclaredMethod 语义下必须为 null。
         // 生产契约:钩子必须挂在**真实声明类**上(挂子类会静默不触发)。
         assertNull(MethodFinder.find("java.lang.String", "wait"))
     }

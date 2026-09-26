@@ -9,11 +9,11 @@ import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.RecordSink
 
 /**
- * 进程控制 Hooker 基类(V33):统一开关判断(master + kind 双门控)、栈 denylist、
+ * 进程控制 Hooker 基类:统一开关判断(master + kind 双门控)、栈 denylist、
  * 会话节流与记录组装;子类拦截逻辑均在 engine PROTECTIVE 模式下执行,异常不影响宿主。
  *
  * V34 审计后:emit/emitUrgent 记录事件到 [RecordSink],不直接执行干预。
- * 干预行为由子类在 before()/after() 中通过 [Invocation.setResult] 实现,
+ * 干预行为由子类在 before/after 中通过 [Invocation.setResult] 实现,
  * 干预结果通过 [interventionAction] 参数传递给记录("BLOCKED"|"DETECTED"|null)。
  */
 abstract class ProcessControlBaseHooker(
@@ -27,7 +27,7 @@ abstract class ProcessControlBaseHooker(
     private val throttle = SessionThrottle()
 
     /**
-     * 目标进程名(V44 T2.6):经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
+     * 目标进程名:经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
      * 旧形态每个 Hooker 基类各自 `by lazy` 读一次 `/proc/self/cmdline`,冷启动期
      * 约 50 个实例 = 50 次文件读 + 字节解码,而进程身份在进程内恒定不变。
      */

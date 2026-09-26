@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.first
 /**
  * 记录组工具(V38,14 个):查询/统计/详情/邻接/写路径/清理/存储。
  * 全部仅经 [RecordService] 上游(与 UI ViewModels 同源,R4/D5)。
- * 写入面载荷 = 类型化记录族 [MonitoredRecord](V45 T2.5):与 `record_get` 输出的
+ * 写入面载荷 = 类型化记录族 [MonitoredRecord]:与 `record_get` 输出的
  * `record` 对象同形,故「读 → 改 → 写回」闭环成立(旧平铺列名形态与读侧不同形,
  * 往返必失真)。
  */
@@ -317,7 +317,7 @@ class RecordTools(private val logs: RecordService) {
 
 // ---- schema 构建助手(全部工具共享;放在本文件便于同包复用) ----
 
-/** 工具构建快捷器:schema 由 [buildSchema] 惰性产出。 */
+/** 工具构建快捷器:schema 由构造期传入的 schema 构建器即时产出。 */
 internal fun schemaTool(
     name: String,
     description: String,
@@ -456,7 +456,7 @@ internal fun SchemaBuilder.recordObject(name: String, desc: String) {
 internal fun emptySchema(): SchemaBuilder.() -> Unit = {}
 
 /**
- * 过滤参数面(V45 T3.2):与 [RecordTools] 的 `parseFilter` 逐参数镜像——
+ * 过滤参数面:与 [RecordTools] 的 `parseFilter` 逐参数镜像——
  * 这里声明的每一项都真被读,`parseFilter` 读的每一项都在这里声明
  * (注册表 `additionalProperties=false` ⇒ 未声明键 = -32602,不存在「静默忽略」)。
  */
@@ -472,7 +472,7 @@ internal fun SchemaBuilder.filterProperties() {
 }
 
 /**
- * 写入载荷面(V45 T3.2):键集与类型全部由 [RecordPayloadSchema] 从模型族派生,
+ * 写入载荷面:键集与类型全部由 [RecordPayloadSchema] 从模型族派生,
  * 注释性说明走 [FIELD_NOTES](说明**不能**扩键集——镜像对账测试会红)。
  */
 internal fun SchemaBuilder.payloadProperties() {
@@ -486,7 +486,7 @@ internal const val SORT_DESC = "desc"
 internal const val SORT_ASC = "asc"
 
 /**
- * 写入面**任何**记录类型都必须给的键(V45 T3.2)。
+ * 写入面**任何**记录类型都必须给的键。
  * schema `required` 与 handler 缺值检查共用本表 —— 声明面要求什么,生效面就要求什么。
  */
 internal val WRITE_REQUIRED_COMMON = listOf("recordType", "packageName", "kind", "operation", "threadName")
@@ -504,7 +504,7 @@ internal val WRITE_REQUIRED_BY_TYPE: Map<RecordType, List<String>> = mapOf(
 )
 
 /**
- * 载荷键的补充说明(V45 T3.2):只解释语义,**不**承载键集真值(键集派生自模型族)。
+ * 载荷键的补充说明:只解释语义,**不**承载键集真值(键集派生自模型族)。
  * `McpToolsTest.field_notes_never_advertise_unknown_keys` 断言本表每个键都存在于
  * 派生键集 —— 模型改名而说明未同步即红(旧手抄表的「contentHex/prefKey 之类的虚构键」
  * 由此不可能再现)。

@@ -62,7 +62,7 @@ class LoadClassWatcher(
                 ClassLoader::class.java.getMethod("loadClass", String::class.java)
             }.getOrNull()
             if (loadClass != null) {
-                // 干预型注册(V43 T3):订阅者可经 Invocation.setThrowable 把 CNFE 抵达调用方
+                // 干预型注册:订阅者可经 Invocation.setThrowable 把 CNFE 抵达调用方
                 engine.hookThrowing(loadClass, object : MethodHook() {
                     override fun before(invocation: Invocation) {
                         val name = invocation.getArg(0) as? String ?: return

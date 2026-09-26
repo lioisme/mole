@@ -29,13 +29,13 @@ import org.robolectric.shadows.ShadowLooper
  * RecordsViewModel 契约(V24 G2 收敛:预设语境必选,全局页退役):
  * - 类型/包名锁定(单应用两列表页);
  * - 查询词过滤 + 类别过滤生效(D6 由预设类型唯一性天然满足);
- * - 计数副标口径(V44 D1)= `RecordService.count`(SQL COUNT),与筛选条件同步收敛。
+ * - 计数副标口径= `RecordService.count`(SQL COUNT),与筛选条件同步收敛。
  * 内存 Room + 真实 LogRepository + 真实 PagingSource,数据流与生产一致。
  *
  * 协程纪律(同 [com.lioisme.modev.ui.apps.AppsViewModelTest]):`totalCount` 为
- * `stateIn(WhileSubscribed)` 的 Main 域 StateFlow,**不得**用 `runBlocking { …first() }`
+ * `stateIn(WhileSubscribed)` 的 Main 域 StateFlow,**不得**用 `runBlocking { …first }`
  * 读取——runBlocking 占住主线程会让 Main 派发的上游永不推进(实测死锁)。
- * 正解 = 独立收集器激活上游 + `ShadowLooper.idleMainLooper()` 泵动 + 读 `.value`。
+ * 正解 = 独立收集器激活上游 + `ShadowLooper.idleMainLooper` 泵动 + 读 `.value`。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])

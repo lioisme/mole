@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 二态偏差解析契约(V24):
+ * 二态偏差解析契约:
  * - null/零偏差零拷贝回传默认配置;
  * - 总开关与类别显式位强制生效,未定制位取默认值;
  * - 未知 kind 忽略(存储漂移兜底);master OFF 抑制一切算法捕获;
@@ -135,7 +135,7 @@ class EffectiveSwitchTest {
         assertTrue(effective.anyDbEnabled)
     }
 
-    /** 全类别不变量(V44 限定键):全部 (type,id) 对按各自默认值取反定制后,解析回读 == 显式偏差。 */
+    /** 全类别不变量:全部 (type,id) 对按各自默认值取反定制后,解析回读 == 显式偏差。 */
     @Test
     fun `readKind invariant holds for every taxonomy kind`() {
         val flipped = CategoryTaxonomy.all().associate {

@@ -110,7 +110,7 @@ class RecordCoreConsistencyTest {
 
     @Test
     fun `observe honors sort on the streaming path (no silent ignore)`() = runBlocking {
-        // V44 Q1 语义锁:observe() 按 filter.sort 选择投影源(ASC 走升序投影变体)。
+        // V44 Q1 语义锁:observe 按 filter.sort 选择投影源(ASC 走升序投影变体)。
         // 切片路径:全量集合方向一致性(同一 WHERE_FILTER,投影同源)双向对账;
         // 流式路径:observe 两个方向都必须可物化(旧形态恒走 DESC 分支,ASC 分支
         // 从未被执行 = sort 静默失效);ASC 分支所依赖的升序 PagingSource 单独

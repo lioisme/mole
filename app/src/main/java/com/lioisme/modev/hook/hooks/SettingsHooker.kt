@@ -8,7 +8,7 @@ import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
- * Settings Global/Secure 拦截 Hooker(V35 momo 增强):
+ * Settings Global/Secure 拦截 Hooker:
  * 拦截 Settings.Global.getInt / Settings.Secure.getInt / ContentResolver.query,
  * 隐藏开发者选项、USB 调试、OEM 解锁等检测信号。
  *

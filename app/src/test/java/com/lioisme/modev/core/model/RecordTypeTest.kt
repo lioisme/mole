@@ -5,7 +5,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * RecordType 领域枚举契约(V17 R2):
+ * RecordType 领域枚举契约:
  * fromWire 已知/未知;wire 与 RecordTypes 字符串常量库单源一致。
  */
 class RecordTypeTest {

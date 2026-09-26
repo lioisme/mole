@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.update
  *   (所有接口,支持同网段外部工具接入;风险提示与开关默认停用见诊断页);
  * - 接受注入进程 TCP 连接,握手后登记 (socket → 包名);
  * - 接收 [WireProtocol.TYPE_RECORD] 并回调 [onRecord];
- * - 配置下发(V23 per-session):握手与广播时按会话包名 resolve 有效配置推送;
+ * - 配置下发:握手与广播时按会话包名 resolve 有效配置推送;
  * - 心跳应答、断连清理、优雅停止([close])与受管重启([restart]);
  * - 注入侧恒连本机回环(hook/ConfigChannel),不受 externalAccess 影响。
  */
@@ -37,13 +37,13 @@ class ConfigServer(
     port: Int = WireProtocol.PORT,
 ) : Closeable, ConnectionMonitor {
 
-    /** 当前监听端口(V29:可动态修改,`restart()` 后生效)。 */
+    /** 当前监听端口(V29:可动态修改,`restart` 后生效)。 */
     @Volatile
     var port: Int = port
         internal set
 
     /**
-     * 外部访问开关(V26):false(默认)= 绑定 127.0.0.1;true = 绑定 0.0.0.0。
+     * 外部访问开关:false(默认)= 绑定 127.0.0.1;true = 绑定 0.0.0.0。
      * volatile:accept 线程每次 bind 尝试读取最新值(退避重试路径天然自适应),
      * 显式 [restart] 提供立即生效语义。偏好持久化在 SettingsRepository(宿主本地)。
      */
@@ -98,7 +98,7 @@ class ConfigServer(
     }
 
     /**
-     * 按包解析有效配置(V23):宿主侧接线 [com.lioisme.modev.data.repo.SettingsRepository.effectiveSwitch]
+     * 按包解析有效配置:宿主侧接线 [com.lioisme.modev.data.repo.SettingsRepository.effectiveSwitch]
      * (全局 ⊕ 单应用三态覆盖)。为 null(未装配)表示不推送,注入侧继续使用内存默认值。
      * 取代 V10 的全局 `configProvider`:每会话按其包名独立取数,协议与注入侧零感知覆盖模型。
      */
@@ -154,7 +154,7 @@ class ConfigServer(
                 runCatching { ss.close() }
             } catch (t: Throwable) {
                 if (!isCurrentEpoch(myEpoch)) break
-                // 端口 bind 失败:指数退避重试(2s→30s);失败原因置观测面(V42 T3)。
+                // 端口 bind 失败:指数退避重试(2s→30s);失败原因置观测面。
                 _bindError.value = t.message ?: t.javaClass.simpleName
                 android.util.Log.w("Modev", "config server bind failed, retry in ${bindRetryMs}ms: $t")
                 try {

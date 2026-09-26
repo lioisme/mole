@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * Activity 转场与 Intent 录制 Hooker(V33):hook Activity.startActivity(Intent)
+ * Activity 转场与 Intent 录制 Hooker:hook Activity.startActivity(Intent)
  * 和 Activity.onCreate(Bundle?),捕获 intent action/data/flags/extras 与目标 Activity 类名。
  */
 class ActivityTransitionHooker(
@@ -73,11 +73,11 @@ class ActivityTransitionHooker(
     }
 
     /**
-     * Activity 生命周期观测(V50 孤儿整改):原 `hookOnCreate` 只挂 onCreate 却以
+     * Activity 生命周期观测:原 `hookOnCreate` 只挂 onCreate 却以
      * `ACTIVITY_RESUME`(kind 名 = 「Activity 恢复」)发射 ⇒ kind 名实相反,且枚举里
      * `ACTIVITY_ON_RESUME`/`ON_PAUSE`/`ON_STOP`/`ON_DESTROY`/`FINISH` 恒零发射
      * (四语标签与筛选菜单都有,选中即恒空)。`BehaviorMethodRegistry` 枚举
-     * `methods ∪ 父类链 declaredMethods`(V36 D-13),故 protected 生命周期可得。
+     * `methods ∪ 父类链 declaredMethods`,故 protected 生命周期可得。
      */
     private fun hookLifecycle() {
         val targets = mapOf(

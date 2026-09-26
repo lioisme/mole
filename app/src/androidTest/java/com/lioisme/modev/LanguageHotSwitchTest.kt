@@ -82,7 +82,7 @@ class LanguageHotSwitchTest {
             rule.onNodeWithText("General").assertIsDisplayed()
 
             // 导航栈保留:返回仍落应用列表(筛选按钮唯一)。切换后 UI 已是英文,
-            // 测试侧 str() 经未包装的 Application 上下文仍解析中文——此处须用
+            // 测试侧 str 经未包装的 Application 上下文仍解析中文——此处须用
             // 英文字面量断言(与上方 "Settings" 同风格,2026-08-17 V9.1 修正)。
             InstrumentationRegistry.getInstrumentation().sendKeyDownUpSync(android.view.KeyEvent.KEYCODE_BACK)
             rule.waitForIdle()

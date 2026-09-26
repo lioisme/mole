@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.ProbeContext
 import java.io.File
 
 /**
- * 文件流 Hooker(V27):FileInputStream / FileOutputStream 构造器(全部公开重载)。
+ * 文件流 Hooker:FileInputStream / FileOutputStream 构造器(全部公开重载)。
  * FileReader/FileWriter 经 libcore 内部委托到流构造器被自然覆盖,不重复挂。
  *
  * 被动红线:仅记录路径与 append 标记,绝不触碰句柄读内容(内容预览由

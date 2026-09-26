@@ -11,7 +11,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * 画像强制档 · android_id / 电话标识 / SIM 三族的行为回归(V49 WP-D3)。
+ * 画像强制档 · android_id / 电话标识 / SIM 三族的行为回归。
  *
  * 除了「填了改、没填不改、关闸不改」这两层,D3 特别钉三件事:
  *  1. **每个钩点都解析得到真实平台方法**(`unresolvedHookPoints` 恒空)——

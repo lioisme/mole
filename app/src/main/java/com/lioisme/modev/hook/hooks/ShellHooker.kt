@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.ProbeContext
 import java.io.File
 
 /**
- * Shell 命令 Hooker(V27):Runtime.exec 全部重载 + ProcessBuilder.start。
+ * Shell 命令 Hooker:Runtime.exec 全部重载 + ProcessBuilder.start。
  * 记录 argv 全量与工作目录/环境差异标记;进程输出流不触碰(被动红线),
  * exitCode/stdout 捕获列为二期。
  */

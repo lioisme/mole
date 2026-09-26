@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 
 /**
  * 记录读写服务(单一门面,V22):所有查询 / 增 / 删 / 改 / 统计经本接口暴露,DAO 不对外暴露。
- * 前端(ViewModel)与 MCP(V38)均仅依赖本接口 + [RecordFilter] + [CategoryTaxonomy],
+ * 前端(ViewModel)与 MCP均仅依赖本接口 + [RecordFilter] + [CategoryTaxonomy],
  * 禁止直触 DAO / 实体(V38 D1:写入面纯 Kotlin,V45 T2.5 起直接用类型化模型族
  * [com.lioisme.modev.core.model.MonitoredRecord],domain 零 data.db 依赖)。
  *

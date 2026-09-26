@@ -24,7 +24,7 @@ class MessageDigestHooker(
     context: ProbeContext,
 ) : BaseHooker(context, CryptoKind.MESSAGE_DIGEST) {
 
-    /** UPDATE 记录节流(V43 T3,V2.10):大文件按块 update 风暴,同实例 1s 窗口一条。 */
+    /** UPDATE 记录节流:大文件按块 update 风暴,同实例 1s 窗口一条。 */
     private val updateThrottle = SessionThrottle()
 
     override fun install() {

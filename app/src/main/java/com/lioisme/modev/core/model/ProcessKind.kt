@@ -1,16 +1,16 @@
 package com.lioisme.modev.core.model
 
 /**
- * 进程控制监听类别(V33):覆盖退出检测/崩溃检测/录屏检测三大子域。
+ * 进程控制监听类别:覆盖退出检测/崩溃检测/录屏检测三大子域。
  *
  * 默认启用态与 [CategoryTaxonomy] 噪点分级一致:
  * - 全部默认关(干预型 hook,安全优先,需用户显式开启)。
  *
  * 注意:各子类 Hooker 的实际行为在 V34 审计后分为两类:
  * - 真正干预型:ExitInterceptHooker/CrashPreventHooker/ScreenRecordHooker
- *   在 before() 中调用 setResult() 阻止原始方法执行,阻止信息通过
+ *   在 before 中调用 setResult 阻止原始方法执行,阻止信息通过
  *   [ProcessRecord.interventionAction] 字段记录("BLOCKED"|"DETECTED")。
- * - 纯监控型:仅在 after() 中记录事件,不修改返回值。
+ * - 纯监控型:仅在 after 中记录事件,不修改返回值。
  */
 enum class ProcessKind {
     // ---- 退出检测/拦截 ----

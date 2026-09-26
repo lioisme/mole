@@ -3,7 +3,7 @@ package com.lioisme.modev.ui.settings
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** 存储占用格式化(V19 T7):档位阈值与小数精度。 */
+/** 存储占用格式化:档位阈值与小数精度。 */
 class StorageFormatTest {
 
     @Test

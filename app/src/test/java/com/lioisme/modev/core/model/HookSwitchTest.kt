@@ -261,14 +261,14 @@ class HookSwitchTest {
         assertFalse(dbOff.dbEnabled(SqlKind.QUERY))
         assertTrue(dbOff.enabled(CryptoKind.CIPHER))
         assertTrue(dbOff.anyCryptoEnabled)
-        // 行为总开关关:全部行为类别停用,算法/数据库不受影响(V27)。
+        // 行为总开关关:全部行为类别停用,算法/数据库不受影响。
         val behaviorOff = HookSwitch(behaviorListen = false)
         assertFalse(behaviorOff.anyBehaviorEnabled)
         assertFalse(behaviorOff.behaviorEnabled(BehaviorKind.SHELL_EXEC))
         assertTrue(behaviorOff.enabled(CryptoKind.CIPHER))
         assertTrue(behaviorOff.anyCryptoEnabled)
         assertTrue(behaviorOff.anyDbEnabled)
-        // 偏好总开关关:全部偏好类别停用,其余域不受影响(V28)。
+        // 偏好总开关关:全部偏好类别停用,其余域不受影响。
         val prefsOff = HookSwitch(prefsListen = false)
         assertFalse(prefsOff.anyPrefsEnabled)
         assertFalse(prefsOff.prefsEnabled(PrefsKind.OPEN))
@@ -276,19 +276,19 @@ class HookSwitchTest {
         assertTrue(prefsOff.anyCryptoEnabled)
         assertTrue(prefsOff.anyDbEnabled)
         assertTrue(prefsOff.anyBehaviorEnabled)
-        // UI 总开关关:全部 UI 交互类别停用,其余域不受影响(V33)。
+        // UI 总开关关:全部 UI 交互类别停用,其余域不受影响。
         val uiOff = HookSwitch(uiListen = false)
         assertFalse(uiOff.anyUiEnabled)
         assertFalse(uiOff.uiInteractionEnabled(UiInteractionKind.DIALOG_SHOW))
         assertTrue(uiOff.enabled(CryptoKind.CIPHER))
         assertTrue(uiOff.anyCryptoEnabled)
         assertTrue(uiOff.anyDbEnabled)
-        // 系统总开关关:全部系统类别停用,其余域不受影响(V33)。
+        // 系统总开关关:全部系统类别停用,其余域不受影响。
         val systemOff = HookSwitch(systemListen = false)
         assertFalse(systemOff.anySystemEnabled)
         assertFalse(systemOff.systemEnabled(SystemKind.LOGCAT))
         assertTrue(systemOff.enabled(CryptoKind.CIPHER))
-        // 进程控制总开关关:全部进程控制类别停用,其余域不受影响(V33)。
+        // 进程控制总开关关:全部进程控制类别停用,其余域不受影响。
         val processOff = HookSwitch(processControlListen = false)
         assertFalse(processOff.anyProcessControlEnabled)
         assertFalse(processOff.processControlEnabled(ProcessKind.EXIT_INTERCEPT))

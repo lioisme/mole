@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 /**
- * 目录(TOC)导航行(V28):
+ * 目录(TOC)导航行:
  *
  * 定位决策(D2.1):目录条目是**导航控件**而非信息区块——Appbar 下的信息内容
  * 100% 由 markdown 承载;目录行以原生可点击 Text 承载(标签 = 与区块标题同源

@@ -8,7 +8,7 @@ import com.lioisme.modev.hook.ProbeContext
 import java.security.MessageDigest
 
 /**
- * 签名读取监控 Hooker(V33):hook PackageManager.getPackageInfo(String, int),
+ * 签名读取监控 Hooker:hook PackageManager.getPackageInfo(String, int),
  * 检测 GET_SIGNATURES(0x40)/GET_SIGNING_CERTIFICATES(0x8000000) 标记,
  * 记录签名哈希(SHA-256)与 Base64 片段。
  */

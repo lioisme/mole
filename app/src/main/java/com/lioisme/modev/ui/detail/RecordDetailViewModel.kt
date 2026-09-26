@@ -18,7 +18,7 @@ import kotlinx.coroutines.launch
  * V44 Q6:依赖收敛 RecordService 接口——与 MCP record_get/record_neighbor 同一契约面):
  * 按 id 订阅单条记录;邻接导航仅查询邻居 id(投影),不再物化邻居大字段。
  * 三态契约由单一 [DetailUiState] 承载:loaded 仅在首次真实查询结果到达后置 true;
- * Failed(loaded && record == null)提供 retry()。
+ * Failed(loaded && record == null)提供 retry。
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class RecordDetailViewModel(

@@ -6,7 +6,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 画像标准取值集回归(V48 R-3):钉的是三张表**自身的一致性**,以及
+ * 画像标准取值集回归:钉的是三张表**自身的一致性**,以及
  * release↔SDK 这一对**必须成对可查**的事实 —— 选 Android 14 却写 API 31 的画像,
  * 靶程序读到的是一台从不存在的设备,那本身就是一枚检测点。
  */

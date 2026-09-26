@@ -6,7 +6,7 @@ import java.util.WeakHashMap
 /**
  * 条带化弱键映射(V44 T2.5,审计 P10):
  *
- * 旧形态 `Collections.synchronizedMap(WeakHashMap())` 是**全局单锁**——算法/数据库
+ * 旧形态 `Collections.synchronizedMap(WeakHashMap)` 是**全局单锁**——算法/数据库
  * hook 事件在多线程(宿主线程池)下被串行化:MessageDigest 每次 update 两次加锁、
  * SQL 五张表全事件共用一把锁,高并发加解密/数据库场景直接成为宿主瓶颈。
  *

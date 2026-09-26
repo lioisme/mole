@@ -99,7 +99,7 @@ fun ComposeTestRule.openServices(
 
 /**
  * 有界等待「全屏搜索 Dialog 内的输入域」出现。
- * Dialog 是**新窗口**,单次 `waitForIdle()` 不保证该窗口的首帧已组合(模拟器高负载下
+ * Dialog 是**新窗口**,单次 `waitForIdle` 不保证该窗口的首帧已组合(模拟器高负载下
  * 尤其如此),旧写法的「点折叠条 → waitForIdle → onNode(SetText && isDialog)」因此在
  * 负载 6+ 的机器上随机红。超时消息同时排除「展开意图被 V42 槽按压宽限窗抑制」这一说:
  * 若意图被抑制,Dialog 恒不出现,消息即定位到那一步。
@@ -118,7 +118,7 @@ fun ComposeTestRule.awaitSearchDialogInput(note: String, timeoutMs: Long = 8_000
 /**
  * 有界等待锚点**消失**(弹层收起、行被删、错误态清除这类「负向」结论)。
  *
- * 为什么不能写成 `assert(isEmpty())` 一次判定:退场动画与提交回调是同一串
+ * 为什么不能写成 `assert(isEmpty)` 一次判定:退场动画与提交回调是同一串
  * (`ModevSheet.dismissWith` 恒在 hide 之后才跑),单次 `waitForIdle` 后节点
  * 仍可能在树上 —— 那时判定的是动画,不是行为。真崩的形态由超时消息给出。
  */

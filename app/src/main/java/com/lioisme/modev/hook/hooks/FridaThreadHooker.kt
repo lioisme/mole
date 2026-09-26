@@ -7,8 +7,8 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * Frida 线程名清理 Hooker(V35 momo 增强):
- * 拦截 Thread.getName() / Thread.currentThread().getName(),
+ * Frida 线程名清理 Hooker:
+ * 拦截 Thread.getName / Thread.currentThread.getName,
  * 剥离 Frida gadget/stalker 注入的线程名特征。
  *
  * momo 检测项覆盖:

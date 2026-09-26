@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * Logcat 捕获 Hooker(V33):hook android.util.Log 的 v/d/i/w/e 方法,
+ * Logcat 捕获 Hooker:hook android.util.Log 的 v/d/i/w/e 方法,
  * 记录 tag + 级别 + message(截断预览)。仅记录目标进程自身的日志输出。
  */
 class LogcatHooker(

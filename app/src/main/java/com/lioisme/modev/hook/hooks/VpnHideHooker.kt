@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * VPN 隐藏 Hooker(V30):隐藏 VPN 连接状态,防止应用检测 VPN 存在。
+ * VPN 隐藏 Hooker:隐藏 VPN 连接状态,防止应用检测 VPN 存在。
  *
  * 设计原则(第一性原则):
  * - 覆盖 Java API 层 4 个检测向量(覆盖 95%+ 场景);
@@ -223,7 +223,7 @@ class VpnHideHooker(
     }
 
     /**
-     * 硬件 MAC 地址隐藏:拦截 NetworkInterface.getHardwareAddress(),
+     * 硬件 MAC 地址隐藏:拦截 NetworkInterface.getHardwareAddress,
      * VPN 接口返回假 MAC 地址,防止通过硬件地址检测 VPN。
      */
     private fun hookHardwareAddress() {

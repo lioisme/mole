@@ -17,7 +17,7 @@ import javax.net.ssl.TrustManagerFactory
 import javax.net.ssl.X509TrustManager
 
 /**
- * SSL Pinning 绕过 Hooker(V30):覆盖 Android 网络安全架构的每一层验证决策点。
+ * SSL Pinning 绕过 Hooker:覆盖 Android 网络安全架构的每一层验证决策点。
  *
  * 设计原则(第一性原则):
  * - 不是 hook 所有 SSL 方法(过度且脆弱),而是精确拦截验证决策点;
@@ -45,7 +45,7 @@ class SSLBypassHooker(
     private val installedClasses = HashSet<String>()
 
     /**
-     * 类解析失败负缓存(V44 T2.2):`SSLContext.init` 是 app dex 类(okhttp/conscrypt)
+     * 类解析失败负缓存:`SSLContext.init` 是 app dex 类(okhttp/conscrypt)
      * 的补装触发点,每次 init 都会重试全表 `forName`;目标类在部分进程中永不存在
      * (无 okhttp 的 App),旧形态每次 init 白付 10 次 forName + 异常构造
      * (fillInStackTrace)。负缓存按类记退避窗口,窗口内不再重试,窗口过后允许
@@ -72,7 +72,7 @@ class SSLBypassHooker(
     }
 
     /**
-     * 任一 SSL 干预类别开启(V44 T2.2):惰性补装与 init 路径的共同粗门。
+     * 任一 SSL 干预类别开启:惰性补装与 init 路径的共同粗门。
      * 默认配置 6 类全关 → 每次 SSLContext.init 零补装成本(仅一次 config 快照)。
      */
     private fun anySslFeatureOn(): Boolean = SSL_KINDS.any { featureOn(it) }
@@ -314,7 +314,7 @@ class SSLBypassHooker(
         engine.hook(method, object : MethodHook() {
             override fun before(invocation: Invocation) {
                 if (!featureOn(NetworkKind.SSL_WEBVIEW)) return
-                // handler.proceed()
+                // handler.proceed
                 try {
                     val handler = invocation.getArg(1) ?: return
                     val proceedMethod = handler.javaClass.getMethod("proceed")
@@ -471,7 +471,7 @@ class SSLBypassHooker(
     }
 
     companion object {
-        /** 惰性补装类解析失败负缓存窗口(V44 T2.2):窗口内不重试,窗口后再探。 */
+        /** 惰性补装类解析失败负缓存窗口:窗口内不重试,窗口后再探。 */
         private const val MISS_RETRY_MS = 5_000L
 
         /** 本 Hooker 覆盖的全部干预类别(粗门用;新增类别必须登记,否则被粗门静默屏蔽)。 */

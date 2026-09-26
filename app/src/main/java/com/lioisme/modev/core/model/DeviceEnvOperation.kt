@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * 设备环境监听操作(V31):具体 API 动作,[kind] 归属到类别。
+ * 设备环境监听操作:具体 API 动作,[kind] 归属到类别。
  * kind = 用户开关粒度([HookSwitch.deviceEnvEnabled] 门控),
  * operation = 列表元行/详情页展示粒度。
  */
@@ -46,12 +46,13 @@ enum class DeviceEnvOperation(
     /** Build.TAGS 字段拦截。 */
     BUILD_TAGS(DeviceEnvKind.ROOT_PROPERTY),
 
-    // V50 孤儿整改(V-OPS-1):以下 7 个值恒零发射却仍在四语标签与筛选菜单里可见
-    // (选中即恒空 = 用户以为「没有这类活动」),且每一个都有已在发射的同义项或不可挂钩的理由:
+    // 以下 7 个值曾恒零发射却仍在四语标签与筛选菜单里可见(选中即恒空 = 用户以为
+    // 「没有这类活动」),已整体退役。每一个都有已在发射的同义项或不可挂钩的理由,
+    // 因此**禁止复活**;要新增操作,先在下表里找到自己的归并去向:
     //   GETPROP            → SYS_PROP_GET / GET_PROPERTY(属性读取已覆盖;getprop 子进程由
     //                        RootExecHooker 拦截并以 EXEC_COMMAND 记录)
     //   CLASS_FOR_NAME     → LOAD_CLASS / FIND_CLASS(**V36 D-17 硬约束禁止钩 Class.forName**
-    //                        —— 该方法经 Reflection.getCallerClass() 取调用方 classloader,
+    //                        —— 该方法经 Reflection.getCallerClass 取调用方 classloader,
     //                        LSPlant 桥接帧会替换真实调用方 ⇒ 目标 App 自身类加载全崩,
     //                        且钩子无条件安装、开关关闭也崩。删除,永不补钩)
     //   OPEN_MAPS          → READ_MAPS / SYS_FILE_EXISTS
@@ -190,32 +191,32 @@ enum class DeviceEnvOperation(
     /** Intent.ACTION_BATTERY_CHANGED 拦截。 */
     BATTERY_CHANGED(DeviceEnvKind.EMULATOR_BATTERY),
 
-    // ---- 系统属性(V35) ----
+    // ---- 系统属性 ----
 
     /** android.os.SystemProperties.get 读取拦截(ro.debuggable 等)。 */
     SYS_PROP_GET(DeviceEnvKind.SYSTEM_PROPERTIES),
 
-    // ---- /proc/self/status (V35) ----
+    // ---- /proc/self/status  ----
 
     /** /proc/self/status 行读取过滤(TracerPid)。 */
     PROC_STATUS_READ(DeviceEnvKind.PROC_STATUS),
 
-    // ---- /proc/self/mountinfo (V35) ----
+    // ---- /proc/self/mountinfo  ----
 
     /** /proc/self/mountinfo 行读取过滤(Magisk overlay)。 */
     PROC_MOUNT_READ(DeviceEnvKind.PROC_MOUNT_INFO),
 
-    // ---- /proc/self/cgroup (V35) ----
+    // ---- /proc/self/cgroup  ----
 
     /** /proc/self/cgroup 行读取过滤(Magisk cgroup)。 */
     PROC_CGROUP_READ(DeviceEnvKind.PROC_CGROUP),
 
-    // ---- /proc/net/tcp (V35) ----
+    // ---- /proc/net/tcp  ----
 
     /** /proc/net/tcp 行读取过滤(Frida 端口)。 */
     PROC_NET_READ(DeviceEnvKind.PROC_NET),
 
-    // ---- Settings Global (V35) ----
+    // ---- Settings Global  ----
 
     /** Settings.Global get 读取拦截(ADB/开发者选项)。 */
     SETTINGS_GLOBAL_GET(DeviceEnvKind.ROOT_PROPERTY),
@@ -240,7 +241,7 @@ enum class DeviceEnvOperation(
     /** 模拟器属性检查记录。 */
     EMULATOR_CHECK_PROP(DeviceEnvKind.DETECT_EMULATOR),
 
-    // ---- 画像驱动的强制档(V49 WP-D1) ----
+    // ---- 画像驱动的强制档 ----
 
     /** `android.os.Build` 静态身份字段被画像值无条件改写(一项一条记录,字段名在载荷里)。 */
     BUILD_IDENTITY_WRITE(DeviceEnvKind.PROFILE_BUILD_IDENTITY),

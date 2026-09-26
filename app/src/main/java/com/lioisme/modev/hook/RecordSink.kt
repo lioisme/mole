@@ -56,7 +56,7 @@ class RecordSink(
 
     /**
      * seq 计数器。V38 修复:构造期求值 restoreSeq 在「注入早于 Application」场景下
-     * applicationContext() 恒 null → 文件不可见 → 每次进程重启 seq 从 1 重发,
+     * applicationContext 恒 null → 文件不可见 → 每次进程重启 seq 从 1 重发,
      * 宿主 (packageName, processName, seq) 唯一索引 + REPLACE 静默覆盖上一代记录
      * (数据丢失)。改为首次发号时惰性续号:文件路径就绪前每次发号重试,
      * 已发号后不再回溯(极早期无 spool 记录直发路径,窗口可忽略)。
@@ -122,7 +122,7 @@ class RecordSink(
     /** 锁内续号(worker 与兜底路径共用;调用方持有 seqRestoreLock)。 */
     private fun restoreSeqIfNeeded() {
         if (seqRestored) return
-        // 注入早于 Application:路径未就绪即保持未恢复态,由后续调用重试(V38 语义)
+        // 注入早于 Application:路径未就绪即保持未恢复态,由后续调用重试
         if (currentSeqFile() == null) return
         val persisted = restoreSeq()
         // 并发发号可能先行(极早期直发路径):取 max 续接,单调性不破坏
@@ -319,7 +319,7 @@ class RecordSink(
     }
 
     /**
-     * 排空溢出队列(V44 T2.3):记录对象已在内存,hook 线程零序列化;
+     * 排空溢出队列:记录对象已在内存,hook 线程零序列化;
      * 本线程统一执行序列化与投递(与主队列同一裁决出口)。
      */
     private fun drainOverflow(sp: RecordSpool?) {
@@ -350,14 +350,14 @@ class RecordSink(
         private const val CAPACITY = 2048
 
         /**
-         * 队列驻留字节预算(V44 T2.3):主队列 + 溢出队列共享。
+         * 队列驻留字节预算:主队列 + 溢出队列共享。
          * 32MB 足以吸收记录风暴的突发(worker 持续落盘,稳态远低于此),
          * 又对「大字段 × 高并发」形成硬上界——宿主内存永不因监听队列失控。
          */
         private const val MAX_QUEUED_BYTES = 32L * 1024 * 1024
 
         /**
-         * 溢出队列条数上限(V44 T2.3):**突发缓冲**,不是稳态队列——主队列满后
+         * 溢出队列条数上限:**突发缓冲**,不是稳态队列——主队列满后
          * 记录先在此暂存、由工作线程序列化并落盘,故容量须显著大于主队列,
          * 避免「突发即丢」(旧形态溢出走同步 WAL 追加、零丢失,本改造必须保持
          * 同等的零丢失语义,只把成本从 hook 线程移到工作线程)。

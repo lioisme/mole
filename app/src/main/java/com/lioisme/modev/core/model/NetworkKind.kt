@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * 网络环境监听类别(V30):覆盖 SSL Pinning 绕过 / 代理隐藏 / VPN 隐藏 / 请求监控四大子域。
+ * 网络环境监听类别:覆盖 SSL Pinning 绕过 / 代理隐藏 / VPN 隐藏 / 请求监控四大子域。
  *
  * 默认启用态与 [CategoryTaxonomy] 噪点分级一致:
  * - 干预类(SSL/代理/VPN)默认开:使绕过/隐藏生效;

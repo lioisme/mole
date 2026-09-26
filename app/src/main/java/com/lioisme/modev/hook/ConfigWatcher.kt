@@ -4,7 +4,7 @@ import com.lioisme.modev.core.model.HookSwitch
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
- * 配置变更订阅器(V37 T0.2):承载「安装期一次性动作」类钩子(如 Build 静态字段改写)
+ * 配置变更订阅器:承载「安装期一次性动作」类钩子(如 Build 静态字段改写)
  * 的延迟评估通道——此类动作无法在每次调用点重做,须在配置推送/变更到达时重新判定
  * 开关并按幂等语义补执行。
  *

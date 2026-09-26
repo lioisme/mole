@@ -157,7 +157,7 @@ object RecordQueryFactory {
 
     /**
      * 详情邻接 id(keyset 翻页,V45 ST-2):谓词 + `(timestamp, id)` 严格比较,
-     * 排序方向与比较方向一致,配合 `index_timestamp` 走索引而非全表排序。
+     * 排序方向与比较方向一致,配合 `index_crypto_records_timestamp` 走索引而非全表排序。
      */
     fun neighborId(filter: RecordFilter, ts: Long, id: Long, newer: Boolean): Built {
         val p = predicate(filter)

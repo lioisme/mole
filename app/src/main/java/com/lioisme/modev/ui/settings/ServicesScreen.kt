@@ -40,7 +40,7 @@ import com.lioisme.modev.ui.components.SettingsToggleItem
 private const val MCP_ENDPOINT_SUBTITLE = "POST /mcp"
 
 /**
- * 令牌认证开态副标题(V41 D-4):鉴权机制一词承载,风险语义由令牌页状态行承载。
+ * 令牌认证开态副标题:鉴权机制一词承载,风险语义由令牌页状态行承载。
  * internal = 服务页/令牌页两处开关同源共用(同包跨文件)。
  */
 internal const val TOKEN_AUTH_BEARER_SUBTITLE = "Bearer"
@@ -53,7 +53,7 @@ internal const val TOKEN_AUTH_BEARER_SUBTITLE = "Bearer"
  *
  * 外部访问(D-1 统一):单一开关同时控制 wire + MCP 绑定(启用 0.0.0.0 / 停用
  * 127.0.0.1,副标题经 [ServicesViewModel.externalAddressLabel] 动态承载),
- * 中性归属——既不属于通信服务也不属于 MCP。认证语义(V40 D-4)不变:令牌认证
+ * 中性归属——既不属于通信服务也不属于 MCP。认证语义不变:令牌认证
  * 独立开关,启用后全接口强制 Bearer,与外部访问无级联。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -129,7 +129,7 @@ fun ServicesScreen(
             }
             Spacer(Modifier.height(24.dp))
             SettingsSection(stringResource(R.string.mcp_section)) {
-                // 副标题动态有效值(V41 D-4):开 = 端点形态(技术字面量);关 = 无副标题。
+                // 副标题动态有效值:开 = 端点形态(技术字面量);关 = 无副标题。
                 SettingsToggleItem(
                     icon = Icons.Default.Hub,
                     title = stringResource(R.string.mcp_enabled),
@@ -138,7 +138,7 @@ fun ServicesScreen(
                     modifier = Modifier.testTag("services-mcp-enabled"),
                     onCheckedChange = viewModel::setMcpEnabled,
                 )
-                // 令牌认证副标题动态化(V41 D-4):开 = Bearer;关 = 简短「无需令牌」。
+                // 令牌认证副标题动态化:开 = Bearer;关 = 简短「无需令牌」。
                 SettingsToggleItem(
                     icon = Icons.Default.Key,
                     title = stringResource(R.string.mcp_token_auth),

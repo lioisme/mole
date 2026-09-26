@@ -4,7 +4,7 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * MCP 会话(V38):initialize 握手建立,`Mcp-Session-Id` 头贯穿后续请求;
+ * MCP 会话:initialize 握手建立,`Mcp-Session-Id` 头贯穿后续请求;
  * 服务端 restart 时整体失效(spec: 客户端收到 404 后重新 initialize)。
  */
 data class McpSession(

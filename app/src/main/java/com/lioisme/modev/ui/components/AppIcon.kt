@@ -35,7 +35,7 @@ import coil.request.Options
  * V42 T2 底图状态驱动):[AsyncImage] + PackageManager Fetcher——Coil 内存
  * 缓存(MemoryCache)承担去重(滚动列表零重复 binder 调用)。
  * 占位首字母块 = **加载中/失败态限定**(AsyncImage onState 驱动,Success 即
- * 移除)——不规则/透明图标加载完成后不再透出底层色块(V42 R2 主诉);
+ * 移除)——不规则/透明图标加载完成后不再透出底层色块;
  * 包不存在/加载失败 = 占位即终态,语义与 V13 形态一致。
  * 彩色启动图标由 [AsyncImage] 直绘 Drawable 保证(不经单色 Icon 管线,
  * 无 LocalContentColor 蒙层问题——V13 已知坑),**恒原样绘制不裁切**

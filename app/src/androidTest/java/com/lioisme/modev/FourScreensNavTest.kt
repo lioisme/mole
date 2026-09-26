@@ -77,7 +77,7 @@ class FourScreensNavTest {
     }
 
     /**
-     * 点击入口页记录列表入口并以「列表页标志」校验导航落地(V40 T4 健壮性):
+     * 点击入口页记录列表入口并以「列表页标志」校验导航落地:
      * 列表页 = cd_back 与 cd_filter 同现(入口页恒无筛选按钮);雷电高负载下
      * uiautomator 点击偶发不生效(V39 设备报告记录),未落地则有界重试 2 次。
      * 入口文本先滚动至可见(入口页条目多,视口下方行未断言可见性)。
@@ -247,7 +247,7 @@ class FourScreensNavTest {
             while (i < rule.onAllNodesWithTag("app-row").fetchSemanticsNodes().size) {
                 rule.onAllNodesWithTag("app-row")[i].performClick()
                 rule.waitForIdle()
-                // 应用监听入口页标志(V18/V20):顶栏返回按钮 1 个,无筛选按钮。
+                // 应用监听入口页标志:顶栏返回按钮 1 个,无筛选按钮。
                 rule.onAllNodesWithContentDescription(str(R.string.cd_back)).assertCountEquals(1)
                 rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(0)
                 val deadline = System.currentTimeMillis() + 300
@@ -368,7 +368,7 @@ class FourScreensNavTest {
         // 启动按钮同款:逐行进入入口页 → 先算法列表,无记录再数据库列表;
         // 均无则返回下一行,找不到跳过)。
         // V40 T4 健壮性:每步导航后校验页面态(入口页 = cd_back 1 + cd_filter 0),
-        // 未落地有界重试——雷电高负载下 uiautomator 点击偶发不生效(V39 报告记录)。
+        // 未落地有界重试——雷电高负载下 uiautomator 点击偶发不生效。
         var openedRecord = false
         var swipes = 0
         while (!openedRecord && swipes < 10) {
@@ -418,7 +418,7 @@ class FourScreensNavTest {
         rule.onAllNodesWithTag("record-row").onFirst().performClick()
         rule.waitForIdle()
 
-        // 记录详情页标志:更多按钮 + 返回;顶栏无复制/分享直挂按钮(V7 收敛)。
+        // 记录详情页标志:更多按钮 + 返回;顶栏无复制/分享直挂按钮。
         rule.onNodeWithContentDescription(str(R.string.record_more)).assertIsDisplayed()
         rule.onNodeWithContentDescription(str(R.string.cd_back)).assertIsDisplayed()
 
@@ -431,7 +431,7 @@ class FourScreensNavTest {
         // 返回记录列表页:AppBar 仅 SearchBar + 筛选按钮。
         rule.onAllNodesWithContentDescription(str(R.string.cd_filter)).assertCountEquals(1)
         pressBack()
-        // 返回入口页(V20):两记录入口仍在(入口页条目多,先滚动至可见再断言)。
+        // 返回入口页:两记录入口仍在(入口页条目多,先滚动至可见再断言)。
         rule.onNodeWithText(str(R.string.algorithm_records_title))
             .performScrollTo()
             .assertIsDisplayed()

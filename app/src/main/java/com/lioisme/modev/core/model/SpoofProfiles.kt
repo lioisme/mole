@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * 设备/网络伪装画像(V37 T2.3):把此前散落于注入侧 hooker 常量的伪装值
+ * 设备/网络伪装画像:把此前散落于注入侧 hooker 常量的伪装值
  * (Build 字段组、ro.* 属性组、电话/网络/CPU 假值参数)收敛为**可枚举、可覆写**的画像模型。
  *
  * - 内置档位:[SpoofProfiles.BUILTINS](auto / pixel7pro / xiaomi13);

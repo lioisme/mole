@@ -11,7 +11,7 @@ import com.lioisme.modev.domain.record.WebViewRow
 import com.lioisme.modev.domain.record.RowModel
 
 /**
- * WebView 记录映射(V29 一等公民):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
+ * WebView 记录映射:wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
  * 与 [PrefsRecordMappers] 同构;枚举严格解析(未知返回 null,绝不误标)。
  *
  * 列复用(ADR-1 单表):path=url;content 五元组=script/input/output;

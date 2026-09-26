@@ -12,7 +12,7 @@ import com.lioisme.modev.domain.record.SystemRow
 import com.lioisme.modev.domain.record.RowModel
 
 /**
- * 系统信息记录映射(V33):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
+ * 系统信息记录映射:wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
  * 与 [BehaviorRecordMappers] 同构;枚举严格解析(未知返回 null,绝不误标)。
  */
 

@@ -5,7 +5,7 @@ import androidx.compose.ui.graphics.Color
 import com.lioisme.modev.core.model.WebViewKind
 
 /*
- * WebView 类别色 token(V29 一等公民):
+ * WebView 类别色 token:
  * 浅/深两套调色板,基于 Material 扩展色板选取,保证类别色字母与淡底在
  * 对应表面(浅色 surface≈#1C1B1F、深色 surface≈#E6E0E9 前景)上的对比度 ≥ AA。
  * 用法:webviewKindColor(kind) 经 LocalIsDarkTheme 自动取浅/深;徽章底 = 13% alpha 淡底。

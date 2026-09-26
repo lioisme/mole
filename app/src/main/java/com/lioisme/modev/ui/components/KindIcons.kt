@@ -47,7 +47,7 @@ import com.lioisme.modev.core.model.UiInteractionKind
 import com.lioisme.modev.core.model.WebViewKind
 
 /**
- * 类别图标映射(V27 M1-T2):记录列表 leading 徽章的 kind→图标单一事实源。
+ * 类别图标映射:记录列表 leading 徽章的 kind→图标单一事实源。
  * 同族内不重复;新增类别必须同步登记。
  */
 object KindIcons {
@@ -82,7 +82,7 @@ object KindIcons {
             SqlKind.TRANSACTION -> Icons.Outlined.SwapHoriz
         }
 
-    /** 行为族(V27)。 */
+    /** 行为族。 */
     fun behavior(kind: BehaviorKind): ImageVector =
         when (kind) {
             BehaviorKind.FILE_READ -> Icons.Outlined.Description
@@ -94,7 +94,7 @@ object KindIcons {
             BehaviorKind.SHELL_EXEC -> Icons.Outlined.IntegrationInstructions
         }
 
-    /** 偏好族(V28)。 */
+    /** 偏好族。 */
     fun prefs(kind: PrefsKind): ImageVector =
         when (kind) {
             PrefsKind.OPEN -> Icons.Outlined.Storage
@@ -104,7 +104,7 @@ object KindIcons {
             PrefsKind.CLEAR -> Icons.Outlined.DeleteSweep
         }
 
-    /** WebView 族(V29 一等公民)。 */
+    /** WebView 族。 */
     fun webview(kind: WebViewKind): ImageVector =
         when (kind) {
             WebViewKind.PAGE_LOAD -> Icons.Outlined.Public
@@ -114,7 +114,7 @@ object KindIcons {
             WebViewKind.JS_CRYPTO -> Icons.Outlined.EnhancedEncryption
         }
 
-    /** 网络环境监听族(V30 一等公民)。 */
+    /** 网络环境监听族。 */
     fun network(kind: NetworkKind): ImageVector =
         when (kind) {
             NetworkKind.SSL_CONTEXT,
@@ -134,7 +134,7 @@ object KindIcons {
             NetworkKind.REQUEST -> Icons.Outlined.ManageSearch
         }
 
-    /** 设备环境监听族(V31 一等公民)。 */
+    /** 设备环境监听族。 */
     fun deviceEnv(kind: DeviceEnvKind): ImageVector =
         when (kind) {
             DeviceEnvKind.ROOT_FILE, DeviceEnvKind.ROOT_EXEC,
@@ -159,7 +159,7 @@ object KindIcons {
             DeviceEnvKind.PROFILE_SIM -> Icons.Outlined.SimCard
         }
 
-    /** UI 交互监听族(V33 一等公民)。 */
+    /** UI 交互监听族。 */
     fun uiInteraction(kind: UiInteractionKind): ImageVector =
         when (kind) {
             UiInteractionKind.DIALOG_SHOW,
@@ -169,7 +169,7 @@ object KindIcons {
             UiInteractionKind.ACTIVITY_RESUME -> Icons.Outlined.SwapHoriz
         }
 
-    /** 系统信息监听族(V33 一等公民)。 */
+    /** 系统信息监听族。 */
     fun system(kind: SystemKind): ImageVector =
         when (kind) {
             SystemKind.LOGCAT -> Icons.Outlined.Terminal
@@ -177,7 +177,7 @@ object KindIcons {
             SystemKind.SIGNATURE -> Icons.Outlined.Security
         }
 
-    /** 进程控制监听族(V33 一等公民)。 */
+    /** 进程控制监听族。 */
     fun process(kind: ProcessKind): ImageVector =
         when (kind) {
             ProcessKind.EXIT_INTERCEPT -> Icons.Outlined.DeleteSweep

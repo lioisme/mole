@@ -11,10 +11,10 @@ import com.lioisme.modev.hook.ProbeContext
  * 三方法各自注册且构造器回调零门控——全进程每次 new FileReader 付 canonicalPath,
  * 开关全关照付;多注册在 Vector 下互相遮蔽)。
  *
- * 拦截 BufferedReader.readLine(),当读取 /proc/[pid]/maps 文件时,
+ * 拦截 BufferedReader.readLine,当读取 /proc/[pid]/maps 文件时,
  * 过滤包含 Xposed/Magisk/Frida 等关键词的行(命中即 setResult(null) 吞行)。
  *
- * 设计决策(V43 T6 延续):不反射 FileReader 内部字段;路径识别统一在
+ * 设计决策:不反射 FileReader 内部字段;路径识别统一在
  * [ProcScanBroadcaster.classify] 廉价判定,本处理器仅承载行过滤逻辑。
  */
 class XposedMapsHooker(
@@ -46,7 +46,7 @@ class XposedMapsHooker(
         }
     }
 
-    /** 生效掩码词表(V37 T2.4):内置基线 ∪ 用户追加关键词(extraMaskKeywords)。 */
+    /** 生效掩码词表:内置基线 ∪ 用户追加关键词(extraMaskKeywords)。 */
     private fun maskKeywords(): List<String> =
         if (config().feature.extraMaskKeywords.isEmpty()) {
             MAPS_KEYWORDS

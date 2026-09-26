@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * SharedPreferences 监听类别(V28):按用户可感知操作分五类。
+ * SharedPreferences 监听类别:按用户可感知操作分五类。
  *
  * 默认启用态与 [CategoryTaxonomy] 噪点分级一致(决策 D4):
  * - 高信号默认开:OPEN(读入配置文件,进程内每文件一次)/ PUT / REMOVE / CLEAR;

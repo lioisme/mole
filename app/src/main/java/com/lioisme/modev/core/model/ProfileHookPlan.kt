@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * 画像干预计划编译器(V47 T3,基线 `HookPlan.activeHookFeatures()` 同族):
+ * 画像干预计划编译器(V47 T3,基线 `HookPlan.activeHookFeatures` 同族):
  * 把一份 [DeviceProfile] 编译成**最小干预组集合**。
  *
  * 三条设计约束:
@@ -50,7 +50,7 @@ object ProfileHookPlan {
         }
 
     /**
-     * R-D 的按族形(V49 WP-D2):条件档与画像强制档**共享同一读口**时,画像填了该族 ⇒ 条件档让位。
+     * R-D 的按族形:条件档与画像强制档**共享同一读口**时,画像填了该族 ⇒ 条件档让位。
      *
      * 与上面 Build 那一对的区别只是族数:核数族(`Runtime.availableProcessors`)与密度族各自
      * 只与一个条件档同伴相撞,键空间不重叠的(电池:画像只占电量百分比,条件档管计数器/电流/

@@ -9,7 +9,7 @@ import com.lioisme.modev.core.model.ProfileFieldError
 import com.lioisme.modev.core.model.ProfileKind
 
 /**
- * 画像配置面的**标签映射唯一出口**(V47 WP-5)。
+ * 画像配置面的**标签映射唯一出口**。
  *
  * 与 [com.lioisme.modev.ui.apps.KindLabelRes] 同族但**独立成表**:干预组标签的事实源是
  * [ProfileKind] 枚举本体(穷尽 `when`,新增组未映射即编译期红),而不是
@@ -21,7 +21,7 @@ import com.lioisme.modev.core.model.ProfileKind
  */
 
 /**
- * 分区标题的**组装**格式(V49 R-1):本地化名 + 来源 API 标识。
+ * 分区标题的**组装**格式:本地化名 + 来源 API 标识。
  *
  * API 名(`android.os.Build` / `Settings.Secure` 之类)是**代码标识符不是文案** ⇒ 不进四语表,
  * 由 [ProfileKind.sourceApi] 以参数注入。这样「每个分区都点名它的底层来源」这条验收既成立,
@@ -47,8 +47,7 @@ internal fun takenOverProfileFamilies(res: android.content.res.Resources): Strin
 /**
  * 底层来源族标签(UI 分区标题的本地化半段 + 实时生效预览 chips 共用同一键)。
  *
- * 一个概念一个键(#31②):V48 的 `profile_section_*` 十条与 `profile_kind_*` 十八条是
- * **同一条分类轴的两套名字**(section ≡ kind ≡ 钩子族),故随 `ProfileSection` 一起退役。
+ * 一个概念一个键:一条分类轴只留一套键名(`profile_kind_*`,曾并存的 `profile_section_*` 已退役)。
  * 新增类别未映射即编译期红(穷尽 `when`)。
  */
 @StringRes

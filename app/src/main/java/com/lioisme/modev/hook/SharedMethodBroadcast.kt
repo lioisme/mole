@@ -36,7 +36,7 @@ class SharedMethodBroadcast(
     }
 
     /**
-     * 注册表按**方法签名**索引(V43 T3):`Class.getMethod` 不保证返回同一实例
+     * 注册表按**方法签名**索引:`Class.getMethod` 不保证返回同一实例
      * (反射对象可能为拷贝),Executable 身份比较会漏合并;签名键跨 hooker 稳定。
      */
     private val registrations = HashMap<String, Registration>()

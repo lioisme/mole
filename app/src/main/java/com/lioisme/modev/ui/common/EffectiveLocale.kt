@@ -29,7 +29,7 @@ fun rememberEffectiveLocale(): Locale {
 }
 
 /**
- * Dialog/Popup 窗口组合的语言跟随资源(V16 R6 实机审计):
+ * Dialog/Popup 窗口组合的语言跟随资源:
  *
  * 独立窗口(Dialog/Popup)组合只继承**创建时**的 CompositionLocal 快照,
  * 主树 provider(如 LocalContext 覆盖)后续更新不传入窗口——窗口内

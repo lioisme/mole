@@ -87,7 +87,7 @@ class McpToolsTest {
             kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
         )
         keywords = KeywordLibraryRepository(db.keywordLibraryDao(), libraryScope)
-        // 画像库(V47 WP-7):与 AppContainer 同序补内置三档,spoof_profiles_list 才有真身可列
+        // 画像库:与 AppContainer 同序补内置三档,spoof_profiles_list 才有真身可列
         profiles = SpoofProfileRepository(db.spoofProfileDao(), libraryScope)
         runBlocking { profiles.synchronizeBuiltins() }
         // init 需要装配关键词库(与 AppContainer 同序)
@@ -256,7 +256,7 @@ class McpToolsTest {
     /**
      * V45 T0.2(DUAL-1 根因治理):工具必须经 [McpToolRegistry] 的 schema 校验路径可达。
      * 旧形态把 `masterValue` 声明为 string 而实现 `require(isBoolean)` —— 真协议路径两种取值
-     * 全被拒(10 个 master 开关经 MCP 完全不可用),而直调 `execute()` 的用例照常全绿 = 门禁盲区。
+     * 全被拒(10 个 master 开关经 MCP 完全不可用),而直调 `execute` 的用例照常全绿 = 门禁盲区。
      * 本用例锁「schema 声明与实现语义互逆」。
      */
     @Test

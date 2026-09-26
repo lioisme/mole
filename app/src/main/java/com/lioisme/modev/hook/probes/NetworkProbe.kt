@@ -12,7 +12,7 @@ import com.lioisme.modev.hook.hooks.SSLBypassHooker
 import com.lioisme.modev.hook.hooks.VpnHideHooker
 
 /**
- * 网络环境监听探针(V34 增强):收敛全部 5 个 Hooker
+ * 网络环境监听探针:收敛全部 5 个 Hooker
  * (SSL 绕过 + 代理隐藏 + VPN 隐藏 + 请求监控 + DNS 监控)。
  */
 class NetworkProbe : Probe, InterventionProbeMarker {

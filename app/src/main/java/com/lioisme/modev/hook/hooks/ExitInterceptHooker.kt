@@ -8,9 +8,9 @@ import com.lioisme.modev.hook.ProbeContext
 
 /**
  * 退出拦截 Hooker(V33,V34 审计修复):hook System.exit(int) 和 Process.killProcess(int),
- * 在 before() 中调用 setResult(null) 阻止进程退出,记录退出码/pid。
+ * 在 before 中调用 setResult(null) 阻止进程退出,记录退出码/pid。
  *
- * 干预机制:before() 中 setResult(null) 阻止原方法执行,进程不会退出。
+ * 干预机制:before 中 setResult(null) 阻止原方法执行,进程不会退出。
  * 干预结果通过 [ProcessRecord.interventionAction] 记录("BLOCKED"|"DETECTED"|null)。
  *
  * 安全注意:此功能会阻止应用正常退出,可能导致应用状态不一致。

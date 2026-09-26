@@ -145,7 +145,7 @@ fun RecordDetailScreen(
     val clipboard = LocalClipboardManager.current
 
     /**
-     * 整段复制统一出口(V13):写剪贴板 + Snackbar 反馈(区块名 + 字符数)。
+     * 整段复制统一出口:写剪贴板 + Snackbar 反馈(区块名 + 字符数)。
      * V15 护栏:超 COPY_MAX_CHARS 字符拒写(ClipboardManager.setText 全量同步
      * 物化,超巨量会卡主线程),仅提示。V26 修复占位符缺参缺陷。
      */
@@ -995,7 +995,7 @@ private fun PrefsLoadedContent(
 
 // region WebView detail
 
-/** WebView 记录详情 Markdown 渲染(V29 一等公民)。 */
+/** WebView 记录详情 Markdown 渲染。 */
 @Composable
 private fun WebViewLoadedContent(
     record: WebViewRecord,

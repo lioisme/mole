@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /*
- * 能力表(V48 R-2):把后端 81 个类别投影成「用户在哪儿改它、在哪儿看它、谁发射它」。
+ * 能力表:把后端登记的每一个类别投影成「用户在哪儿改它、在哪儿看它、谁发射它」。
  *
  * 本文件**不是**第二份类别清单 —— 行集合恒由 [CategoryTaxonomy.all] 派生,功能域分区恒由
  * [FeatureGroups] 派生,新增/删除类别都不需要动这里。它只登记两样分类法本身没有携带的事实:
@@ -45,7 +45,7 @@ private data class Backstage(
     val listenSection: String,
 )
 
-/** 全表(顺序 = `CategoryTaxonomy.all()`:按类型、类型内按 order)。 */
+/** 全表(顺序 = `CategoryTaxonomy.all`:按类型、类型内按 order)。 */
 private val capabilityRows: List<CapabilityRow> = run {
     val backstage: Map<RecordType, Backstage> =
         mapOf(

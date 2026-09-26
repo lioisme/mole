@@ -17,7 +17,7 @@ import org.junit.Before
 import org.junit.Test
 
 /**
- * MCP 服务器生命周期门禁(V38):真回环 socket 驱动 Streamable HTTP 全语义 ——
+ * MCP 服务器生命周期门禁:真回环 socket 驱动 Streamable HTTP 全语义 ——
  * 握手/会话/工具分发/错误码/auth/重启代元失效(镜像 ConfigServerLifecycleTest 的
  * 真端口测试模式)。
  */

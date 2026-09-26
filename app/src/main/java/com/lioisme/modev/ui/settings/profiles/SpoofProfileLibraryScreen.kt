@@ -90,7 +90,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 /**
- * 设备画像库页 VM(V47 WP-5)。
+ * 设备画像库页 VM。
  *
  * 依赖面 = 三个 domain 契约(容器 public 属性恒为接口类型,AGENTS #18 G2 闸):
  * [SpoofProfileService] 画像库唯一写入口、[ListenConfigService] 绑定计数唯一读取源、

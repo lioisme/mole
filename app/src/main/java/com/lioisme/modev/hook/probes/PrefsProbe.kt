@@ -10,10 +10,10 @@ import com.lioisme.modev.hook.hooks.PrefsInstanceIndex
 import com.lioisme.modev.hook.hooks.PrefsOpenHooker
 
 /**
- * 偏好监听探针(V28 一等公民):SharedPreferences 读入配置文件 + Get/Put 全家桶。
+ * 偏好监听探针:SharedPreferences 读入配置文件 + Get/Put 全家桶。
  *
  * 装配三个 Hooker(共享 [PrefsInstanceIndex]):
- * - [PrefsOpenHooker]:配置文件载入(OPEN)+ edit() 实例登记;
+ * - [PrefsOpenHooker]:配置文件载入(OPEN)+ edit 实例登记;
  * - [PrefsGetHooker]:get* 全家桶 / contains / getAll;
  * - [PrefsEditorHooker]:put* 全家桶 / remove / clear。
  */

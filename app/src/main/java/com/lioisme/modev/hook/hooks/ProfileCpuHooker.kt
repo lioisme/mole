@@ -11,7 +11,7 @@ import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
- * 画像强制档 · CPU 核数一族(V49 WP-D2)。
+ * 画像强制档 · CPU 核数一族。
  *
  * 与 [DeviceCpuHooker] 的分工:那边是条件档(真实核数**多于**目标时才改),本类是强制档
  * (画像填了就等于它 —— 真机 8 核伪装成 4 核同样是意图)。两者写同一读口,所以条件档在画像

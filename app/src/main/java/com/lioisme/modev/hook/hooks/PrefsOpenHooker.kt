@@ -7,10 +7,10 @@ import com.lioisme.modev.hook.ProbeContext
 import java.io.File
 
 /**
- * 偏好配置文件载入 Hooker(V28):
+ * 偏好配置文件载入 Hooker:
  * - SharedPreferencesImpl 全部首参 File 的声明构造器(after)= 磁盘读入完成时刻,
  *   进程内每文件一次(实例缓存),天然低噪;
- * - edit()(after)登记 editor→路径映射,供 [PrefsEditorHooker] 反查。
+ * - edit(after)登记 editor→路径映射,供 [PrefsEditorHooker] 反查。
  *
  * 被动红线:仅读取构造实参 File 路径,绝不触碰文件内容、绝不反射内部字段。
  */
@@ -48,7 +48,7 @@ class PrefsOpenHooker(
         }
     }
 
-    /** edit()(after):editor 实例 → impl → 路径 固化(不产记录)。 */
+    /** edit(after):editor 实例 → impl → 路径 固化(不产记录)。 */
     private fun installEdit() {
         val registry = BehaviorMethodRegistry.forName(IMPL_CLASS) ?: return
         hookAfter(registry.named("edit")) { inv, result ->

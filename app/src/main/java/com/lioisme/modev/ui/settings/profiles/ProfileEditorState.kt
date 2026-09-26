@@ -14,7 +14,7 @@ import com.lioisme.modev.core.model.stringOf
 import kotlin.random.Random
 
 /**
- * 画像编辑器的**可视态派生层**(V47 WP-5):[ProfileEditorForm] 是编辑文本与校验结论的
+ * 画像编辑器的**可视态派生层**:[ProfileEditorForm] 是编辑文本与校验结论的
  * 唯一事实源,本类只把那份表单**投影成 UI 要画的形状**(身份预览卡 / 生效组 / 矛盾 /
  * 保存闸),并收口「写入 → 通知 UI 重组」这一侧的动作。
  *
@@ -89,7 +89,7 @@ class ProfileEditorState(
      * 批量写入(机型库选择等「一次改数项」的通路)。
      *
      * 逐字段 `update` 会留下中间帧:型号已换而品牌未换的那一帧,屏上显示的正是
-     * 自相矛盾的画像。整批写完再由调用方 `bump()` 一次 ⇒ 屏上只见结论,不见半成品。
+     * 自相矛盾的画像。整批写完再由调用方 `bump` 一次 ⇒ 屏上只见结论,不见半成品。
      */
     fun applyValues(values: Map<ProfileField, String>) {
         values.forEach { (field, raw) -> form.update(field, raw) }
@@ -172,7 +172,7 @@ class ProfileEditorState(
 }
 
 /**
- * 编辑器的**一帧可视快照**(V47 WP-5):把 [ProfileEditorState] 的全部派生值一次算完,
+ * 编辑器的**一帧可视快照**:把 [ProfileEditorState] 的全部派生值一次算完,
  * 交成一枚不可变值对象。
  *
  * 为什么要这一层而不是让 Composable 直接读表单:Compose 的跳过判定建立在参数上,

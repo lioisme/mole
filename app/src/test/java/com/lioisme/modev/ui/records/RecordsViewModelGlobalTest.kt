@@ -35,9 +35,9 @@ import org.robolectric.shadows.ShadowLooper
  * - packageLabels 仅全局形态接入目录源,单应用形态恒空。
  *
  * 协程纪律(V44 D1 计数改 Room Flow 后强化):`totalCount` 与 `packageLabels` 均为
- * `stateIn(WhileSubscribed)` 的 Main 域 StateFlow,**禁止** `runBlocking { …first() }`
+ * `stateIn(WhileSubscribed)` 的 Main 域 StateFlow,**禁止** `runBlocking { …first }`
  * ——runBlocking 占住主线程会让 Main 派发的上游永不推进(实测整套测试死锁)。
- * 正解 = 独立收集器激活上游 + `ShadowLooper.idleMainLooper()` 泵动 + 读 `.value`。
+ * 正解 = 独立收集器激活上游 + `ShadowLooper.idleMainLooper` 泵动 + 读 `.value`。
  */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])

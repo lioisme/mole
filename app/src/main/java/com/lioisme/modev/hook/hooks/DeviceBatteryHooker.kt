@@ -11,13 +11,13 @@ import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
- * 模拟器电池信息伪造 Hooker(V34):拦截 BatteryManager API,
+ * 模拟器电池信息伪造 Hooker:拦截 BatteryManager API,
  * 返回变化的电池状态值(模拟器通常恒定不变),防止检测框架
  * 通过电池信息识别环境。
  *
  * 覆盖 API:
- * - BatteryManager.getIntProperty():返回合理变化值
- * - BatteryManager.isCharging():返回 false
+ * - BatteryManager.getIntProperty:返回合理变化值
+ * - BatteryManager.isCharging:返回 false
  * - Intent.ACTION_BATTERY_CHANGED:伪造 Extra 值
  */
 class DeviceBatteryHooker(

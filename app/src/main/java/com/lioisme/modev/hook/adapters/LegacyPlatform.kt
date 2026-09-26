@@ -78,7 +78,7 @@ object LegacyPlatform : Platform {
     }
 
     /**
-     * 运行期 `returnEarly` 字段句柄(V44 T2.6):一次性解析,缺失即 null。
+     * 运行期 `returnEarly` 字段句柄:一次性解析,缺失即 null。
      * 不缓存「已解析失败」之外的状态——句柄本身线程安全(Field.get 无状态)。
      */
     private val returnEarlyField: java.lang.reflect.Field? by lazy {
@@ -115,7 +115,7 @@ object LegacyPlatform : Platform {
         override val token: Any? get() = param
 
         override val consumed: Boolean
-            // V44 T2.6(审计 P14):API 82 的 MethodHookParam 无 hasResult(),旧形态以
+            // V44 T2.6(审计 P14):API 82 的 MethodHookParam 无 hasResult,旧形态以
             // `result != null` 近似短路判定 —— 对 `setResult(null)`(吞行/清空结果类
             // 干预)完全失明,后续订阅者会覆写前者的 null 短路。运行期实现
             // (LSPosed/EdXposed 的 XposedBridge)持有 `returnEarly` 布尔字段

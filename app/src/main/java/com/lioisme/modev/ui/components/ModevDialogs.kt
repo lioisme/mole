@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import com.lioisme.modev.R
 
 /**
- * 统一确认对话框(V39 R7):全 App 居中危险确认/信息确认唯一出口。
+ * 统一确认对话框:全 App 居中危险确认/信息确认唯一出口。
  *
  * 契约(取代逐屏手写 AlertDialog 复制模板):
  * - **无图标**(V39 验收:对话框不带 icon,标题上方居中大图标形态整体退役);

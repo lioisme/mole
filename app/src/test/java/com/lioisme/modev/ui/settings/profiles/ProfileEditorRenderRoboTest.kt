@@ -223,7 +223,7 @@ class ProfileEditorRenderRoboTest {
         assertTextPresent(str(R.string.profile_kind_network), "生效组预览")
     }
 
-    // ------------------------------------------------------------------ 机型库选择(V47 WP-5b)
+    // ------------------------------------------------------------------ 机型库选择
 
     @Test
     fun devicePicking_fillsFourIdentityFields_andNeverGuessesProduct() {
@@ -337,7 +337,7 @@ class ProfileEditorRenderRoboTest {
     }
 
     /**
-     * 密度档 / 核数档改走选择器(V48 R-3):本档只证「候选表已挂上且逐值合法」——
+     * 密度档 / 核数档改走选择器:本档只证「候选表已挂上且逐值合法」——
      * 「点开确实出列表」这一层在 Robolectric 打不动弹层手势,归插桩档
      * `ProfileEditorFlowTest.pickerSheets_openWithManualEscape`。
      */

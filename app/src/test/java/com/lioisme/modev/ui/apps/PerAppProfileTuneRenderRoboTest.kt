@@ -130,7 +130,7 @@ class PerAppProfileTuneRenderRoboTest {
     /**
      * 把「VM 写 → viewModelScope(Main) → 仓库 withContext(IO) → StateFlow」这条链走完。
      *
-     * `compose.waitForIdle()` 只管主线程组合与主 looper,**不等 IO 线程上的偏好写入**,
+     * `compose.waitForIdle` 只管主线程组合与主 looper,**不等 IO 线程上的偏好写入**,
      * 所以缺这一步就会读到写前的旧快照(表现成「VM 没落盘」的假故障)。
      * 形态沿用本仓 `KeywordLibraryRepositoryTest` / `ConfigServer*Test` 的轮询等待。
      */

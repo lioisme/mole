@@ -12,7 +12,7 @@ data class HttpResult(
 )
 
 /**
- * MCP HTTP 引擎(V38):NanoHTTPD 2.3.1 子类,唯一职责 = HTTP 解析 +
+ * MCP HTTP 引擎:NanoHTTPD 2.3.1 子类,唯一职责 = HTTP 解析 +
  * 单端点路由,把[method]/[uri]/[headers]/[body]交给 [route] 闭包。
  * 不用其静态文件/会话/Cookie 能力;每连接一线程(NanoHTTPD 默认),
  * 阻塞式 runBlocking 承载 suspend 工具执行。

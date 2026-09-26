@@ -4,7 +4,7 @@ import androidx.compose.runtime.Immutable
 import com.lioisme.modev.core.util.BytesView
 
 /**
- * WebView 监听记录(V29 一等公民):承载 WebView 全生命周期行为的结构化记录。
+ * WebView 监听记录:承载 WebView 全生命周期行为的结构化记录。
  *
  * @param id       数据库自增主键(插入时 0,Room 分配)。
  * @param seq      注入侧序列号(WireCodec 信封写入,去重 + ACK 裁剪)。

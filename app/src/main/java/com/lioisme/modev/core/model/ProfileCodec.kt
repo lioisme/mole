@@ -4,7 +4,7 @@ import com.lioisme.modev.core.codec.Json
 import java.security.MessageDigest
 
 /**
- * 画像编解码与规范化(V47 T2):JSON 正文、内容指纹、整表校验三件事的唯一实现处。
+ * 画像编解码与规范化:JSON 正文、内容指纹、整表校验三件事的唯一实现处。
  *
  * **指纹的确定性来自 [ProfileFieldCatalog] 的字段序**,而不是 Gson 的字段序或
  * [DeviceProfile.toString] —— 三者都会随重构漂移。逐字段按目录序拼

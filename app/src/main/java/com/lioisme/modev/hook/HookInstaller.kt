@@ -74,7 +74,7 @@ class HookInstaller(
 ) {
 
     // 通道与出口存在循环依赖(channel 的 ACK 回调驱动 sink,spool 发送游标依赖 channel
-    // 连接状态),经 lazy 延迟解析,首次访问在 install() 内完成
+    // 连接状态),经 lazy 延迟解析,首次访问在 install 内完成
     private val channel: ConfigChannel by lazy {
         ConfigChannel(
             packageName = packageName,
@@ -86,7 +86,7 @@ class HookInstaller(
         )
     }
 
-    /** 配置变更订阅器(V37 T0.2):Build 静态字段改写等安装期动作经此延迟补执行。 */
+    /** 配置变更订阅器:Build 静态字段改写等安装期动作经此延迟补执行。 */
     private val configWatcher = ConfigWatcher()
 
     private val sink: RecordSink by lazy {

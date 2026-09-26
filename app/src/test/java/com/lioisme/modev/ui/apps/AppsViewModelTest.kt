@@ -32,7 +32,7 @@ import org.robolectric.annotation.Config
 import org.robolectric.shadows.ShadowLooper
 
 /**
- * AppsViewModel 契约(V16 R4 加载态):loading 随目录源传播(首帧 progress 依据,
+ * AppsViewModel 契约:loading 随目录源传播(首帧 progress 依据,
  * 防空态误显);行投影(label/作用域/连接/计数)不受 loading 干扰。
  * 依赖全部走接口替身:AppCatalogSource 假实现 + 空内存 Room 的真实 LogRepository +
  * 无服务 ScopeGateway(作用域不可用) + 空连接集 ConnectionMonitor。

@@ -250,7 +250,7 @@ private data class RowField(
     val middleEllipsis: Boolean = false,
 )
 
-/** 统一行展示规格(presentation 单一数据出口;V43 T4 起 supporting = 字段行列表)。 */
+/** 统一行展示规格(presentation 单一数据出口; supporting = 字段行列表)。 */
 private data class RowPresentation(
     val icon: ImageVector,
     val accent: Color,
@@ -388,7 +388,7 @@ private fun interventionActionLabel(action: String?): String? =
 // 族形态:每族产出统一 [RowPresentation](一行一参数字段列表,V43 T4)。
 // ---------------------------------------------------------------------------
 
-/** 算法形态(V43 T4):类别行 / 操作行 / 数据段行(密钥>别名>输出>输入,恒单段)。 */
+/** 算法形态:类别行 / 操作行 / 数据段行(密钥>别名>输出>输入,恒单段)。 */
 @Composable
 private fun cryptoPresentation(record: CryptoRow): RowPresentation {
     val r = record.record
@@ -413,7 +413,7 @@ private fun cryptoPresentation(record: CryptoRow): RowPresentation {
     )
 }
 
-/** 数据库形态(V43 T4):类别 / 操作 / 库名 / 行数 / 影响行各成行,SQL 预览中缀省略。 */
+/** 数据库形态:类别 / 操作 / 库名 / 行数 / 影响行各成行,SQL 预览中缀省略。 */
 @Composable
 private fun sqlPresentation(record: SqlRow): RowPresentation {
     val accent = sqlKindColor(record.kind)
@@ -455,7 +455,7 @@ private fun SqlRow.sqlHeadlineText(): String {
 }
 
 /**
- * 行为形态(V27;V43 T4 拆行):类别 / 操作 / 主体(path 或 argv 中缀省略)/
+ * 行为形态:类别 / 操作 / 主体(path 或 argv 中缀省略)/
  * 重命名目标 / 文件大小各成行。
  */
 @Composable
@@ -493,7 +493,7 @@ private fun behaviorPresentation(record: BehaviorRow): RowPresentation {
 }
 
 /**
- * 偏好形态(V28;V43 T4 拆行):类别 / 操作 / 配置文件路径各成行。
+ * 偏好形态:类别 / 操作 / 配置文件路径各成行。
  */
 @Composable
 private fun prefsPresentation(record: PrefsRow): RowPresentation {
@@ -519,7 +519,7 @@ private fun prefsPresentation(record: PrefsRow): RowPresentation {
 }
 
 /**
- * WebView 形态(V29;V43 T4 拆行):类别 / 操作 / 桥名 / URL 各成行,
+ * WebView 形态:类别 / 操作 / 桥名 / URL 各成行,
  * 桥名与 headline(域名/桥名回退)重复时不再渲染(V3.5 去重原则)。
  */
 @Composable
@@ -561,7 +561,7 @@ internal fun CryptoRecord.valuableDataPair(): Pair<Int, String>? = when {
 }
 
 /**
- * 算法展示名单一事实源(V16 R1 空白治理):algorithm 为空串/空白时回退类别名(恒有),
+ * 算法展示名单一事实源:algorithm 为空串/空白时回退类别名(恒有),
  * 杜绝列表行 headline、详情页标题、复制摘要首行出现空白。
  */
 @Composable
@@ -686,7 +686,7 @@ fun interventionActionLabel(context: Context, action: String?): String? =
     }
 
 // ---------------------------------------------------------------------------
-// WebView 标签资源(V29 一等公民)
+// WebView 标签资源
 // ---------------------------------------------------------------------------
 
 /** WebView 类别显示名资源(筛选菜单 / 详情页元数据共用)。 */
@@ -983,7 +983,7 @@ fun networkSummary(context: Context, record: NetworkRow): String {
     }
 }
 
-/** 设备环境监听类别显示名资源(V31)。 */
+/** 设备环境监听类别显示名资源。 */
 @StringRes
 fun deviceEnvKindLabelRes(kind: DeviceEnvKind): Int = when (kind) {
     DeviceEnvKind.ROOT_FILE -> R.string.kind_device_env_ROOT_FILE
@@ -1017,7 +1017,7 @@ fun deviceEnvKindLabelRes(kind: DeviceEnvKind): Int = when (kind) {
     DeviceEnvKind.PROFILE_SIM -> R.string.kind_device_env_PROFILE_SIM
 }
 
-/** 设备环境监听操作标签资源(V31)。 */
+/** 设备环境监听操作标签资源。 */
 @StringRes
 fun deviceEnvOperationLabelRes(operation: DeviceEnvOperation): Int = when (operation) {
     DeviceEnvOperation.FILE_EXISTS -> R.string.op_device_env_file_exists
@@ -1104,7 +1104,7 @@ fun deviceEnvSummary(context: Context, record: DeviceEnvRow): String {
     }
 }
 
-/** UI 交互监听类别标签(V33)。 */
+/** UI 交互监听类别标签。 */
 fun uiInteractionKindLabelRes(kind: UiInteractionKind): Int = when (kind) {
     UiInteractionKind.DIALOG_SHOW -> R.string.kind_ui_DIALOG_SHOW
     UiInteractionKind.DIALOG_KEYWORD -> R.string.kind_ui_DIALOG_KEYWORD
@@ -1113,7 +1113,7 @@ fun uiInteractionKindLabelRes(kind: UiInteractionKind): Int = when (kind) {
     UiInteractionKind.ACTIVITY_RESUME -> R.string.kind_ui_ACTIVITY_RESUME
 }
 
-/** UI 交互监听操作标签(V33)。 */
+/** UI 交互监听操作标签。 */
 fun uiInteractionOperationLabelRes(op: UiInteractionOperation): Int = when (op) {
     UiInteractionOperation.DIALOG_SHOW -> R.string.op_ui_show
     UiInteractionOperation.DIALOG_DISMISS -> R.string.op_ui_back_dismiss
@@ -1132,7 +1132,7 @@ fun uiInteractionOperationLabelRes(op: UiInteractionOperation): Int = when (op) 
     UiInteractionOperation.ACTIVITY_ON_DESTROY -> R.string.op_ui_back_dismiss
 }
 
-/** UI 交互记录摘要文本(V33)。 */
+/** UI 交互记录摘要文本。 */
 fun uiInteractionSummary(context: Context, record: UiInteractionRow): String {
     val time = SimpleDateFormat(
         if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
@@ -1151,14 +1151,14 @@ fun uiInteractionSummary(context: Context, record: UiInteractionRow): String {
     }
 }
 
-/** 系统信息监听类别标签(V33)。 */
+/** 系统信息监听类别标签。 */
 fun systemKindLabelRes(kind: SystemKind): Int = when (kind) {
     SystemKind.LOGCAT -> R.string.kind_system_LOGCAT
     SystemKind.APP_INFO -> R.string.kind_system_APP_INFO
     SystemKind.SIGNATURE -> R.string.kind_system_SIGNATURE
 }
 
-/** 系统信息监听操作标签(V33)。 */
+/** 系统信息监听操作标签。 */
 fun systemOperationLabelRes(op: SystemOperation): Int = when (op) {
     SystemOperation.LOG_VERBOSE -> R.string.op_system_capture
     SystemOperation.LOG_DEBUG -> R.string.op_system_capture
@@ -1172,7 +1172,7 @@ fun systemOperationLabelRes(op: SystemOperation): Int = when (op) {
     SystemOperation.SIGNATURE_READ_V2 -> R.string.op_system_read
 }
 
-/** 系统信息记录摘要文本(V33)。 */
+/** 系统信息记录摘要文本。 */
 fun systemSummary(context: Context, record: SystemRow): String {
     val time = SimpleDateFormat(
         if (DateFormat.is24HourFormat(context)) "HH:mm:ss" else "h:mm:ss a",
@@ -1191,14 +1191,14 @@ fun systemSummary(context: Context, record: SystemRow): String {
     }
 }
 
-/** 进程控制监听类别标签(V33)。 */
+/** 进程控制监听类别标签。 */
 fun processKindLabelRes(kind: ProcessKind): Int = when (kind) {
     ProcessKind.EXIT_INTERCEPT -> R.string.kind_process_EXIT_INTERCEPT
     ProcessKind.CRASH_PREVENT -> R.string.kind_process_CRASH_PREVENT
     ProcessKind.SCREEN_RECORD -> R.string.kind_process_SCREEN_RECORD
 }
 
-/** 进程控制监听操作标签(V33)。 */
+/** 进程控制监听操作标签。 */
 fun processOperationLabelRes(op: ProcessOperation): Int = when (op) {
     ProcessOperation.SYSTEM_EXIT -> R.string.op_process_system_exit
     ProcessOperation.KILL_PROCESS -> R.string.op_process_kill_process

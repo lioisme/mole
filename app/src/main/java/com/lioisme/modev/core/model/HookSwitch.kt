@@ -111,14 +111,14 @@ data class HookSwitch(
     /** 调用栈前缀 denylist:任一帧命中即跳过该记录;默认空 = 全捕获。 */
     val ignoreStackPrefixes: List<String> = emptyList(),
     /**
-     * 文件内容捕获(V27):开启后仅对「随调用即可得」的整读 API
+     * 文件内容捕获:开启后仅对「随调用即可得」的整读 API
      * (Files.readAllBytes/readAllLines/write/copy 与 AssetManager.open)
      * 按 [maxBytesPerField] 截断捕获正文预览;流构造器路径绝不触碰句柄(被动红线)。
      * 默认关。
      */
     val fileContentCapture: Boolean = false,
     /**
-     * 路径前缀 denylist(V27 行为降噪):主体路径命中任一前缀即跳过该记录;
+     * 路径前缀 denylist:主体路径命中任一前缀即跳过该记录;
      * 与内置系统路径清单叠加生效,默认空。
      */
     val ignorePathPrefixes: List<String> = emptyList(),
@@ -167,13 +167,13 @@ data class HookSwitch(
 
     /** UI 交互监听全局总开关(V33;false = 全部 UI 交互类别停用,分开关保留原态)。 */
     val uiListen: Boolean = true,
-    /** UI:Dialog.show() 记录(低频高信号,默认开)。 */
+    /** UI:Dialog.show 记录(低频高信号,默认开)。 */
     val dialogShow: Boolean = true,
     /** UI:关键字弹窗拦截记录(低频高信号,默认开)。 */
     val dialogKeyword: Boolean = true,
-    /** UI:TextView.setText() 文本赋值记录(极高频噪声,默认关)。 */
+    /** UI:TextView.setText 文本赋值记录(极高频噪声,默认关)。 */
     val widgetText: Boolean = false,
-    /** UI:Activity.startActivity() 启动记录(低频高信号,默认开)。 */
+    /** UI:Activity.startActivity 启动记录(低频高信号,默认开)。 */
     val activityStart: Boolean = true,
     /** UI:Activity 生命周期记录(高频,默认关)。 */
     val activityResume: Boolean = false,
@@ -193,11 +193,11 @@ data class HookSwitch(
 
     /** 进程控制全局总开关(V33;false = 全部进程控制类别停用,分开关保留原态)。 */
     val processControlListen: Boolean = true,
-    /** 进程:退出检测与拦截 System.exit/killProcess(干预型,默认关;before() 中 setResult(null) 阻止执行)。 */
+    /** 进程:退出检测与拦截 System.exit/killProcess(干预型,默认关;before 中 setResult(null) 阻止执行)。 */
     val exitIntercept: Boolean = false,
     /** 进程:崩溃检测与预防未捕获异常(干预型,默认关;注入 wrapper handler + 吞掉异常)。 */
     val crashPrevent: Boolean = false,
-    /** 进程:录屏限制检测与解除 FLAG_SECURE(干预型,默认关;before() 中清除 FLAG_SECURE 位)。 */
+    /** 进程:录屏限制检测与解除 FLAG_SECURE(干预型,默认关;before 中清除 FLAG_SECURE 位)。 */
     val screenRecordBypass: Boolean = false,
 
     // ---- V33 UI 交互微调项 ----
@@ -242,7 +242,7 @@ data class HookSwitch(
     val emulatorCpu: Boolean = false,
     /** 模拟器:电池信息伪造(干预型,默认关)。 */
     val emulatorBattery: Boolean = false,
-    /** 设备环境:android.os.SystemProperties.get() 拦截(干预型,默认关)。 */
+    /** 设备环境:android.os.SystemProperties.get 拦截(干预型,默认关)。 */
     val systemProperties: Boolean = false,
     /** 设备环境:/proc/self/status 行过滤(TracerPid,干预型,默认关)。 */
     val procStatus: Boolean = false,
@@ -276,7 +276,7 @@ data class HookSwitch(
 
     /** 画像强制档 · `android_id`(V49 WP-D3,默认开;Secure 与 System 两条读口同写)。 */
     val profileAndroidId: Boolean = true,
-    /** 画像强制档 · IMEI / TAC / 手机号(V49 WP-D3,默认开)。 */
+    /** 画像强制档 · IMEI / TAC / 手机号。 */
     val profileTelephonyId: Boolean = true,
     /** 画像强制档 · SIM 运营商族(V49 WP-D3,默认开;MCC/MNC 由运营商码派生,不另填)。 */
     val profileSim: Boolean = true,
@@ -353,7 +353,7 @@ data class HookSwitch(
         get() = processControlListen && (exitIntercept || crashPrevent || screenRecordBypass)
 
     /**
-     * 弹窗拦截有效关键词表(V37 T1.2):feature 段优先,
+     * 弹窗拦截有效关键词表:feature 段优先,
      * 旧扁平字段兜底(fromJson 已做迁移,此处双保险覆盖手工构造路径)。
      */
     @Suppress("DEPRECATION")
@@ -361,7 +361,7 @@ data class HookSwitch(
         get() = feature.dialogKeywords.ifEmpty { dialogKeywords }
 
     /**
-     * 弹窗拦截有效规则(V37 T2.1):结构化规则优先,
+     * 弹窗拦截有效规则:结构化规则优先,
      * 旧字符串列表按 CONTAINS 语义降级适配。
      */
     val activeKeywordRules: List<KeywordRule>

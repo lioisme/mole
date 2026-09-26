@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * 功能域分组(V37 T3.1/T3.4):把 [CapabilityDomain.FEATURE] 的 37 个干预类别
+ * 功能域分组:把 [CapabilityDomain.FEATURE] 的干预类别
  * 聚合为用户可理解的功能卡(每应用功能设置页与监控入口页的唯一驱动源)。
  *
  * - 组内 kind 顺序即 UI 行顺序;

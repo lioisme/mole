@@ -69,9 +69,9 @@ import org.intellij.markdown.parser.MarkdownParser
  * V28 详情页 markdown 渲染层(纯 markdown 化重构):
  *
  * - 全部内容区块经 [RecordMarkdownContent] 单管线渲染;自定义仅限两类公开扩展点:
- *   `markdownTypography()`(M3 字阶显式映射,标题收敛为 titleMedium/titleSmall 级,
+ *   `markdownTypography`(M3 字阶显式映射,标题收敛为 titleMedium/titleSmall 级,
  *   取代库默认 display* 巨型标题)+ `markdownComponents(codeFence=)`(代码块);
- * - 代码块扁平化(V28 去卡):surfaceContainerLowest 圆角容器 + 细描边,零 tonal
+ * - 代码块扁平化:surfaceContainerLowest 圆角容器 + 细描边,零 tonal
  *   elevation,顶部微型行(语言标签 + 复制/全屏出口);
  * - 语法高亮(V28 D2/D3):分词完全由 SnipMeDev Highlights 引擎承载(json→JS 分词、
  *   bash/shell→SHELL;零手搓 tokenizer),主题色经 [modevSyntaxTheme] 与 Material
@@ -360,7 +360,7 @@ private fun langLabelRes(language: String?): Int =
     }
 
 /**
- * 扁平代码块(V28 去卡化):圆角浅底容器 + 细描边(非卡片,无 elevation),
+ * 扁平代码块:圆角浅底容器 + 细描边(非卡片,无 elevation),
  * header = 语言标签(mono micro)+ 复制/全屏 TipIconButton;正文双向限高滚动,
  * json/bash 围栏经 Highlights 引擎着色(M3 同源主题),其余纯 mono。
  */

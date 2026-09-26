@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * 弹窗拦截关键词匹配模式(V37 T2.1)。
+ * 弹窗拦截关键词匹配模式。
  */
 enum class KeywordMatchMode {
     /** 子串包含(大小写不敏感)。 */
@@ -15,7 +15,7 @@ enum class KeywordMatchMode {
 }
 
 /**
- * 弹窗拦截关键词规则(V37 T2.1):文本 + 匹配模式,
+ * 弹窗拦截关键词规则:文本 + 匹配模式,
  * 宿主端由全局关键词库解析产出,经 [FeatureConfig.dialogKeywordRules] 下发;
  * 注入侧 [com.lioisme.modev.hook.hooks.DialogKeywordInterceptHooker] 消费。
  */

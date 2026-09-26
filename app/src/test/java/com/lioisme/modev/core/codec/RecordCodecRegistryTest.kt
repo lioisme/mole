@@ -55,7 +55,7 @@ class RecordCodecRegistryTest {
     fun `re-registration replaces decoder deterministically`() {
         val registry = RecordCodecRegistry()
         var calls = 0
-        // 值类型收口 MonitoredRecord(V45 T2.5)后,替身解码器同样返回类型化记录
+        // 值类型收口 MonitoredRecord后,替身解码器同样返回类型化记录
         fun record(algorithm: String) = CryptoRecord(
             packageName = "pkg.a",
             kind = CryptoKind.CIPHER,

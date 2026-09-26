@@ -11,7 +11,7 @@ import java.io.FileOutputStream
  *
  * - 行格式 `seq\tjson`:seq 为注入侧进程级单调序号,ACK 与幂等去重的依据;
  * - [append] 先落盘再发送(先写后删的 at-least-once 语义):持续打开的输出流 + flush,
- *   每 [FSYNC_EVERY] 条或 [FSYNC_INTERVAL_MS] 一次 `fd.sync()`(崩溃持久性上限 ≤ 一批);
+ *   每 [FSYNC_EVERY] 条或 [FSYNC_INTERVAL_MS] 一次 `fd.sync`(崩溃持久性上限 ≤ 一批);
  * - 双游标:[ackedSeq](宿主已确认,仅增)+ [sentSeq](已发送);[drain] 发送全部
  *   `seq > ackedSeq` 的行(乱序文件安全:低 seq 行不会被已发送高 seq 行挡住),
  *   重复发送由宿主唯一索引幂等吸收,重复量受 ACK 裁剪收敛;断连时 [resetSentCursor]

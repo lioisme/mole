@@ -7,15 +7,15 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * MediaProjection 权限自动授权 Hooker(V34):拦截 MediaProjection 权限请求,
- * 自动调用 handler.proceed() 接受授权,绕过 Android 14+ 的用户确认弹窗。
+ * MediaProjection 权限自动授权 Hooker:拦截 MediaProjection 权限请求,
+ * 自动调用 handler.proceed 接受授权,绕过 Android 14+ 的用户确认弹窗。
  *
  * 覆盖路径:
  * - Activity.startActivityForResult:检测 MediaProjection Intent 并自动授权
  * - SslErrorHandler.proceed(WebView SSL):已在 SSLBypassHooker 覆盖
  *
- * 干预机制:before() 中识别 MediaProjection 权限 Intent,反射调用
- * handler.proceed() 自动授权,用户无感知。
+ * 干预机制:before 中识别 MediaProjection 权限 Intent,反射调用
+ * handler.proceed 自动授权,用户无感知。
  */
 class MediaProjectionHooker(
     context: ProbeContext,
@@ -27,7 +27,7 @@ class MediaProjectionHooker(
 
     /**
      * hook Activity.startActivityForResult:检测 MediaProjection 权限 Intent,
-     * 自动调用 handler.proceed() 接受授权。
+     * 自动调用 handler.proceed 接受授权。
      */
     private fun hookStartActivityForResult() {
         val activityClass = runCatching { Class.forName("android.app.Activity") }.getOrNull() ?: return

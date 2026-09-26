@@ -9,7 +9,7 @@ package com.lioisme.modev.hook
  * V43 T3(V4.4 修复):暂存按**调用句柄配对**([Invocation.token] 即底层
  * chain/MethodHookParam,before/after 共享同一实例)——旧 ThreadLocal 栈方案在
  * 「原方法抛异常跳过 after」时把字节滞留线程栈(慢泄漏),嵌套/异常混排后
- * `take()` 与操作错配(记录数据错位);键控 + 容量上限把两种失效模式同时关闭。
+ * `take` 与操作错配(记录数据错位);键控 + 容量上限把两种失效模式同时关闭。
  */
 object HookerSupport {
 
@@ -20,7 +20,7 @@ object HookerSupport {
 
     /**
      * 逐 token 过期窗口(V44 T2.6,审计 P14):`after` 缺失(原方法抛异常)时条目
-     * 会滞留线程暂存表。旧形态用「`size > 32` → `clear()`」兜底——**误伤在途**:
+     * 会滞留线程暂存表。旧形态用「`size > 32` → `clear`」兜底——**误伤在途**:
      * 并发/嵌套调用超过 32 条时把别的调用尚未消费的字节一起清掉,导致记录数据错位。
      * 改为按时间窗口逐条淘汰:远超任何单次 hook 调用的存活期(30s),
      * 只回收真正的孤儿条目,在途条目零波及。

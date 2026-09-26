@@ -86,7 +86,7 @@ class MonitorEntryHeaderTest {
         rule.waitForIdle()
         openMonitorEntry()
 
-        // Hero 卡(V23):作用域 Switch 行。
+        // Hero 卡:作用域 Switch 行。
         rule.onNodeWithTag("app-scope-row").assertIsDisplayed()
 
         // 两记录入口(单应用语境)+ 顶栏返回。入口行在 Hero/统计区之下,

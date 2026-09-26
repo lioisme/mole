@@ -98,7 +98,7 @@ class AppCatalogRepository(
     }
 
     /**
-     * 模块识别双通道(V17 R1):
+     * 模块识别双通道:
      * A. meta-data 通道(`xposedmodule` / `xposedminversion`,框架元数据约定);
      * B. 资产通道(APK zip 级检测,仅 A 未命中时触发,结果按包缓存)。
      * 仅 refresh 的 IO 协程内调用(串行化),缓存免锁。

@@ -22,9 +22,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * 2. 仅当 App 内为「跟随系统」时,采用系统 per-app locale(API 33+ 系统面板设置);
  * 3. 否则跟随系统默认语言([TAG_SYSTEM])。
  *
- * 跟随系统真实性(V15):进程启动 [init] 与 Activity 重建路径
+ * 跟随系统真实性:进程启动 [init] 与 Activity 重建路径
  * [refreshForRecreation] 双点刷新——系统面板修改语言 / per-app locale 触发
- * Activity 重建时,以 [Resources.getSystem()] 重取系统默认语言并重解析
+ * Activity 重建时,以 [Resources.getSystem] 重取系统默认语言并重解析
  * per-app locale 状态,立即跟随、无需重启。
  *
  * [wrap] 出包装 Context 双路径复用:进程启动 attachBaseContext(首帧语言)
@@ -57,7 +57,7 @@ object LocaleManager {
     /** 内存态单一事实源:语言切换唯一驱动源,UI 收集即热更。 */
     val localeFlow: StateFlow<String> = _localeFlow.asStateFlow()
 
-    /** 系统默认语言(随系统语言;以 [Resources.getSystem()] 为准,不受 App 覆盖污染)。 */
+    /** 系统默认语言(随系统语言;以 [Resources.getSystem] 为准,不受 App 覆盖污染)。 */
     private var systemDefaultLocale: Locale = Locale.getDefault()
 
     /** 包装 Context 缓存(标签 → 配置级资源):切换热路径命中,零 createConfigurationContext。 */
@@ -90,7 +90,7 @@ object LocaleManager {
     /**
      * Activity 重建路径重解析(V15,MainActivity.attachBaseContext 调用):
      * 进程未重启、系统语言或 per-app locale 可能已变更 —— 以系统级
-     * [Resources.getSystem()] 刷新 [systemDefaultLocale](真系统语言,
+     * [Resources.getSystem] 刷新 [systemDefaultLocale](真系统语言,
      * 不被 App 内 Locale.setDefault 覆盖污染);pref = system 时按系统
      * per-app locale 重设 [localeFlow],「跟随系统」立即生效,无需重启。
      * 显式 App 内选择(pref ≠ system)不受系统变更影响。

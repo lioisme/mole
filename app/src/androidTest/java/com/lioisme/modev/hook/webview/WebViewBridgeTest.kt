@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
  * - 注入探针 + 桥后,页面内 WebCrypto 调用被包装并回传 → 映射为 WEB_CRYPTO 记录;
  * - crypto.subtle 不可用(非安全上下文)时静默降级,断言前提按 availability 兜底;
  * - 开关关闭(webView=false)时零回传;畸形载荷静默丢弃;
- * - maxHexChars() 与配置实时一致(JS 侧预截断闸)。
+ * - maxHexChars 与配置实时一致(JS 侧预截断闸)。
  */
 @SuppressLint("SetJavaScriptEnabled")
 @RunWith(AndroidJUnit4::class)

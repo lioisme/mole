@@ -16,7 +16,7 @@ import com.lioisme.modev.domain.server.ConnectionMonitor
 import com.lioisme.modev.domain.scope.ScopeRepository
 
 /**
- * 工具面装配工厂(V38):全部工具的唯一组装点(AppContainer 惰性调用)。
+ * 工具面装配工厂:全部工具的唯一组装点(AppContainer 惰性调用)。
  * 依赖面 = 方法层契约集合(V45 T2.2:零 `data.*` 类型,与 UI ViewModel 同一上游);
  * 工具数量/名单唯一事实源 = 本工厂产出的 registry(冻结快照见 `McpToolParityTest`)。
  * [mcpSnapshot] 由 AppContainer 以自引用惰性 lambda 注入(server_status 消费,

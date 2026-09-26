@@ -12,7 +12,7 @@ import com.lioisme.modev.hook.hooks.UiInteractionBaseHooker
 import com.lioisme.modev.hook.hooks.WidgetTextHooker
 
 /**
- * UI 交互监听探针(V33 一等公民):装配三 Hooker——对话框位置+返回键、
+ * UI 交互监听探针:装配三 Hooker——对话框位置+返回键、
  * 对话框关键词拦截、控件文本赋值。
  * recordType = [RecordTypes.UI_INTERACTION]。
  */

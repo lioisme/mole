@@ -76,7 +76,7 @@ class McpTokensScreenTest {
     }
 
     private fun openMenu() {
-        // ⋮ 按钮可能落在视口外(列表可滚):视口外 performClick 被静默丢弃(V45 实锤),
+        // ⋮ 按钮可能落在视口外(列表可滚):视口外 performClick 被静默丢弃,
         // 故先滚进视口再点。
         rule.clickScrolledIntoView(hasTestTag("token-more-${seeded.id}"))
         rule.waitForIdle()

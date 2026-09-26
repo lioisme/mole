@@ -6,7 +6,7 @@ import com.lioisme.modev.hook.ProbeContext
 import java.io.File
 
 /**
- * 文件元操作 Hooker(V27):java.io.File 的删除/重命名/建目录/列目录。
+ * 文件元操作 Hooker:java.io.File 的删除/重命名/建目录/列目录。
  * 仅 after 且原方法正常返回后触发(delete/renameTo 以返回值 true 为准,
  * false = 操作失败不记录);list/listFiles 返回 null(目录不存在)不记录。
  */

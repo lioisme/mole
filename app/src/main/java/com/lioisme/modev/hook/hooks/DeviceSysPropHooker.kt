@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
- * 模拟器系统属性伪造 Hooker(V34):拦截 System.getProperty 全量系统属性读取,
+ * 模拟器系统属性伪造 Hooker:拦截 System.getProperty 全量系统属性读取,
  * 对模拟器特征属性返回真实设备值,防止检测框架通过 ro.* 属性识别环境。
  *
  * 覆盖属性:
@@ -24,7 +24,7 @@ class DeviceSysPropHooker(
     context: ProbeContext,
 ) : DeviceEnvBaseHooker(context) {
 
-    /** 重入守卫(V43 T3,V4.5):回调体内调 System.getProperty 命中本钩子自身。 */
+    /** 重入守卫:回调体内调 System.getProperty 命中本钩子自身。 */
     private val inHook = ThreadLocal.withInitial { false }
 
     override fun install() {

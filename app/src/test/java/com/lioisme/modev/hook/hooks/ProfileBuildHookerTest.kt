@@ -25,7 +25,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * 画像强制档 · Build 一族的行为回归(V49 WP-D1)。
+ * 画像强制档 · Build 一族的行为回归。
  *
  * 两层判据分开钉:
  *  1. **计划表**(纯函数):画像填了哪几项就该写哪几项、值逐字取自画像、一项没填就零条计划
@@ -50,7 +50,7 @@ class ProfileBuildHookerTest {
             config = { switch },
             configWatcher = ConfigWatcher(),
             tracker = CryptoContextTracker,
-            // 必须 start():未启动的 sink 在 `emit` 首句 `if (!running) return` 就丢弃,
+            // 必须 start:未启动的 sink 在 `emit` 首句 `if (!running) return` 就丢弃,
             // 下面两条审计断言会恒绿在空列表上(V49 WP-D2 实测抓到这条假绿形态)。
             sink = RecordSink(
                 jsonOf = { record -> sink += record; "" },

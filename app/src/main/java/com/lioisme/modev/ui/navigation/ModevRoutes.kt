@@ -36,34 +36,34 @@ object ModevRoutes {
     const val LICENSE_DETAIL = "settings/licenses/{index}"
     const val ALGORITHM_RECORDS = "records/algorithm/{packageName}"
     const val DATABASE_RECORDS = "records/database/{packageName}"
-    /** 每应用行为记录列表(V27 一等公民)。 */
+    /** 每应用行为记录列表。 */
     const val BEHAVIOR_RECORDS = "records/behavior/{packageName}"
-    /** 每应用偏好记录列表(V28 一等公民)。 */
+    /** 每应用偏好记录列表。 */
     const val PREFS_RECORDS = "records/prefs/{packageName}"
-    /** 每应用 WebView 记录列表(V29 一等公民)。 */
+    /** 每应用 WebView 记录列表。 */
     const val WEBVIEW_RECORDS = "records/webview/{packageName}"
-    /** 每应用网络环境监听记录列表(V30 一等公民)。 */
+    /** 每应用网络环境监听记录列表。 */
     const val NETWORK_RECORDS = "records/network/{packageName}"
-    /** 每应用设备环境监听记录列表(V31 一等公民)。 */
+    /** 每应用设备环境监听记录列表。 */
     const val DEVICE_ENV_RECORDS = "records/device_env/{packageName}"
-    /** 每应用 UI 交互监听记录列表(V33 一等公民)。 */
+    /** 每应用 UI 交互监听记录列表。 */
     const val UI_INTERACTION_RECORDS = "records/ui_interaction/{packageName}"
-    /** 每应用系统信息监听记录列表(V33 一等公民)。 */
+    /** 每应用系统信息监听记录列表。 */
     const val SYSTEM_RECORDS = "records/system/{packageName}"
-    /** 每应用进程控制监听记录列表(V33 一等公民)。 */
+    /** 每应用进程控制监听记录列表。 */
     const val PROCESS_CONTROL_RECORDS = "records/process_control/{packageName}"
     /**
      * 按类型全局记录列表(V40 T4 双维度浏览:类型 × 全部应用;
      * 数据管理页类型计数行入口,`records/type/{recordType}`)。
      */
     const val GLOBAL_TYPE_RECORDS = "records/type/{recordType}"
-    /** 每应用监听设置页(V24 二态偏差)。 */
+    /** 每应用监听设置页。 */
     const val APP_LISTEN_SETTINGS = "apps/{packageName}/listen-settings"
     /** 每应用功能设置页(V37 双域拆分:干预开关 + 关键词启用 + 画像选择)。 */
     const val APP_FEATURE_SETTINGS = "apps/{packageName}/feature-settings"
     /** 每应用画像微调页(V49 R-2:41 项逐项覆写,改一项不必动整张共享画像)。 */
     const val APP_PROFILE_TUNE = "apps/{packageName}/profile-tune"
-    /** 全局关键词库管理页(V37 T3.5)。 */
+    /** 全局关键词库管理页。 */
     const val KEYWORD_LIBRARY = "settings/keywords"
     /** 全局伪装画像库管理页(V37 T3.5 三常量单选页;V47 WP-5 改为可视化画像库列表)。 */
     const val SPOOF_PROFILES = "settings/profiles"
@@ -71,7 +71,7 @@ object ModevRoutes {
     const val PROFILE_EDITOR = "settings/profiles/{profileId}"
 
     /**
-     * 画像草稿前缀(V47 WP-5):**库里没有对应行的新建态**。
+     * 画像草稿前缀:**库里没有对应行的新建态**。
      *
      * 新建必须走草稿而不是先落一行空画像 —— 画像库契约拒绝零字段条目
      * (`SpoofProfileService.create` 对空正文返回 null),且用户中途放弃不应
@@ -87,7 +87,7 @@ object ModevRoutes {
     fun draftNameOf(profileId: String): String? =
         profileId.substringAfter(PROFILE_DRAFT_PREFIX).takeIf { profileId.startsWith(PROFILE_DRAFT_PREFIX) }
 
-    /** 全局检测黑名单追加页(V37 T3.5)。 */
+    /** 全局检测黑名单追加页。 */
     const val FEATURE_BLACKLIST = "settings/blacklist"
 
     fun appMonitor(packageName: String): String = "apps/${enc(packageName)}/monitor"

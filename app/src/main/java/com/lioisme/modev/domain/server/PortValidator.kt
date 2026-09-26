@@ -8,7 +8,7 @@ import java.net.ServerSocket
 import java.net.SocketException
 
 /**
- * 端口可用性校验(V42 T3,D-3):编辑链路的「是否可用」三闸 + 范围防御。
+ * 端口可用性校验:编辑链路的「是否可用」三闸 + 范围防御。
  * domain 层零 Android 依赖(JVM 直测);P5-1 边界内——UI 经 ServicesViewModel
  * 消费,禁 import data.server 实现类型。
  *

@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * WebView 监听类别(V29 一等公民):覆盖 WebView 全生命周期行为。
+ * WebView 监听类别:覆盖 WebView 全生命周期行为。
  *
  * 默认启用态与 [CategoryTaxonomy] 噪点分级一致:
  * - 高信号默认开:PAGE_LOAD/EVALUATE_JS/JS_BRIDGE/DEBUG(低频高价值);
@@ -20,6 +20,6 @@ enum class WebViewKind {
     /** 调试开关(setWebContentsDebuggingEnabled)。 */
     DEBUG,
 
-    /** JS 密码学包装(WebCrypto/CryptoJS/JSEncrypt,迁移自 WEB_CRYPTO)。 */
+    /** JS 密码学包装(WebCrypto/CryptoJS/JSEncrypt)。 */
     JS_CRYPTO,
 }

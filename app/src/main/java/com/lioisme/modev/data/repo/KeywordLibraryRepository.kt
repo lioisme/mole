@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 /**
- * 全局弹窗拦截关键词库仓库(V37 T2.1):
+ * 全局弹窗拦截关键词库仓库:
  *
  * - DAO 全量流 → 内存快照([entries]),UI 与配置解析均读快照(同步、无阻塞);
  * - [add] 以 text 唯一索引去重(冲突返回 false,UI 提示重复);
@@ -33,7 +33,7 @@ class KeywordLibraryRepository(
     override val entries: StateFlow<List<KeywordEntry>> = _entries.asStateFlow()
 
     init {
-        // 收集器容错收场(V38):Robolectric 等环境下仓库可能随宿主沙箱一起消亡
+        // 收集器容错收场:Robolectric 等环境下仓库可能随宿主沙箱一起消亡
         // (DB 关闭后 arch_disk_io 线程仍在),一次发射失败即终止收集而非向全局
         // 异常通道泄漏(污染同 JVM 后续用例);生产进程级生命周期下无此路径。
         scope.launch {

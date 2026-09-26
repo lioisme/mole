@@ -11,7 +11,7 @@ import com.lioisme.modev.domain.record.PrefsRow
 import com.lioisme.modev.domain.record.RowModel
 
 /**
- * 偏好记录映射(V28):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
+ * 偏好记录映射:wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
  * 与 [BehaviorRecordMappers] 同构;枚举严格解析(未知返回 null,绝不误标)。
  *
  * 列复用(ADR-1 单表):path=配置文件路径;content 五元组=键值内容;

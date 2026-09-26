@@ -42,6 +42,6 @@ object RemotePrefsBridge {
     /** 握手令牌(host 生成写入;无服务时 null)。 */
     fun token(): String? = prefs()?.getString(TOKEN_KEY, null)
 
-    /** 全局捕获配置键(V10):配置与包名解耦,全应用共享一份。 */
+    /** 全局捕获配置键:配置与包名解耦,全应用共享一份。 */
     const val GLOBAL_SWITCH_KEY = ConfigKeys.GLOBAL_SWITCH
 }

@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * JSON-RPC 2.0 编解码门禁(V38):解析/错误码/响应形态/通知语义。
+ * JSON-RPC 2.0 编解码门禁:解析/错误码/响应形态/通知语义。
  */
 class JsonRpcTest {
 

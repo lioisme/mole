@@ -43,7 +43,7 @@ class ProbeContext(
     val engine: HookEngine,
     /** 捕获配置快照(每次调用现读,变更即生效)。 */
     val config: () -> HookSwitch,
-    /** 配置变更订阅器(V37 T0.2):安装期一次性动作的延迟评估通道;测试可省略(空订阅)。 */
+    /** 配置变更订阅器:安装期一次性动作的延迟评估通道;测试可省略(空订阅)。 */
     val configWatcher: ConfigWatcher = ConfigWatcher(),
     /** 上下文追踪器(同一算法操作链路的关联)。 */
     val tracker: CryptoContextTracker,
@@ -52,7 +52,7 @@ class ProbeContext(
     /** 主包名(记录归档键,分离进程归并后)。 */
     val packageName: String,
     /**
-     * 目标 App classloader 惰性取用(V38):注入早于 Application 时为 null,每次调用重试。
+     * 目标 App classloader 惰性取用:注入早于 Application 时为 null,每次调用重试。
      * 模块注入类的 Class.forName 委派链不含 app dex → okhttp 等 app 类必须经此 loader
      * 显式装载(installSslHooksFor 消费)。
      */

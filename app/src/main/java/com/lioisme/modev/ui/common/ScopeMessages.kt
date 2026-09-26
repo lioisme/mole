@@ -4,7 +4,7 @@ import com.lioisme.modev.R
 import com.lioisme.modev.domain.scope.ScopeChangeResult
 
 /**
- * 作用域变更结果 → 本地化提示(V23 消重):此前 AppsViewModel 与
+ * 作用域变更结果 → 本地化提示:此前 AppsViewModel 与
  * AppMonitorViewModel 各持一份私有映射;domain 零硬编码契约不变,
  * 文案资源解析仍由 UI 层(Snackbar)承担。
  */

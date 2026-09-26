@@ -11,7 +11,7 @@ import com.lioisme.modev.hook.SqlContextTracker
 /**
  * SQLiteOpenHelper 门面 Hooker(T7):
  * getWritableDatabase/getReadableDatabase 为隐式打开(after 注册返回 DB 实例上下文,
- * emit OPEN_HELPER,dbName=getDatabaseName()、dbPath=返回库路径、helper 类名入 params);
+ * emit OPEN_HELPER,dbName=getDatabaseName、dbPath=返回库路径、helper 类名入 params);
  * close 为显式关闭(emit CLOSE_HELPER)。
  */
 class SqlOpenHelperHooker(

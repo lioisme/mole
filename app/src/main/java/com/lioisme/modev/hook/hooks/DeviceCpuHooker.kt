@@ -17,21 +17,21 @@ import com.lioisme.modev.hook.SharedMethodBroadcast
  *  1. **`/proc/cpuinfo` 正文改写自始未生效**(V49-DFC-13):旧实装查的是
  *     `java.io.File.getMethod("readText", Charset)`,而 `readText` 是 `kotlin.io` 的
  *     **扩展函数**(编译成静态 `TextStreamsKt.readText(File, Charset)`),`File` 上根本
- *     没有这个成员 ⇒ `NoSuchMethodException` 被 `getOrNull() ?: return` 咽掉,钩子从未注册。
+ *     没有这个成员 ⇒ `NoSuchMethodException` 被 `getOrNull ?: return` 咽掉,钩子从未注册。
  *     本批把这条死路整体删除(留着就是「文档说掩蔽 cpuinfo、实装零钩子」的漂移本体);
  *     真正可用的钩点(`TextStreamsKt` 经 app classloader,或 `FileInputStream`)属设计题,
  *     归 V49-DFC-13,须连同时机/开销一起定档,不在画像批次里顺手猜。
  *  2. **与画像强制档共享读口**:[ProfileCpuHooker] 无条件写同一个 `availableProcessors`,
- *     所以画像填了核数时本类让位(V49 R-D),两侧经 [SharedMethodBroadcast] 共用单一注册点。
+ *     所以画像填了核数时本类让位,两侧经 [SharedMethodBroadcast] 共用单一注册点。
  */
 class DeviceCpuHooker(
     context: ProbeContext,
 ) : DeviceEnvBaseHooker(context) {
 
-    /** 假核数(V37 T2.3):取自生效伪装画像。 */
+    /** 假核数:取自生效伪装画像。 */
     private fun fakeCores(): Int = config().activeSpoofProfile().cpuCores
 
-    /** 条件档是否生效 = 自身门控开 **且** 画像核数不在场(V49 WP-D2)。 */
+    /** 条件档是否生效 = 自身门控开 **且** 画像核数不在场。 */
     private fun maskActive(): Boolean =
         featureOn(DeviceEnvKind.EMULATOR_CPU) &&
             !ProfileHookPlan.adaptiveMaskShouldYield(

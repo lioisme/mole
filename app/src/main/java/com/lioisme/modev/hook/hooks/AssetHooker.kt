@@ -6,7 +6,7 @@ import com.lioisme.modev.core.model.BehaviorOperation
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * Assets 资源 Hooker(V27):AssetManager.open/openFd/list 全公开重载。
+ * Assets 资源 Hooker:AssetManager.open/openFd/list 全公开重载。
  *
  * 被动红线:open 返回的流绝不读取(消费会破坏宿主读取位置),内容预览不适用于
  * 本 Hooker(整读 API 内容采集由 [NioFilesHooker] 承担);openFd 的长度为

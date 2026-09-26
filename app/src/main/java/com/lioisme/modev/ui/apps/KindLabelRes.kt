@@ -33,7 +33,7 @@ import com.lioisme.modev.ui.components.webviewKindLabelRes
  * - 裸 id 字符串 when 表按分支序 first-wins,`SIGNATURE` 的 SystemKind 分支恒不可达
  *   (系统信息签名行被误标为算法签名),`OPEN` 依赖「偏好前置」脆弱约定;
  * - 本表曾与 [com.lioisme.modev.ui.components.kindLabelRes] 各自持表,
- *   同 kind 双资源键(WEB_CRYPTO:switch_webview vs kind_webview)。
+ *   同 kind 双资源键(同一类别同时存在 switch_* 与 kind_* 两个标签)。
  *
  * 未知 (type,id) → [R.string.unknown_error] 兜底(理论不可达:调用方恒传
  * taxonomy 已登记类别;[KindLabelResExhaustiveTest] 锁全类别非兜底)。

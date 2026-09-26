@@ -19,7 +19,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * 存储索引与管道回归探针(V23 T6.2):
+ * 存储索引与管道回归探针:
  * - 必需索引存在性门禁:6 个索引(含 v3 唯一幂等索引、v5 时间戳、v8 复合筛选索引)
  *   任一缺失即红 —— 防迁移/实体改动静默丢索引;
  * - WAL 加固后端到端冒烟:批量插入(@Transaction)→ RecordFilter 计数/切片一致

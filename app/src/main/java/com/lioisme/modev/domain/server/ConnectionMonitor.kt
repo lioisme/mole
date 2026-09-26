@@ -20,7 +20,7 @@ interface ConnectionMonitor {
     val connectedPackagesFlow: StateFlow<Set<String>>
 
     /**
-     * 当前监听绑定地址(V26 外部访问):[BIND_LOOPBACK] / [BIND_ALL_INTERFACES];
+     * 当前监听绑定地址:[BIND_LOOPBACK] / [BIND_ALL_INTERFACES];
      * 未绑定(服务未启动/重绑退避中)= null。诊断页展示消费。
      */
     val boundAddress: StateFlow<String?>

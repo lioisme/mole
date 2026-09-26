@@ -10,7 +10,7 @@ import com.lioisme.modev.hook.hooks.SignatureMonitorHooker
 import com.lioisme.modev.hook.hooks.SystemBaseHooker
 
 /**
- * 系统信息监听探针(V33 一等公民):装配三 Hooker——Logcat 捕获、
+ * 系统信息监听探针:装配三 Hooker——Logcat 捕获、
  * 应用信息采集、签名读取监控。
  * recordType = [RecordTypes.SYSTEM]。
  */

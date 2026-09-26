@@ -17,7 +17,7 @@ import org.junit.Test
 /**
  * V43 T3 契约忠实化回归(V2.5):root 命令拦截以 IOException 结束调用
  * (Runtime.exec / ProcessBuilder.start 的失败契约),绝不 setResult(null)
- * 让宿主 waitFor()/流读取 NPE。
+ * 让宿主 waitFor/流读取 NPE。
  */
 class RootExecContractTest {
 

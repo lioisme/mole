@@ -12,7 +12,7 @@ import com.lioisme.modev.domain.record.BehaviorRow
 import com.lioisme.modev.domain.record.RowModel
 
 /**
- * 行为记录映射(V27):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
+ * 行为记录映射:wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
  * 与 [CryptoRecordMappers] 同构;枚举严格解析(未知返回 null,绝不误标)。
  */
 

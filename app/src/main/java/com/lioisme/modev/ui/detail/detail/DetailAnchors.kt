@@ -46,7 +46,7 @@ fun sqlAnchors(record: SqlRecord): List<DetailAnchor> {
     return anchors
 }
 
-/** 行为记录锚点(V27):命令 / 内容预览 / 参数 / 调用栈(按存在性)。 */
+/** 行为记录锚点:命令 / 内容预览 / 参数 / 调用栈(按存在性)。 */
 fun behaviorAnchors(record: BehaviorRecord): List<DetailAnchor> {
     val anchors = mutableListOf<DetailAnchor>()
     if (!record.command.isNullOrEmpty()) anchors += DetailAnchor("command", R.string.section_command)
@@ -56,7 +56,7 @@ fun behaviorAnchors(record: BehaviorRecord): List<DetailAnchor> {
     return anchors
 }
 
-/** 偏好记录锚点(V28):值 / 参数 / 调用栈(按存在性)。 */
+/** 偏好记录锚点:值 / 参数 / 调用栈(按存在性)。 */
 fun prefsAnchors(record: PrefsRecord): List<DetailAnchor> {
     val anchors = mutableListOf<DetailAnchor>()
     if (record.value != null) anchors += DetailAnchor("value", R.string.section_value)
@@ -65,7 +65,7 @@ fun prefsAnchors(record: PrefsRecord): List<DetailAnchor> {
     return anchors
 }
 
-/** WebView 记录锚点(V29):脚本 / 参数 / 调用栈(按存在性)。 */
+/** WebView 记录锚点:脚本 / 参数 / 调用栈(按存在性)。 */
 fun webviewAnchors(record: WebViewRecord): List<DetailAnchor> {
     val anchors = mutableListOf<DetailAnchor>()
     if (record.script != null) anchors += DetailAnchor("script", R.string.section_script)
@@ -74,7 +74,7 @@ fun webviewAnchors(record: WebViewRecord): List<DetailAnchor> {
     return anchors
 }
 
-/** 网络环境监听记录锚点(V30)。 */
+/** 网络环境监听记录锚点。 */
 fun networkAnchors(record: NetworkRecord): List<DetailAnchor> {
     val anchors = mutableListOf<DetailAnchor>()
     if (record.stack.isNotEmpty()) anchors += DetailAnchor("stack", R.string.section_stack)
@@ -83,7 +83,7 @@ fun networkAnchors(record: NetworkRecord): List<DetailAnchor> {
     return anchors
 }
 
-/** 设备环境监听记录锚点(V31)。 */
+/** 设备环境监听记录锚点。 */
 fun deviceEnvAnchors(record: DeviceEnvRecord): List<DetailAnchor> {
     val anchors = mutableListOf<DetailAnchor>()
     if (record.stack.isNotEmpty()) anchors += DetailAnchor("stack", R.string.section_stack)

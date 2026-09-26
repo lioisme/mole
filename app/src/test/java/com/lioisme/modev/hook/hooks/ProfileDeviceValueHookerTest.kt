@@ -30,7 +30,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * 画像强制档 · 密度 / 核数 / 电池三族的行为回归(V49 WP-D2)。
+ * 画像强制档 · 密度 / 核数 / 电池三族的行为回归。
  *
  * 三族同一机制(纯计划函数 + 广播订阅 + 门控),所以一个测试类分三段,不再抄三份夹具。
  * 与被测语义分开钉的两层:
@@ -95,7 +95,7 @@ class ProfileDeviceValueHookerTest {
 
     @After
     fun restoreSystemResources() {
-        // 本类会就地改写 `Resources.getSystem()` 的缓存实例,不还原就是跨用例污染。
+        // 本类会就地改写 `Resources.getSystem` 的缓存实例,不还原就是跨用例污染。
         system.displayMetrics.densityDpi = originalDpi
         system.displayMetrics.density = originalDpi / 160f
         system.displayMetrics.scaledDensity = system.displayMetrics.density

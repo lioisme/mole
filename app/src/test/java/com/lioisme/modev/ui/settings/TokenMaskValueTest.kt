@@ -5,7 +5,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
- * 令牌页掩码函数契约(V40 T6):前 4 + 6 圆点 + 后 4 摘要形态;
+ * 令牌页掩码函数契约:前 4 + 6 圆点 + 后 4 摘要形态;
  * 短值(≤8)全掩不泄露结构;空串零输出。
  */
 class TokenMaskValueTest {

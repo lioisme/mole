@@ -14,11 +14,11 @@ import com.lioisme.modev.hook.SharedMethodBroadcast
  * 返回基于包名哈希的稳定假值,防止模拟器检测框架通过电话信息识别环境。
  *
  * 覆盖 API:
- * - getDeviceId():15 位 IMEI 格式假值
- * - getImei()/getImei(slot):双卡 IMEI 假值
- * - getSubscriberId():IMSI 格式假值
- * - getSimSerialNumber():ICCID 格式假值
- * - getLine1Number():手机号格式假值
+ * - getDeviceId:15 位 IMEI 格式假值
+ * - getImei/getImei(slot):双卡 IMEI 假值
+ * - getSubscriberId:IMSI 格式假值
+ * - getSimSerialNumber:ICCID 格式假值
+ * - getLine1Number:手机号格式假值
  *
  * 假值生成策略:包名哈希确定性映射(同包名始终产生同假值,防不一致检测)。
  *

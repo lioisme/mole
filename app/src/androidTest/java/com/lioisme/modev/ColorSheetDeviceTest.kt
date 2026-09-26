@@ -28,7 +28,7 @@ import org.junit.runner.RunWith
  * - 点选色点即写 ThemeConfig(useWallpaper=false + customSeedColor)且选择即生效不关弹层;
  * - 「跟随系统壁纸」行恢复壁纸模式(useWallpaper=true);
  * - sheet 关闭路径正常(onDismissRequest 收口)。
- * 前置/卫生:@After 恢复壁纸模式(V41 工厂默认)。
+ * 前置/卫生:@After 恢复壁纸模式。
  */
 @RunWith(AndroidJUnit4::class)
 class ColorSheetDeviceTest {

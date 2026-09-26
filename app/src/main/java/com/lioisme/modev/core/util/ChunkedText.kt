@@ -2,7 +2,7 @@ package com.lioisme.modev.core.util
 
 /**
  * 惰性分块字符串视图(V30 行边界对齐):
- * 以 O(N) 预计算行边界 + O(1) 按 index 取块,取代 `String.chunked()` 的全量
+ * 以 O(N) 预计算行边界 + O(1) 按 index 取块,取代 `String.chunked` 的全量
  * 列表物化——详情页展开态仅组合可视块,主线程零大分配、零重复物化。
  *
  * 行边界对齐:切割点 snap 到最近的换行符,保证每个 chunk 以完整行结尾

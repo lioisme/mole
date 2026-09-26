@@ -11,12 +11,12 @@ import com.lioisme.modev.domain.record.DeviceEnvRow
 import com.lioisme.modev.domain.record.RowModel
 
 /**
- * 设备环境监听记录映射(V31 一等公民):wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
+ * 设备环境监听记录映射:wire 模型 ↔ 实体 ↔ 投影行 ↔ 详情模型,
  * 与 [NetworkRecordMappers] 同构;枚举严格解析(未知返回 null,绝不误标)。
  *
  * 列复用(ADR-1 单表,**本段与下方实现逐行对齐** —— V47 T2 修正此前注释与实现的
  * 四处漂移,漂移会让读代码的人按错的列去查数据):
- *   algorithm=targetSummary();path=targetPath;destPath=targetClass;
+ *   algorithm=targetSummary;path=targetPath;destPath=targetClass;
  *   command=targetProperty;sql=detectionPattern;
  *   proxyHost=originalValue(干预前原值);maskedValue=干预后值(V47 T2 新增列,
  *     两者配对 = 伪装的双侧 oracle);

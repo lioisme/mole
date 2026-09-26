@@ -3,7 +3,7 @@ package com.lioisme.modev.mcp.tools
 import com.google.gson.JsonObject
 
 /**
- * MCP 工具(V38):Agent 面向能力的最小契约。
+ * MCP 工具:Agent 面向能力的最小契约。
  * 实现仅允许依赖 UI 同源上游(domain、data.repo、core 三族包,B2 allowlist,
  * `McpLayerBoundaryTest` 强制);工具文本一律英文(B4,非用户可见文本)。
  */

@@ -24,7 +24,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 偏好监听真机端到端(V28):宿主进程内以 PrefsProbe 装配三 Hooker
+ * 偏好监听真机端到端:宿主进程内以 PrefsProbe 装配三 Hooker
  * (PrefsFakePlatform 捕获注册,手动按调用时序驱动真实 SharedPreferencesImpl),
  * 验证 OPEN→GET→PUT→REMOVE→CLEAR 全链产出、实例索引路径回填、
  * fileContentCapture 闸门(D6)与开关关闭零产出。

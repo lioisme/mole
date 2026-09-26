@@ -14,7 +14,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * 算法展示名单一事实源契约(V16 R1 空白治理):
+ * 算法展示名单一事实源契约:
  * algorithm 为 null/空串/纯空白 → 回退类别名(恒有,杜绝列表行/详情标题/摘要空白);
  * 正常值原样透传。
  */

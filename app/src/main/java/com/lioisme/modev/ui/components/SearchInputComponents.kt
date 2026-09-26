@@ -138,7 +138,7 @@ fun SearchInputField(
 }
 
 /**
- * 槽按压窗口观测(V42 T1):记录容器内按下→全部指针释放的窗口。
+ * 槽按压窗口观测:记录容器内按下→全部指针释放的窗口。
  * 仅观测不消费(requireUnconsumed=false 覆盖按钮已消费事件),按钮 click/
  * 长按 tooltip 行为零改变;try/finally 保证取消路径不残留按压态。
  */

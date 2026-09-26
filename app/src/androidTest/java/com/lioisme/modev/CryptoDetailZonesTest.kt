@@ -33,7 +33,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * 算法详情页数据关系分区验收(V20 R4):
+ * 算法详情页数据关系分区验收:
  * - AES 加密记录(方向=加密,key + iv + input + output):
  *   数据流分区(分区头 + 输入(明文) → 流向箭头 → 输出(密文))+
  *   密钥材料分区(分区头)+ 元数据算法行;

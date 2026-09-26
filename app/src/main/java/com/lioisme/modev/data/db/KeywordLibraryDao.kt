@@ -8,7 +8,7 @@ import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 关键词库 DAO(V37 T2.1):全量流观测(内存快照缓存驱动)+ 幂等增删改。
+ * 关键词库 DAO:全量流观测(内存快照缓存驱动)+ 幂等增删改。
  * [insertIgnore] 以 text 唯一索引去重(冲突返回 -1,调用方据此提示重复)。
  */
 @Dao

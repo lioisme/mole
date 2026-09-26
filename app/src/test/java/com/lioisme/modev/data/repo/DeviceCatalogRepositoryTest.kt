@@ -14,7 +14,7 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
 
 /**
- * 真机目录仓库测试(V47):测的是**资产通路 + 缓存口径**,不是解析细节
+ * 真机目录仓库测试:测的是**资产通路 + 缓存口径**,不是解析细节
  * (解析与写入语义由纯 JVM 的 `core.model.DeviceCatalogTest` 逐条钉住,那里零 Robolectric)。
  *
  * 四条口径:

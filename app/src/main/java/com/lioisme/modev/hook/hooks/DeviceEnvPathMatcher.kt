@@ -4,7 +4,7 @@ package com.lioisme.modev.hook.hooks
  * Root/模拟器路径匹配纯函数——可脱离 Android 框架在 JVM 单测中验证。
  *
  * 匹配规则:精确相等 / 前缀+路径分隔符(`/`) / 前缀+扩展名(`.`),
- * 杜绝 `contains()` 子串误杀(如 `/data/user/0` 不应匹配 `/su`)。
+ * 杜绝 `contains` 子串误杀(如 `/data/user/0` 不应匹配 `/su`)。
  */
 object DeviceEnvPathMatcher {
 

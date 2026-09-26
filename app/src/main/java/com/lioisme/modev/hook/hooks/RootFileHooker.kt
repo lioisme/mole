@@ -7,10 +7,10 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * 文件存在性检测干预 Hooker(V31):统一拦截 java.io.File 的 exists/length/canRead,
+ * 文件存在性检测干预 Hooker:统一拦截 java.io.File 的 exists/length/canRead,
  * 同时覆盖 root 路径与模拟器路径检测,避免同一方法被多个 hooker 重复 hook。
  *
- * 合并自原 RootFileHooker + EmulatorFileHooker 的 File.exists() hook,
+ * 合并自原 RootFileHooker + EmulatorFileHooker 的 File.exists hook,
  * 减少热路径回调开销(三合一→单一)。
  *
  * 路径匹配优化:使用 HashSet 存储路径后缀,O(1) 查找替代 List 遍历。

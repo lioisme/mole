@@ -25,7 +25,7 @@ import com.lioisme.modev.core.model.WebViewOperation
  * 列表行轻量模型(ADR-10,数据库监听 T9):
  * 数据库投影行([CryptoRecordRow])按 [recordType] 分派为本密封族,
  * 算法行复用轻量 [CryptoRecord](投影预览),数据库行承载 SQL 摘要等投影列,
- * 行为行(V27)承载路径/命令等投影列,
+ * 行为行承载路径/命令等投影列,
  * 列表/时间线/分页/邻接场景零大字段物化。
  */
 sealed interface RowModel {
@@ -309,5 +309,5 @@ data class ProcessRow(
     override val id: Long get() = recordId
     override val timestamp: Long get() = recordTimestamp
     // V43 T4:进程行 headline 由 UI 侧以资源本地化承担(操作名 + 拆分参数行);
-    // 旧 headlineText() 硬编码英文("exit=…"/"detected")随 V3.3 违规一并清除。
+    // 旧 headlineText 硬编码英文("exit=…"/"detected")随 V3.3 违规一并清除。
 }

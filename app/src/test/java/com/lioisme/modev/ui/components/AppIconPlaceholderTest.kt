@@ -26,7 +26,7 @@ import org.robolectric.annotation.Config
 /**
  * AppIcon 占位底图状态驱动回归(V42 T2,Robolectric 全装配驱动):
  * 占位首字母块必须为「加载中/失败态限定」——加载成功(Success)后立即移除,
- * 不规则/透明图标不再透出底层色块(V42 R2 主诉);加载失败仍保持首字母兜底。
+ * 不规则/透明图标不再透出底层色块;加载失败仍保持首字母兜底。
  * 两用例经 fake [ImageLoader] 注入(成功/失败双路),与生产 loader 零耦合;
  * 两用例使用不同包名,规避 Coil MemoryCache 跨用例命中(键 = "icon:{pkg}")。
  */

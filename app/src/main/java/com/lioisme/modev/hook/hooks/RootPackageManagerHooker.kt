@@ -9,10 +9,10 @@ import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
- * Root 包管理器查询干预 Hooker(V31):拦截 PackageManager 的包列表查询方法,
+ * Root 包管理器查询干预 Hooker:拦截 PackageManager 的包列表查询方法,
  * 从返回结果中过滤 root 管理应用,阻止应用通过已安装包列表检测 root。
  *
- * 注意:PackageInfo 的包名是 public field `packageName`,不是方法 `getPackageName()`。
+ * 注意:PackageInfo 的包名是 public field `packageName`,不是方法 `getPackageName`。
  * 使用 field 访问而非反射调用不存在的方法。
  */
 class RootPackageManagerHooker(
@@ -27,7 +27,7 @@ class RootPackageManagerHooker(
     }
 
     /**
-     * `packageName` 字段句柄按类缓存(V44 T2.5):旧形态在逐包 filter 里对每个元素
+     * `packageName` 字段句柄按类缓存:旧形态在逐包 filter 里对每个元素
      * 做 `javaClass.getField("packageName")`——列表 300+ 项时每调用一次 getPackageInfo/
      * getInstalledPackages 就是 300+ 次反射解析(外加首次 miss 的异常构造)。
      * [com.lioisme.modev.hook.ClassValueCache] = 每类一份、随类卸载回收;
@@ -164,7 +164,7 @@ class RootPackageManagerHooker(
         })
     }
 
-    /** Root 包名判定(V37 T2.4):内置基线 ∪ 用户追加项(extraRootPackages)。 */
+    /** Root 包名判定:内置基线 ∪ 用户追加项(extraRootPackages)。 */
     private fun isRootPackage(packageName: String): Boolean =
         ROOT_PACKAGES.any { it.equals(packageName, ignoreCase = true) } ||
             config().feature.extraRootPackages.any { it.isNotBlank() && it.equals(packageName, ignoreCase = true) }

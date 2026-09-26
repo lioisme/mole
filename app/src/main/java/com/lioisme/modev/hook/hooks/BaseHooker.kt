@@ -30,7 +30,7 @@ abstract class BaseHooker(
     protected val contextRef = context
 
     /**
-     * 目标进程名(V44 T2.6):经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
+     * 目标进程名:经 [com.lioisme.modev.hook.ProcessIdentity] 单例读取——
      * 旧形态每个 Hooker 基类各自 `by lazy` 读一次 `/proc/self/cmdline`,冷启动期
      * 约 50 个实例 = 50 次文件读 + 字节解码,而进程身份在进程内恒定不变。
      */
@@ -40,7 +40,7 @@ abstract class BaseHooker(
 
     protected fun enabled(): Boolean = config().enabled(kind)
 
-    /** 通用 provider 提取:getInstance 返回对象的标准化门面均带 getProvider()。 */
+    /** 通用 provider 提取:getInstance 返回对象的标准化门面均带 getProvider。 */
     protected fun providerOf(instance: Any?): String? =
         runCatching {
             instance?.javaClass?.getMethod("getProvider")?.invoke(instance) as? Provider

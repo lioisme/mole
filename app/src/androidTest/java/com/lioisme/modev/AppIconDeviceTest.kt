@@ -13,7 +13,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 /**
- * AppIcon 底图状态驱动设备锚点(V42 T2):
+ * AppIcon 底图状态驱动设备锚点:
  * 应用列表真实 Coil 加载(真实 PackageManager Drawable)完成后,占位底图
  * (`app-icon-placeholder`)必须归零——不规则/透明图标不再透出底层色块
  * (V42 R2 主诉的实机验证)。加载中/失败态兜底由 Robolectric

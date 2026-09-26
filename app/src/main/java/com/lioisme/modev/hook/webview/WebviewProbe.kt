@@ -1,7 +1,7 @@
 package com.lioisme.modev.hook.webview
 
 /**
- * WebView JS 探针(V12):内嵌字符串常量而非 asset——注入进程无模块资源上下文,
+ * WebView JS 探针:内嵌字符串常量而非 asset——注入进程无模块资源上下文,
  * 零 IO 零失败面。由 [WebViewHooker] 经 evaluateJavascript 注入,幂等守卫
  * [IDEMPOTENCE_GUARD](window.__modevProbe),重复注入零副作用。
  *
@@ -11,7 +11,7 @@ package com.lioisme.modev.hook.webview
  * - JSEncrypt:prototype.encrypt / decrypt。
  *
  * 数据面:ArrayBuffer / TypedArray → hex;CryptoJS WordArray → hex(经 C.enc.Hex);
- * 字符串明文 → text;全部经 [MAX_HEX_CAP] 预截断(桥接接口 maxHexChars 读取
+ * 字符串明文 → text;全部经 JS 侧 MAX_HEX 预截断(桥接接口 maxHexChars 读取
  * HookSwitch.maxBytesPerField),Java 侧 BytesView.of 保险丝兜底。
  * 仅只读包装,异常全捕获,绝不影响宿主页面。
  */

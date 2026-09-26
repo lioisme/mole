@@ -13,7 +13,7 @@ import com.lioisme.modev.hook.hooks.ScreenRecordHooker
 import com.lioisme.modev.hook.hooks.SurfaceBypassHooker
 
 /**
- * 进程控制监听探针(V34 增强):装配五 Hooker——退出拦截(System.exit/
+ * 进程控制监听探针:装配五 Hooker——退出拦截(System.exit/
  * killProcess)、崩溃预防(UncaughtExceptionHandler)、录屏拦截(FLAG_SECURE
  * 多路径)、MediaProjection 权限自动授权、Surface 截图/录屏绕过。
  * recordType = [RecordTypes.PROCESS_CONTROL]。

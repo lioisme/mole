@@ -3,7 +3,7 @@ package com.lioisme.modev.hook.hooks
 import com.lioisme.modev.core.model.HookSwitch
 
 /**
- * 行为监听路径降噪闸(V27):主体路径命中任一前缀即跳过该记录。
+ * 行为监听路径降噪闸:主体路径命中任一前缀即跳过该记录。
  *
  * 内置清单 = 系统框架/设备节点路径(全 App 高频低值,不可配置关闭)+
  * 模块自身基础设施(spool/seq 文件);用户清单([HookSwitch.ignorePathPrefixes])

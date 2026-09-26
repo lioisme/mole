@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 
 /**
- * MCP 服务器(V38;V39 令牌化):进程内常驻 Streamable HTTP,与注入侧 wire
+ * MCP 服务器:进程内常驻 Streamable HTTP,与注入侧 wire
  * [com.lioisme.modev.data.server.ConfigServer] 完全独立生命周期(独立端口/开关/restart,互不触碰)。
  *
  * - 生命周期:`@Volatile epoch` 守卫(镜像 ConfigServer 既有模式),restart = close+start,
@@ -29,7 +29,7 @@ import kotlinx.coroutines.runBlocking
  * - 协议分发:initialize 建会话 → Mcp-Session-Id 头;notifications → 202;
  *   DELETE 关会话;GET 405(无服务端主动流,batching 已移除 → 数组 -32600)。
  *
- * 纯分发逻辑([dispatch])传输无关,JVM 真回环 socket 直测。
+ * 纯分发逻辑([handlePost] 一族)传输无关,JVM 真回环 socket 直测。
  */
 class McpServer(
     @Volatile var port: Int = McpProtocol.DEFAULT_PORT,
@@ -122,7 +122,7 @@ class McpServer(
     fun sessionCount(): Int = sessions.count()
 
     /**
-     * 装配侧工具面真值(V45 T0.1):`server_status.mcp.toolCount` 与 `tools/list`
+     * 装配侧工具面真值:`server_status.mcp.toolCount` 与 `tools/list`
      * 构成双通道对账——协议序列化若丢工具即不一致,消费方(测试/脚本)一律派生
      * 本值而非写死数字(43/46 漂移根因治理)。
      */

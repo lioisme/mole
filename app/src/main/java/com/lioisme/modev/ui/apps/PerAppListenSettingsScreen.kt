@@ -107,22 +107,22 @@ class PerAppListenSettingsViewModel(
         }
     }
 
-    /** 行为监听总开关定制(V27)。 */
+    /** 行为监听总开关定制。 */
     fun setBehaviorMaster(value: Boolean) {
         update { it.copy(behaviorListen = value) }
     }
 
-    /** 偏好监听总开关定制(V28)。 */
+    /** 偏好监听总开关定制。 */
     fun setPrefsMaster(value: Boolean) {
         update { it.copy(prefsListen = value) }
     }
 
-    /** WebView 监听总开关定制(V29)。 */
+    /** WebView 监听总开关定制。 */
     fun setWebviewMaster(value: Boolean) {
         update { it.copy(webviewListen = value) }
     }
 
-    /** 系统信息监听总开关定制(V33)。 */
+    /** 系统信息监听总开关定制。 */
     fun setSystemMaster(value: Boolean) {
         update { it.copy(systemListen = value) }
     }
@@ -132,7 +132,7 @@ class PerAppListenSettingsViewModel(
         update { it.copy(kinds = it.kinds + (AppListenOverride.kindKey(type, kindId) to value)) }
     }
 
-    /** 记录堆栈定制(V25)。 */
+    /** 记录堆栈定制。 */
     fun setLogStack(value: Boolean) {
         update { it.copy(logStack = value) }
     }
@@ -147,17 +147,17 @@ class PerAppListenSettingsViewModel(
         update { it.copy(ignoreStackPrefixes = value.ifEmpty { null }) }
     }
 
-    /** 结果行数上限定制(V25)。 */
+    /** 结果行数上限定制。 */
     fun setMaxResultRows(value: Int) {
         update { it.copy(maxResultRows = value) }
     }
 
-    /** 结果字节上限定制(V25)。 */
+    /** 结果字节上限定制。 */
     fun setMaxResultChars(value: Int) {
         update { it.copy(maxResultChars = value) }
     }
 
-    /** 文件内容捕获定制(V27)。 */
+    /** 文件内容捕获定制。 */
     fun setFileContentCapture(value: Boolean) {
         update { it.copy(fileContentCapture = value) }
     }
@@ -324,7 +324,7 @@ fun PerAppListenSettingsScreen(
             }
             Spacer(Modifier.height(16.dp))
 
-            // 行为 7 类别 + 内容捕获 + 忽略路径前缀(V27 一等公民)
+            // 行为 7 类别 + 内容捕获 + 忽略路径前缀
             SettingsSection(stringResource(R.string.filter_type_behavior)) {
                 CategoryTaxonomy.forType(RecordType.BEHAVIOR).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
@@ -369,7 +369,7 @@ fun PerAppListenSettingsScreen(
             }
             Spacer(Modifier.height(16.dp))
 
-            // WebView 5 类别(V29 一等公民)
+            // WebView 5 类别
             SettingsSection(stringResource(R.string.filter_type_webview)) {
                 CategoryTaxonomy.forType(RecordType.WEBVIEW).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()
@@ -409,7 +409,7 @@ fun PerAppListenSettingsScreen(
             }
             Spacer(Modifier.height(16.dp))
 
-            // 系统信息 3 类别(V33 一等公民)
+            // 系统信息 3 类别
             SettingsSection(stringResource(R.string.filter_type_system)) {
                 CategoryTaxonomy.forType(RecordType.SYSTEM).forEachIndexed { index, category ->
                     if (index > 0) HorizontalDivider16()

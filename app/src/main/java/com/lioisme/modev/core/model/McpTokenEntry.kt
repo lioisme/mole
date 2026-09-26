@@ -3,7 +3,7 @@ package com.lioisme.modev.core.model
 import java.security.SecureRandom
 
 /**
- * MCP 访问令牌条目(V39):多令牌列表的存储单元,宿主本地 SharedPreferences
+ * MCP 访问令牌条目:多令牌列表的存储单元,宿主本地 SharedPreferences
  * 专用(`ConfigKeys.MCP_TOKENS` JSON 数组),**不入远程镜像**(仅宿主进程消费,
  * 同 [ConfigKeys.SERVER_EXTERNAL_ACCESS] 纪律)。
  *

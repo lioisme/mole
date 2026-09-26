@@ -6,7 +6,7 @@ import com.lioisme.modev.core.model.parseDeviceCatalog
 import com.lioisme.modev.domain.config.DeviceCatalogService
 
 /**
- * 真机目录仓库(V47):随包 `devices.json` 的**唯一读者**,实现 `domain.config` 的
+ * 真机目录仓库:随包 `devices.json` 的**唯一读者**,实现 `domain.config` 的
  * [DeviceCatalogService] 契约(容器 public 出口只露接口,G2 闸;实现类型仅装配可见)。
  *
  * V48 起「读一次 + 缓存 + 失败冷却 + 计数」四条口径收口在 [CachedAssetReader]

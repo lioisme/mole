@@ -6,7 +6,7 @@ import com.lioisme.modev.core.model.WebViewKind
 import com.lioisme.modev.hook.RecordSink
 
 /**
- * JS 桥(V29 重构):经 addJavascriptInterface 注入页面全局 [WebviewProbe.BRIDGE_NAME]。
+ * JS 桥:经 addJavascriptInterface 注入页面全局 [WebviewProbe.BRIDGE_NAME]。
  * - [report] 运行于 WebView 私有线程,经解析 + 映射后走 [RecordSink.emit](线程安全);
  *   畸形载荷静默丢弃,不抛异常、不影响页面;
  * - [maxHexChars] 为 JS 侧数据量预截断闸(hex 字符数;0 = 不限制),读配置实时生效。

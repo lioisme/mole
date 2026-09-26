@@ -83,7 +83,7 @@ import kotlinx.coroutines.launch
  * 恒不进 MCP 工具输出与诊断快照);`mcpTokenSetUpdater` 原地生效不重启不踢会话
  * (重命名只动 label、值集合内容不变 ⇒ 会话零影响);删除最后一枚不停用
  * 认证(空集 = 全拒,状态卡可见);legacy 迁移条目显示「导入」;新建与重命名走
- * [ModevInputSheet]、查看走 [ModevValueDialog]、删除走 [ModevConfirmDialog](#27);
+ * [ModevInputSheet]、查看走 [ModevValueDialog]、删除走 [ModevConfirmDialog];
  * 本页无搜索 → Appbar actions 仅「新建」一枚(排他规范合规)。
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -269,10 +269,10 @@ fun McpTokensScreen(
 }
 
 /**
- * 认证状态行(V40 T6):语义色圆点(M3 Badge)+ 一句话状态——
+ * 认证状态行:语义色圆点(M3 Badge)+ 一句话状态——
  * 开 = 「已启用 · N 枚令牌」;开且零令牌 = 空集全拒警示(error 色,可从 UI
  * 直接理解撤销最后一枚不停用语义);关 = 「已停用 · 请求无需令牌」。
- * 资源形态(V41 T1):三个状态键均为自含文案(「On ·/已启用 ·」前缀由各语言
+ * 资源形态:三个状态键均为自含文案(「On ·/已启用 ·」前缀由各语言
  * 资源字面承载)——`tokens_status_active` 仅含单个 `%d` 占位符,**传参必须
  * 单参 tokenCount**;传参与占位符错配会在组合期抛 IllegalFormatConversionException
  * (V41 V1.1 闪退根因,三态回归由 McpTokensScreenStateTest 锁定)。
@@ -317,7 +317,7 @@ internal fun AuthStatusLine(authEnabled: Boolean, tokenCount: Int) {
 }
 
 /**
- * 令牌卡(V46 R3 重排):行体不承载点击(D4),三动作恒由「更多」菜单驱动;
+ * 令牌卡:行体不承载点击(D4),三动作恒由「更多」菜单驱动;
  * 值恒掩码(D3)—— 明文只经 [ModevValueDialog] 上屏。掩码串长度固定(前 4 +
  * 六点 + 后 4),与创建日同排因此不会随内容长短被截断。
  * 菜单序 = 查看 → 重命名 → 删除(危险度递进),删除项整项 error 语义。

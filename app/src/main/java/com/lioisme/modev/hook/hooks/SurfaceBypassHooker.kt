@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * Surface 录屏/截图限制绕过 Hooker(V34):拦截 Surface 相关 API,
+ * Surface 录屏/截图限制绕过 Hooker:拦截 Surface 相关 API,
  * 允许对设置了 FLAG_SECURE 的窗口进行录屏和截图。
  *
  * 覆盖 API:

@@ -60,7 +60,7 @@ internal class DeviceHookerHarness {
         config = { switch },
         configWatcher = ConfigWatcher(),
         tracker = CryptoContextTracker,
-        // 必须 start():否则 `emit` 首句 `if (!running) return` 静默丢记录,审计断言恒绿在空列表上。
+        // 必须 start:否则 `emit` 首句 `if (!running) return` 静默丢记录,审计断言恒绿在空列表上。
         sink = RecordSink(
             jsonOf = { record -> records += record; "" },
             sendJson = { true },

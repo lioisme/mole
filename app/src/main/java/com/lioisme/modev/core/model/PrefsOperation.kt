@@ -1,7 +1,7 @@
 package com.lioisme.modev.core.model
 
 /**
- * SharedPreferences 监听操作(V28):具体 API 动作,[kind] 归属到类别。
+ * SharedPreferences 监听操作:具体 API 动作,[kind] 归属到类别。
  * kind = 用户开关粒度([HookSwitch.prefsEnabled] 门控),
  * operation = 列表元行/详情页展示粒度。
  */

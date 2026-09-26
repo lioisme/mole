@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * 控件文本赋值 Hooker(V33):hook android.widget.TextView.setText(CharSequence),
+ * 控件文本赋值 Hooker:hook android.widget.TextView.setText(CharSequence),
  * 记录每次赋值的文本内容(截断预览)与控件类名。
  * 仅记录文本非空且长度 > 1 的赋值,避免空/占位噪声。
  */

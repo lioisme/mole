@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
- * Root 系统属性检测干预 Hooker(V31):拦截 System.getProperty 读取 root 指示属性,
+ * Root 系统属性检测干预 Hooker:拦截 System.getProperty 读取 root 指示属性,
  * 伪造返回值,阻止应用通过系统属性检测 root。
  *
  * Build.TAGS 字段访问无法通过 MethodHook 拦截(Xposed 仅支持方法/构造器 hook),

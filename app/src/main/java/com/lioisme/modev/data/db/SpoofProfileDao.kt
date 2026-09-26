@@ -8,9 +8,9 @@ import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 /**
- * 画像库 DAO(V47 T2)。
+ * 画像库 DAO。
  *
- * 消费面受限:`spoofProfileDao()` 调用白名单 = ModevApp(装配)与该画像仓库自身,
+ * 消费面受限:`spoofProfileDao` 调用白名单 = ModevApp(装配)与该画像仓库自身,
  * 越界即红(`RecordDaoAccessGateTest` 已把本 accessor 纳入扫描面)——
  * UI 与 MCP 一律经 `SpoofProfileService` 契约,与记录面同一红线。
  */

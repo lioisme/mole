@@ -24,7 +24,7 @@ import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 
 /**
- * 单应用监听自定义持久化契约(V24 D2):每包一键 `override_{pkg}` 双写、
+ * 单应用监听自定义持久化契约:每包一键 `override_{pkg}` 双写、
  * 零偏差即删键、init 预载、旧 `switch_{pkg}` 键隔离(不误吞)、effective 解析联动。
  */
 @RunWith(RobolectricTestRunner::class)

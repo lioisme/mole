@@ -7,7 +7,7 @@ import com.lioisme.modev.hook.MethodHook
 import com.lioisme.modev.hook.ProbeContext
 
 /**
- * 模拟器传感器检测 Hooker(V34 增强):拦截 SensorManager/Sensor API,
+ * 模拟器传感器检测 Hooker:拦截 SensorManager/Sensor API,
  * 伪造传感器属性以模拟真实设备传感器环境。
  *
  * 设计决策:Sensor 类无公共无参构造器,无法创建假 Sensor 对象,
@@ -15,11 +15,11 @@ import com.lioisme.modev.hook.ProbeContext
  * 方法,使已有传感器对象的属性值看起来像真实设备。
  *
  * 覆盖 API:
- * - SensorManager.getDefaultSensor():返回 null 时记录
- * - SensorManager.getSensorList():返回空列表时补充假传感器
- * - Sensor.getName():返回真实设备传感器名称
- * - Sensor.getVendor():返回真实传感器供应商
- * - Sensor.getMinDelay():返回真实传感器延迟值
+ * - SensorManager.getDefaultSensor:返回 null 时记录
+ * - SensorManager.getSensorList:返回空列表时补充假传感器
+ * - Sensor.getName:返回真实设备传感器名称
+ * - Sensor.getVendor:返回真实传感器供应商
+ * - Sensor.getMinDelay:返回真实传感器延迟值
  */
 class EmulatorSensorHooker(
     context: ProbeContext,

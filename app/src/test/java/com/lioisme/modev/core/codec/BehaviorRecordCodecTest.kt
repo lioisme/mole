@@ -10,7 +10,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 /**
- * BehaviorRecord 载荷编解码契约(V27):与 Crypto/Sql codec 同规——
+ * BehaviorRecord 载荷编解码契约:与 Crypto/Sql codec 同规——
  * - encode/decode Gson 往返对称(枚举/BytesView/params/stack 全字段);
  * - 畸形载荷(kind/operation 未知、包名空白)返回 null,绝不误标;
  * - recordType 恒 "behavior",注册表按其分发。

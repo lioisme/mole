@@ -9,7 +9,7 @@ import com.lioisme.modev.hook.ProbeContext
 import com.lioisme.modev.hook.SharedMethodBroadcast
 
 /**
- * WiFi 代理隐藏 Hooker(V30):隐藏系统/应用层代理配置,防止应用检测到 MITM 代理。
+ * WiFi 代理隐藏 Hooker:隐藏系统/应用层代理配置,防止应用检测到 MITM 代理。
  *
  * 设计原则(第一性原则):
  * - 每个检测通道独立 hook,不可遗漏;
@@ -69,8 +69,8 @@ class ProxyHideHooker(
 
     /**
      * ConnectivityManager 代理查询隐藏:
-     * - getDefaultProxy(): 返回 null
-     * - getLinkProperties().getHttpProxy(): 返回 null
+     * - getDefaultProxy: 返回 null
+     * - getLinkProperties.getHttpProxy: 返回 null
      */
     private fun hookConnectivityManager() {
         val cmClass = runCatching { Class.forName("android.net.ConnectivityManager") }.getOrNull() ?: return
@@ -141,7 +141,7 @@ class ProxyHideHooker(
 
     /**
      * OkHttp ProxySelector 替换:返回空列表(无代理)。
-     * 拦截 java.net.ProxySelector.getDefault().select(URI)。
+     * 拦截 java.net.ProxySelector.getDefault.select(URI)。
      */
     private fun hookOkHttpProxy() {
         val clazz = runCatching { Class.forName("java.net.ProxySelector") }.getOrNull() ?: return
