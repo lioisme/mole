@@ -52,7 +52,7 @@
 | i18n 键 | 860 string + 13 plurals | **860 + 13**(四语等集) | `values*/strings.xml` 解析 | AGENTS「en 695 键、plurals 8」 |
 | 机型库可达集 | 25 品牌 / 8,075 机型(apple 已剔) | 同 | `AndroidOnlyDataTest` | ✓ |
 | 运营商库 | 1,597 条 | 同 | `assets/carriers.json` | ✓ |
-| lint 基线 | 43 warning / 1 hint / 0 error | 见 §7 执行记录 | 本次实测 | ✓ |
+| lint 基线 | 40 warning / 1 hint / 0 error | 见 §7 执行记录 | 本次实测 | ✓ |
 
 ---
 

@@ -133,7 +133,7 @@ telemetry, no server. Records leave only when you export them.
 ./gradlew :app:assembleModernDebug     # 默认变体(Vector / libxposed)
 ./gradlew :app:assembleLegacyDebug     # legacy 变体(旧框架)
 ./gradlew :app:testModernDebugUnitTest # 单元 + Robolectric(含全部架构门禁)
-./gradlew :app:lintModernRelease       # lint(基线 43 warning / 1 hint / 0 error,不许新增)
+./gradlew :app:lintModernRelease       # lint(基线 40 warning / 1 hint / 0 error,不许新增;数字以实跑为准)
 ```
 
 Windows 上用 `.\gradlew.bat ...`。签名不需要配置:缺 `dev-local/secrets/keystore/keystore.properties`

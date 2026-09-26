@@ -28,8 +28,9 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 .\gradlew.bat :app:assembleModernDebugAndroidTest
 .\gradlew.bat :app:connectedModernDebugAndroidTest
 
-# lint 门禁(基线:**43 warning / 1 hint / 0 error**,V46 实测复核;此前 40/41/43 三种
-# 口径并存,一律以本次实测为准 —— V46 三项 UI 改动净新增 = 0,无一条落在 V46 触碰文件;
+# lint 门禁(基线:**40 warning / 1 hint / 0 error**,开源前整改轮实测;此前 40/41/43 三种
+# 口径并存的原因就是「抄数字而不是跑一次」—— 一律以本次实测为准。本轮 43→40 的
+# 差额是删死代码顺带删掉的 3 条宿主告警,净新增恒为 0;
 # 提交前必须跑,禁止新增 warning)
 .\gradlew.bat :app:lintModernRelease
 ```
@@ -122,7 +123,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 5. **弃用 API 零容忍**:新增源码一律不得引入已弃用 API;`getInstalledApplications`
    走 `core/util/PackageManagerCompat.kt` 统一入口(API 33+ `ApplicationInfoFlags`,
    旧系统弃用分支);`getLaunchIntentForPackage(String)` 全 API 无 flags 重载且从未
-   弃用,直接使用即可。`lintModernRelease` 零新增(基线 43 warning/0 error,V34 清理 39 死资源,
+   弃用,直接使用即可。`lintModernRelease` 零新增(基线 40 warning/0 error,V34 清理 39 死资源,
    见上文构建命令)。
 6. **计数文本复数**:en 带 `%d` 的计数文案用 `<plurals>`(one/other),zh 仅
    `other`;禁止 `<string>` 直接内嵌 `%d + 英文单词`(PluralsCandidate lint)。
@@ -278,7 +279,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
     统一 `ui/common/scopeChangeMessage`,状态语义分派统一
     `ui/common/connectionStatus/scopeStatus`;Room 显式 WAL
     (`ModevDatabase.get`)、批量插入显式 `@Transaction`;
-    lint 基线更新:**实测 43 warnings / 1 hint / 0 errors**(V46 复核修正,V46 三项 UI
+    lint 基线更新:**实测 40 warnings / 1 hint / 0 errors**(开源前整改轮实测;V46 三项 UI
     改动净新增 0;V45 曾记 41、构建段曾记 40 —— 三种口径并存已统一以本次实测为准,
     权威口径见「构建 / 测试」段 lint 门禁行;V34 清理 39 死资源键
     detail_remove_scope/listen_settings_title/record_copied/

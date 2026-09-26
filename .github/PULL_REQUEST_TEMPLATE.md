@@ -8,7 +8,7 @@ One or two sentences. Say what a reader would notice, not which files you touche
 - [ ] `./gradlew :app:compileModernDebugAndroidTestKotlin` green — the JVM suite does **not**
       compile the instrumented source set, so a deleted string key or a renamed enum entry
       only shows up here
-- [ ] `./gradlew :app:lintModernRelease` with no new warnings (baseline: 43 warnings / 1 hint / 0 errors)
+- [ ] `./gradlew :app:lintModernRelease` with no new warnings (measured baseline: 40 warnings / 1 hint / 0 errors — read it from a run, not from this file)
 - [ ] `./gradlew :app:assembleModernDebug` green
 - [ ] Architecture gates still green (`AGENTS.md` lists which invariant each one owns)
 

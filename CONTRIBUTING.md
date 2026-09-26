@@ -35,7 +35,7 @@ themselves. This page is the human-facing summary; the machine-facing one is
 
 ```bash
 ./gradlew :app:testModernDebugUnitTest          # unit + Robolectric, includes all architecture gates
-./gradlew :app:lintModernRelease                # baseline is 43 warnings / 1 hint / 0 errors; adding one is a no
+./gradlew :app:lintModernRelease                # baseline: 40 warnings / 1 hint / 0 errors; adding one is a no
 ```
 
 Also compile the instrumented source set, because the JVM run above does **not**
