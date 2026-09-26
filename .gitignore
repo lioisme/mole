@@ -1,25 +1,36 @@
 .gradle/
 build/
-dist/
-keystore/
 local.properties
 .idea/
 .vscode/
 *.iml
-*.jks
 .kotlin/
 captures/
 .externalNativeBuild/
 .cxx/
+
+# 唯一的本地物料目录:密钥、构建产物、日志、验收台账、抓取数据、草稿文档都在这下面,
+# 由 scripts/test-integration/tt-env.ps1 的 REPORT_DIR 等入口把产物导到这里。
+dev-local/
+
+# 纵深防御:密钥一旦被放到 dev-local 之外,仍然不该进索引
+keystore/
+*.keystore
+*.jks
+keystore.properties
+
+# JVM 崩溃现场:雷电/Gradle/OOM 时会在工作目录就地写出,不归我们选路径
 hs_err_pid*.log
 replay_pid*.log
-docs/log/
-.env
-.env.*
+
+# 编码 agent 的会话目录(不属于项目内容)
 org/
 .zcode/
 .workbuddy-ai/
-arthub/
+
+# 基线参考工程(仅本机对账用;判据已抽成 app/src/test/resources/baseline/ 摘要锁)
 third_party/
-docs/test-reports/v45-*/
-dev-local/
+
+# 环境/密钥模板兜底
+.env
+.env.*
