@@ -326,9 +326,14 @@ class RecordSinkTest {
         sink.start()
         // 远超主队列容量(2048):后续记录全部走溢出队列
         repeat(3000) { sink.emit(record("burst-$it")) }
+        val spoolFile = File(dir, "spool.dat")
+        // 沉降窗内轮询,且**文件尚未被工作线程创建时按 0 计**:readLines() 对不存在的文件抛
+        // FileNotFoundException,于是这个用例在冷构建(无 build 目录、磁盘更慢)上必炸 ——
+        // 断言强度不减:仍然要求恰好 3000 行。
+        fun spoolLines(): Int = if (spoolFile.isFile) spoolFile.readLines().size else 0
         val deadline = System.currentTimeMillis() + 10_000
         while (System.currentTimeMillis() < deadline) {
-            if (File(dir, "spool.dat").readLines().size >= 3000) break
+            if (spoolLines() >= 3000) break
             Thread.sleep(50)
         }
         assertTrue("序列化必须发生过(否则断言无意义)", jsonThreads.isNotEmpty())
@@ -337,9 +342,9 @@ class RecordSinkTest {
             jsonThreads.none { it == emitThread },
         )
         assertEquals(
-            "溢出路径同样零丢失:全部 3000 条应落盘",
+            "溢出路径同样零丢失:全部 3000 条应落盘(实得 ${spoolLines()} 条)",
             3000,
-            File(dir, "spool.dat").readLines().size,
+            spoolLines(),
         )
     }
 }

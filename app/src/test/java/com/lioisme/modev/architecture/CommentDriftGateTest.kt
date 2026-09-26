@@ -16,7 +16,7 @@ import org.junit.Test
  *
  * 四条判据:
  *  - 注释里点名的 `R.string.*` / `R.plurals.*` 必须在资源里存在;
- *  - 注释里点名的 `Xxx.kt` 文件名必须在工作树里存在;
+ *  - 注释里点名的**带路径**源文件引用(`hook/probes/Foo.kt`)必须存在(裸文件名不判,那可能是上游文件);
  *  - 不允许 TODO / FIXME / HACK(待办属于议题,不属于源码;占位符形态不计);
  *  - 版本簿记(`V37` 一类内部任务标记)总量只降不升 —— 见 [VERSION_MARKER_CEILING]。
  *
@@ -29,7 +29,7 @@ class CommentDriftGateTest {
 
     private val lineComment = Pattern.compile("//[^\\n]*")
     private val stringKeyRef = Pattern.compile("""R\.(string|plurals)\.([a-z0-9_]+)""")
-    private val fileNameRef = Pattern.compile("(?<![*\\w])([A-Za-z][A-Za-z0-9_]*)\\.kt")
+    private val fileNameRef = Pattern.compile("(?<![\\w/.])([A-Za-z][\\w]*(?:/[\\w.]+)+)\\.kt")
     private val versionMarker = Pattern.compile("\\bV\\d{1,3}\\b")
     private val todoMarker = Pattern.compile("\\b(TODO|FIXME|HACK)\\b")
     private val historicalHint = Pattern.compile("退役|已删除|已整体删除|禁止复活|勿再|曾经|曾为|原为|历史")
@@ -55,12 +55,16 @@ class CommentDriftGateTest {
         assertTrue("注释点名了已不存在的资源键:\n" + violations.joinToString("\n"), violations.isEmpty())
     }
 
+    /**
+     * 只判**带路径的**引用(`hook/probes/Foo.kt`):那是对本仓布局的断言,改错即红。
+     * 裸文件名不判 —— 注释里也正当引用上游参考工程的文件(`Randoms.kt` 属于基线),
+     * 把那种也当成本仓断言就会假红,而假红的门禁比没有门禁更糟。
+     */
     @Test
     fun everyFileNameNamedInComments_stillExists() {
         val root = locateProjectRoot()
-        val present = root.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .map { it.name }
+        val present = allSources(root)
+            .map { it.relativeTo(root).path.replace('\\', '/') }
             .toSet()
         assertTrue("工作树里没有 kt 文件(遍历失效)", present.isNotEmpty())
 
@@ -69,11 +73,12 @@ class CommentDriftGateTest {
             if (historicalHint.matcher(text).find()) continue
             val m = fileNameRef.matcher(text)
             while (m.find()) {
-                val name = m.group(1)!! + ".kt"
-                if (!present.contains(name)) missing += name
+                val ref = m.group(1)!! + ".kt"
+                // 允许从模块根或包根起写:只要本仓有某个源文件以该路径结尾即可
+                if (present.none { it.endsWith(ref) }) missing += ref
             }
         }
-        assertTrue("注释点名了不存在的源文件:$missing", missing.isEmpty())
+        assertTrue("注释点名了不存在的源文件路径:$missing", missing.isEmpty())
     }
 
     @Test

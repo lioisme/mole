@@ -3,7 +3,7 @@ package com.lioisme.modev.core.model
 import kotlin.random.Random
 
 /**
- * 画像值生成器(V47 T3,基线 `Randoms.kt` 的形态纪律移植):
+ * 画像值生成器(V47 T3,基线参考工程(Guise Reborn)的 Randoms 形态纪律移植):
  * 生成的是**「真实设备可能出现的值」**,不是随机字符。
  *
  * 为什么值得单独立文件并全部接受可注入的 [Random]:
