@@ -108,9 +108,3 @@ internal fun IntLimitSheet(
         onDismiss = onDismiss,
     )
 }
-
-/** 脚手架内文本提示(自定义内容 sheet 复用)。 */
-@Composable
-internal fun SheetHintText(text: String) {
-    Text(text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-}

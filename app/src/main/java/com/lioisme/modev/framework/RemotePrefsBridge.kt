@@ -19,9 +19,6 @@ object RemotePrefsBridge {
     const val PREFS_KEY = "modev_config"
     const val TOKEN_KEY = "token"
 
-    /** 配置键前缀(与 SettingsRepository 同源引用 ConfigKeys,防双端漂移)。 */
-    const val KEY_SWITCH_PREFIX = ConfigKeys.SWITCH_PREFIX
-
     /** 当前可用的框架服务(可空 = 无现代框架服务;公开为 Any? 防 legacy 类解析,见 FrameworkBridge)。 */
     val serviceFlow: StateFlow<Any?> = FrameworkBridge.serviceFlow
 

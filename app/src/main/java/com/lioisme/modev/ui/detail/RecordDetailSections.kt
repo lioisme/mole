@@ -196,6 +196,3 @@ internal fun LazyListScope.tocSectionItems(
     }
     return 1
 }
-
-/** 供锚点簿记与显示上限联动使用的展示上限(capDisplay 已内聚,此处仅再导出语义)。 */
-internal val DETAIL_DISPLAY_CAP_CHARS = com.lioisme.modev.ui.detail.markdown.MARKDOWN_DISPLAY_MAX_CHARS

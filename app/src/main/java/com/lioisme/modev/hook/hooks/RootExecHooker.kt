@@ -71,7 +71,6 @@ class RootExecHooker(
         }
 
         // exec(String[], String[])
-        val stringArrayStringArrayClass = arrayOf(Array<String>::class.java, Array<String>::class.java)
         val methodStringArrayStringArray = runCatching {
             clazz.getMethod("exec", Array<String>::class.java, Array<String>::class.java)
         }.getOrNull()

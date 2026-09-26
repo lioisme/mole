@@ -284,12 +284,7 @@ data class AppListenOverride(
             return type to raw
         }
 
-        /** 键归一:任意合法键 → 限定形态;非法键 null(调用方丢弃)。 */
-        fun normalizeKindKey(raw: String): String? =
-            parseKindKey(raw)?.let { kindKey(it.first, it.second) }
-
-        /**
-         * 反序列化 + 全量容错:
+        /** 反序列化 + 全量容错:
          * - null/空白/非法 JSON → [DEFAULT];
          * - 字段缺失 → 取默认(null);V23 遗留字符串形态平滑映射;
          * - kinds 内未知 kind 名、非法值 → 该条目忽略。

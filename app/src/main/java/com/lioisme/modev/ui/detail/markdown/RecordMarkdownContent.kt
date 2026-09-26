@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.lioisme.modev.R
 import com.lioisme.modev.ui.components.TipIconButton
+import com.lioisme.modev.ui.theme.Tokens
 import com.mikepenz.markdown.compose.components.MarkdownComponentModel
 import com.mikepenz.markdown.compose.components.markdownComponents
 import com.mikepenz.markdown.m3.Markdown
@@ -398,7 +399,7 @@ internal fun MdCodeBlock(
             .fillMaxWidth()
             .padding(vertical = 8.dp)
             .background(color = scheme.surfaceContainerLowest, shape = CODE_BLOCK_SHAPE)
-            .border(width = 1.dp, color = scheme.outlineVariant.copy(alpha = 0.4f), shape = CODE_BLOCK_SHAPE)
+            .border(width = 1.dp, color = scheme.outlineVariant.copy(alpha = Tokens.codeBorderAlpha), shape = CODE_BLOCK_SHAPE)
             .testTag("md-code-block"),
     ) {
         Row(

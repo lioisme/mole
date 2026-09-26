@@ -56,16 +56,4 @@ data class SystemRecord(
 ) : MonitoredRecord {
 
     override fun withSeq(seq: Long): SystemRecord = copy(seq = seq)
-
-    /** Logcat 摘要(列表预览用)。 */
-    fun logcatSummary(): String? {
-        if (logcatTag.isNullOrBlank() && logcatMessage.isNullOrBlank()) return null
-        val tag = logcatTag?.take(20) ?: "*"
-        val msg = logcatMessage?.take(60) ?: ""
-        return "[$tag] $msg"
-    }
-
-    /** 签名摘要(列表预览用)。 */
-    fun signatureSummary(): String? =
-        signatureHash?.takeIf { it.isNotBlank() }?.take(16)?.let { "$it…" }
 }

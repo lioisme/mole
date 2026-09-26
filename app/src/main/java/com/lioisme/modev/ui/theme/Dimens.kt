@@ -21,7 +21,4 @@ object Dimens {
 
     /** 页尾留白。 */
     val pageBottom: Dp = 24.dp
-
-    /** 列表/卡片行内边距。 */
-    val rowPadding: Dp = 16.dp
 }

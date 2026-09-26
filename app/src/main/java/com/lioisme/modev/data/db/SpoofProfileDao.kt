@@ -24,10 +24,6 @@ interface SpoofProfileDao {
     @Query("SELECT * FROM ${SpoofProfileEntity.TABLE_NAME} WHERE deleted = 0 ORDER BY createTime ASC")
     suspend fun getAll(): List<SpoofProfileEntity>
 
-    /** 含墓碑行(账本同步须看见墓碑才能守住「删过不再复活」)。 */
-    @Query("SELECT * FROM ${SpoofProfileEntity.TABLE_NAME} ORDER BY createTime ASC")
-    suspend fun getAllIncludingTombstones(): List<SpoofProfileEntity>
-
     @Query("SELECT * FROM ${SpoofProfileEntity.TABLE_NAME} WHERE id = :id")
     suspend fun getById(id: String): SpoofProfileEntity?
 
@@ -45,7 +41,4 @@ interface SpoofProfileDao {
 
     @Query("DELETE FROM ${SpoofProfileEntity.TABLE_NAME} WHERE id = :id")
     suspend fun deleteById(id: String)
-
-    @Query("SELECT COUNT(*) FROM ${SpoofProfileEntity.TABLE_NAME} WHERE deleted = 0")
-    suspend fun countLive(): Int
 }

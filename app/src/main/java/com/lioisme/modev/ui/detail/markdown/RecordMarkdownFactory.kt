@@ -208,6 +208,3 @@ fun metaTableMarkdown(
     headers: List<String>,
     entries: List<Pair<String, String>>,
 ): String = mdTable(headers, entries.map { (label, value) -> listOf(label, value) })
-
-/** 引用块尾注行(独立使用场景:向既有文档追加省略标记)。 */
-fun mdQuoteLine(line: String): String = "> ${mdHeadingText(line)}"

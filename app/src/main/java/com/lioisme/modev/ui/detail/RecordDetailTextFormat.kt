@@ -96,30 +96,6 @@ internal const val RESULT_MAX_ROWS = 200
 /** 结果集单行渲染上限列数。 */
 internal const val RESULT_MAX_COLS = 50
 
-/** 绑定参数 → 有界渲染行(`#i [类型] 值`,截断标记由 UI 追加)。 */
-internal fun formatBindArgsText(args: List<SqlBindValue>): List<String> {
-    val lines = mutableListOf<String>()
-    for ((index, arg) in args.withIndex()) {
-        if (index >= BIND_ARGS_MAX_ROWS) break
-        lines += "#${arg.i} [${arg.t.name}] ${arg.renderValue()}"
-    }
-    return lines
-}
-
-/** 结果集 → 有界渲染行(`#i col=值, …`)。 */
-internal fun formatRowsText(rows: List<SqlResultRow>): List<String> {
-    val lines = mutableListOf<String>()
-    for ((rowIndex, row) in rows.withIndex()) {
-        if (rowIndex >= RESULT_MAX_ROWS) break
-        val cells = row.c.take(RESULT_MAX_COLS)
-        val truncated = row.c.size > RESULT_MAX_COLS
-        lines += "#$rowIndex " + cells.joinToString(", ") { cell ->
-            "${cell.n}=${cell.renderValue()}" + if (cell.truncated) "…" else ""
-        } + if (truncated) " …" else ""
-    }
-    return lines
-}
-
 private fun SqlBindValue.renderValue(): String = when (t) {
     SqlValueType.L, SqlValueType.D, SqlValueType.S -> v ?: ""
     SqlValueType.B -> hex ?: ""

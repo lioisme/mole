@@ -34,7 +34,4 @@ interface KeywordLibraryDao {
 
     @Query("DELETE FROM keyword_library")
     suspend fun clear()
-
-    @Query("SELECT COUNT(*) FROM keyword_library")
-    fun observeCount(): Flow<Int>
 }

@@ -110,9 +110,4 @@ abstract class PrefsBaseHooker(
             })
         }
     }
-
-    companion object {
-        /** /proc/self/cmdline 的终止符(避免源码内嵌控制字符字面量)。 */
-        private val NULL_CHAR: Char = 0.toChar()
-    }
 }

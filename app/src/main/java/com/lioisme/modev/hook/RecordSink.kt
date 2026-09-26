@@ -366,8 +366,6 @@ class RecordSink(
          */
         private const val OVERFLOW_CAPACITY = 32_768
 
-        private const val SPOOL_RETRY_MS = 10_000L
-
         /** 空闲轮询基线(V43 T1 起按 2^n 退避至 [MAX_IDLE_POLL_MS])。 */
         private const val IDLE_POLL_MS = 500L
 

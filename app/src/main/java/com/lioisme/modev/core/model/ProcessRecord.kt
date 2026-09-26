@@ -53,13 +53,4 @@ data class ProcessRecord(
 ) : MonitoredRecord {
 
     override fun withSeq(seq: Long): ProcessRecord = copy(seq = seq)
-
-    /** 退出摘要(列表预览用)。 */
-    fun exitSummary(): String? {
-        return when (kind) {
-            ProcessKind.EXIT_INTERCEPT -> "exit=${exitCode ?: "?"} pid=${processPid ?: "?"}"
-            ProcessKind.CRASH_PREVENT -> "${crashType ?: "Exception"}: ${crashMessage?.take(60) ?: ""}"
-            ProcessKind.SCREEN_RECORD -> interventionAction?.lowercase() ?: "detected"
-        }
-    }
 }

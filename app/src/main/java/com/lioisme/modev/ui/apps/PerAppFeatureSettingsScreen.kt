@@ -694,13 +694,3 @@ internal fun featureGroupLabelRes(group: FeatureGroup): Int = when (group) {
     FeatureGroup.ROOT_XPOSED_HIDE -> R.string.feature_group_root_xposed_hide
     FeatureGroup.DEVICE_SPOOF -> R.string.feature_group_device_spoof
 }
-
-/** 功能组观测记录类型(入口页「查看记录」路由用;null = 无记录面)。 */
-internal fun featureGroupRecordType(group: FeatureGroup): RecordType? = FeatureGroups.recordType(group)
-
-/** 功能组启用类别数(入口页摘要「N/M 已启用」)。 */
-internal fun featureGroupEnabledCount(effective: HookSwitch, group: FeatureGroup): Int =
-    FeatureGroups.kindRefs(group).count { (type, id) -> EffectiveSwitch.readKind(effective, type, id) == true }
-
-/** 功能组类别总数。 */
-internal fun featureGroupTotalCount(group: FeatureGroup): Int = FeatureGroups.kindRefs(group).size

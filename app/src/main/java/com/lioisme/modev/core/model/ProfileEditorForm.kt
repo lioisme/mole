@@ -232,9 +232,6 @@ class ProfileEditorForm(
         else -> null
     }
 
-    private data class BrandSample(val brand: String, val manufacturer: String, val model: String, val device: String)
-    private data class CarrierSample(val plmn: String, val name: String, val country: String)
-
     private companion object {
         val NETWORK_SLOTS = listOf(
             ProfileValues.NET_WIFI,

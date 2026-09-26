@@ -142,12 +142,10 @@ dependencies {
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
-    implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     // HCT 色板算法(materialkolor,LIDE 同版本同源):主题引擎唯一色彩来源
     implementation(libs.com.materialkolor)
-    debugImplementation(libs.androidx.compose.ui.tooling)
 
     implementation(libs.androidx.navigation.compose)
     implementation(libs.kotlinx.coroutines.android)
@@ -184,6 +182,5 @@ dependencies {
     testImplementation(libs.androidx.compose.ui.test.junit4)
       testImplementation(libs.androidx.compose.ui.test.manifest)
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
-      androidTestImplementation(libs.uiautomator)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
 }

@@ -501,7 +501,6 @@ internal fun CryptoLoadedContent(
     val outputRole = stringResource(flowRoles.second ?: R.string.section_output)
     val hasInput = record.input != null
     val hasOutput = record.output != null
-    val hasFlowZone = hasInput && hasOutput
     val zoneFlowTitle = stringResource(R.string.section_zone_data_flow)
 
     // 区块文档预计算(组合期;@Composable 文档构建器不得进入 LazyListScope DSL 作用域):

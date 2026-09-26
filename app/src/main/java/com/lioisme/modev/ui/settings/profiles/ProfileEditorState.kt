@@ -100,8 +100,6 @@ class ProfileEditorState(
         form.update(field, if (value) "true" else "")
     }
 
-    fun readBool(field: ProfileField): Boolean = form.textOf(field).toBooleanStrictOrNull() == true
-
     /**
      * 枚举槽写入:选中「不干预」槽即清空编辑态。
      *
@@ -113,19 +111,11 @@ class ProfileEditorState(
         form.update(field, if (slot == unhookSlotOf(field)) "" else slot.toString())
     }
 
-    /** 当前槽位(未填返回不干预槽)。 */
-    fun readSlot(field: ProfileField): Int =
-        form.textOf(field).toIntOrNull() ?: unhookSlotOf(field)
-
     /** 就近随机(仅目录 RANDOMIZABLE 内生效,其余为 no-op)。 */
     fun randomizeField(field: ProfileField): Boolean = form.randomizeField(field, randomProvider())
 
     /** 整组随机(同一品牌世代运营商同源派生);返回被写入的字段数。 */
     fun randomizeAll(): Int = form.randomizeAll(randomProvider())
-
-    /** 该参数的有效域提示(数值/浮点取目录 rangeOf,其余为 null)。 */
-    fun rangeHint(field: ProfileField): String? =
-        ProfileFieldCatalog.rangeOf(field)?.let { "${it.first}-${it.last}" }
 
     companion object {
 

@@ -61,15 +61,4 @@ data class UiInteractionRecord(
 ) : MonitoredRecord {
 
     override fun withSeq(seq: Long): UiInteractionRecord = copy(seq = seq)
-
-    /** 弹窗摘要(列表预览用)。 */
-    fun dialogSummary(): String? =
-        dialogTitle?.takeIf { it.isNotBlank() }
-            ?: dialogMessage?.takeIf { it.isNotBlank() }
-                ?.take(80)
-
-    /** Activity 摘要(列表预览用)。 */
-    fun activitySummary(): String? =
-        activityName?.takeIf { it.isNotBlank() }
-            ?.substringAfterLast('.')
 }

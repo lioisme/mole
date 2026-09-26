@@ -83,9 +83,6 @@ class ServicesViewModel(
             .map { it.size }
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 0)
 
-    /** MCP 监听地址展示口径:未运行 = null(UI 回落端口字面量)。 */
-    val mcpListeningAddress: StateFlow<String?> = mcpBoundAddress
-
     /** MCP 最近一次绑定失败原因(null = 正常)。 */
     val mcpBindError: StateFlow<String?> = mcpBindError
 
