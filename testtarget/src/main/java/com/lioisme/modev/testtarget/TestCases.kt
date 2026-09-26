@@ -1,7 +1,7 @@
 package com.lioisme.modev.testtarget
 
 /**
- * 用例注册表(单一事实源):与 docs/V35-FULL-FEATURE-ACCEPTANCE-TASK.md 验收矩阵逐一对应。
+ * 用例注册表(单一事实源):与 docs/history/V35-FULL-FEATURE-ACCEPTANCE-TASK.md 验收矩阵逐一对应。
  * 编排脚本经 `am start -n ./.TriggerActivity --es domain <域> --es case <ID>` 驱动;
  * `--es domain list` 输出全部用例 ID(TT_RESULT case=REGISTRY result=...)。
  */
