@@ -202,7 +202,7 @@ class WebViewBridgeTest {
     fun switch_off_emits_nothing() {
         webView = injectProbeAndWaitReady()
         assumeTrue("当前 WebView 上下文无 crypto.subtle,跳过端到端断言", webCryptoAvailable())
-        switch = HookSwitch.DEFAULT.copy(webView = false)
+        switch = HookSwitch.DEFAULT.copy(webviewListen = false)
         evaluate(webView!!, 
             """
             (function () {

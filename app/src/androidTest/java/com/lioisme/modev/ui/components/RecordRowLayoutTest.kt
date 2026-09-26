@@ -56,10 +56,10 @@ class RecordRowLayoutTest {
         packageName = "com.example.app",
         processName = "com.example.app:web",
         threadName = "test-thread",
-        kind = CryptoKind.WEB_CRYPTO,
+        kind = CryptoKind.CIPHER,
         operation = CryptoOperation.ENCRYPT,
-        algorithm = "WebCrypto/AES-GCM",
-        provider = "WebView",
+        algorithm = "AES-GCM",
+        provider = "Conscrypt",
         direction = 1,
         iv = BytesView(hex = "000102030405060708090a0b0c0d0e0f", text = null, totalLength = 16, truncated = false),
         key = null,
@@ -79,8 +79,8 @@ class RecordRowLayoutTest {
         }
         // V43 T4/D-1 一行一参数:类别与操作拆为独立行(「类别 · 操作」拼行形态退役);
         // 数据段行 label+值 合并单行;时间尾随右对齐(秒级)。
-        rule.onNodeWithText("WebCrypto/AES-GCM").assertIsDisplayed()
-        rule.onNodeWithText(str(R.string.kind_webview), substring = false).assertIsDisplayed()
+        rule.onNodeWithText("AES-GCM").assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.kind_cipher), substring = false).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.meta_operation) + " " + str(R.string.op_encrypt)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.dir_encrypt)).assertIsDisplayed()
         rule.onNodeWithText(str(R.string.record_data_out) + " " + "cafebabe").assertIsDisplayed()
@@ -164,9 +164,9 @@ class RecordRowLayoutTest {
             }
         }
         // V16 R1:空算法不得渲染空白行,回退类别名(与详情页标题/摘要同源)
-        rule.onNodeWithText(str(R.string.kind_webview)).assertIsDisplayed()
+        rule.onNodeWithText(str(R.string.kind_cipher)).assertIsDisplayed()
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals(str(R.string.kind_webview), blank.copySummary(context).lineSequence().elementAt(0))
+        assertEquals(str(R.string.kind_cipher), blank.copySummary(context).lineSequence().elementAt(0))
     }
 
     @Test
