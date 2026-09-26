@@ -381,3 +381,26 @@
 另有 401 个未跟踪散件堆在工作树里。
 判据:**任何"防产物入库"的规则,必须用一次真实运行来验**,而不是看规则写没写。
 本轮的处置是不再逐目录设防:产物只有一个落点 `dev-local/`,那里整棵子树不入库。
+
+## `--no-daemon` + 冷构建会把 KSP worker 炸成 `NoClassDefFoundError`(与被测代码无关)
+
+为躲 commit-charge OOM,本仓的提交前纪律是 `--no-daemon --max-workers=1 -Dorg.gradle.jvmargs=-Xmx2048m`。
+在**已有 build 目录**的热工作树上这样跑没问题;但在**全新克隆**上跑同一条命令,会在
+`:app:kspModernDebugKotlin` 直接炸:
+
+```
+e: [ksp] java.lang.NoClassDefFoundError: com/google/devtools/ksp/impl/KotlinSymbolProcessing$execute$7
+> A failure occurred while executing com.google.devtools.ksp.gradle.KspAAWorkerAction
+Failed to notify build listener.
+> org/jetbrains/kotlin/gradle/plugin/statistics/BuildFinishMetrics$reportGlobalMetrics$1
+```
+
+根因是单使用 daemon 的类加载路径与 KSP 的 worker 动作、Kotlin 插件的构建结束监听器不匹配,
+**症状完全不像构建配置问题,像代码问题** —— 于是会被追半天"是不是我改坏了"。
+判据:同一条命令在同一份代码上,**带 daemon 就绿**。
+
+处置分工(别把两者混成一条命令):
+- **本机省内存验收**:保留 `--no-daemon`,但只在已有 build 目录的工作树上跑;
+  冷构建首轮允许用 daemon(`-Dorg.gradle.jvmargs=-Xmx2560m`,不开 --no-daemon)。
+- **CI 与"陌生人可用"判据**:一律用默认 daemon 路径(GitHub Actions 就是这么跑的),
+  这样测出来的才是别人会得到的结果。
