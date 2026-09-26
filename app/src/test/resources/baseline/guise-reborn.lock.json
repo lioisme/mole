@@ -1,0 +1,297 @@
+{
+  "note": "基线 third_party/Guise_Reborn-main 的完整性锁。provenance(上游 URL/修订号)唯一事实源是 app/src/main/assets/*.NOTICE.txt,本文件刻意不重复抄一遍。",
+  "regenerate": "跑一次 scripts 段的 sha256sum 命令(见 BaselineDataParityTest KDoc),换上游版本时同时更新 NOTICE。",
+  "files": {
+    "assets/devices.json": "9485f0721aedfb63c75f6535d9e5fb35ffcc57d88cfa74546209e4e841b460cc",
+    "assets/carriers.json": "fd589d853e29bdcb33b4465d328f6670e55d592d3decc7dc1bd56c7aa360c3e9",
+    "assets/devices.NOTICE.txt": "c77de60b77a8f7ad60a83b1048f8e7021f1087e2820588012e258d2222d570f1",
+    "assets/carriers.NOTICE.txt": "2d4dc66fd2e685f27594c7c66c53ef37a82ffeac2b5b6c1028df3453fff0ced7",
+    "res/raw/presets.json": "03730ef01e517e8530d41e80fe12e952243fbfe86f986e6406c54240c53d518c"
+  },
+  "presets": {
+    "androidVersions": [
+      {
+        "label": "Android 1.0",
+        "value": "1|1"
+      },
+      {
+        "label": "Android 1.1",
+        "value": "1.1|2"
+      },
+      {
+        "label": "Android 1.5",
+        "value": "1.5|3"
+      },
+      {
+        "label": "Android 1.6",
+        "value": "1.6|4"
+      },
+      {
+        "label": "Android 2.0",
+        "value": "2|5"
+      },
+      {
+        "label": "Android 2.0.1",
+        "value": "2.0.1|6"
+      },
+      {
+        "label": "Android 2.1",
+        "value": "2.1|7"
+      },
+      {
+        "label": "Android 2.2",
+        "value": "2.2|8"
+      },
+      {
+        "label": "Android 2.3",
+        "value": "2.3|9"
+      },
+      {
+        "label": "Android 2.3.3",
+        "value": "2.3.3|10"
+      },
+      {
+        "label": "Android 3.0",
+        "value": "3|11"
+      },
+      {
+        "label": "Android 3.1",
+        "value": "3.1|12"
+      },
+      {
+        "label": "Android 3.2",
+        "value": "3.2|13"
+      },
+      {
+        "label": "Android 4.0",
+        "value": "4|14"
+      },
+      {
+        "label": "Android 4.0.3",
+        "value": "4.0.3|15"
+      },
+      {
+        "label": "Android 4.1",
+        "value": "4.1|16"
+      },
+      {
+        "label": "Android 4.2",
+        "value": "4.2|17"
+      },
+      {
+        "label": "Android 4.3",
+        "value": "4.3|18"
+      },
+      {
+        "label": "Android 4.4",
+        "value": "4.4|19"
+      },
+      {
+        "label": "Android 4.4W",
+        "value": "4.4W|20"
+      },
+      {
+        "label": "Android 5.0",
+        "value": "5|21"
+      },
+      {
+        "label": "Android 5.1",
+        "value": "5.1|22"
+      },
+      {
+        "label": "Android 6",
+        "value": "6|23"
+      },
+      {
+        "label": "Android 7.0",
+        "value": "7|24"
+      },
+      {
+        "label": "Android 7.1",
+        "value": "7.1|25"
+      },
+      {
+        "label": "Android 8.0",
+        "value": "8|26"
+      },
+      {
+        "label": "Android 8.1",
+        "value": "8.1|27"
+      },
+      {
+        "label": "Android 9",
+        "value": "9|28"
+      },
+      {
+        "label": "Android 10",
+        "value": "10|29"
+      },
+      {
+        "label": "Android 11",
+        "value": "11|30"
+      },
+      {
+        "label": "Android 12",
+        "value": "12|31"
+      },
+      {
+        "label": "Android 12L",
+        "value": "12|32"
+      },
+      {
+        "label": "Android 13",
+        "value": "13|33"
+      },
+      {
+        "label": "Android 14",
+        "value": "14|34"
+      },
+      {
+        "label": "Android 15",
+        "value": "15|35"
+      },
+      {
+        "label": "Android 16",
+        "value": "16|36"
+      },
+      {
+        "label": "Android 17",
+        "value": "17|37"
+      }
+    ],
+    "densityDpi": [
+      {
+        "label": "120 dpi (ldpi)",
+        "value": "120"
+      },
+      {
+        "label": "160 dpi (mdpi)",
+        "value": "160"
+      },
+      {
+        "label": "213 dpi (tvdpi)",
+        "value": "213"
+      },
+      {
+        "label": "240 dpi (hdpi)",
+        "value": "240"
+      },
+      {
+        "label": "280 dpi",
+        "value": "280"
+      },
+      {
+        "label": "320 dpi (xhdpi)",
+        "value": "320"
+      },
+      {
+        "label": "360 dpi",
+        "value": "360"
+      },
+      {
+        "label": "400 dpi",
+        "value": "400"
+      },
+      {
+        "label": "420 dpi",
+        "value": "420"
+      },
+      {
+        "label": "440 dpi",
+        "value": "440"
+      },
+      {
+        "label": "480 dpi (xxhdpi)",
+        "value": "480"
+      },
+      {
+        "label": "560 dpi",
+        "value": "560"
+      },
+      {
+        "label": "640 dpi (xxxhdpi)",
+        "value": "640"
+      }
+    ],
+    "networks": [
+      {
+        "label": "5G",
+        "value": "5"
+      },
+      {
+        "label": "4G",
+        "value": "4"
+      },
+      {
+        "label": "3G",
+        "value": "3"
+      },
+      {
+        "label": "2G",
+        "value": "2"
+      },
+      {
+        "label": "Wi-Fi",
+        "value": "1"
+      },
+      {
+        "label": "None",
+        "value": "-1"
+      }
+    ],
+    "languages": [
+      {
+        "label": "简体中文",
+        "value": "zh_CN"
+      },
+      {
+        "label": "简体中文 (Hans)",
+        "value": "zh_Hans"
+      },
+      {
+        "label": "繁體中文 (TW)",
+        "value": "zh_TW"
+      },
+      {
+        "label": "繁體中文 (HK)",
+        "value": "zh_HK"
+      },
+      {
+        "label": "English",
+        "value": "en_US"
+      },
+      {
+        "label": "日本語",
+        "value": "ja_JP"
+      },
+      {
+        "label": "한국어",
+        "value": "ko_KR"
+      },
+      {
+        "label": "Français",
+        "value": "fr_FR"
+      },
+      {
+        "label": "Deutsch",
+        "value": "de_DE"
+      },
+      {
+        "label": "Bahasa Melayu",
+        "value": "ms_MY"
+      },
+      {
+        "label": "Bahasa Indonesia",
+        "value": "id_ID"
+      },
+      {
+        "label": "ไทย",
+        "value": "th_TH"
+      },
+      {
+        "label": "Tiếng Việt",
+        "value": "vi_VN"
+      }
+    ]
+  }
+}

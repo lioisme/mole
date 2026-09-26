@@ -9,14 +9,28 @@ import java.io.File
 import java.security.MessageDigest
 
 /**
- * 内置数据与基线 `third_party/Guise_Reborn-main` 的**同源对账**(V49 R-3「内置数据要求完全
- * 照搬基线文件夹下的 Guise 项目」)。
+ * 内置数据与基线 Guise Reborn 的**同源对账**。
  *
  * 为什么这条测试值得存在(而不是「我们抄过了」写进文档就算):
- *  - 「照搬」是可被静默违反的 —— 上游换版、本地顺手改表、生成器漏行,全都不会让任何功能变红,
- *    只会让 Modev 的内置数据悄悄偏离基线。能长期钉住它的只有**逐行对账**;
- *  - 读的是**仓库工作树里的基线真身**(不是复制进测试的常量),所以基线一旦更新而本仓未跟进,
- *    本测试当场红并点名差在哪一行。
+ *  「照搬」是可被静默违反的 —— 上游换版、本地顺手改表、生成器漏行,全都不会让任何功能变红,
+ *  只会让 Modev 的内置数据悄悄偏离基线。能长期钉住它的只有逐行/逐字节对账。
+ *
+ * 对账的两半各由什么承载:
+ *  - **逐字节那半**(两本 JSON + 两份 NOTICE):由 `app/src/test/resources/baseline/guise-reborn.lock.json`
+ *    里的摘要锁钉住。锁文件是**签核过的依赖清单**(同 `gradle.lockfile` 的地位),被跟踪 ⇒ 任何克隆都能跑;
+ *    本仓不再为了跑测试而要求工作树里存在一份 1.9 MB 的上游副本 —— 那份副本连同 NC 数据被复制进仓库
+ *    正是它不该有的分发形态。
+ *  - **行集那半**(presets 的四张表):只锁**对账真正需要的行**(SDK↔release / 密度 / 网络槽 / 语言),
+ *    同样落在锁文件里。整本 presets.json 不复制,因为它含基线自有文本。
+ *
+ * 本机若真的拉了基线(`third_party/Guise_Reborn-main`,按仓库惯例不入库),
+ * [lock_matchesBaselineOnDisk_whenBaselineIsPresent] 会再验一次「锁 == 基线真身」,
+ * 使锁文件本身也无法悄悄偏离它声称钉住的那份数据。
+ *
+ * 更新基线时:改 NOTICE(修订号/出处)→ 重算摘要写进锁文件 → 本测试绿。
+ * 生成命令(在仓库根):
+ *   sha256sum third_party/Guise_Reborn-main/app/src/main/assets/{devices,carriers}.{json,NOTICE.txt} \
+ *             third_party/Guise_Reborn-main/app/src/main/res/raw/presets.json
  *
  * 纯 JVM(读文件形态沿用 `core.model.DeviceCatalogTest`)。
  */
@@ -29,78 +43,103 @@ class BaselineDataParityTest {
         val userDir = File(System.getProperty("user.dir") ?: error("user.dir unavailable"))
         listOf(userDir, userDir.parentFile)
             .filterNotNull()
-            .firstOrNull { File(it, "third_party/Guise_Reborn-main").isDirectory }
-            ?: error("未定位到基线目录 third_party/Guise_Reborn-main(user.dir=$userDir)")
+            .firstOrNull { File(it, "app/src/main/assets/devices.json").isFile }
+            ?: error("未定位到仓库根(user.dir=$userDir 及其父目录下都没有 app/src/main/assets/devices.json)")
     }
 
-    private fun modevAsset(name: String): File =
-        File(repoRoot, "app/src/main/assets/$name").also {
+    /** 随包资产(Modev 侧,被跟踪 ⇒ 任何克隆都在)。 */
+    private fun modevFile(relativePath: String): File =
+        File(repoRoot, "app/src/main/$relativePath").also {
             assertTrue("Modev 侧资产缺失:$it", it.isFile)
         }
 
-    private fun baselineFile(relativePath: String): File =
-        File(repoRoot, "third_party/Guise_Reborn-main/$relativePath").also {
-            assertTrue("基线侧文件缺失:$it(基线被移动?对账即失去意义,须同步本路径)", it.isFile)
-        }
+    /** 基线真身,仅在本机拉过基线时存在;缺席不判红(判据在锁文件里)。 */
+    private val baselineRoot: File? by lazy {
+        val userDir = File(System.getProperty("user.dir") ?: "")
+        listOf(userDir, userDir.parentFile)
+            .filterNotNull()
+            .map { File(it, "third_party/Guise_Reborn-main/app/src/main") }
+            .firstOrNull { it.isDirectory }
+    }
 
-    private fun md5(file: File): String =
-        MessageDigest.getInstance("MD5").digest(file.readBytes())
+    private fun digest(file: File): String =
+        MessageDigest.getInstance("SHA-256").digest(file.readBytes())
             .joinToString("") { "%02x".format(it) }
 
-    // ------------------------------------------------- ① 两本 JSON:逐字节相同
+    // ---------------------------------------------------------------- 摘要锁
 
-    @Test
-    fun deviceAndCarrierCatalogs_areByteIdenticalToBaseline() {
-        for ((modevName, baselineName) in listOf(
-            "devices.json" to "app/src/main/assets/devices.json",
-            "carriers.json" to "app/src/main/assets/carriers.json",
-        )) {
-            assertEquals(
-                "两本 assets 里 $modevName 与基线不再逐字节相同(被本地改过,或上游换版未跟进)",
-                md5(baselineFile(baselineName)),
-                md5(modevAsset(modevName)),
-            )
-        }
-    }
-
-    @Test
-    fun notices_areByteIdenticalToBaseline() {
-        // 被改写过的 NOTICE 不能与「照搬」同时成立:上游修订号对不上,照搬就成了抄袭。
-        for (name in listOf("devices.NOTICE.txt", "carriers.NOTICE.txt")) {
-            assertEquals(
-                "$name 与基线不同源",
-                md5(baselineFile("app/src/main/assets/$name")),
-                md5(modevAsset(name)),
-            )
-        }
-    }
-
-    // ---------------------------------------- ② presets 五张表:行集同源
-
-    private data class PresetItem(val label: String = "", val value: String = "")
+    private data class PresetItem(val label: String, val value: String)
 
     private data class BaselinePresets(
-        val androidVersions: List<PresetItem> = emptyList(),
-        val densityDpi: List<PresetItem> = emptyList(),
-        val networks: List<PresetItem> = emptyList(),
-        val languages: List<PresetItem> = emptyList(),
+        val androidVersions: List<PresetItem>,
+        val densityDpi: List<PresetItem>,
+        val networks: List<PresetItem>,
+        val languages: List<PresetItem>,
     )
 
-    private val baselinePresets: BaselinePresets by lazy {
-        Json.gson.fromJson(
-            baselineFile("app/src/main/res/raw/presets.json").readText(),
-            BaselinePresets::class.java,
-        ) ?: error("基线 presets.json 解析失败")
+    private data class BaselineLock(val files: Map<String, String>, val presets: BaselinePresets)
+
+    private val lock: BaselineLock by lazy {
+        val text = checkNotNull(
+            javaClass.getResourceAsStream("/baseline/guise-reborn.lock.json")
+                ?.bufferedReader()?.readText(),
+        ) { "摘要锁 baseline/guise-reborn.lock.json 不在测试类路径上(被移动过?对账即失去对象)" }
+        Json.gson.fromJson(text, BaselineLock::class.java) ?: error("摘要锁解析失败")
     }
+
+    /** 锁里钉住的五个基线文件。 */
+    private val lockedFiles = listOf(
+        "assets/devices.json",
+        "assets/carriers.json",
+        "assets/devices.NOTICE.txt",
+        "assets/carriers.NOTICE.txt",
+        "res/raw/presets.json",
+    )
+
+    @Test
+    fun lockCoversEveryClaimedFile() {
+        assertEquals(
+            "锁文件的键集与本测试声明要对账的文件集不一致(新增资产必须同批登记,否则钉不到)",
+            lockedFiles.sorted(),
+            lock.files.keys.sorted(),
+        )
+    }
+
+    @Test
+    fun lock_matchesBaselineOnDisk_whenBaselineIsPresent() {
+        val root = baselineRoot ?: return Unit.also {
+            // 缺席不是失败:基线不入库,而判据(锁)已被上面的字节对账钉住。
+        }
+        for (rel in lockedFiles) {
+            val file = File(root, rel)
+            assertTrue("基线目录在场但 $rel 缺失(被移动?锁与真身必须同步)", file.isFile)
+            assertEquals("锁里的 $rel 摘要与基线真身不符(锁过期了)", lock.files.getValue(rel), digest(file))
+        }
+    }
+
+    // ------------------------------------------------- ① 两本 JSON + 两份 NOTICE:逐字节
+
+    @Test
+    fun deviceAndCarrierCatalogs_matchLockedBaselineDigest() {
+        for (rel in listOf("assets/devices.json", "assets/carriers.json", "assets/devices.NOTICE.txt", "assets/carriers.NOTICE.txt")) {
+            assertEquals(
+                "$rel 与锁定的基线摘要不再相同(被本地改过,或上游换版未跟进 → 先更新 NOTICE 再更新锁)",
+                lock.files.getValue(rel),
+                digest(modevFile(rel)),
+            )
+        }
+    }
+
+    // ---------------------------------------- ② presets 四张表:行集同源
 
     /** 基线每行的 `SDK → release`。 */
     private val baselineReleaseBySdk: Map<String, String> by lazy {
-        baselinePresets.androidVersions.associate { item ->
+        lock.presets.androidVersions.associate { item ->
             item.value.substringAfter('|') to item.value.substringBefore('|')
         }.also {
             assertEquals(
                 "基线 androidVersions 自身有重复 SDK 行(本测试按 SDK 认行,重复即失去唯一性)",
-                baselinePresets.androidVersions.size,
+                lock.presets.androidVersions.size,
                 it.size,
             )
         }
@@ -159,8 +198,8 @@ class BaselineDataParityTest {
     @Test
     fun densityTiers_areTheBaselineSetInBaselineOrder() {
         assertEquals(
-            "密度档与基线 presets.json 不再逐行一致(此处零差异是允许的)",
-            baselinePresets.densityDpi.map { it.value },
+            "密度档与基线 presets 不再逐行一致(此处零差异是允许的)",
+            lock.presets.densityDpi.map { it.value },
             ProfileValueSets.densities(),
         )
     }
@@ -173,7 +212,7 @@ class BaselineDataParityTest {
         ).map { it.toString() }.sorted()
         assertEquals(
             "活动网络类型槽集与基线不一致",
-            baselinePresets.networks.map { it.value }.sorted(),
+            lock.presets.networks.map { it.value }.sorted(),
             ours,
         )
     }
@@ -182,8 +221,8 @@ class BaselineDataParityTest {
     fun everyBaselineLanguageValue_passesOurValidator() {
         // 基线 13 条语言的 label 是单语硬编码文本(与本仓 #1 四语资源契约冲突)⇒ 有意不照搬 label;
         // 但**值**必须恒过本仓 LANGUAGE 校验,否则「照搬」在这里就是一句空话。
-        assertTrue("基线语言表为空,对账失去对象", baselinePresets.languages.isNotEmpty())
-        for (item in baselinePresets.languages) {
+        assertTrue("基线语言表为空,对账失去对象", lock.presets.languages.isNotEmpty())
+        for (item in lock.presets.languages) {
             assertNull(
                 "基线语言值 ${item.value}(${item.label})过不了本仓 LANGUAGE 校验",
                 ProfileFieldCatalog.validate(ProfileField.LANGUAGE, item.value),
@@ -191,41 +230,32 @@ class BaselineDataParityTest {
         }
     }
 
-    // -------------------------------------- ③ 解码后可达集 = 基线扣掉非 Android 平台
+    // -------------------------------------- ③ 解码后可达集 = 原始集扣掉非 Android 平台
 
     @Test
-    fun decodedDeviceCatalog_isBaselineMinusNonAndroidBrands() {
-        val baselineText = baselineFile("app/src/main/assets/devices.json").readText()
-        val rawBaseline = Json.gson.fromJson(baselineText, DeviceCatalog::class.java)
-            ?: error("基线 devices.json 解析失败")
-        val baselineDecoded = parseDeviceCatalog(baselineText) ?: error("基线 devices.json 过了解码闸失败")
-        val modevDecoded = parseDeviceCatalog(modevAsset("devices.json").readText())
-            ?: error("随包 devices.json 解析失败")
-
+    fun decodedDeviceCatalog_dropsExactlyTheNonAndroidBrands() {
+        // 字节对账已把随包 devices.json 钉成「与基线同一份数据」,故可达集只需与**它自己**的原始集比:
         // 剔掉的必须恰是非 Android 品牌(剔多 = 顺手删了 Android 数据;剔少 = 苹果还在)。
+        val text = modevFile("assets/devices.json").readText()
+        val raw = Json.gson.fromJson(text, DeviceCatalog::class.java) ?: error("devices.json 解析失败")
+        val decoded = parseDeviceCatalog(text) ?: error("devices.json 过了解码闸失败")
+
+        assertTrue(
+            "数据里无非 Android 品牌 ⇒ 剔量口径须重估(本测试与 AndroidOnlyDataTest 一起改)",
+            raw.brands.any { it.isNonAndroidPlatform() },
+        )
         assertEquals(
             "解码闸应只剔非 Android 品牌",
-            rawBaseline.brands.filterNot { it.isNonAndroidPlatform() }.map { it.key },
-            baselineDecoded.brands.map { it.key },
-        )
-        assertTrue(
-            "基线原始集里无非 Android 品牌 ⇒ 剔量口径须重估(本测试与 AndroidOnlyDataTest 一起改)",
-            rawBaseline.brands.any { it.isNonAndroidPlatform() },
-        )
-        assertEquals(
-            "基线与 Modev 的**可达集**必须整本相等(品牌、机型、逐字段)",
-            baselineDecoded,
-            modevDecoded,
+            raw.brands.filterNot { it.isNonAndroidPlatform() }.map { it.key },
+            decoded.brands.map { it.key },
         )
     }
 
     @Test
-    fun carrierCount_matchesBaselineRowSet() {
-        val baselineSize = parseCarrierCatalog(baselineFile("app/src/main/assets/carriers.json").readText())
-            ?.size ?: error("基线 carriers.json 解析失败")
-        val ours = parseCarrierCatalog(modevAsset("carriers.json").readText())
+    fun carrierCatalog_parsesToTheLockedRowSet() {
+        // 条数只防「静默缩水」这一种事故;与基线的等价性由 [deviceAndCarrierCatalogs_matchLockedBaselineDigest] 的字节对账承担。
+        val ours = parseCarrierCatalog(modevFile("assets/carriers.json").readText())
             ?.size ?: error("随包 carriers.json 解析失败")
-        assertEquals("运营商条数与基线不一致", baselineSize, ours)
         assertTrue("运营商表不应静默缩水,实为 $ours", ours > 1_500)
     }
 }
