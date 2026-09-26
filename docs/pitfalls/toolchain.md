@@ -363,3 +363,21 @@
 - **靶程序 launcher 入口是 `.TriggerActivity`**(非 MainActivity);
   uiautomator dump 在高负载偶发挂起/截断,解析用 perl(宿主 grep 是 ugrep 别名,
   `-o` 行为不同)。
+
+## PowerShell 5.1 按系统 ANSI 解码「无 BOM 的 UTF-8 .ps1」
+
+含中文的 `.ps1` 若无 UTF-8 BOM,PS 5.1 会按 GBK 解码 ⇒ 中文字符串字面量被拆坏,
+报 `TerminatorExpectedAtEndOfString`,位置还落在**最后一个含中文的 Write-Host** 上
+(前面几行看起来完全正常,于是会把「解析失败」误读成「运行到一半出错」)。
+判据:`Get-Content -TotalCount 1 -Encoding Byte` 看前三字节是否 `EF BB BF`。
+本仓 `scripts/*.ps1` 全部带 BOM 是**既有惯例**,新脚本必须照做;
+写盘工具默认输出无 BOM UTF-8,所以由 agent/脚本新生成的 `.ps1` 一定会踩这一条。
+
+## 忽略规则的尾斜杠只挡目录,不挡同名散件
+
+`docs/test-reports/v45-*/` 这条规则看起来在防验收产物入库,实际一条也挡不住:
+带尾斜杠 = 只匹配**目录**,而 `run-acceptance.ps1` 除了写轮次目录,还往同一层写
+`v45-<utc>.json` / `.md` 两个散件。结果 78 个台账进了索引(36 个含 `D:\Users\...` 本机路径),
+另有 401 个未跟踪散件堆在工作树里。
+判据:**任何"防产物入库"的规则,必须用一次真实运行来验**,而不是看规则写没写。
+本轮的处置是不再逐目录设防:产物只有一个落点 `dev-local/`,那里整棵子树不入库。
