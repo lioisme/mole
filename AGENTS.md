@@ -559,7 +559,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       **画像族默认开**(与条件档默认 false 相反)是定档而非疏漏:真闸是「该项是否被填」,空 ⇒ 一族零安装。
       这也是 `ProfileKind`(V49 R-1 后 **20**,画像层)与 `DeviceEnvKind`(V49 WP-D3 后 **29**,taxonomy 层)
       目前**故意不合并**的原因 —— 两者基数不同且画像族仍在逐批登记,
-      合并只能在批量登记那一轮做,半合并即把仓库留在红色(实测链见 `TASK-V47-SPOOF-PLAN.md` §WP-3c)。
+      合并只能在批量登记那一轮做,半合并即把仓库留在红色(实测链见 `docs/history/TASK-V47-SPOOF-PLAN.md` §WP-3c)。
       **V49 R-1 的分类单轴(改画像分组前必读)**:`底层来源 API 族 ≡ ProfileKind ≡ UI 分区 ≡ 钩子族 ≡
       MCP enum 值`,五者 1:1,由 `ProfileKind.sourceApi`(纯 ASCII 代码标识符,不进四语表)在屏上点名,
       分区标题 = `profile_section_title(本地化名, sourceApi)` 组装。V48 的 `ProfileSection`(10 值)与
@@ -581,7 +581,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 32. **无孤儿功能契约(V50,需求「禁止有任何一个孤儿功能」的机器面)**:孤儿 =
     **登记了、能勾选/能筛选,但注入侧永不兑现**的条目。它是本仓最贵的缺陷形态,因为
     开关位存在 ≠ 有人读它、枚举值存在 ≠ 有人发射它,**全部单测与门禁照常绿**。
-    V50 首轮实测抓到 **1 个死行 + 27 个恒空操作**(见 `docs/v50-capability-inventory.md` §7)。
+    V50 首轮实测抓到 **1 个死行 + 27 个恒空操作**(见 `docs/capability-inventory.md` §7)。
     **四向门禁 `FeatureOrphanGateTest`**(扫描 `hook/` 全子树源文本):
     O1 每个登记 kind 必须被注入侧引用 / O2 每个操作枚举值必须被注入侧引用 /
     O3 注入侧引用的 `*Kind.NAME` 必须全部在分类法登记(反向旁路)/ O4 两域均非空且求和等于总数。
@@ -592,7 +592,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       —— 实锤 S1:`toJson` 走 Gson 反射自动写、`fromJson` 是**手写逐键**,加属性忘加解析臂
       = 写得出读不回(V49 R-2 画像微调因此静默失效数轮,内存直读型测试恒绿);
     ② `FrameworkEntrypointContractTest`(两入口/两 flavor 元数据/legacy 不携带现代声明/
-      `checkcast` 纪律/两适配器契约面)—— 钉住双 API 骨架,详见 `docs/v50-xposed-api-compat.md`。
+      `checkcast` 纪律/两适配器契约面)—— 钉住双 API 骨架,详见 `docs/xposed-api-compat.md`。
     **禁**用「门禁全绿」代替「发射面存在」作为功能完成的证据;生效判据仍是靶程序读回(设备矩阵)。
     **V50 追加两类更隐蔽的孤儿(都在"门禁全绿"下长期存在)**:
     ③ **配置孤儿** —— 测试档案定义了却从未被 `ApplyProfile`:设备档 `root-on`(`21-run-enhance.ps1:23`,

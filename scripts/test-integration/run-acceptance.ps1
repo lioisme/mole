@@ -1,4 +1,4 @@
-﻿# run-acceptance.ps1 — V45 一次性全量验收编排(TASK-V45-ACCEPTANCE.md §8.1 / BL-4 根因治理)
+﻿# run-acceptance.ps1 — V45 一次性全量验收编排(docs/history/TASK-V45-ACCEPTANCE.md §8.1 / BL-4 根因治理)
 #
 # 用法:
 #   powershell -File scripts/test-integration/run-acceptance.ps1                 # 全量单轮

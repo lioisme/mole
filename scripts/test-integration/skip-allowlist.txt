@@ -1,4 +1,4 @@
-# V45 验收轮 SKIP 豁免表 —— 与 TASK-V45-ACCEPTANCE.md §4.3 同源(T4.4 假绿防线)
+# V45 验收轮 SKIP 豁免表 —— 与 docs/history/TASK-V45-ACCEPTANCE.md §4.3 同源(T4.4 假绿防线)
 #
 # 一行一个「可机械匹配的 SKIP 标识」:
 #   · 矩阵脚本步(`00/10-27-*.ps1` 台账)= 断言名(Assert / SkipResult 的 Name 字段)

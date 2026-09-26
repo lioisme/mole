@@ -223,7 +223,7 @@ Modev 是抓取目标 App 全部算法调用(JCA/JCE 门面类)的 Xposed 模块
 **状态**:✅ → 备注:assembleDebug/lintDebug/testDebugUnitTest 全绿;lint 0 error(17 warning 均为既有文件,无新增);x86_64 debug APK 展开核验:含 META-INF/xposed/java_init.list+module.prop 与 assets/xposed_init,无任何框架类打包;Manifest 元数据在位。
 
 ### T9 文档收尾
-**验收**:README 安装/限制章节补充双框架说明;`docs/DEVELOPMENT.md` 增加 T12 双框架兼容条目;本文件状态全部收敛。
+**验收**:README 安装/限制章节补充双框架说明;`docs/history/DEVELOPMENT.md` 增加 T12 双框架兼容条目;本文件状态全部收敛。
 **状态**:✅ → 备注:README 功能导语/安装(双框架二选一 + 双入口互斥说明)/限制(新增 legacy 范围与 LSPosed 1.9/1.10 灰区)/开发链接全部更新;DEVELOPMENT.md 增加 T12 条目与目录结构(双入口 + assets/xposed_init);本文件 T0~T9 全部标记完成并附工作备注。
 
 ---
