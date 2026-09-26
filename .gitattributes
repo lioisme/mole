@@ -1,0 +1,33 @@
+# 行尾单一事实源:仓库内一律 LF,检出也一律 LF。
+# 不设本文件的后果 = core.autocrlf=true 在 Windows 上把每次 checkout 变成一次全文件重写,
+# 每个 PR 都带行尾噪音 diff,而 gradlew 在 Linux/macOS 克隆后可能失去可执行位语义。
+* text=auto eol=lf
+
+# 构建脚本:shell 侧必须 LF(检出成 CRLF 会让 /bin/sh 把 \r 当参数的一部分)
+gradlew text eol=lf
+*.sh text eol=lf
+
+# 批处理必须 CRLF(Windows cmd 对 LF-only 的 .bat 行为不稳)
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 逐字节对账钉住的数据资产:git 永不改写其字节
+# (改一个换行 = BaselineDataParityTest 的摘要对账当场红,而这正是它该有的行为)
+app/src/main/assets/devices.json -text
+app/src/main/assets/carriers.json -text
+app/src/main/assets/devices.NOTICE.txt -text
+app/src/main/assets/carriers.NOTICE.txt -text
+
+# 二进制
+*.png binary
+*.webp binary
+*.jpg binary
+*.jar binary
+*.apk binary
+*.aab binary
+*.keystore binary
+*.jks binary
+*.p12 binary
+*.der binary
+*.ttf binary
+*.otf binary

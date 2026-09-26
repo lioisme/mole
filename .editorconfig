@@ -1,0 +1,43 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.kt]
+indent_style = space
+indent_size = 4
+
+[*.kts]
+indent_style = space
+indent_size = 4
+
+[*.md]
+# Markdown 里两空格结尾是硬换行语义,不能被裁
+trim_trailing_whitespace = false
+
+[*.{json,yaml,yml}]
+indent_style = space
+indent_size = 2
+
+[*.ps1]
+indent_style = space
+indent_size = 4
+
+# Room 的 exportSchema 产物:字节归生成器所有(它不写末行换行)。
+# 手工补一个换行 = 下一次导出又改掉,永久留一条 diff-vs-生成器的假改动。
+[app/schemas/**.json]
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+# 逐字节对账钉住的上游资产:字节归上游所有,编辑器一律别伸手
+# (一个换行就会让 BaselineDataParityTest 的摘要对账红 —— 那是它该有的行为,但没必要天天撞上)
+[{devices,carriers}.json]
+insert_final_newline = false
+trim_trailing_whitespace = false
+
+[*.NOTICE.txt]
+insert_final_newline = false
+trim_trailing_whitespace = false
