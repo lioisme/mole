@@ -16,7 +16,7 @@ class CategoryTaxonomyTest {
             setOf(
                 CryptoKind.KEY_PARAM.name, CryptoKind.KEY_GENERATION.name, CryptoKind.KEY_FACTORY.name,
                 CryptoKind.KEY_STORE.name, CryptoKind.KEY_AGREEMENT.name, CryptoKind.RANDOM.name,
-                CryptoKind.BASE64.name, CryptoKind.WEB_CRYPTO.name,
+                CryptoKind.BASE64.name,
             ),
             off,
         )
@@ -41,8 +41,8 @@ class CategoryTaxonomyTest {
     @Test
     fun forType_returns_ordered_categories() {
         val crypto = CategoryTaxonomy.forType(RecordType.CRYPTO)
-        assertEquals(12, crypto.size)
-        assertEquals((0..11).toList(), crypto.map { it.order })
+        assertEquals(11, crypto.size)
+        assertEquals((0..10).toList(), crypto.map { it.order })
         assertEquals(CryptoKind.CIPHER.name, crypto.first().id)
         val db = CategoryTaxonomy.forType(RecordType.DATABASE)
         assertEquals(5, db.size)
@@ -133,7 +133,8 @@ class CategoryTaxonomyTest {
 
     @Test
     fun `validateOperations includes DeviceEnvOperation entries`() {
-        val valid = CategoryTaxonomy.validateOperations(RecordTypes.DEVICE_ENV, setOf("FILE_EXISTS", "CLASS_FOR_NAME"))
+        // V50:原用例取 "CLASS_FOR_NAME" 作第二个样本,该值已随死钩退役 ⇒ 换仍在发射的 LOAD_CLASS
+        val valid = CategoryTaxonomy.validateOperations(RecordTypes.DEVICE_ENV, setOf("FILE_EXISTS", "LOAD_CLASS"))
         assertNotNull(valid)
         assertEquals(2, valid!!.size)
     }
@@ -305,7 +306,8 @@ class CategoryTaxonomyTest {
         // 注意:kind id 跨类型存在同名碰撞(OPEN: SQL/PREFS;SIGNATURE: CRYPTO/SYSTEM),
         // 域完备性断言必须用 (type,id) 对而非裸 id 集合。
         val listen = CategoryTaxonomy.forDomain(CapabilityDomain.LISTEN)
-        assertEquals(44, listen.size)
+        // V50 孤儿整改:44 → 43(死行 CryptoKind.WEB_CRYPTO 退役,监听域唯一无法兑现的一行)
+        assertEquals(43, listen.size)
         val listenIds = listen.map { it.id }.toSet()
         // 观测子类不得混入功能域
         assertTrue(listenIds.contains(NetworkKind.REQUEST.name))

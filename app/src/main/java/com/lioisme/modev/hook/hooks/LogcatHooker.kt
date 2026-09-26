@@ -24,6 +24,8 @@ class LogcatHooker(
             "i" to SystemOperation.LOG_INFO,
             "w" to SystemOperation.LOG_WARN,
             "e" to SystemOperation.LOG_ERROR,
+            // V50 孤儿整改:wtf 在枚举与四语标签里登记过却从未挂钩(LOG_FATAL 恒零发射)。
+            "wtf" to SystemOperation.LOG_FATAL,
         )
         for ((method, op) in levels) {
             val methods = registry.named(method)

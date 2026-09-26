@@ -58,7 +58,7 @@ class DetectionMonitorHooker(
             if (!featureOn(DeviceEnvKind.EMULATOR_SENSOR)) monitorGetDefaultSensor()
             // getMacAddress 由 EmulatorNetworkHooker 覆盖,跳过 monitorGetMacAddress
             if (!featureOn(DeviceEnvKind.EMULATOR_NETWORK)) monitorGetMacAddress()
-            monitorBuildFields()
+            monitorBuildFieldReflection()
         }
     }
 
@@ -200,29 +200,52 @@ class DetectionMonitorHooker(
         )
     }
 
+    /**
+     * Build 字段反射读取监控(V50 死钩整改)。
+     *
+     * **旧实装是一条永不生效的死钩**:它用 `clazz.getMethod(field)` 找
+     * `getFINGERPRINT` / `getMODEL` / `getPRODUCT` / `getMANUFACTURER` —— 而
+     * `android.os.Build` 的这些成员是 `public static final` **字段,根本没有同名 getter**
+     * ⇒ 四次 `NoSuchMethodException` 全被 `?: continue` 咽掉 ⇒ 零安装、零记录,
+     * 而 AGENTS 写着「已监控 Build 字段」(与 V49 实锤的 `File.readText` / @hide 方法同族)。
+     *
+     * 静态字段直读(`GETSTATIC`)在 ART 上不可钩,这是物理上限;真正可观测的是
+     * **反射读**这条通路,故本实装改钩 `java.lang.reflect.Field.get` 并只筛 `Build` 的字段。
+     * 直读路径不申报 —— 由 `EmulatorBuildHooker` 的字段改写覆盖(干预面),不伪造观测面。
+     *
+     * 热路径护栏:`Field.get` 是极高频反射入口,门控与「是否 Build 字段」判定必须在
+     * 取任何值之前完成(V44 T2.2 热路径先行规约),非 Build 字段的成本 = 两次引用比较。
+     */
     @Synchronized
-    private fun monitorBuildFields() {
+    private fun monitorBuildFieldReflection() {
         if (buildFieldsInstalled) return
         buildFieldsInstalled = true
-        val clazz = runCatching { Class.forName("android.os.Build") }.getOrNull() ?: return
-        for (field in BUILD_FIELDS) {
-            val method = runCatching { clazz.getMethod(field) }.getOrNull() ?: continue
-            engine.hook(method, object : MethodHook() {
-                override fun after(invocation: Invocation) {
-                    // 运行时检查:如果干预型 Hooker 已启用,跳过监控(避免双重 Hook)
-                    if (featureOn(DeviceEnvKind.EMULATOR_BUILD)) return
-                    val value = invocation.result as? String ?: return
-                    emit(
-                        kind = DeviceEnvKind.DETECT_EMULATOR,
-                        operation = DeviceEnvOperation.EMULATOR_CHECK_BUILD,
-                        originalValue = value,
-                        targetProperty = field,
-                        detectionPattern = "build-check",
-                        intervention = false,
-                    )
-                }
-            })
+        val method = runCatching {
+            java.lang.reflect.Field::class.java.getMethod("get", Any::class.java)
+        }.getOrNull()
+        if (method == null) {
+            // 解析失败必须点名(V49 收口:静默空装 = 文档替死钩撒谎)
+            unresolvedHookPoints += "java.lang.reflect.Field#get/get"
+            return
         }
+        engine.hook(method, object : MethodHook() {
+            override fun before(invocation: Invocation) {
+                if (!featureOn(DeviceEnvKind.DETECT_EMULATOR)) return
+                val field = invocation.thisObject as? java.lang.reflect.Field ?: return
+                if (field.declaringClass != android.os.Build::class.java) return
+                if (field.type != String::class.java) return
+                val name = field.name
+                if (name !in BUILD_FIELDS) return
+                emit(
+                    kind = DeviceEnvKind.DETECT_EMULATOR,
+                    operation = DeviceEnvOperation.EMULATOR_CHECK_BUILD,
+                    targetProperty = name,
+                    detectionPattern = "build-reflect",
+                    intervention = false,
+                    params = mapOf("via" to "Field.get"),
+                )
+            }
+        })
     }
 
     companion object {
@@ -242,8 +265,14 @@ class DetectionMonitorHooker(
             "su", "busybox", "magisk", "superuser", "supersu",
         )
 
-        private val BUILD_FIELDS = listOf(
-            "getFINGERPRINT", "getMODEL", "getPRODUCT", "getMANUFACTURER",
+        /**
+         * 参与反射读监控的 `android.os.Build` **字段名**(V50 更正:旧列表写的是
+         * `getFINGERPRINT` 之类的假 getter 名,而 Build 上不存在这些方法 ⇒ 死钩)。
+         * 只列字符串型身份字段;`Build` 其余字段(int/long/布尔)不是模拟器指纹的主信号。
+         */
+        private val BUILD_FIELDS = setOf(
+            "FINGERPRINT", "MODEL", "PRODUCT", "MANUFACTURER",
+            "BRAND", "DEVICE", "BOARD", "TAGS", "USER", "HOST", "ID", "DISPLAY", "SERIAL",
         )
     }
 }

@@ -4,6 +4,8 @@ import androidx.room.Room
 import com.google.gson.JsonObject
 import com.lioisme.modev.core.model.AppListenOverride
 import com.lioisme.modev.core.model.BehaviorKind
+import com.lioisme.modev.core.model.CapabilityDomain
+import com.lioisme.modev.core.model.CategoryTaxonomy
 import com.lioisme.modev.core.model.BuiltinDeviceProfiles
 import com.lioisme.modev.core.model.KeywordMatchMode
 import com.lioisme.modev.core.model.RecordTypes
@@ -335,10 +337,12 @@ class McpToolsTest {
     }
 
     @Test
-    fun taxonomy_listen_has_44_entries() = kotlinx.coroutines.runBlocking {
+    fun `taxonomy_listen matches LISTEN domain size`() = kotlinx.coroutines.runBlocking {
         val taxonomy = listenTools.tools.first { it.name == "taxonomy_listen" }
         val categories = taxonomy.execute(JsonObject()).get("categories").asJsonArray
-        assertEquals(44, categories.size())
+        // V50 孤儿整改:计数派生自分类法本身(死行退役后恒与 forDomain(LISTEN) 同数,
+        // 不再抄一个字面量 —— 抄死的数字正是本仓「文档替死钩撒谎」的成因之一)。
+        assertEquals(CategoryTaxonomy.forDomain(CapabilityDomain.LISTEN).size, categories.size())
         assertTrue(categories.all { it.asJsonObject.get("domain").asString == "LISTEN" })
     }
 

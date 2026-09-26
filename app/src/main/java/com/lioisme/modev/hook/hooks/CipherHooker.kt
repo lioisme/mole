@@ -1,5 +1,6 @@
 package com.lioisme.modev.hook.hooks
 
+import com.lioisme.modev.core.model.CipherDirection
 import com.lioisme.modev.core.model.CryptoKind
 import com.lioisme.modev.core.model.CryptoOperation
 import com.lioisme.modev.core.model.HookSwitch
@@ -228,6 +229,14 @@ class CipherHooker(
         )
     }
 
+    /** 按 init 方向决定 doFinal 的操作名;WRAP/UNWRAP/未知仍归 DO_FINAL(不谎报加/解密)。 */
+    private fun directionOperation(direction: Int?): CryptoOperation =
+        when (CipherDirection.fromMode(direction)) {
+            CipherDirection.ENCRYPT -> CryptoOperation.ENCRYPT
+            CipherDirection.DECRYPT -> CryptoOperation.DECRYPT
+            else -> CryptoOperation.DO_FINAL
+        }
+
     private fun afterDoFinal(invocation: Invocation, ctx: CryptoContext, outArg: Any?, result: Any?) {
         val instance = invocation.thisObject ?: return
         val input = when (val arg = invocation.getArg(0)) {
@@ -251,7 +260,11 @@ class CipherHooker(
         }
         ctx.outputTotal += output?.size ?: 0
         emit(
-            operation = CryptoOperation.DO_FINAL,
+            // V50 孤儿整改:此处恒发 DO_FINAL ⇒ `CryptoOperation.ENCRYPT/DECRYPT` 两个枚举值
+            // 零发射(筛选菜单与详情页流向角色都认得它们,却永远选不到)。
+            // 方向已由 `ctx.direction`(init 第一实参)确知 ⇒ 改按方向发射:
+            // 加/解密各自成操作,其余方向(WRAP/UNWRAP/未知)保持 DO_FINAL 不谎报。
+            operation = directionOperation(ctx.direction),
             algorithm = ctx.algorithm,
             contextId = CryptoContextTracker.identity(instance),
             context = ctx,

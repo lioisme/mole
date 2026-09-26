@@ -21,7 +21,7 @@ internal fun cryptoFlowRoles(
     operation: CryptoOperation,
     direction: Int?,
 ): Pair<Int?, Int?> = when (kind) {
-    CryptoKind.CIPHER, CryptoKind.WEB_CRYPTO -> cipherRoles(operation, CipherDirection.fromMode(direction))
+    CryptoKind.CIPHER -> cipherRoles(operation, CipherDirection.fromMode(direction))
 
     CryptoKind.MESSAGE_DIGEST -> when (operation) {
         CryptoOperation.DIGEST -> R.string.role_input_message to R.string.role_output_digest

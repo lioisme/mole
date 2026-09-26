@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.update
@@ -274,6 +275,51 @@ class SettingsRepository(
     /** 装配画像库(容器初始化期一次;null = 未装配,快照恒保持来路值不覆盖)。 */
     fun attachSpoofProfiles(service: SpoofProfileService) {
         spoofProfiles = service
+        // V50 S4 的另一半:画像正文被编辑后,**已落盘的快照必须跟着刷新**。
+        // 只补 setOverride 写入点会留下新洞:绑档时快照正确,之后改档 ⇒ TCP 通路是新的、
+        // 注入侧「直读两键 / 磁盘兜底」读到的仍是旧快照 = 两条通路各说一套
+        // (TCP 侧重推由 assetRevision 承担,本收集器只管落盘内容)。
+        scope.launch {
+            service.profiles.drop(1).collect { refreshResolvedProfileSnapshots() }
+        }
+    }
+
+    /**
+     * 落盘快照的取值规则(V50 S4)—— 三条,缺一不可:
+     *  - **画像库未装配** ⇒ 保持来路值:外部推送方自带的快照是它唯一的输入,
+     *    用空画像覆盖 = 把「绑了档」变成「什么都没伪装」;
+     *  - **显式绑档或带逐项覆写** ⇒ 一律按库重算:TCP 下发的就是这个值,
+     *    若让推送方自带的旧快照活着,两条通路会**各自伪装成不同的机器**
+     *    (这正是 S4 的反向形态,比恒空更难查);
+     *  - **两者皆无** ⇒ 本包不参与画像,来路值原样保留(不凭全局档替它造一份 ——
+     *    全局档变化由 `switch_global` 通路承载,写进包级快照只会多一处会过期的副本)。
+     */
+    private fun snapshotFor(override: AppListenOverride): DeviceProfile? {
+        if (spoofProfiles == null) return override.resolvedProfile
+        val libraryDriven = override.spoofProfileId != null || !override.profileOverrides.isNullOrEmpty()
+        if (!libraryDriven) return override.resolvedProfile
+        return resolveFor(_globalSwitch.value, override).feature.deviceProfile
+    }
+
+    /**
+     * 逐包重派生快照并落盘(值未变的包零写入,避免画像库每次变更都全量重写偏好)。
+     *
+     * **只处理画像参与的包**(绑档或带逐项覆写):库是这些包的权威源,改档必须跟随。
+     * 未参与画像而仅「自带快照」的条目属外部推送方意图,不由库重算覆盖
+     * (与 [snapshotFor] 第三条同一条纪律)。
+     */
+    private suspend fun refreshResolvedProfileSnapshots() {
+        val pending = _overrides.value.filterValues {
+            it.spoofProfileId != null || !it.profileOverrides.isNullOrEmpty()
+        }
+        if (pending.isEmpty()) return
+        for ((packageName, override) in pending) {
+            val snapshot = snapshotFor(override) ?: continue
+            if (snapshot == override.resolvedProfile) continue
+            val next = override.copy(resolvedProfile = snapshot)
+            withContext(Dispatchers.IO) { writer.put(ConfigKeys.overrideKey(packageName), next.toJson(gson)) }
+            _overrides.update { it + (packageName to next) }
+        }
     }
 
     /**
@@ -343,10 +389,15 @@ class SettingsRepository(
             removeOverride(packageName)
             return
         }
+        // V50 实锤 S4:`resolvedProfile` 有读臂(EffectiveSwitch)与解析臂,却**全无写入方**
+        // ⇒ 不经宿主 TCP 的两条通路(直读两键 / 磁盘兜底)拿到的 deviceProfile 恒为空,
+        // 用户绑了画像而注入侧什么都不改。写入点必须与生效值同源,故复用唯一解析出口
+        // [resolveFor](禁在此再拼一遍「画像 ⊕ 覆写」—— 那是 #30 禁止的第二事实源)。
+        val persisted = override.copy(resolvedProfile = snapshotFor(override))
         withContext(Dispatchers.IO) {
-            writer.put(ConfigKeys.overrideKey(packageName), override.toJson(gson))
+            writer.put(ConfigKeys.overrideKey(packageName), persisted.toJson(gson))
         }
-        _overrides.update { it + (packageName to override) }
+        _overrides.update { it + (packageName to persisted) }
         pushOverride(packageName)
     }
 

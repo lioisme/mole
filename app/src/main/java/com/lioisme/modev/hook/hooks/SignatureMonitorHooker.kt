@@ -34,6 +34,14 @@ class SignatureMonitorHooker(
                     val hasSignatures = (flags and FLAG_GET_SIGNATURES != 0L) ||
                         (flags and FLAG_GET_SIGNING_CERTIFICATES != 0L)
                     if (!hasSignatures) return
+                    // V50 孤儿整改:两个 flag 早已分别判定,但发射恒用 SIGNATURE_READ
+                    // ⇒ SIGNATURE_READ_V2 恒零发射。GET_SIGNING_CERTIFICATES(API 28+ 的
+                    // v2 签名块读口)与 GET_SIGNATURES(v1)是靶程序不同的自校验通路,该分开。
+                    val readOperation = if (flags and FLAG_GET_SIGNING_CERTIFICATES != 0L) {
+                        SystemOperation.SIGNATURE_READ_V2
+                    } else {
+                        SystemOperation.SIGNATURE_READ
+                    }
                     val info = invocation.result ?: return
                     val signatures = runCatching {
                         val sigField = info.javaClass.getField("signatures")
@@ -54,7 +62,7 @@ class SignatureMonitorHooker(
                         )
                         emit(
                             kind = SystemKind.SIGNATURE,
-                            operation = SystemOperation.SIGNATURE_READ,
+                            operation = readOperation,
                             signatureHash = hashHex,
                             signatureBase64 = base64,
                             params = mapOf(

@@ -31,7 +31,12 @@ class ProfileBatteryHooker(
     context: ProbeContext,
 ) : DeviceEnvBaseHooker(context) {
 
-    private var audited: Int? = null
+    /**
+     * 节流集(V50):旧形态 `audited: Int?` 只按电量值去重 ⇒ 两条读口互相吞记录
+     * (getIntProperty 先发过 80,则 sticky Intent 的 80 永不发射 = BATTERY_CHANGED
+     * 换了操作名仍然恒零发射)。键 = `操作名:值`,每口各自节流。
+     */
+    private val audited = java.util.concurrent.ConcurrentHashMap.newKeySet<String>()
 
     override fun install() {
         subscribeIntProperty()
@@ -72,18 +77,33 @@ class ProfileBatteryHooker(
                     val value = if (key == BatteryManager.EXTRA_LEVEL) level else SCALE
                     val current = result as? Int ?: return
                     if (current != value) invocation.setResult(value)
-                    audit(level, original = current.toString(), target = "Intent.getIntExtra($key)")
+                    audit(
+                        level,
+                        original = current.toString(),
+                        target = "Intent.getIntExtra($key)",
+                        operation = DeviceEnvOperation.BATTERY_CHANGED,
+                    )
                 }
             },
         )
     }
 
-    private fun audit(level: Int, original: String, target: String) {
-        if (audited == level) return
-        audited = level
+    /**
+     * 审计发射。操作名按**读口**分派(V50 孤儿整改):sticky `ACTION_BATTERY_CHANGED` 的
+     * extras 读取是一条独立且靶程序更常用的通路(旧 `DeviceBatteryHooker` 的类注释至今
+     * 广告着这条通路),此前两条读口都发 BATTERY_WRITE ⇒ 枚举里的 BATTERY_CHANGED
+     * 恒零发射、筛选恒空。分派后「改的是哪张读口」在记录里可读。
+     */
+    private fun audit(
+        level: Int,
+        original: String,
+        target: String,
+        operation: DeviceEnvOperation = DeviceEnvOperation.BATTERY_WRITE,
+    ) {
+        if (!audited.add("${operation.name}:$level")) return
         emit(
             kind = DeviceEnvKind.PROFILE_BATTERY,
-            operation = DeviceEnvOperation.BATTERY_WRITE,
+            operation = operation,
             originalValue = original,
             maskedValue = "$target -> $level",
             targetClass = "BatteryManager",

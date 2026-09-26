@@ -320,6 +320,10 @@ data class AppListenOverride(
                     dialogKeywords = stringListOf(obj, FIELD_DIALOG_KEYWORDS),
                     spoofProfileId = stringOf(obj, FIELD_SPOOF_PROFILE),
                     spoofOverrides = stringMapOf(obj, FIELD_SPOOF_OVERRIDES),
+                    // V50 实锤 S1:V49 R-2 加 profileOverrides 属性时只补了 toJson(Gson 反射自动写)、
+                    // isDefault/deviationCount/clearDomain,唯独漏了这条手写解析臂 ⇒
+                    // 每应用画像微调**落盘后读回即丢**,而全部单测经内存对象直读故恒绿。
+                    profileOverrides = stringMapOf(obj, FIELD_PROFILE_OVERRIDES),
                     resolvedProfile = obj.get(FIELD_RESOLVED_PROFILE)
                         ?.takeIf { it.isJsonObject }
                         ?.let {
@@ -445,6 +449,7 @@ data class AppListenOverride(
         private const val FIELD_DIALOG_KEYWORDS = "dialogKeywords"
         private const val FIELD_SPOOF_PROFILE = "spoofProfileId"
         private const val FIELD_SPOOF_OVERRIDES = "spoofOverrides"
+        private const val FIELD_PROFILE_OVERRIDES = "profileOverrides"
         private const val FIELD_RESOLVED_PROFILE = "resolvedProfile"
         private const val FIELD_EXTRA_ROOT_PACKAGES = "extraRootPackages"
         private const val FIELD_EXTRA_XPOSED_PREFIXES = "extraXposedPrefixes"

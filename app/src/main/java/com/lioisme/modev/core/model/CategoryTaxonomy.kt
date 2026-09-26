@@ -63,7 +63,6 @@ object CategoryTaxonomy {
         add(RecordCategory(CryptoKind.KEY_AGREEMENT.name, RecordType.CRYPTO, L, false, NoiseTier.NOISE_HIGH, 8))
         add(RecordCategory(CryptoKind.RANDOM.name, RecordType.CRYPTO, L, false, NoiseTier.NOISE_HIGH, 9))
         add(RecordCategory(CryptoKind.BASE64.name, RecordType.CRYPTO, L, false, NoiseTier.NOISE_HIGH, 10))
-        add(RecordCategory(CryptoKind.WEB_CRYPTO.name, RecordType.CRYPTO, L, false, NoiseTier.NOISE_HIGH, 11))
         // 数据库类别(顺序对齐原设置页)
         add(RecordCategory(SqlKind.OPEN.name, RecordType.DATABASE, L, false, NoiseTier.NOISE_HIGH, 0))
         add(RecordCategory(SqlKind.QUERY.name, RecordType.DATABASE, L, true, NoiseTier.SIGNAL, 1))

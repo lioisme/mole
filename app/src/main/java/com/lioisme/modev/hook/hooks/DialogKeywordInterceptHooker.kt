@@ -44,7 +44,19 @@ class DialogKeywordInterceptHooker(
                     val title = extractTitle(dialog)
                     val message = extractMessage(dialog)
                     val matched = matchedKeywords(switch, title, message)
-                    if (matched.isEmpty()) return
+                    if (matched.isEmpty()) {
+                        // V50 孤儿整改:DIALOG_PASSED 登记过、有四语标签、可筛选,但恒零发射
+                        // ⇒ 用户开了关键词拦截却看不到「哪些弹窗被放行」,无法区分
+                        // 「规则没命中」与「钩子没生效」。补发射即消歧(同一门控之后,零额外成本)。
+                        emit(
+                            kind = UiInteractionKind.DIALOG_KEYWORD,
+                            operation = UiInteractionOperation.DIALOG_PASSED,
+                            dialogTitle = title,
+                            dialogMessage = message,
+                            interventionAction = ACTION_PASSED,
+                        )
+                        return
+                    }
                     emit(
                         kind = UiInteractionKind.DIALOG_KEYWORD,
                         operation = UiInteractionOperation.DIALOG_INTERCEPTED,
@@ -76,6 +88,9 @@ class DialogKeywordInterceptHooker(
     companion object {
         /** interventionAction:已阻止弹窗显示 */
         private const val ACTION_BLOCKED = "BLOCKED"
+
+        /** interventionAction:有规则表但本弹窗未命中,放行 */
+        private const val ACTION_PASSED = "PASSED"
 
         /**
          * 拦截判定纯函数(V37 T0.1,可 JVM 直测;T2.1 规则化):

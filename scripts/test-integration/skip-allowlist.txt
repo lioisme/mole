@@ -16,3 +16,21 @@ com.lioisme.modev.FourScreensNavTest#recordRowOpensRecordDetail_andMoreMenuHasSi
 # EX-03 复位步:数据库文件本就不存在(上一轮已删/首装前)时无从验证「下次打开会重建」,
 # 该断言按 SKIP 记录而非 FAIL(复位目标已达成)。
 record db rebuilt on next launch
+
+# V50 掩蔽型 device_env kind(L 档只验「被动看得见」,掩蔽动作的有效性在 E 档二态)。
+# 豁免条件 = **同名 kind 已由 `21-run-enhance.ps1` 逐条 Assert**,不再是"环境大概干净"的推测:
+#   EMULATOR_BUILD      → E-EMU-01 ON record(EMULATOR_BUILD 计数 >0)
+#   EMULATOR_SENSOR/CPU/BATTERY → E-EMU record kind=<同名>(emulator-on 生效 + E-EMU-02..07 触发读口)
+#   ROOT_PACKAGE_MANAGER / ROOT_PROPERTY(+ ROOT_FILE/ROOT_EXEC)→ E-ROOT record kind=<同名>
+#                          (V50 补:`root-on` 档案此前从未被 ApplyProfile,等于两档都没测)
+#   PROC_STATUS / PROC_CGROUP → E-PRCFILE record kind=<同名>,且该断言已改为**靶程序自报脏量**
+#                          驱动(E-PRC-01 tracerPid / E-PRC-03 dirtyCgroup):实测有脏而记录 0 ⇒ 红。
+# ⇒ 若上列任一 E 档断言变红,本豁免即失效,该能力当场以红呈现(不再是双层互推)。
+L/deviceenv kind=ROOT_PACKAGE_MANAGER (masking-type)
+L/deviceenv kind=ROOT_PROPERTY (masking-type)
+L/deviceenv kind=EMULATOR_BUILD (masking-type)
+L/deviceenv kind=EMULATOR_SENSOR (masking-type)
+L/deviceenv kind=EMULATOR_CPU (masking-type)
+L/deviceenv kind=EMULATOR_BATTERY (masking-type)
+L/deviceenv kind=PROC_STATUS (masking-type)
+L/deviceenv kind=PROC_CGROUP (masking-type)

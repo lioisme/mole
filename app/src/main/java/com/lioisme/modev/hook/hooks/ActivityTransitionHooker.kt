@@ -18,7 +18,7 @@ class ActivityTransitionHooker(
 
     override fun install() {
         hookStartActivity()
-        hookOnCreate()
+        hookLifecycle()
     }
 
     private fun hookStartActivity() {
@@ -50,7 +50,13 @@ class ActivityTransitionHooker(
                     }.getOrNull()
                     emit(
                         kind = UiInteractionKind.ACTIVITY_START,
-                        operation = UiInteractionOperation.ACTIVITY_START_INTENT,
+                        // V50 孤儿整改:循环含 `startActivity(Intent, Bundle)` 重载,
+                        // 但发射时不区分实参数 ⇒ ACTIVITY_START_OPTIONS 恒零发射。
+                        operation = if (invocation.argCount >= 2) {
+                            UiInteractionOperation.ACTIVITY_START_OPTIONS
+                        } else {
+                            UiInteractionOperation.ACTIVITY_START_INTENT
+                        },
                         activityName = targetResolve ?: intent.component?.getClassName(),
                         intentAction = intent.action,
                         intentData = intent.dataString,
@@ -66,22 +72,38 @@ class ActivityTransitionHooker(
         }
     }
 
-    private fun hookOnCreate() {
-        val methods = activityRegistry?.named("onCreate").orEmpty()
-        if (methods.isEmpty()) return
-        for (method in methods) {
-            engine.hook(method, object : MethodHook() {
-                override fun after(invocation: Invocation) {
-                    if (!featureOn(UiInteractionKind.ACTIVITY_RESUME)) return // V43 T2
-                    val activity = invocation.thisObject ?: return
-                    val activityName = activity.javaClass.name
-                    emit(
-                        kind = UiInteractionKind.ACTIVITY_RESUME,
-                        operation = UiInteractionOperation.ACTIVITY_ON_CREATE,
-                        activityName = activityName,
-                    )
-                }
-            })
+    /**
+     * Activity 生命周期观测(V50 孤儿整改):原 `hookOnCreate` 只挂 onCreate 却以
+     * `ACTIVITY_RESUME`(kind 名 = 「Activity 恢复」)发射 ⇒ kind 名实相反,且枚举里
+     * `ACTIVITY_ON_RESUME`/`ON_PAUSE`/`ON_STOP`/`ON_DESTROY`/`FINISH` 恒零发射
+     * (四语标签与筛选菜单都有,选中即恒空)。`BehaviorMethodRegistry` 枚举
+     * `methods ∪ 父类链 declaredMethods`(V36 D-13),故 protected 生命周期可得。
+     */
+    private fun hookLifecycle() {
+        val targets = mapOf(
+            "onCreate" to UiInteractionOperation.ACTIVITY_ON_CREATE,
+            "onResume" to UiInteractionOperation.ACTIVITY_ON_RESUME,
+            "onPause" to UiInteractionOperation.ACTIVITY_ON_PAUSE,
+            "onStop" to UiInteractionOperation.ACTIVITY_ON_STOP,
+            "onDestroy" to UiInteractionOperation.ACTIVITY_ON_DESTROY,
+            "finish" to UiInteractionOperation.ACTIVITY_FINISH,
+        )
+        for ((method, operation) in targets) {
+            val methods = activityRegistry?.named(method).orEmpty()
+            if (methods.isEmpty()) continue
+            for (m in methods) {
+                engine.hook(m, object : MethodHook() {
+                    override fun after(invocation: Invocation) {
+                        if (!featureOn(UiInteractionKind.ACTIVITY_RESUME)) return // V43 T2
+                        val activity = invocation.thisObject ?: return
+                        emit(
+                            kind = UiInteractionKind.ACTIVITY_RESUME,
+                            operation = operation,
+                            activityName = activity.javaClass.name,
+                        )
+                    }
+                })
+            }
         }
     }
 }

@@ -169,6 +169,14 @@ class SettingsRepositoryProfileExpansionTest {
         )
     }
 
+    /**
+     * 快照的 **JSON 往返保真**(V47 T2 原始意图;V50 调整夹具形态):
+     * 未绑档的包自带快照 ⇒ 落盘再读回必须逐字相等。
+     *
+     * V50 前本用例同时绑了 xiaomi 档,于是它暗中也在断言「来路值优先于库」;
+     * S4 修复把**绑了档**的情形改成「库为权威」(否则 TCP 与磁盘兜底会伪装成两台不同机器),
+     * 故此处把「未绑档」显式化,并另立一条用例钉住新 precedence。
+     */
     @Test
     fun `carried snapshot round trips through persisted override json`() = runBlocking {
         val carried = ProfileField.DENSITY_DPI.withText(
@@ -177,7 +185,8 @@ class SettingsRepositoryProfileExpansionTest {
         )
         repo.setOverride(
             "com.target",
-            AppListenOverride(spoofProfileId = xiaomiId, resolvedProfile = carried),
+            // cryptoListen 是一项真实用户意图(仅有快照不构成偏差,会被零偏差归一删键)
+            AppListenOverride(cryptoListen = false, resolvedProfile = carried),
         )
 
         val persisted = prefs.getString(
@@ -188,7 +197,32 @@ class SettingsRepositoryProfileExpansionTest {
 
         val restored = AppListenOverride.fromJson(gson, persisted)
         assertEquals(carried, restored.resolvedProfile)
-        assertEquals(xiaomiId, restored.spoofProfileId)
+        assertTrue("未绑档 ⇒ 不得凭全局档替它造一份", restored.spoofProfileId == null)
+    }
+
+    /**
+     * V50 S4 的 precedence:**绑了档 ⇒ 库是权威**,推送方自带的旧快照必须被重算覆盖。
+     * 放行旧快照的后果不是「丢一个字段」而是两条下发通路各伪装成一台机器。
+     */
+    @Test
+    fun `bound profile recomputes a stale carried snapshot`() = runBlocking {
+        val stale = ProfileField.BRAND.withText(DeviceProfile.EMPTY, "samsung")
+        repo.setOverride(
+            "com.target",
+            AppListenOverride(spoofProfileId = xiaomiId, resolvedProfile = stale),
+        )
+
+        val persisted = AppListenOverride.fromJson(
+            gson,
+            prefs.getString(com.lioisme.modev.core.model.ConfigKeys.overrideKey("com.target"), null),
+        )
+        assertEquals(
+            "落盘快照必须等于按库展开的结果(TCP 通路就是这个值)",
+            repo.effectiveSwitch("com.target").feature.deviceProfile,
+            persisted.resolvedProfile,
+        )
+        assertEquals("Xiaomi", persisted.resolvedProfile?.brand)
+        assertNotEquals("旧值不得残留", stale, persisted.resolvedProfile)
     }
 
     @Test

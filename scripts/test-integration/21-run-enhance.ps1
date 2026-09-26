@@ -199,6 +199,18 @@ if ($ttXppOff -match "forNamePath=found") {
     Skip "E-XPP-01 OFF baseline" "环境不向 App 注入 Xposed API 类(found/cnfe 基线不可区分)"
 }
 Skip "E-ROOT delta" "Magisk 默认 denylist 已对 App 隐藏 su,OFF 基线不可区分;记录面断言见 L-DEV"
+# V50 孤儿清零:`root-on` 档案在全仓**从未被 ApplyProfile 过**(定义于 :23,零消费方),
+# 而 E-ROOT 那批用例是在 `default` 档案下跑的 ⇒ ROOT_PACKAGE_MANAGER / ROOT_PROPERTY
+# 两个钩子在设备侧**从来没被按干预档配置过一次**,L 档却把它们记成
+# "掩蔽型 ⇒ 无脏可掩"。这是"档案存在 ≠ 档案生效"的典型孤儿,补一次通电验证。
+ApplyProfile "root-on"
+ClearDb
+foreach ($c in @("E-ROOT-01","E-ROOT-02","E-ROOT-03","E-ROOT-04")) { RunCase "enhance-root" $c 5 }
+WaitSpoolDrain | Out-Null
+foreach ($k in @("ROOT_FILE","ROOT_EXEC","ROOT_PACKAGE_MANAGER","ROOT_PROPERTY")) {
+    $n = KindCount "device_env" $k
+    Assert "E-ROOT record kind=$k" ($n -gt 0) "root-on 已生效且 E-ROOT-01..04 已触发四类读口;count=$n"
+}
 ApplyProfile "xposed-on"
 ClearDb
 foreach ($c in @("E-XPP-01","E-XPP-02","E-XPP-03")) { RunCase "enhance-xposed" $c 5 }
@@ -226,6 +238,15 @@ WaitSpoolDrain | Out-Null
 $n = KindCount "device_env" "EMULATOR_BUILD"
 Assert "E-EMU-01 ON record" ($n -gt 0) "count=$n"
 foreach ($c in @("E-EMU-02","E-EMU-03","E-EMU-04","E-EMU-05","E-EMU-06","E-EMU-07")) { RunCase "enhance-emulator" $c 5 }
+# V50 孤儿清零:SENSOR/CPU/BATTERY 过去只在 L 档被无条件记作"掩蔽型 ⇒ 无脏可掩",
+# 而 E 档(`emulator-on` 已生效、E-EMU-02..07 已实测跑过读口)从未断言过它们 ⇒
+# **两档各推各的,合起来等于没测**。这里补上真正的断言:干预档已开、读口已触发,
+# 记录仍为 0 就是缺陷,该红就红。
+WaitSpoolDrain | Out-Null
+foreach ($k in @("EMULATOR_SENSOR","EMULATOR_CPU","EMULATOR_BATTERY")) {
+    $n = KindCount "device_env" $k
+    Assert "E-EMU record kind=$k" ($n -gt 0) "emulator-on 已生效且读口已由 E-EMU-02..07 触发;count=$n"
+}
 
 Write-Host "`n--- E-PRCFILE ---" -ForegroundColor Magenta
 ApplyProfile "procfile-on"
@@ -236,8 +257,25 @@ foreach ($k in @("PROC_MOUNT_INFO","PROC_NET","SYSTEM_PROPERTIES")) {
     $n = KindCount "device_env" $k
     Assert "E-PRCFILE record kind=$k" ($n -gt 0) "count=$n"
 }
-foreach ($k in @("PROC_STATUS","PROC_CGROUP")) {
-    Skip "E-PRCFILE record kind=$k" "环境无 magisk cgroup 行/TracerPid=0,无脏可掩即正确行为"
+# V50:这两条过去是**无条件 Skip**,理由写成"环境无脏可掩"却从未测量 —— 于是
+# 「钩子死了」与「环境确实干净」两种相反的事实产出同一条绿字豁免,正是需求 2
+# 禁止的孤儿藏身处。判据其实**已经在靶程序嘴里**:`E-PRC-01` 自报 tracerPid、
+# `E-PRC-03` 自报 dirtyCgroup(它读的就是钩子要掩的那份内容),所以不需要新造
+# 一套 host 侧谓词(那会变成第二事实源)。
+#   脏 > 0 而记录 = 0 ⇒ 真缺陷,红;脏 = 0 ⇒ 无脏可掩,Skip 且把证据贴在消息里。
+foreach ($probe in @(
+        @("PROC_STATUS", "E-PRC-01", "tracerPid"),
+        @("PROC_CGROUP", "E-PRC-03", "dirtyCgroup"))) {
+    $k = $probe[0]; $caseId = $probe[1]; $field = $probe[2]
+    $tt = GetTt $caseId
+    $rawDirt = ([regex]::Match($tt, "$field=(\d+)")).Groups[1].Value
+    WaitSpoolDrain | Out-Null
+    $n = KindCount "device_env" $k
+    if ($rawDirt -match "^\d+$" -and [int]$rawDirt -gt 0) {
+        Assert "E-PRCFILE record kind=$k" ($n -gt 0) "环境实测有脏($field=$rawDirt)而记录=$n ⇒ 掩蔽钩子未生效"
+    } else {
+        Skip "E-PRCFILE record kind=$k" "靶程序自报 $field='$rawDirt'(无脏可掩即正确行为);记录=$n"
+    }
 }
 
 # ---------- E-MP ----------

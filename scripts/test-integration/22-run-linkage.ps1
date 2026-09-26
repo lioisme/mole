@@ -5,11 +5,22 @@ $ErrorActionPreference = "Stop"
 Write-Host "== 联动矩阵 Round(C) ==" -ForegroundColor Cyan
 
 # C-GATE-01 结果双闸门截断
-ResetState '{"dbListen":true,"kinds":{"QUERY":true},"maxResultRows":10}'
+# V50:配置复用监听矩阵自己的 `db-all` 档(20-run-listen.ps1:8,该域在矩阵里 5/5 稳定),
+# 只额外叠 `maxResultRows:10` —— 手工自拼 kinds 子集在磁盘兜底通道上不稳定
+# (同配置多次跑出 0/207 两种结果),不该由一条闸门用例去重新发明。
+ResetState '{"dbListen":true,"logStack":false,"kinds":{"OPEN":true,"QUERY":true,"DML":true,"EXEC":true,"TRANSACTION":true},"maxResultRows":10}'
 RunCase "db" "L-DB-11" 10
 WaitSpoolDrain | Out-Null
-$row = @(Q "SELECT rowCount FROM crypto_records WHERE packageName='$script:TARGET_PKG' AND operation='QUERY_RESULT' ORDER BY id DESC LIMIT 1;")
-Assert "C-GATE-01 row gate truncates (<=10)" ($row[0] -match "^\d+$" -and [int]$row[0] -le 10) "rowCount=$($row[0])"
+# V50 量具修复:原断言查 `rowCount <= 10` —— 但 `rowCount` 的语义是**游标总行数**
+# (被动 `mCount` 反射,ADR-6/#11:不得为测量而迭代游标),靶用例插 200 行并全量迭代,
+# 所以 rowCount 恒为 200,这条断言自 V45 起就是**恒红的错判据**(V49 台账里那一族
+# 「长期红、无人修」的实例)。行闸门的真判据是**被采集的行数** = `rowsJson` 里的行对象数。
+$rowsJson = @(Q "SELECT rowsJson FROM crypto_records WHERE packageName='$script:TARGET_PKG' AND operation='QUERY_RESULT' ORDER BY id DESC LIMIT 1;")
+$total = @(Q "SELECT rowCount FROM crypto_records WHERE packageName='$script:TARGET_PKG' AND operation='QUERY_RESULT' ORDER BY id DESC LIMIT 1;")
+$captured = ([regex]::Matches([string]$rowsJson[0], '\{"c":')).Count
+Assert "C-GATE-01 row gate truncates captured rows (<=10)" ($captured -ge 1 -and $captured -le 10) "captured=$captured"
+# 被动总行数仍须如实上报 200(证明确实是「采集被截」而非「查询只返 10 行」)
+Assert "C-GATE-01 passive cursor total still reported" ("$($total[0])" -match "^200$") "rowCount=$($total[0])"
 
 # C-GATE-02 ignoreStackPrefixes denylist
 ResetState '{"cryptoListen":true,"kinds":{"MESSAGE_DIGEST":true},"ignoreStackPrefixes":["com.lioisme.modev.testtarget"]}'
@@ -80,7 +91,10 @@ Assert "C-OVR-02 default restored (BASE64 off)" ($n -eq 0) "count=$n"
 # C-FB-01 V35 磁盘兜底加载日志
 ResetState '{"cryptoListen":true,"kinds":{"BASE64":true}}'
 $tt = AdbShell "logcat -d -s HookInstaller"
-Assert "C-FB-01 disk fallback loaded" ($tt -match "磁盘加载") ""
+# V50 量具修复:原断言匹配中文子串「磁盘加载」,而 PowerShell 5.1 解码 adb 文本输出时
+# **非 ASCII 字符全成 `?`**(实测 logcat 行显示为 `???????????: NetworkProbe`),
+# ⇒ 这条断言永远不可能命中,而日志实际在(`V35` 命中为 True)。改用行内的 ASCII 锚点。
+Assert "C-FB-01 disk fallback loaded" ($tt -match "V35.*override") ""
 RemoveConfig
 
 # C-EXT-01 externalAccess 默认回环绑定

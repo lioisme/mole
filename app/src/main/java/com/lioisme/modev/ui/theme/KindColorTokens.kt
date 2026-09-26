@@ -28,7 +28,6 @@ private val lightPalette: Map<CryptoKind, Color> =
         CryptoKind.KEY_STORE to Color(0xFF00696E),
         CryptoKind.KEY_AGREEMENT to Color(0xFF3A5BA9),
         CryptoKind.RANDOM to Color(0xFF8E4A56),
-        CryptoKind.WEB_CRYPTO to Color(0xFF506800),
     )
 
 /** 深色模式类别色(前景为深色 surface 上的浅色文本,对比度 ≥ 4.5:1)。 */
@@ -45,7 +44,6 @@ private val darkPalette: Map<CryptoKind, Color> =
         CryptoKind.KEY_STORE to Color(0xFF82D9DE),
         CryptoKind.KEY_AGREEMENT to Color(0xFFB7C6FF),
         CryptoKind.RANDOM to Color(0xFFF3BAC5),
-        CryptoKind.WEB_CRYPTO to Color(0xFFB3CF5B),
     )
 
 /** 浅色模式 SQL 类别色(Material 扩展色板,对比度 ≥ 4.5:1)。 */

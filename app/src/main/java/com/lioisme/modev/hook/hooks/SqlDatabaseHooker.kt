@@ -25,11 +25,37 @@ class SqlDatabaseHooker(
 ) : SqlBaseHooker(context) {
 
     override fun install() {
-        val db = DatabaseMethodRegistry.forName("android.database.sqlite.SQLiteDatabase") ?: return
-        val cursor = DatabaseMethodRegistry.forName("android.database.sqlite.SQLiteCursor") ?: return
-        installDatabase(db)
-        installCursor(cursor)
+        // V50 死钩修复:原形态是两处 `?: return` 串联 —— `SQLiteCursor` 此刻解析不到
+        // (注入早于游标类首次加载是常态)会让**整个 SQLiteDatabase 表面一起不装**,
+        // 表现就是「数据库监听按默认配置(OPEN 关、QUERY/DML/EXEC 开)整域零记录」,
+        // 而设备矩阵的 db 档恰好全开 kind(含 OPEN)故永远测不到 —— 与 V49 实锤的
+        // `readText`/`@hide` 同族:解析失败静默吞,文档却写着「已采集」。
+        // 两个区域现在各自独立安装,任一解析失败只降级自己,并点名到日志。
+        val db = DatabaseMethodRegistry.forName("android.database.sqlite.SQLiteDatabase")
+        if (db == null) {
+            android.util.Log.w("HookInstaller", "DB registry unresolved: android.database.sqlite.SQLiteDatabase (db surface skipped)")
+        } else {
+            installDatabase(db)
+        }
+        val cursor = DatabaseMethodRegistry.forName("android.database.sqlite.SQLiteCursor")
+        if (cursor == null) {
+            android.util.Log.w("HookInstaller", "DB registry unresolved: android.database.sqlite.SQLiteCursor (result-set capture deferred to first cursor)")
+        } else {
+            installCursor(cursor)
+            cursorHooksInstalled = true
+        }
     }
+
+    /**
+     * 游标钩子是否已挂(全进程一次)。
+     *
+     * 这里**不按游标类名各挂一次**:`moveToFirst/moveToNext/move/close` 实际声明在
+     * `AbstractCursor` 上,`DatabaseMethodRegistry.methods` 取到的就是同一个 Method 对象 ——
+     * 按类名去重会对同一方法重复注册,而 Vector 2.2 上「同一方法的第二个 hook 静默不执行」
+     * (V38 实锤),重复注册等于把已有的钩子弄没。
+     */
+    @Volatile
+    private var cursorHooksInstalled: Boolean = false
 
     // region SQLiteDatabase
 
@@ -115,6 +141,8 @@ class SqlDatabaseHooker(
         val sql = extractQuerySql(inv)
         val args = queryArgs(inv)
         val ctx = SqlContextTracker.contextFor(instance)
+        // V50:注入期游标类常未加载 → 以「首个游标」为触发点补装(一次 volatile 读)
+        ensureCursorHooks(cursor.javaClass)
         val switch = config()
         val buffer = SqlContextTracker.cursorBuffer(cursor)
         buffer.db = instance
@@ -366,6 +394,23 @@ class SqlDatabaseHooker(
         }
         hookAfter(cursor.named("requery")) { inv, _ -> afterCursorRequery(inv) }
         hookAfter(cursor.named("close")) { inv, _ -> afterCursorClose(inv) }
+    }
+
+    /**
+     * 游标钩子的**惰性补装**(V50):注入期 `SQLiteCursor` 常尚未被加载(它要等第一次
+     * 真正建游标才加载),所以「装一次失败就永久没有结果集采集」是死路 ——
+     * 与 SSL 域 `installSslHooksFor` 同一病形。这里以**首次见到游标实例**为触发点:
+     * `afterQuery` 已拿到 result,按实例真实类名补装(该类移动方法的声明类是 AbstractCursor,
+     * 故一次补装覆盖全部游标类型)。
+     *
+     * 幂等靠 [cursorHooksInstalled];注册走 `engine.hook`,与本类注入期路径同源,
+     * 且全进程只挂一次(V38:Vector 上同方法第二个 hook 静默不执行)。
+     */
+    private fun ensureCursorHooks(cursorClass: Class<*>) {
+        if (cursorHooksInstalled) return
+        cursorHooksInstalled = true
+        val registry = DatabaseMethodRegistry.forName(cursorClass.name) ?: DatabaseMethodRegistry(cursorClass)
+        installCursor(registry)
     }
 
     private fun afterCursorMove(inv: Invocation, result: Any?) {

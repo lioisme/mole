@@ -27,9 +27,8 @@ enum class SystemOperation(
     LOG_FATAL(SystemKind.LOGCAT),
 
     // ---- Application 信息 ----
-
-    /** Application.onCreate() 后采集元数据。 */
-    APP_ON_CREATE(SystemKind.APP_INFO),
+    // V50 孤儿整改:删除 `APP_ON_CREATE`(恒零发射 + 筛选恒空)。Application 元数据
+    // 在首次 getPackageInfo 即由 APP_VERSION 采到,另挂 Application.onCreate 是新功能而非补漏。
 
     /** PackageManager.getPackageInfo() 读取版本。 */
     APP_VERSION(SystemKind.APP_INFO),

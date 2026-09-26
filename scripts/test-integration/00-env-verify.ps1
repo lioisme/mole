@@ -57,8 +57,11 @@ if ($Mode -ne "env") {
     $tp = & $ADB -s $DEVICE shell "ps -A" 2>$null | Select-String $TARGET_PKG
     Check "Twilight process alive" ($tp -ne $null)
 
-    $sp = & $ADB -s $DEVICE shell "su -c 'ls /data/user/0/$TARGET_PKG/files/modev_spool/$TARGET_PKG/spool.dat'" 2>$null
-    Check "Spool file exists" ($sp -match "spool.dat")
+    # V50 实锤:「spool.dat 存在」在这一档**恒不可能为真** —— spool 是「宿主不可达时的
+    # 磁盘兜底」(V36 D-1),而本步的 EnsureHost 已经保证宿主在线,记录走 TCP 直落库,
+    # 兜底文件自然不存在。断在线态的存在性 = 断言方向写反。
+    # 该能力的正档在 `26-run-module-off-negative`(模块关闭/宿主离线时才验 spool 留存),
+    # 这里删除而不是「放宽成目录存在」——放宽只会造出第二条永不失败的断言。
 }
 
 $root = & $ADB -s $DEVICE shell "su -c id" 2>$null
@@ -71,18 +74,24 @@ $pp = & $ADB -s $DEVICE shell "pm list packages" 2>$null | Select-String "com.ne
 Check "PinProxy installed" ($pp -ne $null)
 
 if ($Mode -ne "env") {
-    # Record count
-    $SQLITE = $script:SQLITE
-    $tmpDb = "$env:TEMP\modev_env_check.db"
-    & $ADB -s $DEVICE shell "su -c 'cp /data/user/0/$MODEV_PKG/databases/modev.db /sdcard/modev_env_check.db'" 2>$null | Out-Null
-    & $ADB -s $DEVICE pull /sdcard/modev_env_check.db $tmpDb 2>$null | Out-Null
-    if (Test-Path $tmpDb) {
-        $cnt = & $SQLITE $tmpDb "SELECT COUNT(*) FROM crypto_records WHERE packageName='$TARGET_PKG';" 2>$null
-        $cntVal = $cnt.Trim()
-        Check "Modev has records ($cntVal)" ([int]$cntVal -gt 0)
-        Remove-Item $tmpDb -Force -ErrorAction SilentlyContinue
+    # Record count —— V50 实锤:旧实装 `cp modev.db` 到 /sdcard 再拉回本地查,而 **Room 是
+    # 显式 WAL 的**(AGENTS #18),未 checkpoint 的行全在 `modev.db-wal` 里 ⇒ 单拷主库文件
+    # 必然少读甚至读到 0 行,这一条恒红;同一时刻矩阵用 tt-lib 的 `Q`
+    # (`run-as … sqlite3 databases/modev.db`)查**活库**却看得见同样这些记录。
+    # 修法 = 与 `Q` 同路(设备侧开活库,WAL 自解析)。SQL 里带包名单引号,
+    # 照 `Q` 的做法落成 .sql 文件再 `.read`,避开 adb shell 引号地狱。
+    $sqlLocal = Join-Path $env:TEMP "modev_env_count.sql"
+    [IO.File]::WriteAllText(
+        $sqlLocal,
+        "SELECT COUNT(*) FROM crypto_records WHERE packageName='$TARGET_PKG';",
+        (New-Object System.Text.UTF8Encoding($false)))
+    & $ADB -s $DEVICE push $sqlLocal /data/local/tmp/modev_env_count.sql 2>$null | Out-Null
+    $cnt = ((& $ADB -s $DEVICE shell "run-as $MODEV_PKG sqlite3 databases/modev.db '.read /data/local/tmp/modev_env_count.sql'" 2>$null |
+            ForEach-Object { "$_" }) -join "").Trim()
+    if ($cnt -match "^\d+$") {
+        Check "Modev has records ($cnt)" ([int]$cnt -gt 0)
     } else {
-        Check "DB readable" $false
+        Check "Modev has records (unreadable: $cnt)" $false
     }
 }
 

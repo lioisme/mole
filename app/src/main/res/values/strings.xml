@@ -110,8 +110,6 @@
     <string name="kind_key_agreement">Key Agreement</string>
     <string name="kind_random">Random</string>
     <string name="kind_base64">Base64</string>
-    <string name="kind_webview">WebView</string>
-    <string name="op_get_instance">Get instance</string>
     <string name="op_init">Init</string>
     <string name="op_update">Update</string>
     <string name="op_do_final">Final</string>
@@ -604,14 +602,11 @@
     <string name="op_device_env_query_intent_activities">queryIntentActivities</string>
     <string name="op_device_env_get_property">getProperty</string>
     <string name="op_device_env_build_tags">Build.TAGS</string>
-    <string name="op_device_env_getprop">getprop</string>
-    <string name="op_device_env_class_for_name">Class.forName</string>
     <string name="op_device_env_load_class">loadClass</string>
     <string name="op_device_env_find_class">findClass</string>
     <string name="op_device_env_get_stack_trace">getStackTrace</string>
     <string name="op_device_env_thread_stack">Thread.stackTrace</string>
     <string name="op_device_env_read_maps">read /proc/self/maps</string>
-    <string name="op_device_env_open_maps">open maps file</string>
     <string name="op_device_env_build_fingerprint">Build.FINGERPRINT</string>
     <string name="op_device_env_build_model">Build.MODEL</string>
     <string name="op_device_env_build_product">Build.PRODUCT</string>
@@ -622,8 +617,6 @@
     <string name="op_device_env_get_default_sensor">getDefaultSensor</string>
     <string name="op_device_env_sensor_list">getSensorList</string>
     <string name="op_device_env_get_mac_address">getMacAddress</string>
-    <string name="op_device_env_get_device_id">getDeviceId</string>
-    <string name="op_device_env_get_imei">getImei</string>
     <string name="op_device_env_android_id">ANDROID_ID</string>
     <string name="op_device_env_phone_device_id">TelephonyManager.getDeviceId</string>
     <string name="op_device_env_phone_imei">TelephonyManager.getImei</string>
@@ -631,8 +624,6 @@
     <string name="op_device_env_phone_sim_serial">TelephonyManager.getSimSerialNumber</string>
     <string name="op_device_env_phone_line1_number">TelephonyManager.getLine1Number</string>
     <string name="op_device_env_cpu_available_processors">Runtime.availableProcessors</string>
-    <string name="op_device_env_cpu_proc_info">/proc/cpuinfo</string>
-    <string name="op_device_env_cpu_sysconf">os.sysconf</string>
     <string name="op_device_env_battery_int_property">BatteryManager.getIntProperty</string>
     <string name="op_device_env_battery_is_charging">BatteryManager.isCharging</string>
     <string name="op_device_env_battery_changed">ACTION_BATTERY_CHANGED</string>
@@ -645,7 +636,6 @@
     <string name="op_device_env_build_display">Build.DISPLAY</string>
     <string name="op_device_env_build_serial">Build.SERIAL</string>
     <string name="op_device_env_build_type">Build.TYPE</string>
-    <string name="op_device_env_root_check_api">Root check API</string>
     <string name="op_device_env_root_check_file">Root check file</string>
     <string name="op_device_env_root_check_exec">Root check exec</string>
     <string name="op_device_env_emulator_check_build">Emulator build check</string>
@@ -666,7 +656,6 @@
     <string name="op_device_env_proc_net_read">/proc/net/tcp read</string>
     <string name="op_device_env_settings_global_get">Settings.Global.get</string>
     <string name="op_device_env_settings_secure_get">Settings.Secure.get</string>
-    <string name="op_device_env_content_query_settings">ContentResolver.query settings</string>
 
     <!-- V33 UI Interaction -->
     <string name="filter_type_ui_interaction">UI Interaction</string>

@@ -117,7 +117,6 @@ object EffectiveSwitch {
                 CryptoKind.KEY_AGREEMENT -> switch.keyAgreement
                 CryptoKind.RANDOM -> switch.random
                 CryptoKind.BASE64 -> switch.base64
-                CryptoKind.WEB_CRYPTO -> switch.webView
             }
         }
 
@@ -277,7 +276,6 @@ object EffectiveSwitch {
                     CryptoKind.KEY_AGREEMENT -> switch.copy(keyAgreement = value)
                     CryptoKind.RANDOM -> switch.copy(random = value)
                     CryptoKind.BASE64 -> switch.copy(base64 = value)
-                    CryptoKind.WEB_CRYPTO -> switch.copy(webView = value)
                 }
             } ?: switch
 

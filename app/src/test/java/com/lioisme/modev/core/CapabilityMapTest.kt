@@ -42,8 +42,10 @@ class CapabilityMapTest {
     /** 分类快照:域数量与跨域类型集合是本次重整的根据,改动必须是有意的。 */
     @Test
     fun frozenClassificationSnapshot() {
-        assertEquals(89, CapabilityMap.entries.size)
-        assertEquals(44, CapabilityMap.entries.count { it.domain == CapabilityDomain.LISTEN })
+        // V50 孤儿整改:89/44 是含死行 CryptoKind.WEB_CRYPTO 的口径;该行注入侧零发射
+        // (勾选后开关亮、永不出记录),已随 HookSwitch.webView 位一并退役 ⇒ 88/43。
+        assertEquals(88, CapabilityMap.entries.size)
+        assertEquals(43, CapabilityMap.entries.count { it.domain == CapabilityDomain.LISTEN })
         assertEquals(45, CapabilityMap.entries.count { it.domain == CapabilityDomain.FEATURE })
         assertEquals(
             "跨域类型 = 同一记录类型里两域混居,这正是 V48 要治理的形态",

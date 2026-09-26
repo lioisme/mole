@@ -22,7 +22,6 @@ class HookSwitchTest {
             messageDigest = false, cipher = false, mac = false, signature = false,
             keyParam = false, keyGeneration = false, keyFactory = false,
             keyStore = false, keyAgreement = false, random = false, base64 = false,
-            webView = false,
             dbOpen = false, dbQuery = false, dbDml = false, dbExec = false,
             dbTransaction = false,
             fileRead = false, fileWrite = false, fileDelete = false,
@@ -71,7 +70,6 @@ class HookSwitchTest {
             messageDigest = false, cipher = false, mac = false, signature = false,
             keyParam = false, keyGeneration = false, keyFactory = false,
             keyStore = false, keyAgreement = false, random = false, base64 = false,
-            webView = false,
             dbOpen = false, dbQuery = true, dbDml = false, dbExec = false,
             dbTransaction = false,
         )
@@ -98,7 +96,7 @@ class HookSwitchTest {
         for (kind in listOf(
             CryptoKind.KEY_PARAM, CryptoKind.KEY_GENERATION, CryptoKind.KEY_FACTORY,
             CryptoKind.KEY_STORE, CryptoKind.KEY_AGREEMENT, CryptoKind.RANDOM,
-            CryptoKind.BASE64, CryptoKind.WEB_CRYPTO,
+            CryptoKind.BASE64,
         )) {
             assertFalse("noise crypto category $kind should default off", HookSwitch.DEFAULT.enabled(kind))
         }
@@ -187,22 +185,18 @@ class HookSwitchTest {
         assertTrue(s.dbEnabled(SqlKind.TRANSACTION))
     }
 
+    /**
+     * V50 孤儿整改:`webview_off_by_default` / `webview_enabled_maps_kind_and_any` 两测的
+     * 主语是 `CryptoKind.WEB_CRYPTO`(死行,已随 HookSwitch.webView 一并删除),
+     * 真实 JS 密码学开关 `WebViewKind.JS_CRYPTO` 由本文件内 webview 族用例覆盖。
+     * 此处仅保留「全关 = anyEnabled false」这条与死行无关的断言。
+     */
     @Test
-    fun webview_off_by_default() {
-        assertFalse(HookSwitch.DEFAULT.enabled(CryptoKind.WEB_CRYPTO))
-        assertFalse(HookSwitch.DEFAULT.webView)
-    }
-
-    @Test
-    fun webview_enabled_maps_kind_and_any() {
-        val s = HookSwitch(webView = true)
-        assertTrue(s.enabled(CryptoKind.WEB_CRYPTO))
-        assertTrue(s.anyEnabled)
+    fun all_off_switch_disables_any() {
         val allOff = HookSwitch(
             messageDigest = false, cipher = false, mac = false, signature = false,
             keyParam = false, keyGeneration = false, keyFactory = false,
             keyStore = false, keyAgreement = false, random = false, base64 = false,
-            webView = false,
             dbOpen = false, dbQuery = false, dbDml = false, dbExec = false,
             dbTransaction = false,
             fileRead = false, fileWrite = false, fileDelete = false,
@@ -379,7 +373,6 @@ class HookSwitchTest {
             messageDigest = false, cipher = false, mac = false, signature = false,
             keyParam = false, keyGeneration = false, keyFactory = false,
             keyStore = false, keyAgreement = false, random = false, base64 = false,
-            webView = false,
             dbOpen = false, dbQuery = false, dbDml = false, dbExec = false, dbTransaction = false,
             fileRead = false, fileWrite = false, fileDelete = false, fileRename = false,
             fileList = false, assetRead = false, shellExec = false,

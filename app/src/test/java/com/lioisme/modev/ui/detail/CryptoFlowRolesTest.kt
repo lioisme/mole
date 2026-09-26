@@ -50,13 +50,9 @@ class CryptoFlowRolesTest {
         )
     }
 
-    @Test
-    fun webCrypto_usesOperationFallback() {
-        assertEquals(
-            R.string.role_input_plaintext to R.string.role_output_ciphertext,
-            roles(CryptoKind.WEB_CRYPTO, CryptoOperation.ENCRYPT),
-        )
-    }
+    // V50 孤儿整改:原 `webCrypto_usesOperationFallback` 的主语是死行 CryptoKind.WEB_CRYPTO
+    // (已删除)。ENCRYPT/DECRYPT 现为 Cipher doFinal 的真实操作,其角色映射已由上方
+    // `cipher_missingDirection_usesOperationFallback` 覆盖,不再另立同形用例。
 
     @Test
     fun messageDigest_digest_mapsMessageToDigest() {
@@ -128,8 +124,8 @@ class CryptoFlowRolesTest {
         assertNull(roles(CryptoKind.MAC, CryptoOperation.DIGEST).first)
         assertNull(roles(CryptoKind.MAC, CryptoOperation.DIGEST).second)
         // 无方向来源时 CIPHER 操作不匹配 → 回落(CIPHER 分支以 direction 为主判据)。
-        assertNull(roles(CryptoKind.CIPHER, CryptoOperation.GET_INSTANCE).first)
+        assertNull(roles(CryptoKind.CIPHER, CryptoOperation.GET_IV).first)
         assertNull(roles(CryptoKind.MESSAGE_DIGEST, CryptoOperation.INIT).second)
-        assertNull(roles(CryptoKind.BASE64, CryptoOperation.GET_INSTANCE).first)
+        assertNull(roles(CryptoKind.BASE64, CryptoOperation.GET_IV).first)
     }
 }

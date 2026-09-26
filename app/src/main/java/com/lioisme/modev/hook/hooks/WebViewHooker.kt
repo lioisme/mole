@@ -121,7 +121,9 @@ class WebViewHooker(
         hookBefore(f.find("android.webkit.WebView", "evaluateJavascript", String::class.java)) { inv ->
             val view = inv.thisObject as? WebView ?: return@hookBefore
             ensureBridge(view)
-            emitEvaluateJs(view, inv.getArg(0) as? String)
+            // V50 孤儿整改:此重载早已挂钩,但发射时不传操作名 ⇒ EVALUATE_JS_LEGACY 恒零发射
+            // (筛选菜单上有这一项却永远选不中)。
+            emitEvaluateJs(view, inv.getArg(0) as? String, WebViewOperation.EVALUATE_JS_LEGACY)
         }
 
         // setWebContentsDebuggingEnabled:调试开关记录
@@ -162,9 +164,13 @@ class WebViewHooker(
         emit(view, WebViewKind.PAGE_LOAD, op, url = url)
     }
 
-    private fun emitEvaluateJs(view: WebView, script: String?) {
+    private fun emitEvaluateJs(
+        view: WebView,
+        script: String?,
+        op: WebViewOperation = WebViewOperation.EVALUATE_JS,
+    ) {
         if (!enabled(WebViewKind.EVALUATE_JS)) return
-        emit(view, WebViewKind.EVALUATE_JS, WebViewOperation.EVALUATE_JS, url = null, scriptSnippet = script)
+        emit(view, WebViewKind.EVALUATE_JS, op, url = null, scriptSnippet = script)
     }
 
     private fun emitJsBridge(view: WebView) {

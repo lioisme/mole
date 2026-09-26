@@ -55,12 +55,20 @@ class ServerTools(
         description = "Toggle external access for BOTH wire ConfigServer and MCP server (unified switch, " +
             "V41): false = bind 127.0.0.1 (default), true = bind 0.0.0.0 (same-segment devices can " +
             "connect; connected wire sessions recover via inject-side reconnect loop). MCP auth is " +
-            "independent: Bearer is enforced only when token auth is enabled.",
-        schema = objSchema(required = listOf("enabled")) {
+            "independent: Bearer is enforced only when token auth is enabled. " +
+            "REQUIRES confirm=true: opening the bind address is the user's explicit choice " +
+            "(AGENTS #19), not something an Agent may decide on its own.",
+        schema = objSchema(required = listOf("enabled", "confirm")) {
             bool("enabled", "true = bind all interfaces")
+            bool("confirm", "Must be true to execute this exposure-changing action")
         },
     ) { args ->
         val enabled = McpJson.bool(args, "enabled") ?: throw McpTool.McpToolException("enabled is required")
+        // V50 安全闸:0.0.0.0 无认证监听是本产品的最高危状态,契约把它定义为「用户显式选择」;
+        // 此前 Agent 可单方翻到该状态(与其余 6 个破坏性工具的 confirm 门槛不对称)。
+        if (McpJson.bool(args, "confirm") != true) {
+            throw McpTool.McpToolException("confirm=true is required to change the bind address")
+        }
         kotlinx.coroutines.runBlocking { settings.setExternalAccess(enabled) }
         McpJson.obj(
             "ok" to true,

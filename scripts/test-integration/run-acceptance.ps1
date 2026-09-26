@@ -114,6 +114,10 @@ function Run-Child {
     # 子进程必须走**文件重定向**,不能用 `& cmd | Tee`:子脚本会拉起 gradle/adb 守护进程,
     # 它们继承 stdout 句柄 ⇒ 管道永不 EOF ⇒ 编排器在子进程退出后仍挂死(V45 首轮实锤)。
     $psArgs = (@("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "`"$path`"") + $ChildArgs) -join " "
+    # 掉线标记按**步**隔离:子进程写自己那一份,父进程按步判定,不会把上一步的掉线
+    # 记到这一步头上。路径经环境变量下传(Start-Process 继承父进程 env)。
+    $vmMark = Join-Path $logDir "vm-lost-$Id.mark"
+    $env:TT_VM_LOST_MARK = $vmMark
     $proc = Start-Process -FilePath "powershell.exe" -ArgumentList $psArgs `
         -RedirectStandardOutput $log -RedirectStandardError $errLog -NoNewWindow -PassThru
     # PS 5.1 实锤:不加 EnableRaisingEvents 时,`WaitForExit(ms)` 轮询后 `.ExitCode`
@@ -136,6 +140,21 @@ function Run-Child {
     if ($timedOut) { $st.Note = "超时 ${TimeoutMin}min,已强杀子进程" }
     $imported = $false
     if ($RoundJson) { $imported = Import-Round -Path (Join-Path $script:TMP $RoundJson) -Since $started }
+    # V50 实锤(整轮 21 条假红的真因):VM 中途掉线被 WaitDevice 静默自愈后,矩阵照着
+    # 一台刚冷重启的设备继续跑 —— 靶进程已消失、注入未必然恢复,于是 db 全域 count=0、
+    # enhance 连台账都没写下,而台账上显示的是「功能失败」。
+    # 现在:本步发生过掉线 ⇒ 该步计数一律作废(不留 21 条假账),记 BLOCKED 并**中止整轮**,
+    # 因为重启后的设备上跑出的任何绿都不可信。环境故障必须归因为环境。
+    if (Test-Path $vmMark) {
+        $st.Pass = 0; $st.Fail = 0; $st.Skip = 0
+        $lost = @([IO.File]::ReadAllLines($vmMark))
+        $st.Verdict = "BLOCKED"
+        $st.Note = "本步设备掉线并冷重启 {0} 次(首记 {1}):计数作废,整轮中止 —— 重启后设备上产生的任何 PASS 都不算证据" -f $lost.Count, $lost[0]
+        $script:BLOCKED = $true
+        Write-Host ("  [BLOCKED] {0}:设备掉线自愈({1} 次),本步计数作废,后续阶段全部记 BLOCKED" -f $Id, $lost.Count) -ForegroundColor Red
+        Write-Host ("           → 环境侧根因(宿主机内存/VM 存活),不是产品缺陷;先解决环境再重跑整轮") -ForegroundColor Yellow
+        return
+    }
     if ($st.Fail -gt 0) { $st.Verdict = "FAIL" }
     elseif ($timedOut) { $st.Verdict = "FAIL" }
     elseif ($st.ExitCode -ne 0) { $st.Verdict = "FAIL" }
@@ -163,7 +182,12 @@ function Run-Gradle {
     # 验收轮必须「从源码可复现」:本地构建缓存曾把旧的 androidTest dex 当 up-to-date 交回
     # (同一轮宿主 APK 是新产物),插桩运行期才炸 NoSuchMethodError —— 前端-3/4 两轮
     # DataSettingsScreenTest 即此因,`--rerun-tasks --no-build-cache` 重编后消失(DEF-V45-012)。
-    $gradleArgs = (@($Tasks) + @("--console=plain", "--no-daemon", "--max-workers=1", "--no-build-cache", "-Dorg.gradle.jvmargs=-Xmx2048m")) -join " "
+    # V50 实锤(R5 整树被 OS 杀):本机 commit 上限是**动态**的,实测从 37.3GB 掉到 31.4GB
+    # (页面文件被压缩)⇒ OS 直接杀 dnplayer 与编排器本身。设备段期间最该省的就是内存,
+    # 而 Kotlin 编译守护进程默认**独立于 gradle --no-daemon 存活**(实测残留 2.5GB 私存),
+    # 所以强制 in-process 编译:构建慢一点,换设备段整轮不被内存挤死。
+    $gradleArgs = (@($Tasks) + @("--console=plain", "--no-daemon", "--max-workers=1", "--no-build-cache",
+            "-Dorg.gradle.jvmargs=-Xmx2048m", "-Dkotlin.compiler.execution.strategy=in-process")) -join " "
     # 与 Run-Child 同构走**文件重定向**:`& gradlew | Tee` 下 gradle 拉起的构建/Kotlin
     # 守护进程继承 stdout 句柄 ⇒ 管道无 EOF ⇒ 编排器在构建已结束后永久挂死
     # (AGENTS「验收编排器三坑」①,本轮 -Stage ui 实测复现)。
@@ -212,6 +236,12 @@ function Run-Gradle {
     Write-Host ("  {0} exit={1}" -f $st.Verdict, $st.ExitCode) -ForegroundColor $(if ($st.Verdict -eq "PASS") { "Green" } else { "Red" })
 }
 
+function Get-DefaultSequences {
+    param([string]$Pt)
+    # 只数**状态为 device** 的序列(unauthorized/offline 不算可用,但也不能悄悄放过)
+    @((& $Pt devices 2>$null | Select-String -Pattern "\tdevice$" | ForEach-Object { ($_ -split "\s+")[0] }))
+}
+
 function Set-SingleSequence {
     param([bool]$ForInstrument)
     $pt = Join-Path $script:PLATFORM_TOOLS "adb.exe"
@@ -223,8 +253,31 @@ function Set-SingleSequence {
         # 焦点、触摸注入与 prefs)= 大面积假失败(V45 前端轮实锤根因之一)。
         # 插桩档必须回到默认 server,且只看 emulator-5554 一条序列。
         Remove-Item Env:ANDROID_ADB_SERVER_PORT -ErrorAction SilentlyContinue
-        & $pt disconnect $script:DEVICE 2>&1 | Out-Null
-        $devs = @((& $pt devices | Select-String -Pattern "device$" | ForEach-Object { ($_ -split "\s+")[0] }))
+        $devs = @(Get-DefaultSequences -Pt $pt)
+        # V50 实锤:旧实装**无条件** disconnect TCP 序列再要求"恰 1 条",它假设默认 server 上
+        # 一定还留着 `emulator-5554`。本机 LDPlayer 只在默认 server 上注册 TCP 一条
+        # (手工 adb devices 实测为空 ⇒ 只有连过才有),于是 disconnect 后计数归 0,
+        # `ui`/`mcp` 两步**每一轮都被 Z4 自己拦死**,与产品无关。
+        # 真正的踩踏条件是「同一台 VM 以两种序列同时在场」,那就只在同时在场时丢 TCP。
+        $emu = @($devs | Where-Object { $_ -like "emulator-*" })
+        if ($devs -contains $script:DEVICE -and $emu.Count -ge 1) {
+            & $pt disconnect $script:DEVICE 2>&1 | Out-Null
+            $devs = @(Get-DefaultSequences -Pt $pt)
+        }
+        # 零序列同样拦死插桩轮(R8 的 ui/mcp 就是这么没跑成的)。插桩要的是
+        # 「恰一条」,不是「必须是 emulator- 那条」⇒ 一条都没有时把 TCP 序列连回来。
+        if ($devs.Count -eq 0) {
+            & $pt connect $script:DEVICE 2>&1 | Out-Null
+            Start-Sleep -Seconds 3
+            $devs = @(Get-DefaultSequences -Pt $pt)
+        }
+        # V50 实锤(极可能是历轮「VM 掉线」真凶之一):同一台雷电被**两个 adb server 同时持有**
+        # —— 手工 `adb connect` 让默认 server(5037)也注册了序列,实测同一瞬间
+        # 默认 server 看到 `emulator-5554 offline`、独立 server 5038 看到它 `device`。
+        # 一个 guest adbd / 一条 NAT 转发被两个 server 抢,雷电自己的
+        # `autoAdbReconnect` 一重挂就把其中一边打成 `device not found`
+        # ⇒ 插桩段必须让**一个 server 独占**这条桥,而不是两个 server 各拿一半。
+        & $script:ADB -s $script:DEVICE disconnect 2>&1 | Out-Null
         Write-Host "  [Z4] instrument 序列面:$($devs -join ',')(应恰 1 条)" -ForegroundColor Gray
         $script:Z4_VIOLATION = ($devs.Count -ne 1)
     } else {
@@ -260,6 +313,12 @@ if ($Stage -in @("all", "build")) {
     Run-Gradle -Id "unit" -Tasks @(":app:testModernDebugUnitTest") -Gate $true
     Run-Gradle -Id "lint" -Tasks @(":app:lintModernRelease")
     Run-Gradle -Id "assembleRelease" -Tasks @(":app:assembleModernRelease")
+    # 设备段开始前交还构建内存并**把余量打进台账**:R3/R4/R5 三轮的「VM 掉线」真因是宿主
+    # commit 耗尽(R5 里 OS 直接杀掉了 dnplayer 与编排器进程树),而过去台账上只显示
+    # "device lost" 五个字 —— 缺这一行测量,五轮都在猜。
+    & (Join-Path $repo "gradlew.bat") --stop 2>&1 | Out-Null
+    $os = Get-CimInstance Win32_OperatingSystem
+    Write-Host ("  [mem] 设备段起始:free={0:N1}GB" -f ($os.FreePhysicalMemory / 1MB)) -ForegroundColor Gray
 }
 if ($Stage -in @("all", "install")) {
     Run-Child -Id "install" -File "10-build-install.ps1" -RoundJson "install-round.json" -TimeoutMin 30 -Gate $true
@@ -311,11 +370,14 @@ if ($Stage -in @("all", "scope")) {
 if ($Stage -in @("all", "inject")) {
     if ($SkipInject) { Add-Step -Id "inject" -Verdict "SKIPPED" -ExitCode 0 -Log "" }
     else {
-        # 运行态前置(进程存活 / spool / 已有记录):装包与作用域接线之后才有意义
-        Run-Child -Id "env-runtime" -File "00-env-verify.ps1" -ChildArgs @("-Mode", "runtime") -RoundJson "env-round.json"
         # 顺序纪律:冒烟 → 监听 → 增强 → 联动 → 负向 → 背压(MCP 必须最后,见头注)
         Run-Child -Id "smoke" -File "23-run-smoke.ps1" -RoundJson "smoke-round.json" -TimeoutMin 40
         Run-Child -Id "listen" -File "20-run-listen.ps1" -RoundJson "listen-round.json" -TimeoutMin 60
+        # V50 实锤(两次才挪对):运行态断言的前置是**它自己要验的结果**。
+        # 第 1 次挪到冒烟后 ⇒ `Twilight 进程存活`转绿,但 `已入库记录 >0` 仍红,
+        # 因为冒烟用例(L-SMOKE-01/L-PERF-01)只验帧语义与耗时,**不产业务记录**;
+        # 真正入库的第一批记录出自监听矩阵。⇒ 落在监听之后,这一条才既有意义又可为真。
+        Run-Child -Id "env-runtime" -File "00-env-verify.ps1" -ChildArgs @("-Mode", "runtime") -RoundJson "env-round.json"
         Run-Child -Id "enhance" -File "21-run-enhance.ps1" -RoundJson "enhance-round.json" -TimeoutMin 60
         Run-Child -Id "linkage" -File "22-run-linkage.ps1" -RoundJson "linkage-round.json" -TimeoutMin 40
         Run-Child -Id "module-off" -File "26-run-module-off-negative.ps1" -RoundJson "module-off-negative.json" -TimeoutMin 20

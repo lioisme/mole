@@ -79,7 +79,14 @@ class AppInfoHooker(
                     }
                     emit(
                         kind = SystemKind.APP_INFO,
-                        operation = SystemOperation.APP_VERSION,
+                        // V50 孤儿整改:flags 已取但恒发 APP_VERSION ⇒ APP_PERMISSIONS
+                        // 零发射。GET_PERMISSIONS(0x80) 请求是靶程序读权限清单的独立意图,
+                        // 与读版本号在风控上是两件事,按其分派操作名。
+                        operation = if (flags and FLAG_GET_PERMISSIONS != 0) {
+                            SystemOperation.APP_PERMISSIONS
+                        } else {
+                            SystemOperation.APP_VERSION
+                        },
                         appVersion = versionName,
                         appVersionCode = versionCode,
                         appMinSdk = minSdk,
@@ -93,5 +100,10 @@ class AppInfoHooker(
                 },
             )
         }
+    }
+
+    companion object {
+        /** PackageManager.GET_PERMISSIONS(读权限清单的请求标志)。 */
+        private const val FLAG_GET_PERMISSIONS = 0x00000080
     }
 }

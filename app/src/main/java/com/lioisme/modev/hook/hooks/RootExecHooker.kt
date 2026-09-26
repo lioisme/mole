@@ -151,6 +151,19 @@ class RootExecHooker(
             detectionPattern = pattern,
             interventionAction = ACTION_BLOCKED,
         )
+        // V50 孤儿整改:DETECT_ROOT 域此前只能看见「扫文件」这一种尝试(ROOT_CHECK_FILE),
+        // 「用命令探测 root」被本钩干预掉之后在检测监控面完全隐身。补发一条观测记录
+        // (与干预记录并列:开关各自独立,关干预仍想看见探测行为)。
+        if (featureOn(DeviceEnvKind.DETECT_ROOT)) {
+            emit(
+                kind = DeviceEnvKind.DETECT_ROOT,
+                operation = DeviceEnvOperation.ROOT_CHECK_EXEC,
+                originalValue = command,
+                targetClass = "java.lang.Runtime",
+                detectionPattern = pattern,
+                intervention = false,
+            )
+        }
         // V43 T3 契约忠实化(V2.5):exec 失败契约 = IOException(宿主 catch 分支);
         // 旧 setResult(null) 令宿主 `.waitFor()`/流读取直接 NPE = 模块引入的宿主崩溃
         invocation.setThrowable(IOException("Command blocked by Modev: $pattern"))

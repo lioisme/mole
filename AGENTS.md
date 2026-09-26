@@ -51,16 +51,16 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
 | 功能域 Feature Domain | 主动干预能力域(退出拦截/崩溃预防/解除录屏/弹窗关键词拦截/SSL 绕过/代理 VPN 隐藏/Root·Xposed·模拟器伪装);`domain = FEATURE` | 伪装成监听类型 |
 | 关键词库 Keyword Library | 全局弹窗拦截关键词资产(Room `keyword_library`,text 唯一 + matchMode + 全局启停);每应用默认跟随全局,可显式子集 | 仅 override 扁平词表、无库 |
 | 伪装画像 Spoof Profile | **两套并存,以 V47 画像库为准**:①画像库 `spoof_profile` 表(Room v15)= 41 项 `DeviceProfile` 正文 + **九内置档账本(V48 D1:3→9 档,机型身份 13 项,D-7 只填身份不填现场)** + DIY + 草稿新建 + 绑定唯一入口 `spoofProfileId`(= 库主键或 `""`);①b **每应用逐项微调(V49 R-2)** = `AppListenOverride.profileOverrides`(键 = `ProfileFieldCatalog.jsonKeyOf`,值 = 编辑态串,空串 = 显式不伪装该项;缺键 = 跟随画像),UI 唯一入口 = 功能设置页「画像微调」区(`apps/{pkg}/profile-tune`,与编辑器**共用** `ProfileFieldControls` 的行与弹层),MCP 唯一入口 = `feature_settings_set.profileFieldEntries`(**不另立新工具**,同一可变上游撞 R1);合并与反推的**唯一实现点 = `core/model/ProfileFieldDeviation`**(`apply` 下发用 / `between` 写盘用,二者互逆由 `ProfileFieldDeviationTest` + `PerFieldIndependenceTest` 钉),**禁**在 UI 或仓库里再拼一遍「画像 ⊕ 覆写」;`还原`(删覆写)与 `清除`(写空)是两件事,少任一即半功能;②接管前遗留通路 `SpoofProfiles`(auto/pixel7pro/xiaomi13 常量档)+ `spoofOverrides` 字段覆写,**仍是未接管族的实际取值源**。机型字面量唯一事实源仍是 `SpoofProfiles` 与 `BuiltinDeviceProfiles` 各自承担的两层(钩子禁内置)。**当前边界(实至名归的分界,不是待办)**:画像库已完成「取值 / 校验 / 编辑 / **选型(选而非填,V48 R-3)** / **逐项覆写(V49 R-2)** / 传输 / 绑定 / 下发」——即 `FeatureConfig.deviceProfile` 快照经 `SettingsRepository.expandProfile`(= `ProfileFieldDeviation.apply`)随有效配置推到注入进程;注入侧**自 V49 WP-D1 起按族逐个接管**(`DeviceEnvKind` 的 `PROFILE_` 项 ⇔ 该族有钩子,值源已是画像),**未接管的族仍走** `SpoofProfiles.resolve`。因此「画像已生效于靶程序」这句**只对已登记族为真**,对剩余族仍是假;`SpoofProfileLibraryScreen` 顶部 `profile-takeover-status`(键 `profile_takeover_status_hint`)那一句**就是这条边界的 UI 兑现,且其名单从 `DeviceEnvKind` 派生**(V49 D-3 保证登记 ⇔ 生效)—— 撤掉它 = 撒谎,写死它 = 另一种撒谎 | 把画像库称已完成、把遗留档称退役(两者都还没)、`spoofOverrides` 称已合并(未合并,写面已冻结而已)、**把接管说成整体完成(只有已登记族)** |
-| 能力表 Capability Map | 前后端**逐类对照的唯一投影**(V48 R-2,`core/model/CapabilityMap.kt`):83 行 kind(V48 定档时 81;V49 WP-D1 起随画像族递增)→(记录类型, 域, **分区资源键**, master 位名, 记录路由常量, 探针类名)。行集恒由 `CategoryTaxonomy.all()` 派生、功能域分区恒由 `FeatureGroups.kindRefs()` 派生 ⇒ 本文件**零 kind 字面量、不是第二份清单**;`CapabilityMapTest` 双向对账(表↔分类法/`R.string`/`ModevRoutes`/`hook/probes` 源文件)并冻结 83/44/39 与**三张跨域类型**(NETWORK / DEVICE_ENV / UI_INTERACTION 同类型内两域混居)。`sectionKey`/`routeKey` 存**名字**不存 `R.string` Int(core 子树零 android) | 在页面里再拼一份"哪些类归本页"(旧监听页自拼跨域清单即 V48-DFC-03 根因)、把表当文档不做门禁 |
+| 能力表 Capability Map | 前后端**逐类对照的唯一投影**(V48 R-2,`core/model/CapabilityMap.kt`):**88 行 kind**(V50 孤儿整改实测口径:V48 定档 81 → V49 WP-D1 起随画像族递增至 89 → **V50 退役死行 `CryptoKind.WEB_CRYPTO` 后 88**;监听 43 / 功能 45)→(记录类型, 域, **分区资源键**, master 位名, 记录路由常量, 探针类名)。行集恒由 `CategoryTaxonomy.all()` 派生、功能域分区恒由 `FeatureGroups.kindRefs()` 派生 ⇒ 本文件**零 kind 字面量、不是第二份清单**;`CapabilityMapTest` 双向对账(表↔分类法/`R.string`/`ModevRoutes`/`hook/probes` 源文件)并冻结 **88/43/45** 与**三张跨域类型**(NETWORK / DEVICE_ENV / UI_INTERACTION 同类型内两域混居)。`sectionKey`/`routeKey` 存**名字**不存 `R.string` Int(core 子树零 android)。**V50 起另有 `FeatureOrphanGateTest` 从反方向钉它**:O1 每个登记类别必须在 `hook/` 源集被引用(死行 = 勾选后开关亮、永不出记录)、O2 每个操作枚举值必须被发射(恒空筛选项)、O3 注入侧不得发射未登记 kind、O4 两域均非空且求和等于总数 —— **四向都绿才叫「无孤儿功能」** | 在页面里再拼一份"哪些类归本页"(旧监听页自拼跨域清单即 V48-DFC-03 根因)、把表当文档不做门禁、**用「门禁全绿」代替「发射面存在」**(V50 实锤:1 个死行 + 27 个恒空操作曾全程绿着) |
 | 画像选型库 Profile Picker 库 | 41 字段中**取值域有限的每一项都不许让用户凭记忆打字**,四本目录各有唯一通路:①**机型库**`devices.json`(见下行)写身份四项;②**运营商库** `assets/carriers.json`(1597 条,MIT,`carriers.NOTICE.txt` 记上游 revision,禁改文件):`core/model/CarrierCatalog.kt` 纯数据 + `parseCarrierCatalog` 唯一解码口 + `applyCarrierPreset` 一次写全 SIM_OPERATOR/SIM_OPERATOR_NAME/SIM_COUNTRY,**国家码恰两字母才写**(数据集实有 77 条 `"AU/CC/CX"` 多地区串,拆/猜即自造非法值 ⇒ 恒留空);③**平台表** `ProfileOptionSource.optionsFor`(语言/SIM 国家/时区 + **V48 新增密度档与核数档**);④**事实表** `core/model/ProfileValueSets`(Android release↔SDK **37 对**,表尾恒与基线同尾 = Android 17 / API 37,V49 D-6 以「内置数据照搬基线」反转了 V48「止于已知最高 API 36」定档,逐行同源由 `BaselineDataParityTest` 直读 `third_party/.../res/raw/presets.json` 钉;**唯一不照搬的是基线 release 字面量**(`6` 之类),因真机 API 23 上报 `6.0`,照搬即自造检测点,差异逐条登记在 `releaseLiteralDeltas`;13 密度档与基线零差异 / 6 核数档为 Modev 超基线项)。**成对字段走复合动作、不走 `optionsFor`**:`pickAndroidRelease`(release+SDK 同写)、`pickCarrier`、`pickDevice`。**`CarrierCatalogRepository` 与 `DeviceCatalogRepository` 共用 `data/repo/CachedAssetReader<T>`**(一次读盘 / null 不缓存 / 冷却窗 / `attempts` 计数)——加第三本随包目录时必须复用它,禁再抄一份 reader | 让任一有限域字段只可手填、把 countryCode 直写进画像、为运营商/密度另建第二张清单、把 SDK_INT 单独可写而与 release 脱钩 |
-| 作用域 Scope（V48 R-1） | 本产品**唯一的顶层闸**:框架级 Xposed 作用域成员资格。动作行文案恒为「作用域此应用」(`app_monitor_scope_row`,四语同轴),它管辖两域共 83 类开关 + 全部干预;状态呈现词 = 已作用域 / 未作用域(`detail_listening`/`detail_not_listening`,键名保留历史形态、值已迁)。禁用旧词:**监听此应用**(把管辖干预的动作称作监听,`DomainVocabularyTest` 四语常驻拦截);第二控件(应用列表行尾 Checkbox)与监控页开关共享同一状态、同一名词、同一写路径(`app-row-scope` testTag + contentDescription)。移出作用域无独立确认入口(恒由开关的 off 分支承担),`removeScope()` 与 `danger_remove_scope_msg` 已随死路删除,**禁止复活** | 「监听此应用」再版、给行尾 Checkbox 换个名词、恢复移出作用域二次确认 |
+| 作用域 Scope（V48 R-1） | 本产品**唯一的顶层闸**:框架级 Xposed 作用域成员资格。动作行文案恒为「作用域此应用」(`app_monitor_scope_row`,四语同轴),它管辖两域共 88 类开关 + 全部干预(V50 实测口径;旧记 83 为 V48 定档数);状态呈现词 = 已作用域 / 未作用域(`detail_listening`/`detail_not_listening`,键名保留历史形态、值已迁)。禁用旧词:**监听此应用**(把管辖干预的动作称作监听,`DomainVocabularyTest` 四语常驻拦截);第二控件(应用列表行尾 Checkbox)与监控页开关共享同一状态、同一名词、同一写路径(`app-row-scope` testTag + contentDescription)。移出作用域无独立确认入口(恒由开关的 off 分支承担),`removeScope()` 与 `danger_remove_scope_msg` 已随死路删除,**禁止复活** | 「监听此应用」再版、给行尾 Checkbox 换个名词、恢复移出作用域二次确认 |
 | 机型库 Device Catalog | 随包 `assets/devices.json`(源自 KHwang9883/MobileModels-csv,**CC BY-NC-SA 4.0**,修订号与出处逐字记在 `devices.NOTICE.txt`,禁改文件 / 禁minify;**且与基线 `third_party/Guise_Reborn-main` 同目录文件逐字节相同,MD5 由 `BaselineDataParityTest` 钉** —— 「照搬基线内置数据」是可被静默违反的事,只能靠对账测试维持):品牌 → 型号的**身份选择器**唯一数据源(`core/model/DeviceCatalog.kt` 纯数据 + `domain/config/DeviceCatalogService` 契约 + `data/repo/DeviceCatalogRepository` 唯一读者与进程内缓存)。**非 Android 平台在 `parseDeviceCatalog` 一处剔除**(V49 R-3:上游收全平台机型,`apple` 品牌 458 条含 iPhone/iPad/Apple Watch/Apple TV,写进 `Build.BRAND` 就是造一台从不存在的设备;资产不动、可达集剔,`DeviceBrandEntry.isNonAndroidPlatform()` 是唯一谓词,`AndroidOnlyDataTest` 五面扫「解码集 / 逐条机型记录 / 9 内置档 41 字段 / 随机源 2000 种子 / 遗留 `SpoofProfiles`」——**判据是可达即违规,不是「文件里没有」**)。可达集实测 **25 品牌 / 8,075 机型**(= 基线 26/8,533 减 apple)。扫描面两条显式豁免:`pineapple` = 骁龙 8 Gen 3 板级代号、`darwin` = 锤子 `hardware` 与荣耀机型代号(V49 WP-B 首跑被这两条真 Android 数据判成假阳性,别再往 token 表里加常见词)。编辑器「选择真实机型」行一次写全 BRAND/MANUFACTURER/MODEL/DEVICE;**PRODUCT / BOARD / HARDWARE 恒不猜**(上游数据不提供这三个值,凑一个就是自造真实机型从不存在的字段组合);读不到资产 = `Unavailable` 上屏点名,禁退化成「库里没机型」。**另三项枚举字段(语言 / SIM 国家 / 时区)候选表唯一来源 = `core/model/ProfileOptionSource`**(直接取 `Locale.getISOLanguages` / `Locale.getISOCountries` / `TimeZone.getAvailableIDs` 平台表,**禁再随包或再手抄第三份清单**;`ProfileOptionSourceTest` 逐值断言平台表恒过 catalog 校验,选择器 sheet 首项恒留「改为手动填写」—— 做列表不得顺手夺走手填)| 拿 MODEL 或 DEVICE 猜 PRODUCT、把 devices.json 当画像正文来源、UI 侧再拼一份 `model (name)` 呈现串、为语言/时区另建一张本地清单、**把 Apple 记录当可选机型(或在 UI 侧过滤而不收口在解码口)** |
 | 检测黑名单追加项 extra* | Root 包名/Xposed 前缀/Frida 端口/掩码词的用户追加项(内置基线 ∪ 追加,只增不删) | 覆盖内置基线 |
 | MCP 服务 MCP Server | 进程内常驻 Streamable HTTP(spec 2025-06-18,V39 起端口默认 **1510**(wire 迁 1511 让位),单端点 POST /mcp,偏好 `mcp_port` 可改);监听绑定随**统一外部访问开关**(V41 D-1,见 #19);令牌认证独立开关(V39,默认停用)启用后**全接口强制**(含回环),服务端是否鉴权仅由 `tokenAuthEnabled` 决定(`McpServer` 无 externalAccess 耦合);多令牌 `McpTokenEntry`(SecureRandom 32 hex,宿主本地 `mcp_tokens` 不镜像,V38 单键惰性迁移);与 wire ConfigServer 完全独立生命周期(独立端口/开关/restart,互不触碰,VERSION 恒 4 零感知) | 把 MCP 当 wire 通道扩展、恢复 resources/prompts 双通道、令牌暴露为 MCP 工具(引导悖论 + PII)、恢复外部访问↔认证级联、恢复 mcp_external_access 独立键 |
 | 令牌管理 Token Management | MCP 访问令牌管理页(`settings/mcp-tokens`):认证开关 + 多令牌列表(**行内零动作按钮,动作唯一入口 = trailing「更多」菜单三项:查看 / 重命名 / 删除**,V46 R3;创建走 Appbar `tokens-add`);重命名走 `McpServiceConfig.setMcpTokenLabel` 方法层契约(仅动 label,值与顺序不变 ⇒ 校验集内容零变化,经 `mcpTokenSetUpdater` 原地生效,不重启不踢会话);**行内恒掩码,明文只在 `ModevValueDialog` 一处上屏**(复制后关窗);删除最后一枚不停用认证(空集 = 全拒);令牌值宿主本地秘密,恒不进 MCP 工具输出与诊断快照 | 显隐(行内 toggle)/行内复制按钮/「撤销」措辞/`token_show`·`token_hide` 键(V46 全部退役);UI 直写 prefs 改名 |
 | 工具面 Tool Surface 50 | MCP 对 Agent 的能力清单(记录 14/应用 6/监听 4/功能 4/资产 10/画像库 5/服务 4/作用域 3),与 UI 能力逐行对照、同上游继承;`McpToolParityTest` 冻结快照 + B1 边界源码扫描 + `UiMcpCapabilityParityTest` 能力归属与动作单点(R1-R6)三门禁(V45 T3.5:`app_clear_records` 与 `records_clear_package` 同上游重复已整体删除,应用组 7→6;V47 WP-7:画像库五工具 = 存/删/绑/目录/导入,`spoof_profiles_list` 改读画像库真身;V48 E1:`spoof_profile_catalog` 由零参数升为 `kind=fields\|devices\|carriers` 三本目录分派(**名仍 50**,参数字段声明新增;`kind` 带 enum ⇒ 乱值 = -32602;每行回 `writable` 对象 = UI 选择器真正落的那几项,读不到资产回 `available:false` + reason,**禁**回空表) | 「MCP 子集」「UI 专属阉割」(§5.3 明示排除除外)、「同一动作两处广告」(R1 红) |
 | 端口校验 Port Validation | 端口编辑可用性链(V42 T3,强约束 #29):`ModevPortSheet` 异步校验 → `PortValidator`(特权 <1024/双服务冲突/占用探测三闸 + 自身豁免),失败硬阻止保存;wire/MCP 双 `bindError` 观测面 + 服务页对称错误行 | 恢复静默保存(无校验)、特权端口可录入、双服务同端口、wire 绑定失败不可见 |
-| 语言 Language | 四语 en/zh/ja/ko(V42 T5):枚举唯一事实源 `LocaleManager.SUPPORTED_TAGS`(`locales_config.xml` 同表);选择面板 5 项(system + 四语,自名键 `lang_*`);values-ja/values-ko 为**生成物**(`scripts/v42_table_*.mjs` + `node scripts/v42_generate.mjs`;V46 复核实测 en 695 键、plurals 8 —— 旧记 701 为 V42 时点口径,以生成器控制台输出为准;技术词回落 en);ja/ko plurals 仅 other;`AppCountFormat` zh/ja/ko 同 10^4 万进位档;`TimelineGroup.formatDay` ja/ko 母语惯形分支 | 三语硬编码枚举(TAG 单常量散落)、ja/ko 资源缺键静默回落 en、日韩日期走 MMM 截断形态、**直写 values-ja/ko 而不回写翻译表**(V46 实锤的静默失效根因) |
+| 语言 Language | 四语 en/zh/ja/ko(V42 T5):枚举唯一事实源 `LocaleManager.SUPPORTED_TAGS`(`locales_config.xml` 同表);选择面板 5 项(system + 四语,自名键 `lang_*`);values-ja/values-ko 为**生成物**(`scripts/v42_table_*.mjs` + `node scripts/v42_generate.mjs`;**V50 复核实测 en 860 string + 13 plurals(四语等键集、零死键)** —— 旧记 695/8 为 V46 时点、701 为 V42 时点,一律以生成器控制台输出为准;技术词回落 en);ja/ko plurals 仅 other;`AppCountFormat` zh/ja/ko 同 10^4 万进位档;`TimelineGroup.formatDay` ja/ko 母语惯形分支 | 三语硬编码枚举(TAG 单常量散落)、ja/ko 资源缺键静默回落 en、日韩日期走 MMM 截断形态、**直写 values-ja/ko 而不回写翻译表**(V46 实锤的静默失效根因) |
 
 ## 强约束(改了会挂测试/降级质量)
 
@@ -263,7 +263,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
     `onNodeWithText(<区块标题>)`。
 18. **解耦契约(V23 R4;V43 T7 升级;V45 T2 收口)**:`PackageBoundaryTest` 规则 = **文本级全限定引用扫描**(去注释后匹配 `com.lioisme.modev.<子树>`,堵 `^import` 行扫描被 FQN 内联绕过的洞——V5.2 实证 SettingsRepository→mcp 依赖环):**ui 子树禁 hook 与 data 全子树**(V45 T2.2 收紧,原仅禁 data.server/data.db;V23 存储细节由仓库出口承担,如存储占用 =
     `LogRepository.storageUsage()`,DB+wal+shm 三文件和);**V43 新增**——domain 子树禁 android(白名单 `androidx.compose.runtime.Immutable` 纯注解 + `androidx.paging.*` 分页契约)/ui/data 逆向(模型族 `RowModel/RecordDetailModel/RecordTypeCount/PipelineStats/ChannelStats` 已上移 domain;**V45 T2.3:typealias 兼容层已整体删除** —— RowModelCompat / RecordDetailModelCompat / PipelineStatsCompat / data.repo.RecordFilter / data.repo.RecordService 五件 28 别名清零,消费方一律 import `domain.*`,`PackageBoundaryTest` 豁免集合恒空,`LayerDependencyGateTest` 禁复活);hook 子树禁 ui/compose(注入侧与宿主 UI 完全隔离);data.repo 禁 mcp(服务生命周期装配集中 ModevApp,仓库不得反控服务层);**mcp 子树禁 data 全子树**(V45 R6,与 UI 同一契约面 = 需求 3「双一等公民」的类型级保证)。
-    **V45 分层三门禁(`LayerDependencyGateTest`)**:G1 兼容 typealias 禁复活;G2 `AppContainer` 的 public 属性类型必须来自 `domain.*`(实现类型只允许 `internal`/`private`,即仅装配可见 —— `settingsRepo/logsRepo/wireServer/mcpServer`),消费方持有的静态类型即接口,「这一屏只用什么」由类型系统表达而非命名纪律;G3 ui/mcp 零 `import ...data.`。**方法层契约族** = `ListenConfigService`/`FeatureService`(domain.config)、`KeywordLibraryService`(domain.asset)、`ServerConfigService`/`McpServiceConfig`/`ConnectionMonitor`/`PortWriteGuard`(domain.server)、`AppCatalogService`/`AppListPreferences`/`AppSort`(domain.app)、`RecordService`/`RecordFilter`/`RecordDraft`→已删/`MonitoredRecord`(core.model 类型化族,写入面唯一模型)、`RecordService.stats`(原 `LogRepository.statsFlow` 契约外成员)、`RecordService.exportJson`(原 UI import `data.mapping.toJson`);`McpServer` 与 `ConfigServer` 双双实现 `ConnectionMonitor`(含 `bindError`)。**写侧单点(`SingleWriteEntryPointTest` W1/W2/W3)** = prefs 文件仅设计所有者可开(`SettingsRepository`+`MirroredConfigWriter` / `AppListSettings` / `LocaleManager` / `ThemeSettingsManager`)、服务端可变面仅装配层与配置仓库可写、端口写仅经 `PortWriteGuard` 收口的契约方法。**写入模型对账(`RecordWriteModelParityTest` P1-P4)** = 实体每列必有映射器写入者(`id`/`seq` 登记为存储自管)、类型化模型必带 packageName/kind/operation/timestamp/threadName、`RecordDraft` 平铺镜像禁复活、domain 零 `androidx.room`。**MCP 双域闸** = `listen_settings_set` 拒 FEATURE kind、`feature_settings_set` 拒 LISTEN kind(与 UI 两页按 `CategoryTaxonomy.domain` 分列同口径)。**core 子树零 `android.*` import**(V5.1:日志经 `EffectiveSwitch.interventionWarn` 注入、`ScopeRepository.logger` 由 ModevApp 装配;V43 T7 已落地,禁止回归);**MCP 工具模型族 import 唯一事实源 = domain.record**(V5.4,McpDtos import data.mapping 即红,`is com.lioisme.modev.data.mapping.*` FQN 形态已被 B1 文本级扫描捕获);**端口默认值单一事实源 = `ConfigKeys.WIRE_DEFAULT_PORT(1511)/MCP_DEFAULT_PORT(1510)`**(V5.13,WireProtocol/McpProtocol/SettingsRepository 一律引用,禁再写字面量);**Room 迁移对账 = `DbMigrationParityTest`**(version=14 与 MIGRATION_x_y 链 + addMigrations 清单三处一致性测试锁定,升级新迁移必须同步三处否则红);data/repo 与 domain 的 RecordFilter 扩展双定义死重复已清除(V5.7;V45 T2.3 起兼容层本体已灭)。UI 变更
+    **V45 分层三门禁(`LayerDependencyGateTest`)**:G1 兼容 typealias 禁复活;G2 `AppContainer` 的 public 属性类型必须来自 `domain.*`(实现类型只允许 `internal`/`private`,即仅装配可见 —— `settingsRepo/logsRepo/wireServer/mcpServer`),消费方持有的静态类型即接口,「这一屏只用什么」由类型系统表达而非命名纪律;G3 ui/mcp 零 `import ...data.`。**方法层契约族** = `ListenConfigService`/`FeatureService`(domain.config)、`KeywordLibraryService`(domain.asset)、`ServerConfigService`/`McpServiceConfig`/`ConnectionMonitor`/`PortWriteGuard`(domain.server)、`AppCatalogService`/`AppListPreferences`/`AppSort`(domain.app)、`RecordService`/`RecordFilter`/`RecordDraft`→已删/`MonitoredRecord`(core.model 类型化族,写入面唯一模型)、`RecordService.stats`(原 `LogRepository.statsFlow` 契约外成员)、`RecordService.exportJson`(原 UI import `data.mapping.toJson`);`McpServer` 与 `ConfigServer` 双双实现 `ConnectionMonitor`(含 `bindError`)。**写侧单点(`SingleWriteEntryPointTest` W1/W2/W3)** = prefs 文件仅设计所有者可开(`SettingsRepository`+`MirroredConfigWriter` / `AppListSettings` / `LocaleManager` / `ThemeSettingsManager`)、服务端可变面仅装配层与配置仓库可写、端口写仅经 `PortWriteGuard` 收口的契约方法。**写入模型对账(`RecordWriteModelParityTest` P1-P4)** = 实体每列必有映射器写入者(`id`/`seq` 登记为存储自管)、类型化模型必带 packageName/kind/operation/timestamp/threadName、`RecordDraft` 平铺镜像禁复活、domain 零 `androidx.room`。**MCP 双域闸** = `listen_settings_set` 拒 FEATURE kind、`feature_settings_set` 拒 LISTEN kind(与 UI 两页按 `CategoryTaxonomy.domain` 分列同口径)。**core 子树零 `android.*` import**(V5.1:日志经 `EffectiveSwitch.interventionWarn` 注入、`ScopeRepository.logger` 由 ModevApp 装配;V43 T7 已落地,禁止回归);**MCP 工具模型族 import 唯一事实源 = domain.record**(V5.4,McpDtos import data.mapping 即红,`is com.lioisme.modev.data.mapping.*` FQN 形态已被 B1 文本级扫描捕获);**端口默认值单一事实源 = `ConfigKeys.WIRE_DEFAULT_PORT(1511)/MCP_DEFAULT_PORT(1510)`**(V5.13,WireProtocol/McpProtocol/SettingsRepository 一律引用,禁再写字面量);**Room 迁移对账 = `DbMigrationParityTest`**(version=**15**(V50 实测;旧记 14 为 V37 时点)与 MIGRATION_x_y 链 + addMigrations 清单三处一致性测试锁定,升级新迁移必须同步三处否则红);data/repo 与 domain 的 RecordFilter 扩展双定义死重复已清除(V5.7;V45 T2.3 起兼容层本体已灭)。UI 变更
     应用列表偏好一律经 `AppsViewModel.setPinScoped/setShowSystem/
     setShowModules`(UI 零 import `AppListSettings`,VM 持注入的 `AppListPreferences`;其 init 缓存
     applicationContext,setX 无 Context 参数);作用域变更提示文案
@@ -381,7 +381,7 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
      HookInstaller probes/jsonOf + CapabilityKind.PREFS_LISTEN)。
 23. **双域拆分契约(V37,最高架构优先级)**:`CapabilityDomain { LISTEN, FEATURE }`
      为类别归属唯一事实源,`CategoryTaxonomy.RecordCategory.domain` **必填无默认**
-     (新增类别未标域编译即红);FEATURE 37 类 / LISTEN 44 类,快照测试锁定
+     (新增类别未标域编译即红);FEATURE 45 类 / LISTEN 43 类(V50 实测,合计 88),快照测试锁定
      (kind id 跨类型碰撞 OPEN/SIGNATURE,域完备断言必须用 (type,id) 对)。
      **FeatureGate 红线**:一切干预动作(setResult/字段改写/弹窗拦截/进程拦截/
      掩码)必须经基类 `featureOn(kind)` = master∧kind 双门控,**禁止裸布尔位直读**
@@ -571,12 +571,39 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
       的 20 计数与「sourceApi 互异」断言。**禁止**为 UI 方便再引入分组枚举。
 
 31. **分类与词汇契约(V48,前后端逐类对齐)**:
-    **① 一层一名词。** 域名词恒为 **监听(LISTEN,被动采集)/ 功能(FEATURE,主动干预)**;「总开关/Masters/マスター/마스터」在四语的**分区标题与行标签**里全部退役(本产品有 12 个层级的上级闸:1 作用域 + 10 类型 master + 3 服务开关,该词不携带信息);「作用域此应用」是唯一的顶层闸文案。以上由 `DomainVocabularyTest` 常驻拦截(四语禁把作用域称作监听/监视、两页标题在四语必须互异、两页重置确认同动词同句式、退役词不得复现、跨域提示必须点名那个闸)。
+    **① 一层一名词。** 域名词恒为 **监听(LISTEN,被动采集)/ 功能(FEATURE,主动干预)**;「总开关/Masters/マスター/마스터」在四语的**分区标题与行标签**里全部退役(本产品有 **14** 个层级的上级闸:1 作用域 + 10 类型 master + 3 服务开关 —— V50 更正,原文写「12 个」与其自身算式不符),该词不携带信息);「作用域此应用」是唯一的顶层闸文案。以上由 `DomainVocabularyTest` 常驻拦截(四语禁把作用域称作监听/监视、两页标题在四语必须互异、两页重置确认同动词同句式、退役词不得复现、跨域提示必须点名那个闸)。
     **② 一个概念一个键。** 一个记录类型**只有一个**标题键(`××_records_title`;`settings_records_*` 十键已删,数据管理页与监控页入口共用);一条遗留通路只有一个名字(画像库三段 = 画像库(编辑·校验·绑定) / 旧内置档(仍生效中) / 旧字段覆写(仍生效中))。
-    **③ 页面不许自拼分类清单。** 跨域行集合、分区归属、master 归属一律读 `CapabilityMap`(`crossDomainListen` / `of(type)`);kind→master 标签走 `KindLabelRes.masterLabelRes(type)`、master 现值走 `HookSwitch.masterFor(type)`,两处都是穷尽 `when`(新增类型编译期点名)。`CapabilityMapTest` 冻结 83/44/39 与三张跨域类型,并把表钉到 `R.string` / `ModevRoutes` / `hook/probes` 真实存在物上。
+    **③ 页面不许自拼分类清单。** 跨域行集合、分区归属、master 归属一律读 `CapabilityMap`(`crossDomainListen` / `of(type)`);kind→master 标签走 `KindLabelRes.masterLabelRes(type)`、master 现值走 `HookSwitch.masterFor(type)`,两处都是穷尽 `when`(新增类型编译期点名)。`CapabilityMapTest` 冻结 **88/43/45**(V50 实测)与三张跨域类型,并把表钉到 `R.string` / `ModevRoutes` / `hook/probes` 真实存在物上;**发射面另由 `FeatureOrphanGateTest` O1–O4 钉**(见 #32)。
     **④ 跨域闸必须可见。** 监听页「环境监听」里 kind 已开而外来 master 关 ⇒ 行 `supporting` 点名该 master 的名字与所在页(`listen_kind_master_off_hint`);**禁**回到"勾了什么都不发生"的静默形态,也**禁**为此把 FEATURE kind 移到监听页(#23 双域闸与 DUAL-12 按域清除不破)。
     **⑤ 配对字段不得分开可写。** Android release↔SDK 由 `pickAndroidRelease` 一次写全,`ProfileValueSets` 是唯一配对表(`ProfileEditorForm` 原私有 `ANDROID_GENERATIONS` 与"认不出就硬写 34"已删);内置画像恒只填机型身份 13 项(D-7),新档的 MODEL/代号取自 `devices.json` 实测条目而非记忆书写。
     **⑥ 删键的 grep 面 = 键名。** V48 实锤:改文案时只搜了中文值、漏了 `DataSettingsScreenTest` 里的 `R.string.settings_records_algorithm` 引用 ⇒ androidTest 编译才炸。删/改任何资源键前先 `grep -rn "<key>" app/src scripts`。
+
+32. **无孤儿功能契约(V50,需求「禁止有任何一个孤儿功能」的机器面)**:孤儿 =
+    **登记了、能勾选/能筛选,但注入侧永不兑现**的条目。它是本仓最贵的缺陷形态,因为
+    开关位存在 ≠ 有人读它、枚举值存在 ≠ 有人发射它,**全部单测与门禁照常绿**。
+    V50 首轮实测抓到 **1 个死行 + 27 个恒空操作**(见 `docs/v50-capability-inventory.md` §7)。
+    **四向门禁 `FeatureOrphanGateTest`**(扫描 `hook/` 全子树源文本):
+    O1 每个登记 kind 必须被注入侧引用 / O2 每个操作枚举值必须被注入侧引用 /
+    O3 注入侧引用的 `*Kind.NAME` 必须全部在分类法登记(反向旁路)/ O4 两域均非空且求和等于总数。
+    **新增或退役任何一条能力都必须在这一层留痕**:补发射点、或整行退役(taxonomy + 枚举 +
+    `HookSwitch` 位 + `EffectiveSwitch` 双臂 + 图标/色板/标签四语 + `FeatureGroups` + 三处计数快照)。
+    配套两条防复发门禁:
+    ① `AppListenOverridePersistenceTest`(A1 属性↔解析臂 / A2 常量↔属性 / A3 真 JSON 全字段往返)
+      —— 实锤 S1:`toJson` 走 Gson 反射自动写、`fromJson` 是**手写逐键**,加属性忘加解析臂
+      = 写得出读不回(V49 R-2 画像微调因此静默失效数轮,内存直读型测试恒绿);
+    ② `FrameworkEntrypointContractTest`(两入口/两 flavor 元数据/legacy 不携带现代声明/
+      `checkcast` 纪律/两适配器契约面)—— 钉住双 API 骨架,详见 `docs/v50-xposed-api-compat.md`。
+    **禁**用「门禁全绿」代替「发射面存在」作为功能完成的证据;生效判据仍是靶程序读回(设备矩阵)。
+    **V50 追加两类更隐蔽的孤儿(都在"门禁全绿"下长期存在)**:
+    ③ **配置孤儿** —— 测试档案定义了却从未被 `ApplyProfile`:设备档 `root-on`(`21-run-enhance.ps1:23`,
+      含 `ROOT_PACKAGE_MANAGER`/`ROOT_PROPERTY`)零消费方,而 E-ROOT 那批用例是在 `default` 档案下跑的
+      ⇒ 这两个钩子在设备侧**从未按干预档通电过一次**。判据:档案/常量/开关的"存在"不是"生效",
+      grep 一遍 `ApplyProfile` 的实参集合与 `$E[...]` 键集合是否相等。
+    ④ **互推孤儿** —— 两档各写一条"另一档会验",合起来等于没验:`20-run-listen.ps1` 把 8 个
+      掩蔽型 kind 记作 `Skip "…干预有效性见 E-* 二态"`,而 `21-run-enhance.ps1` 对其中 **7 个
+      一条断言都没有**(仅 `EMULATOR_BUILD` 有 `E-EMU-01 ON record`)。掩蔽类断言的正确形态 =
+      **让靶程序自报它看到了多少脏**(`E-PRC-01 tracerPid` / `E-PRC-03 dirtyCgroup`,它读的就是
+      钩子要掩的那份内容,不新造 host 侧谓词):有脏而记录 0 ⇒ 真缺陷红;脏 0 ⇒ Skip 且证据贴在消息里。
 
 ## 已知工具链坑
 
@@ -622,14 +649,23 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
   `.also { it.start() }`,且**捕获列表用 `CopyOnWriteArrayList` + 有界等待**(出口在工作线程上
   异步回调,0 条的断言没有沉淀窗就是恒真)。判据:同一用例里既数记录又读字段现值,两边必须一
   一对应 —— 只有一边时,另一边才是被测对象。
-- **反射查不到方法 = 永不生效的死钩子,而文档会替它撒谎(V49 WP-D2/D3 两连实锤,登记 V49-DFC-13/14)**:
-  两种查不到的形态都真实存在过 ——①`java.io.File.getMethod("readText", Charset)`:`readText` 是
+- **反射查不到方法 = 永不生效的死钩子,而文档会替它撒谎(V49 WP-D2/D3 两连实锤,登记 V49-DFC-13/14;V50 第三形态)**:
+  三种查不到的形态都真实存在过 ——①`java.io.File.getMethod("readText", Charset)`:`readText` 是
   `kotlin.io` 的**扩展函数**(编译成静态 `TextStreamsKt.readText(File, Charset)`),`File` 上没有这个成员;
   ②`CellIdentity` 的四个 mcc/mnc 取口与 `SubscriptionManager.getPhoneNumber()` 无参形:它们是
-  **@SystemApi/@hide**,公开 android.jar 里根本没有(靶程序也调不到 ⇒ 钩了零读者)。两者都因
-  `getOrNull() ?: return` 咽掉 `NoSuchMethodException` 而静默空装,而 AGENTS/§2.2 写着"已掩蔽"。
+  **@SystemApi/@hide**,公开 android.jar 里根本没有(靶程序也调不到 ⇒ 钩了零读者)。
+  **③(V50 新增)`DetectionMonitorHooker` 的 `BUILD_FIELDS = ["getFINGERPRINT","getMODEL",…]`
+  经 `Build.getMethod(field)` 解析 —— `android.os.Build` 的这些成员是 `public static final` 字段,
+  从来没有同名 getter**(第 3 号形态的特征:名字是**凭印象加的 "get" 前缀**,连 `NoSuchMethodException`
+  都必然发生,却因 `?: continue` 在循环里静默跳过,比 ①② 更隐蔽:整段监控代码零安装而表面看不出来)。
+  三者的共同点都是 `getOrNull() ?: return`/`?: continue` 咽掉异常,而 AGENTS/§2.2 写着"已掩蔽/已监控"。
   收口 = `DeviceEnvBaseHooker.unresolvedHookPoints`(记录每个解析失败的 `类#方法#参数`)
-  + 每族一条「列出的钩点必须全部解析得到」断言;照抄上游钩点名单前,先在测试里证明它存在。
+  + 每族一条「列出的钩点必须全部解析得到」断言;**且**该观测面必须覆盖**私有 `runCatching` 分支**
+  (V50 实锤:`monitorBuildFields` 走私有 runCatching,根本不进 `unresolvedHookPoints`,
+  所以「列出的钩点全部解析得到」的既有断言看不见它);照抄上游钩点名单前,先在测试里证明它存在。
+  **静态字段直读(`GETSTATIC`)在 ART 上不可钩是物理上限** —— 想观测「读 Build 字段」只能钩
+  `java.lang.reflect.Field.get`(反射通路,V50 `monitorBuildFieldReflection` 即此),
+  字段改写型干预则由 `EmulatorBuildHooker` 承担,**禁**伪造一个观测不到的观测点。
 - **注入侧「改 `static final` 平台字段」在 JVM 档**大部分真的改得动**(V49 WP-D2 更正,原条目为假):
   原记「`Field.set` 对 `static final` 恒抛 `IllegalAccessException` ⇒ 实测 0/11 落地」,那是上一条
   未启动 sink 造出来的**零记录**,与写入成功与否无关。启动后实测:`Build` 身份八项 + `VERSION.RELEASE`
@@ -712,6 +748,55 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
   `WaitDevice` —— VM 根本没关过,`boot_completed` 立刻为 1 ⇒ 打印「设备已就绪」,
   而后续注入矩阵对着 lspd 的陈旧模块表全红。修法 = **判据只能是失联**:`cmd.exe /c` 包装
   `quit` 后轮询 `sys.boot_completed` 读到非 `1`(90s 窗)才认定关机,否则整轮 BLOCKED。
+- **验收量具自己就是掉线制造者 + 假红工厂(V50 实锤,四条同批修)**:
+  ① `WaitDevice` 旧阈值「连续 8 次 adb 级报错(≈40s)」⇒ 直接 `Stop-Process dnplayer -Force`
+  冷启动,**而宿主满载时单次 `adb shell` 就能卡过这个窗口** —— 量具把一台活 VM 打死,
+  再把后半程零产出全记成产品缺陷(R8 一轮 8 次)。阈值提到 24(≈2min 持续报错)且
+  **必须把末次真实报错打进日志**,否则「掉线」这个词只是情绪。
+  ② 掉线自愈过去只打一行黄字、编排器毫不知情 ⇒ 一整轮 **21 条功能红**里真因只有掉线。
+  现在:子进程按步写标记文件(`TT_VM_LOST_MARK`),编排器见标记 ⇒ **该步计数清零作废 +
+  整轮 BLOCKED** —— 刚冷重启的设备上靶进程已消失、注入未必恢复(lspd 缓存模块表),
+  任何 PASS 都不是证据。**归因纪律:环境故障登记成产品缺陷,比产品缺陷更难发现。**
+  ③ Z4 要的是「默认 server 上**恰 1 条**序列」,不是「必须是 `emulator-5554`」。旧实装
+  无条件 `disconnect` TCP 序列再要求恰 1 条,而本机 LDPlayer 在默认 server 上**只注册 TCP
+  一条** ⇒ disconnect 后计数归 0,`ui`/`mcp` 两步**每轮都被 Z4 自己拦死**(R8 即此,
+  台账只留一行「序列面非恰 1 条」,看着像产品问题)。现在:两种序列同时在场才去重,
+  零序列则主动 `connect` 回来。
+  ④ `env-runtime`(Twilight 进程存活 / `spool.dat` 存在 / 已入库记录 >0)排在 `smoke`
+  **之前** ⇒ 它断言的是「冒烟跑过之后才存在」的产物,连续两轮恒 3 红且与代码零关系。
+  写运行态断言前先问:**这一条的前序动作在本步之前还是之后**。挪对一次后仍剩 1 红,
+  才看清第二层:`spool.dat` 是**宿主不可达时的磁盘兜底**(V36 D-1),而本步的 `EnsureHost`
+  恰恰保证宿主在线 ⇒ 断「在线态下兜底文件存在」是方向写反,该能力的正档在
+  `26-run-module-off-negative`;`已入库记录 >0` 则要等监听矩阵才可能为真(冒烟用例
+  L-SMOKE-01/L-PERF-01 只验帧语义与耗时,**不产业务记录**)。
+  ⑤ **数记录必须走设备侧活库,不许 `cp modev.db` 拉回本地查**:Room 是显式 WAL(#18),
+  未 checkpoint 的行全在 `modev.db-wal` 里,单拷主库文件必然少读甚至读到 0 行 ⇒
+  `00-env-verify` 的 `Modev has records (0)` 恒红,而**同一时刻**矩阵用 tt-lib 的 `Q`
+  (`run-as … sqlite3 databases/modev.db`)看得见同样这些记录。判据:同一事实两条通路
+  结果不同 ⇒ 先怀疑通路,别急着认定功能坏。
+  ⑥ **「VM 掉线」绝大多数不是 VM 死了,而是雷电自己重挂 adb 端口转发**(V50 铁证,
+  推翻本项目历轮对掉线的所有归因):`D:\leidian\LDPlayer14\crash_copyx86\leidian0_vbox.log`
+  里逐行写着 `vbox::VBoxClientImpl::_onCallPropNotify(1908): app crash` →
+  `autoAdbReconnect(1691): adb auto reconnect` → `remove natnetwork port forward tcp_5555_0`
+  → `add natnetwork port forward tcp_5555_0`。**Guest 内任一 App 崩溃**(压力矩阵里天天发生)
+  都会让雷电重挂 5555 转发,期间 adb 侧序列凭空消失 = `device '127.0.0.1:5555' not found`,
+  而 VM 活得好好的。旧 `WaitDevice` 把这判成 VM 死亡并 `Stop-Process dnplayer -Force`
+  ⇒ **量具亲手把健康设备上的现场(靶进程/spool/lspd 内存态)毁掉**,再把后半程零产出记成产品缺陷。
+  修法 = 恢复分两级:一级只 `adb kill-server` + 重连并把窗口给到 300s(覆盖 guest 框架重启 +
+  端口重挂 + `boot_completed` 回 1),只有真回不来才二级冷启动;且冷启动必须落标记文件,
+  由编排器作废本步计数 + 整轮 BLOCKED。
+  **连带结论**:此机制同时解释了"db 五类恒 `count=0`"——设备失联期间 `Q` 把 adb 报错文本
+  **当数据行**返回,`KindCountsAll` 见计数列非数字就静默跳行 ⇒ 整表读成零记录(撒谎的只有这一条
+  通路,`KindCount` 走 `CountChecked` 拿不到数字直接 `throw`,所以 enhance 档从不撒这个谎)。
+- **整域零产出必须先测量再改代码(V50 反例,五种假设烧掉五轮)**:db 域五类 kind
+  连着两轮全 `count=0`。台账只给「五个 0」这一种信息,于是只能猜 —— 游标类死钩、
+  `recordType` 字符串不匹配(`RecordTypes.DATABASE` 恰为 `"db"`,匹配)、JSON 键没绑
+  (`dbListen` 有 `FIELD_DB` 解析臂,绑了)、配置默认值(`dbListen`/`dbQuery` 恒 `true`)、
+  探针未注册(`HookInstaller:64` 在列)—— **五条全部排除,但没有一条是设备证据否掉的**,
+  每条都要跑一轮才能证伪。修法不是继续猜第六个,而是给量具补上缺的那一次测量:
+  整域零产出时自动打印「该包在 `crypto_records` 里究竟有哪些 recordType|kind」
+  + `logcat -d -s HookInstaller` 的装钩自报。**判据:一轮 80 分钟的设备档,只能用来
+  区分已经互相冲突的假设,不能用来海选。**
 - **框架守护进程整场缺席(V48 实锤,注入类断言全红的根因,改代码前先看这条)**:
   LSPosed 与 Vector 都是 **Zygisk 模块** —— Magisk 没跑,两者一起不加载,与本项目代码零关系。
   判据(全在设备侧,无需重跑矩阵):`/sbin` 与 `/dev/.magisk` 不存在 +
@@ -839,6 +924,16 @@ Modev — Kotlin/Compose (Material3) Xposed 模块,双域架构:监听域(算法
   复杂 sed。
 - **`am instrument` 前必须 force-stop 宿主**:残留宿主进程导致测试进程
   `failed to attach` / 原生 segfault(INSTRUMENTATION_CODE 0)。
+- **验收轮进行中，任何人(含 agent 自己)并行发 adb 命令 = 整轮判据作废(V50 实锤)**:
+  设备矩阵的等待/计数全靠对 `127.0.0.1:5555` 的连续 `adb shell` 轮询;编排器跑着时另开一条
+  `adb devices` / `adb -s … shell` 会造成连接**中途掉离 server**,症状不是断言失败而是
+  `adb.exe: device '127.0.0.1:5555' not found` 抛出 → **整步在日志中途截断**(enhance 28 行只剩 12 行),
+  台账 JSON 不落盘 ⇒ 编排器按「无台账 = 不可判定」记 FAIL(该机制本身是对的,救了我们没把崩掉的步读成绿)。
+  同因连带把 `env-runtime` 从 3 红放大到 **11 红**(连 `Root available` 都红,而手工查是 uid=0)。
+  **判据**:一次红先别归因产品 —— 看该步 err 日志有没有 `not found` / `device offline`,
+  以及 FAIL 集合是否是「root/adb 类断言齐红」这种**环境连通性形态**;静默重跑同一阶段,
+  连红数回落到基线即为争用。实测:quiet 重跑 env-runtime 11→3(与基线逐条同名)。
+  **纪律**:矩阵跑着的时候,agent 不许对设备发任何命令;要查状态就读日志文件,别开 adb。
 - **雷电同一设备双序列**(`127.0.0.1:5555` + `emulator-5554`):Gradle
   connectedAndroidTest 会对两序列各跑一遍、互相踩踏(共享 prefs/前台/记录),表现为
   大面积假失败(实锤形态:`Failed to inject touch input` 成片、用例数虚增到 2×);

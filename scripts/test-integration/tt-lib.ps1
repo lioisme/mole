@@ -19,13 +19,61 @@ function WaitDevice([int]$timeoutSec = 420) {
     $ErrorActionPreference = "Continue"
     $deadline = (Get-Date).AddSeconds($timeoutSec)
     $miss = 0
+    $lastErr = ""
     while ((Get-Date) -lt $deadline) {
         Reconnect
         $st = (& $script:ADB -s $script:DEVICE shell "getprop sys.boot_completed" 2>&1 | ForEach-Object { "$_" }) -join ""
         if ("$st".Trim() -eq "1") { return $true }
-        if ("$st" -match "not found|offline|closed|refused") { $miss++ } else { $miss = 0 }
-        if ($miss -ge 8) {
-            Write-Host "  [VM] device lost, cold relaunching dnplayer..." -ForegroundColor Yellow
+        if ("$st" -match "not found|offline|closed|refused") { $miss++; $lastErr = "$st" } else { $miss = 0 }
+        # V50 实锤:阈值 8(≈40s)太低 —— 宿主满载时 `adb shell` 单次就能卡过这个窗口,
+        # 而本分支会 **Stop-Process -Force 掉 dnplayer 再冷启动**,等于量具自己把一台
+        # 活着的 VM 打死,再把后半程所有零产出错记成产品缺陷(R8 一轮 8 次即此)。
+        # 现在:窗口拉到 24 次(≈2min 持续 adb 级报错,而非单次慢),并把真实报错
+        # 打进日志,掉线才有可归因的证据。
+        if ($miss -ge 24) {
+            # V50 实锤:报错形态是 `adb.exe: device '...' not found`,而这**同样**是
+            # 雷电 TCP 桥掉了而 Android 照常活着的特征 —— 旧实装不分辨,直接杀 dnplayer,
+            # 于是「自愈」本身毁掉了靶进程/spool/lspd 现场,后半程必然全零。
+            # 一级恢复只动 adb 桥(不碰 VM,现场无损);只有桥救不回来才认定 VM 真死。
+            Write-Host "  [VM] $miss 次连续 adb 报错(末次: $($lastErr.Trim()))⇒ 一级恢复:重启 adb 桥(不动 VM)" -ForegroundColor Yellow
+            & $script:ADB kill-server 2>&1 | Out-Null
+            $bridgeOk = $false
+            # V50 铁证(`LDPlayer14/crash_copyx86/leidian0_vbox.log`):
+            #   vbox::VBoxClientImpl::_onCallPropNotify(1908): app crash
+            #   vbox::VBoxClientImpl::autoAdbReconnect(1691): adb auto reconnect
+            #   remove natnetwork port forward tcp_5555_0 / add natnetwork port forward tcp_5555_0
+            # ⇒ Guest 内**某个 App 崩溃**(压力矩阵里天天发生)就会触发 LDPlayer 自己
+            #   重挂 5555 端口转发,期间 adb 侧序列凭空消失 = `device '...' not found`,
+            #   **而 VM 活得好好的**。旧自愈把这当成 VM 死亡并 Stop-Process,等于把
+            #   R3/R4/R5 三轮「掉线」的根因从环境故障升级成量具误杀健康 VM。
+            # 一级恢复窗口因此给到 300s(要覆盖 guest 框架重启 + 端口重挂 + boot_completed 回 1)。
+            $bDeadline = (Get-Date).AddSeconds(300)
+            while ((Get-Date) -lt $bDeadline) {
+                Reconnect
+                $b = (& $script:ADB -s $script:DEVICE shell "getprop sys.boot_completed" 2>&1 | ForEach-Object { "$_" }) -join ""
+                if ("$b".Trim() -eq "1") { $bridgeOk = $true; break }
+                Start-Sleep -Seconds 4
+            }
+            if ($bridgeOk) {
+                Write-Host "  [VM] adb 桥恢复,VM 未受扰 ⇒ 现场保留,继续本步" -ForegroundColor Green
+                $miss = 0
+                $deadline = (Get-Date).AddSeconds($timeoutSec)
+                continue
+            }
+            Write-Host "  [VM] 桥重启无效 ⇒ 判定 VM 真死,二级恢复:冷启动 dnplayer(本步现场已毁)" -ForegroundColor Red
+            # V50 实锤:掉线自愈过去**只打一行黄字**,编排器毫不知情,于是继续用被重启
+            # 过的设备跑完剩余断言 —— 靶进程已没了、注入未必恢复(lspd 缓存模块表),
+            # 后半程计数恒 0,一轮里凭空造出 21 条「功能失败」(真因 = 1 次掉线)。
+            # 现在把这件事写成标记文件交给编排器裁决:本步作废 + 整轮 BLOCKED,
+            # 而不是把环境故障登记成产品缺陷。
+            if ($env:TT_VM_LOST_MARK) {
+                try {
+                    [IO.File]::AppendAllText(
+                        $env:TT_VM_LOST_MARK,
+                        ("{0}`t{1}`n" -f (Get-Date).ToString("o"), $MyInvocation.ScriptName),
+                        (New-Object System.Text.UTF8Encoding($false)))
+                } catch { }
+            }
             Get-Process dnplayer,Ld9BoxHeadless,VBoxNetDHCP -ErrorAction SilentlyContinue | Stop-Process -Force
             Start-Sleep -Seconds 6
             Start-Process -FilePath $script:DNPLAYER -ArgumentList "-index","0" -WorkingDirectory $script:LDPLAYER_DIR
@@ -41,7 +89,17 @@ function WaitDevice([int]$timeoutSec = 420) {
 function KindCountsAll {
     $rows = @(Q "SELECT recordType, kind, COUNT(*) FROM crypto_records WHERE packageName='$script:TARGET_PKG' GROUP BY 1,2;")
     $map = @{}
+    # V50 实锤(R6 普查抓到):设备掉线瞬间 `Q` 把 **adb 报错文本当数据行**返回
+    # (`adb.exe: device '...' not found`),旧循环因 `$p[2]` 不是数字而**静默跳过** ⇒
+    # 整表读成「零记录」⇒ db 五类恒 `count=0` 被记成产品缺陷,真因却是设备不可达。
+    # 这正是 R3 红 / R10 绿 / R6 又红的全部成因 —— 与产品代码无关的 flaky 假故障。
+    # 现在:报错行不再被吞,记账成显式状态供断言侧点名。
+    $script:LAST_QUERY_ERROR = ""
     foreach ($r in $rows) {
+        if ($r -match "device .*not found|device offline|error:|closed|refused|cannot connect") {
+            $script:LAST_QUERY_ERROR = "$r"
+            continue
+        }
         $p = $r -split '\|'
         if ($p.Count -ge 3 -and $p[2] -match "^\d+$") { $map["$($p[0])|$($p[1])"] = [int]$p[2] }
     }
@@ -228,13 +286,23 @@ function Exit-WithResult {
 function ScreencapNonBlackRatio {
     $ErrorActionPreference = "Continue"
     $png = Join-Path $script:TMP "cap.png"
+    Remove-Item $png -Force -ErrorAction SilentlyContinue
+    # V50 量具修复:原实装 `adb exec-out screencap -p > cap.png` 在 PowerShell 5.1 下
+    # **按文本重编码原生 stdout**(换行/字符集转换),PNG 被毁 ⇒ FromFile 抛 ⇒ 恒返回 -1,
+    # 于是 E-SEC-01/02 三条「FLAG_SECURE 解除」断言在每一轮都是假红(V49 台账里那 14 条
+    # 长期无人修复的红项正是这一族)。改为「设备侧落图 + `adb pull`」:pull 由 adb
+    # 自己写字节文件,二进制安全。
     for ($i = 0; $i -lt 5; $i++) {
         Reconnect
-        & $script:ADB -s $script:DEVICE exec-out screencap -p > $png 2>$null
+        & $script:ADB -s $script:DEVICE shell "screencap -p /sdcard/modev_cap.png" 2>$null | Out-Null
+        & $script:ADB -s $script:DEVICE pull /sdcard/modev_cap.png $png 2>$null | Out-Null
         if ((Test-Path $png) -and (Get-Item $png).Length -gt 1000) { break }
         Start-Sleep -Seconds 2
     }
-    if (-not (Test-Path $png) -or (Get-Item $png).Length -lt 1000) { return -1 }
+    if (-not (Test-Path $png) -or (Get-Item $png).Length -lt 1000) {
+        Write-Host "    [cap] 取图失败(文件缺失或 <1000B)" -ForegroundColor DarkGray
+        return -1
+    }
     Add-Type -AssemblyName System.Drawing
     try {
         $bmp = [System.Drawing.Bitmap]::FromFile($png)
@@ -249,13 +317,27 @@ function ScreencapNonBlackRatio {
         $bmp.Dispose()
         if ($total -eq 0) { return -1 }
         return [math]::Round($nonBlack / $total, 4)
-    } catch { return -1 }
+    } catch {
+        # 失败原因必须可见 —— 静默 -1 让「量具坏了」和「功能坏了」长得一模一样
+        Write-Host "    [cap] 解码失败: $($_.Exception.Message)" -ForegroundColor DarkGray
+        return -1
+    }
 }
 
+# UI 树里找子串。**必须走设备侧 grep**:PowerShell 5.1 解码 adb 文本输出时非 ASCII 全成 `?`
+# (V50 实锤:`-match "录屏"` 恒假 ⇒ E-MP-01 的「OFF 出弹窗」永远红,而「ON 弹窗消失」
+# 因为检测不到而**真空假绿** —— 一个假红配一个假绿,比两个假红更坏)。
+# 把 needle 以 UTF-8 文件推到设备上 `grep -f`,回传的是命中行数(纯 ASCII),编码不再经过 PS。
 function UiDumpContains([string]$needle) {
+    $ErrorActionPreference = "Continue"
     AdbShell "uiautomator dump /sdcard/ui.xml" | Out-Null
-    $xml = AdbShell "cat /sdcard/ui.xml"
-    return ($xml -match [regex]::Escape($needle))
+    $local = Join-Path $script:TMP "needle.txt"
+    [IO.File]::WriteAllText($local, $needle, (New-Object System.Text.UTF8Encoding($false)))
+    Reconnect
+    & $script:ADB -s $script:DEVICE push $local /sdcard/modev_needle.txt 2>&1 | Out-Null
+    $c = AdbShell "grep -c -f /sdcard/modev_needle.txt /sdcard/ui.xml"
+    if ("$c" -match "^\s*(\d+)") { return ([int]$Matches[1]) -gt 0 }
+    return $false
 }
 
 function TargetAlive {

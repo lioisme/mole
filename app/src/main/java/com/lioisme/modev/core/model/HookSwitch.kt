@@ -29,10 +29,8 @@ data class HookSwitch(
     val keyAgreement: Boolean = false,
     /** 随机数:极高频、逆向价值低,默认关(噪点类别)。 */
     val random: Boolean = false,
-    /** Base64 编码:纯编码噪声,默认关(噪点类别,与 webView 同先例)。 */
+    /** Base64 编码:纯编码噪声,默认关(噪点类别)。 */
     val base64: Boolean = false,
-    /** WebView JS 加解密监听(WebCrypto / CryptoJS / JSEncrypt,V12 起;默认关,同 base64 先例)。 */
-    val webView: Boolean = false,
     /**
      * 数据库监听:打开/关闭(openDatabase/openOrCreateDatabase/SQLiteOpenHelper)。
      * 高频、信号弱(仅生命周期),默认关(噪点类别,见 [CategoryTaxonomy])。
@@ -303,7 +301,7 @@ data class HookSwitch(
     /** 算法捕获相关类别是否任一启用(含全局总开关投影,供算法监听能力判定)。 */
     val anyCryptoEnabled: Boolean
         get() = cryptoListen && (messageDigest || cipher || mac || signature || keyParam || keyGeneration ||
-            keyFactory || keyStore || keyAgreement || random || base64 || webView)
+            keyFactory || keyStore || keyAgreement || random || base64)
 
     /** 数据库监听相关类别是否任一启用(含全局总开关投影,供数据库监听能力判定)。 */
     val anyDbEnabled: Boolean
@@ -383,7 +381,6 @@ data class HookSwitch(
         CryptoKind.KEY_AGREEMENT -> keyAgreement
         CryptoKind.RANDOM -> random
         CryptoKind.BASE64 -> base64
-        CryptoKind.WEB_CRYPTO -> webView
     }
 
     fun dbEnabled(kind: SqlKind): Boolean = dbListen && when (kind) {

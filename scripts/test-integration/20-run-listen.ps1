@@ -94,21 +94,55 @@ $DOMAINS = [ordered]@{
 Write-Host "== 监听矩阵 Round(L) ==" -ForegroundColor Cyan
 EnsureHost
 
-foreach ($dom in $DOMAINS.Keys) {
+:domain foreach ($dom in $DOMAINS.Keys) {
   try {
     $spec = $DOMAINS[$dom]
-    Write-Host "`n--- domain: $dom ---" -ForegroundColor Magenta
-    if (-not (WaitDevice)) { Assert "L/$dom device-reachable" $false "VM lost"; continue }
+    # V50 实锤(R3/R6/R7/R8 四轮同位复发):guest 的 adb 序列**专挑 db 域断**(该域记录量最大,
+    # R10 实测单域 219 条 EXEC 行),恢复后其余 9 个域照常全绿。旧行为 = 一次不可达就把整步
+    # 判死、连带作废 60 条好断言,一轮 80 分钟白跑。
+    # 现在:域内检测到「设备不可达」⇒ **丢弃本域刚记的那几条(它们本就是假红),等设备回来重跑本域一次**。
+    # 只重试一次:两次都不可达就是环境问题,该由编排器 BLOCKED 说话,不在这里无限打转。
+    for ($attempt = 1; $attempt -le 2; $attempt++) {
+    $snapN = $script:RESULTS.Count; $snapP = $script:PASS; $snapF = $script:FAIL; $snapS = $script:SKIP
+    $script:LAST_QUERY_ERROR = ""
+    Write-Host "`n--- domain: $dom --- (第 $attempt 次)" -ForegroundColor Magenta
+    if (-not (WaitDevice)) { Assert "L/$dom device-reachable" $false "VM lost"; continue domain }
     ResetState $P[$spec.profile]
     foreach ($c in $spec.cases) {
         RunCase $c[1] $c[0] $c[2]
     }
     WaitSpoolDrain | Out-Null
     $counts = KindCountsAll
+    # V50 实锤:db 域整域 count=0 连着两轮红,而台账只给「五个 0」—— 排查时只能靠猜
+    # (游标死钩?recordType 拼错?JSON 键没绑?四种 theory 全部**无法用现有台账证伪**,
+    #  每轮设备档 80 分钟才否掉一个)。这里把缺的那一次测量补上:
+    # 整域零产出时,顺手打印「该包究竟有哪些 recordType|kind」+ 注入侧自报的装钩失败点。
+    if (@($spec.kinds).Count -gt 0) {
+        $anyInDom = 0
+        foreach ($key in $counts.Keys) { if ($key -like "$($spec.rt)|*") { $anyInDom += $counts[$key] } }
+        if ($anyInDom -eq 0) {
+            Write-Host "  !! L/$dom 整域零产出 ⇒ 打证据(非断言):" -ForegroundColor DarkYellow
+            $census = @(Q "SELECT recordType, kind, COUNT(*) FROM crypto_records WHERE packageName='$script:TARGET_PKG' GROUP BY 1,2;")
+            if ($census.Count -eq 0) { Write-Host "     该包在 crypto_records 里零行(整表没有任何记录 ⇒ 上游链路/装钩问题)" -ForegroundColor DarkYellow }
+            else {
+                foreach ($r in ($census | Sort-Object)) { Write-Host ("     现存: {0}" -f ($r -replace '\|', ' = ')) -ForegroundColor DarkYellow }
+            }
+            $hk = AdbShell "logcat -d -s HookInstaller:* -t 60"
+            foreach ($ln in ($hk -split "`n")) {
+                if ($ln -match "unresolved|skipped|deferred|Probe|install") { Write-Host ("     hook> {0}" -f $ln.Trim()) -ForegroundColor DarkGray }
+            }
+        }
+    }
     foreach ($k in $spec.kinds) {
         $n = if ($counts.ContainsKey("$($spec.rt)|$k")) { $counts["$($spec.rt)|$k"] } else { 0 }
-        Assert "L/$dom kind=$k" ($n -gt 0) "count=$n"
+        # 计数为 0 有两种截然相反的原因:「真没记录」与「设备不可达,查询回的是报错文本」。
+        # 过去只打 count=0,于是后者被记成产品缺陷(db 五类连红两轮即此)。
+        $why = if ($script:LAST_QUERY_ERROR) { "设备不可达 ⇒ 计数不可信:$($script:LAST_QUERY_ERROR)" } else { "count=$n" }
+        Assert "L/$dom kind=$k" ($n -gt 0) $why
     }
+    # NEG 的「total=0」在设备不可达时是**必然为真的假 PASS**(查不到行 ≠ 没有行),
+    # 所以不可达标记必须同时覆盖正向与负向两段,任一段中招就整域重来。
+    $domUnreachable = [bool]$script:LAST_QUERY_ERROR
     $cond = $spec.conditional
     if ($null -eq $cond) { $cond = @() }
     foreach ($k in $cond) {
@@ -128,6 +162,16 @@ foreach ($dom in $DOMAINS.Keys) {
     $anyInRt = 0
     foreach ($key in $counts2.Keys) { if ($key -like "$($spec.rt)|*") { $anyInRt += $counts2[$key] } }
     Assert "L/$dom NEG master-off zero" ($anyInRt -eq 0) "total=$anyInRt"
+    if (($domUnreachable -or $script:LAST_QUERY_ERROR) -and $attempt -lt 2) {
+        Write-Host ("  !! L/$dom 期间设备不可达(末次:{0})⇒ 撤销本域 {1} 条断言(全是假红/假绿),等恢复后重跑" -f `
+                $script:LAST_QUERY_ERROR, ($script:RESULTS.Count - $snapN)) -ForegroundColor DarkYellow
+        while ($script:RESULTS.Count -gt $snapN) { $script:RESULTS.RemoveAt($script:RESULTS.Count - 1) }
+        $script:PASS = $snapP; $script:FAIL = $snapF; $script:SKIP = $snapS
+        if (-not (WaitDevice 420)) { Assert "L/$dom device-reachable(after retry)" $false "VM lost"; continue domain }
+        continue
+    }
+    break
+    }
   } catch {
     Assert "L/$dom domain-execution" $false "exception: $($_.Exception.Message)"
   }

@@ -113,8 +113,6 @@
     <string name="kind_key_agreement">키 합의</string>
     <string name="kind_random">난수</string>
     <string name="kind_base64">Base64</string>
-    <string name="kind_webview">웹</string>
-    <string name="op_get_instance">인스턴스 가져오기</string>
     <string name="op_init">초기화</string>
     <string name="op_update">업데이트</string>
     <string name="op_do_final">최종 처리</string>
@@ -600,14 +598,11 @@
     <string name="op_device_env_query_intent_activities">인텐트 쿼리 감시</string>
     <string name="op_device_env_get_property">시스템 속성 읽기</string>
     <string name="op_device_env_build_tags">Build.TAGS 감지</string>
-    <string name="op_device_env_getprop">getprop 명령</string>
-    <string name="op_device_env_class_for_name">클래스 로드 감시</string>
     <string name="op_device_env_load_class">loadClass 감시</string>
     <string name="op_device_env_find_class">findClass 감시</string>
     <string name="op_device_env_get_stack_trace">스택 가져오기 필터</string>
     <string name="op_device_env_thread_stack">스레드 스택 필터</string>
     <string name="op_device_env_read_maps">maps 읽기 필터</string>
-    <string name="op_device_env_open_maps">maps 파일 감시</string>
     <string name="op_device_env_build_fingerprint">Build.FINGERPRINT 위장</string>
     <string name="op_device_env_build_model">Build.MODEL 위장</string>
     <string name="op_device_env_build_product">Build.PRODUCT 위장</string>
@@ -618,8 +613,6 @@
     <string name="op_device_env_get_default_sensor">센서 조회 감시</string>
     <string name="op_device_env_sensor_list">센서 목록 감시</string>
     <string name="op_device_env_get_mac_address">MAC 주소 위장</string>
-    <string name="op_device_env_get_device_id">기기 ID 위장</string>
-    <string name="op_device_env_get_imei">IMEI 위장</string>
     <string name="op_device_env_android_id">ANDROID_ID 위장</string>
     <string name="op_device_env_phone_device_id">TelephonyManager.getDeviceId</string>
     <string name="op_device_env_phone_imei">TelephonyManager.getImei</string>
@@ -627,8 +620,6 @@
     <string name="op_device_env_phone_sim_serial">TelephonyManager.getSimSerialNumber</string>
     <string name="op_device_env_phone_line1_number">TelephonyManager.getLine1Number</string>
     <string name="op_device_env_cpu_available_processors">Runtime.availableProcessors</string>
-    <string name="op_device_env_cpu_proc_info">/proc/cpuinfo</string>
-    <string name="op_device_env_cpu_sysconf">os.sysconf</string>
     <string name="op_device_env_battery_int_property">BatteryManager.getIntProperty</string>
     <string name="op_device_env_battery_is_charging">BatteryManager.isCharging</string>
     <string name="op_device_env_battery_changed">ACTION_BATTERY_CHANGED</string>
@@ -641,7 +632,6 @@
     <string name="op_device_env_build_display">Build.DISPLAY</string>
     <string name="op_device_env_build_serial">Build.SERIAL</string>
     <string name="op_device_env_build_type">Build.TYPE</string>
-    <string name="op_device_env_root_check_api">루트 감지 API 기록</string>
     <string name="op_device_env_root_check_file">루트 감지 파일 기록</string>
     <string name="op_device_env_root_check_exec">루트 감지 명령 기록</string>
     <string name="op_device_env_emulator_check_build">에뮬레이터 Build 확인</string>
@@ -662,7 +652,6 @@
     <string name="op_device_env_proc_net_read">/proc/net/tcp read</string>
     <string name="op_device_env_settings_global_get">Settings.Global.get</string>
     <string name="op_device_env_settings_secure_get">Settings.Secure.get</string>
-    <string name="op_device_env_content_query_settings">ContentResolver.query settings</string>
 
     <!-- V33 UI Interaction -->
     <string name="filter_type_ui_interaction">UI 상호작용</string>

@@ -3,5 +3,6 @@ name=Modev
 version=0.1.0
 versionCode=1
 author=lioisme
-description=抓取目标 App 全部算法调用(摘要/加解密/签名/MAC/密钥/编码)的 Xposed 模块;legacy 构建变体,兼容 LSPosed ≤93/EdXposed 及含 legacy 路径的 1.10.x。
+description=抓取目标 App 全部算法调用(摘要/加解密/签名/MAC/密钥/编码)的 Xposed 模块;legacy 构建变体,以 assets/xposed_init + Xposed API 82 入口被旧加载器(EdXposed / LSPosed 未支持现代 API 的版本)装载。
 minApiVersion=82
+targetApiVersion=82

@@ -70,7 +70,6 @@ object KindIcons {
             CryptoKind.KEY_AGREEMENT -> Icons.Outlined.SwapHoriz
             CryptoKind.RANDOM -> Icons.Outlined.Casino
             CryptoKind.BASE64 -> Icons.Outlined.DataObject
-            CryptoKind.WEB_CRYPTO -> Icons.Outlined.Public
         }
 
     /** 数据库族。 */

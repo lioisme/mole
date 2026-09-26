@@ -19,7 +19,29 @@ class DialogLocationHooker(
 
     override fun install() {
         hookDialogShow()
+        hookDialogCancel()
         hookOnBackPressed()
+    }
+
+    /**
+     * `Dialog.cancel()` 观测(V50 孤儿整改):`DIALOG_CANCEL` 在枚举、四语标签与筛选菜单里
+     * 都存在,但从未挂钩 ⇒ 恒空选项。用户主动取消与点按钮关闭在风控语义上不同,值得单列。
+     */
+    private fun hookDialogCancel() {
+        val methods = registry?.named("cancel").orEmpty()
+        if (methods.isEmpty()) return
+        for (method in methods) {
+            engine.hook(method, object : MethodHook() {
+                override fun after(invocation: Invocation) {
+                    if (!featureOn(UiInteractionKind.DIALOG_SHOW)) return // 门控先行
+                    emit(
+                        kind = UiInteractionKind.DIALOG_SHOW,
+                        operation = UiInteractionOperation.DIALOG_CANCEL,
+                        dialogTitle = extractTitle(invocation.thisObject),
+                    )
+                }
+            })
+        }
     }
 
     private fun hookDialogShow() {

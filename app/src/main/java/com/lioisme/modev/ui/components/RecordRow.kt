@@ -611,13 +611,11 @@ fun kindLabelRes(kind: CryptoKind): Int = when (kind) {
     CryptoKind.KEY_AGREEMENT -> R.string.kind_key_agreement
     CryptoKind.RANDOM -> R.string.kind_random
     CryptoKind.BASE64 -> R.string.kind_base64
-    CryptoKind.WEB_CRYPTO -> R.string.kind_webview
 }
 
 /** 操作标签资源(2026-08-16 V3 起走资源,消除硬编码英文;i18n 四语)。 */
 @StringRes
 fun operationLabelRes(operation: CryptoOperation): Int = when (operation) {
-    CryptoOperation.GET_INSTANCE -> R.string.op_get_instance
     CryptoOperation.INIT -> R.string.op_init
     CryptoOperation.UPDATE -> R.string.op_update
     CryptoOperation.DO_FINAL -> R.string.op_do_final
@@ -1032,14 +1030,11 @@ fun deviceEnvOperationLabelRes(operation: DeviceEnvOperation): Int = when (opera
     DeviceEnvOperation.QUERY_INTENT_ACTIVITIES -> R.string.op_device_env_query_intent_activities
     DeviceEnvOperation.GET_PROPERTY -> R.string.op_device_env_get_property
     DeviceEnvOperation.BUILD_TAGS -> R.string.op_device_env_build_tags
-    DeviceEnvOperation.GETPROP -> R.string.op_device_env_getprop
-    DeviceEnvOperation.CLASS_FOR_NAME -> R.string.op_device_env_class_for_name
     DeviceEnvOperation.LOAD_CLASS -> R.string.op_device_env_load_class
     DeviceEnvOperation.FIND_CLASS -> R.string.op_device_env_find_class
     DeviceEnvOperation.GET_STACK_TRACE -> R.string.op_device_env_get_stack_trace
     DeviceEnvOperation.THREAD_STACK -> R.string.op_device_env_thread_stack
     DeviceEnvOperation.READ_MAPS -> R.string.op_device_env_read_maps
-    DeviceEnvOperation.OPEN_MAPS -> R.string.op_device_env_open_maps
     DeviceEnvOperation.BUILD_FINGERPRINT -> R.string.op_device_env_build_fingerprint
     DeviceEnvOperation.BUILD_MODEL -> R.string.op_device_env_build_model
     DeviceEnvOperation.BUILD_PRODUCT -> R.string.op_device_env_build_product
@@ -1050,8 +1045,6 @@ fun deviceEnvOperationLabelRes(operation: DeviceEnvOperation): Int = when (opera
     DeviceEnvOperation.GET_DEFAULT_SENSOR -> R.string.op_device_env_get_default_sensor
     DeviceEnvOperation.SENSOR_LIST -> R.string.op_device_env_sensor_list
     DeviceEnvOperation.GET_MAC_ADDRESS -> R.string.op_device_env_get_mac_address
-    DeviceEnvOperation.GET_DEVICE_ID -> R.string.op_device_env_get_device_id
-    DeviceEnvOperation.GET_IMEI -> R.string.op_device_env_get_imei
     DeviceEnvOperation.ANDROID_ID -> R.string.op_device_env_android_id
     DeviceEnvOperation.PHONE_DEVICE_ID -> R.string.op_device_env_phone_device_id
     DeviceEnvOperation.PHONE_IMEI -> R.string.op_device_env_phone_imei
@@ -1059,8 +1052,6 @@ fun deviceEnvOperationLabelRes(operation: DeviceEnvOperation): Int = when (opera
     DeviceEnvOperation.PHONE_SIM_SERIAL -> R.string.op_device_env_phone_sim_serial
     DeviceEnvOperation.PHONE_LINE1_NUMBER -> R.string.op_device_env_phone_line1_number
     DeviceEnvOperation.CPU_AVAILABLE_PROCESSORS -> R.string.op_device_env_cpu_available_processors
-    DeviceEnvOperation.CPU_PROC_INFO -> R.string.op_device_env_cpu_proc_info
-    DeviceEnvOperation.CPU_SYSCONF -> R.string.op_device_env_cpu_sysconf
     DeviceEnvOperation.BATTERY_INT_PROPERTY -> R.string.op_device_env_battery_int_property
     DeviceEnvOperation.BATTERY_IS_CHARGING -> R.string.op_device_env_battery_is_charging
     DeviceEnvOperation.BATTERY_CHANGED -> R.string.op_device_env_battery_changed
@@ -1073,7 +1064,6 @@ fun deviceEnvOperationLabelRes(operation: DeviceEnvOperation): Int = when (opera
     DeviceEnvOperation.BUILD_DISPLAY -> R.string.op_device_env_build_display
     DeviceEnvOperation.BUILD_SERIAL -> R.string.op_device_env_build_serial
     DeviceEnvOperation.BUILD_TYPE -> R.string.op_device_env_build_type
-    DeviceEnvOperation.ROOT_CHECK_API -> R.string.op_device_env_root_check_api
     DeviceEnvOperation.ROOT_CHECK_FILE -> R.string.op_device_env_root_check_file
     DeviceEnvOperation.ROOT_CHECK_EXEC -> R.string.op_device_env_root_check_exec
     DeviceEnvOperation.EMULATOR_CHECK_BUILD -> R.string.op_device_env_emulator_check_build
@@ -1094,7 +1084,6 @@ fun deviceEnvOperationLabelRes(operation: DeviceEnvOperation): Int = when (opera
     DeviceEnvOperation.PROC_NET_READ -> R.string.op_device_env_proc_net_read
     DeviceEnvOperation.SETTINGS_GLOBAL_GET -> R.string.op_device_env_settings_global_get
     DeviceEnvOperation.SETTINGS_SECURE_GET -> R.string.op_device_env_settings_secure_get
-    DeviceEnvOperation.CONTENT_QUERY_SETTINGS -> R.string.op_device_env_content_query_settings
 }
 
 /** 设备环境记录摘要文本(列表行长按复制,V31)。 */
@@ -1177,7 +1166,6 @@ fun systemOperationLabelRes(op: SystemOperation): Int = when (op) {
     SystemOperation.LOG_WARN -> R.string.op_system_capture
     SystemOperation.LOG_ERROR -> R.string.op_system_capture
     SystemOperation.LOG_FATAL -> R.string.op_system_capture
-    SystemOperation.APP_ON_CREATE -> R.string.op_system_get_info
     SystemOperation.APP_VERSION -> R.string.op_system_get_info
     SystemOperation.APP_PERMISSIONS -> R.string.op_system_get_info
     SystemOperation.SIGNATURE_READ -> R.string.op_system_read

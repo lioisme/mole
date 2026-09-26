@@ -46,13 +46,23 @@ enum class DeviceEnvOperation(
     /** Build.TAGS 字段拦截。 */
     BUILD_TAGS(DeviceEnvKind.ROOT_PROPERTY),
 
-    /** getprop 命令拦截。 */
-    GETPROP(DeviceEnvKind.ROOT_PROPERTY),
+    // V50 孤儿整改(V-OPS-1):以下 7 个值恒零发射却仍在四语标签与筛选菜单里可见
+    // (选中即恒空 = 用户以为「没有这类活动」),且每一个都有已在发射的同义项或不可挂钩的理由:
+    //   GETPROP            → SYS_PROP_GET / GET_PROPERTY(属性读取已覆盖;getprop 子进程由
+    //                        RootExecHooker 拦截并以 EXEC_COMMAND 记录)
+    //   CLASS_FOR_NAME     → LOAD_CLASS / FIND_CLASS(**V36 D-17 硬约束禁止钩 Class.forName**
+    //                        —— 该方法经 Reflection.getCallerClass() 取调用方 classloader,
+    //                        LSPlant 桥接帧会替换真实调用方 ⇒ 目标 App 自身类加载全崩,
+    //                        且钩子无条件安装、开关关闭也崩。删除,永不补钩)
+    //   OPEN_MAPS          → READ_MAPS / SYS_FILE_EXISTS
+    //   GET_DEVICE_ID      → PHONE_DEVICE_ID
+    //   GET_IMEI           → PHONE_IMEI
+    //   ROOT_CHECK_API     → ROOT_CHECK_FILE(DetectionMonitorHooker 的 monitorClassForName
+    //                        正是因上述 D-17 主动跳过 ⇒ 本操作无可达钩点)
+    //   CONTENT_QUERY_SETTINGS → SETTINGS_SECURE_GET / SETTINGS_GLOBAL_GET
+    // V49 已登记的收口纪律同样适用:照抄上游钩点名单前,先在测试里证明它存在。
 
     // ---- Xposed 类存在性 ----
-
-    /** Class.forName 拦截(命中 xposed 类名)。 */
-    CLASS_FOR_NAME(DeviceEnvKind.XPOSED_CLASS),
 
     /** ClassLoader.loadClass 拦截。 */
     LOAD_CLASS(DeviceEnvKind.XPOSED_CLASS),
@@ -72,9 +82,6 @@ enum class DeviceEnvOperation(
 
     /** /proc/self/maps 读取过滤。 */
     READ_MAPS(DeviceEnvKind.XPOSED_MAPS),
-
-    /** maps 文件打开拦截。 */
-    OPEN_MAPS(DeviceEnvKind.XPOSED_MAPS),
 
     // ---- 模拟器 Build ----
 
@@ -141,12 +148,6 @@ enum class DeviceEnvOperation(
     /** WifiInfo.getMacAddress 拦截。 */
     GET_MAC_ADDRESS(DeviceEnvKind.EMULATOR_NETWORK),
 
-    /** TelephonyManager.getDeviceId 拦截。 */
-    GET_DEVICE_ID(DeviceEnvKind.EMULATOR_NETWORK),
-
-    /** TelephonyManager.getImei 拦截。 */
-    GET_IMEI(DeviceEnvKind.EMULATOR_NETWORK),
-
     /** Settings.Secure.ANDROID_ID 拦截。 */
     ANDROID_ID(DeviceEnvKind.EMULATOR_NETWORK),
 
@@ -172,11 +173,11 @@ enum class DeviceEnvOperation(
     /** Runtime.availableProcessors 拦截。 */
     CPU_AVAILABLE_PROCESSORS(DeviceEnvKind.EMULATOR_CPU),
 
-    /** /proc/cpuinfo 读取拦截。 */
-    CPU_PROC_INFO(DeviceEnvKind.EMULATOR_CPU),
-
-    /** os.sysconf 读取拦截。 */
-    CPU_SYSCONF(DeviceEnvKind.EMULATOR_CPU),
+    // V50 孤儿整改(V-OPS-2):CPU_PROC_INFO / CPU_SYSCONF 随其钩点一并退役 ——
+    //   CPU_PROC_INFO:V49 WP-D1 已把「/proc/cpuinfo 正文改写」整条死路删除(V49-DFC-13),
+    //     但枚举值留了下来 ⇒ 筛选菜单上是一个恒空选项(比无选项更糟:它谎报能力)。
+    //   CPU_SYSCONF:libc `sysconf(_SC_NPROCESSORS)` 不经任何 Java 方法,无可达钩点。
+    // 二者共同的真实读口 = CPU_AVAILABLE_PROCESSORS。
 
     // ---- 模拟器电池信息 ----
 
@@ -222,13 +223,7 @@ enum class DeviceEnvOperation(
     /** Settings.Secure get 读取拦截(OEM unlock)。 */
     SETTINGS_SECURE_GET(DeviceEnvKind.ROOT_PROPERTY),
 
-    /** ContentResolver.query Settings 过滤。 */
-    CONTENT_QUERY_SETTINGS(DeviceEnvKind.ROOT_PROPERTY),
-
     // ---- 检测行为监控 ----
-
-    /** Root 检测 API 调用记录。 */
-    ROOT_CHECK_API(DeviceEnvKind.DETECT_ROOT),
 
     /** Root 检测文件扫描记录。 */
     ROOT_CHECK_FILE(DeviceEnvKind.DETECT_ROOT),

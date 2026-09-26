@@ -4,16 +4,16 @@ package com.lioisme.modev.core.model
  * 算法调用中的具体操作阶段。
  */
 enum class CryptoOperation {
-    /** 获取算法实例 */
-    GET_INSTANCE,
-
-    /** 初始化(设置密钥/IV/方向) */
+    /** 初始化(设置密钥/IV/方向)。
+     *  V50 孤儿整改:原 `GET_INSTANCE` 恒零发射 —— 变换名已由 `Cipher.init(String)` 第一实参
+     *  捕获进 `CryptoRecord.algorithm`(每条记录都带),另发一条事件零信息增量、
+     *  却把高频算法面的记录数翻倍 ⇒ 删除,不补钩。 */
     INIT,
 
     /** 分块更新输入 */
     UPDATE,
 
-    /** 收尾计算(doFinal / digest / doFinal(Mac)) */
+    /** 收尾计算(doFinal / digest / doFinal(Mac);Cipher 的 WRAP/UNWRAP/未知方向亦归此项) */
     DO_FINAL,
 
     /** 摘要计算(MessageDigest.digest) */
@@ -61,9 +61,14 @@ enum class CryptoOperation {
     ENCODE,
     DECODE,
 
-    /** WebView JS 侧加密(WebCrypto encrypt / CryptoJS encrypt / JSEncrypt encrypt) */
+    /**
+     * 加密收尾(`Cipher.doFinal`,init 方向 = ENCRYPT_MODE)。
+     * V29 曾把这两个值当 WebCrypto 迁移遗留,但 V50 起它们是 **Cipher 真操作**:
+     * 方向在 `init` 即确知,故 doFinal 按方向发射(不再统一发 DO_FINAL),
+     * 详情页加/解密流向角色([CryptoFlowRoles] 的 cipherRoles)由此真正可达。
+     */
     ENCRYPT,
 
-    /** WebView JS 侧解密(WebCrypto decrypt / CryptoJS decrypt / JSEncrypt decrypt) */
+    /** 解密收尾(`Cipher.doFinal`,init 方向 = DECRYPT_MODE)。 */
     DECRYPT,
 }

@@ -106,8 +106,6 @@ export const T1 = {
   kind_key_store: ['キーストア', '키스토어'],
   kind_key_agreement: ['鍵合意', '키 합의'],
   kind_random: ['乱数', '난수'],
-  kind_webview: ['ウェブ', '웹'],
-  op_get_instance: ['インスタンス取得', '인스턴스 가져오기'],
   op_init: ['初期化', '초기화'],
   op_update: ['更新', '업데이트'],
   op_do_final: ['最終処理', '최종 처리'],
