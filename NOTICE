@@ -1,0 +1,69 @@
+Modev
+Copyright 2026 Modev contributors
+
+Licensed under the Apache License, Version 2.0 for the source code in this
+repository (see LICENSE). This file records the third-party material that ships
+inside the APK or inside the repository, because those parts are NOT covered by
+LICENSE and carry their own terms.
+
+================================================================================
+1. Datasets shipped inside the APK (app/src/main/assets/, app/src/main/res/raw/)
+================================================================================
+
+devices.json — device model catalog
+  Source:    https://github.com/KHwang9883/MobileModels-csv
+  License:   Creative Commons Attribution-NonCommercial-ShareAlike 4.0
+             International (CC BY-NC-SA 4.0)
+             https://creativecommons.org/licenses/by-nc-sa/4.0/
+  Revision:  recorded verbatim, together with the attribution text, in
+             app/src/main/assets/devices.NOTICE.txt (do not edit either file;
+             app/src/test/.../BaselineDataParityTest.kt pins both byte-for-byte
+             against the digest lock in app/src/test/resources/baseline/)
+
+  ** Consequence for anyone redistributing this repository **
+  The NC element means the *bundled dataset* may not be used for commercial
+  purposes, and the SA element means derivative databases must be shared under
+  the same license. While this file ships inside app/src/main/assets/, the
+  combined work (app + assets) inherits that restriction, regardless of the
+  Apache-2.0 grant on the code. Treat code and data as separately licensed, and
+  drop or replace this asset before any commercial distribution. This repository
+  has no clean-room generator for the catalog, so "replace it" is real work
+  tracked as an open item, not a switch to flip.
+
+carriers.json — MCC/MNC carrier catalog
+  Source:    https://github.com/pbakondy/mcc-mnc-list
+  License:   MIT (full text and upstream revision recorded in
+             app/src/main/assets/carriers.NOTICE.txt)
+  Notes:     The upstream dataset derives its numbering from ITU-T E.121
+             (https://www.itu.int/rec/T-REC-E.212/en). Rows are used read-only
+             to fill SIM operator fields of a spoof profile.
+
+================================================================================
+2. Reference baseline used by the parity gate (NOT redistributed)
+================================================================================
+
+third_party/Guise_Reborn-main
+  A local copy of the Guise Reborn project is used only as a byte-parity
+  baseline for the shipped catalogs above. It is gitignored and is NOT part of
+  this repository's distribution. Contributors who want to run the deeper
+  cross-check (app/src/test/.../BaselineDataParityTest.kt →
+  lock_matchesBaselineOnDisk_whenBaselineIsPresent) fetch it locally; its own
+  upstream license then governs that copy. The parity assertion itself runs on a
+  fresh clone without it, against the checked-in digest lock.
+
+================================================================================
+3. Runtime dependencies
+================================================================================
+
+The complete list of third-party runtime libraries with their licenses is
+generated at build time by AboutLibraries and shown in-app under
+Settings → About → Open source licenses. Notable ones that shaped this
+repository:
+
+  de.robv.android.xposed:api          Xposed Legacy API (module entry, api 82)
+  io.github.libxposed:*               libxposed API 101/102 (modern entry)
+  org.nanohttpd:nanohttpd             loopback HTTP for the MCP endpoint
+  com.mikepenz:multiplatform-markdown-renderer-m3  record detail rendering
+      (pinned at 0.38.1; newer lines require a Kotlin stdlib beyond the
+       compiler metadata ceiling — see the comment in gradle/libs.versions.toml)
+  dev.snipme:highlights               code fence syntax highlighting
