@@ -1,4 +1,4 @@
-﻿# 99-report.ps1 — 汇总各轮结果 → docs/test-reports/round-N.md
+﻿# 99-report.ps1 — 汇总各轮结果 → $script:REPORT_DIR/round-N.md(落点见 tt-env)
 $ErrorActionPreference = "Stop"
 . "$PSScriptRoot\tt-lib.ps1"
 
@@ -10,9 +10,10 @@ $files = [ordered]@{
     "MCP 矩阵 M"   = Join-Path $script:TMP "mcp-round.json"
 }
 $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
-$reports = Resolve-Path "$PSScriptRoot\..\..\docs\test-reports" -ErrorAction SilentlyContinue
-if (-not $reports) { New-Item -ItemType Directory -Force -Path "docs\test-reports" | Out-Null; $reports = "docs\test-reports" }
-$out = Join-Path $PWD "docs\test-reports\round-$stamp.md"
+# 路径唯一事实源 = tt-env 的 $script:REPORT_DIR。此处原先自己拼 "docs\test-reports"
+# 且用 $PWD 解析 ⇒ 落点随调用者的 cwd 漂移,这正是散件长出来的第二种形态。
+if (-not (Test-Path $script:REPORT_DIR)) { New-Item -ItemType Directory -Force -Path $script:REPORT_DIR | Out-Null }
+$out = Join-Path $script:REPORT_DIR "round-$stamp.md"
 
 $lines = @("# Modev 全功能验收报告 — $stamp", "")
 $totP = 0; $totF = 0; $totS = 0

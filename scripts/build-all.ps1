@@ -11,7 +11,7 @@
 
 $ErrorActionPreference = "Stop"
 $Root = Split-Path -Parent $PSScriptRoot
-$Dist = Join-Path $Root "dist"
+$Dist = Join-Path $Root "dev-local\build-output\dist"
 
 Write-Host "==> Modev build (release/debug x arm64-v8a/x86_64)" -ForegroundColor Cyan
 
@@ -67,7 +67,9 @@ try {
     Write-Host "[2/4] SDK: $sdk | build-tools: $(Split-Path $buildTools -Leaf)"
 
     # ---------- 3. project-local signing keys (auto-generate once) ----------
-    $keystoreDir = Join-Path $Root "keystore"
+    # 密钥与口令一律落在 dev-local/secrets/(gitignore 收口的唯一凭证目录)。
+    # 曾经落在仓库根 keystore/,而忽略规则只有 keystore/ 与 *.jks —— 换个目录或后缀就成了可提交物。
+    $keystoreDir = Join-Path $Root "dev-local\secrets\keystore"
     $propsFile = Join-Path $keystoreDir "keystore.properties"
     if (-not (Test-Path $propsFile)) {
         New-Item -ItemType Directory -Force -Path $keystoreDir | Out-Null
@@ -76,22 +78,30 @@ try {
         $relPass = [System.Guid]::NewGuid().ToString("N").Substring(0, 24)
         $dbgPass = [System.Guid]::NewGuid().ToString("N").Substring(0, 24)
         $keytool = Join-Path $javaBin "keytool.exe"
-        & $keytool -genkeypair -v -keystore (Join-Path $keystoreDir "release.keystore") `
-            -alias $relAlias -keyalg RSA -keysize 2048 -validity 10000 `
-            -storepass $relPass -keypass $relPass `
-            -dname "CN=Modev,OU=Dev,O=Lioisme,L=Unknown,ST=Unknown,C=CN" -noprompt | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Failed to create release keystore" }
-        & $keytool -genkeypair -v -keystore (Join-Path $keystoreDir "debug.keystore") `
-            -alias $dbgAlias -keyalg RSA -keysize 2048 -validity 10000 `
-            -storepass $dbgPass -keypass $dbgPass `
-            -dname "CN=Modev Debug,OU=Dev,O=Lioisme,L=Unknown,ST=Unknown,C=CN" -noprompt | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "Failed to create debug keystore" }
+        # 口令走环境变量,不走 argv:Windows 上任何进程枚举命令行都能看到它
+        # (旧实装把两个口令直接拼进参数表 = 构建瞬间对同机全部进程可读)。
+        $env:MODEV_KS_REL = $relPass
+        $env:MODEV_KS_DBG = $dbgPass
+        try {
+            & $keytool -genkeypair -v -keystore (Join-Path $keystoreDir "release.keystore") `
+                -alias $relAlias -keyalg RSA -keysize 2048 -validity 10000 `
+                -storepass:env MODEV_KS_REL -keypass:env MODEV_KS_REL `
+                -dname "CN=Modev,OU=Dev,O=Lioisme,L=Unknown,ST=Unknown,C=CN" -noprompt | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Failed to create release keystore" }
+            & $keytool -genkeypair -v -keystore (Join-Path $keystoreDir "debug.keystore") `
+                -alias $dbgAlias -keyalg RSA -keysize 2048 -validity 10000 `
+                -storepass:env MODEV_KS_DBG -keypass:env MODEV_KS_DBG `
+                -dname "CN=Modev Debug,OU=Dev,O=Lioisme,L=Unknown,ST=Unknown,C=CN" -noprompt | Out-Null
+            if ($LASTEXITCODE -ne 0) { throw "Failed to create debug keystore" }
+        } finally {
+            Remove-Item Env:MODEV_KS_REL, Env:MODEV_KS_DBG -ErrorAction SilentlyContinue
+        }
         @"
-storeFile=keystore/release.keystore
+storeFile=dev-local/secrets/keystore/release.keystore
 storePassword=$relPass
 keyAlias=$relAlias
 keyPassword=$relPass
-debugStoreFile=keystore/debug.keystore
+debugStoreFile=dev-local/secrets/keystore/debug.keystore
 debugStorePassword=$dbgPass
 debugKeyAlias=$dbgAlias
 debugKeyPassword=$dbgPass

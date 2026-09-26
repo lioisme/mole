@@ -62,7 +62,11 @@ $script:SQLITE = Get-ModevEnv "MODEV_SQLITE" "modev.sqlite" (Join-Path $script:P
 $script:DNCONSOLE = Get-ModevEnv "MODEV_DNCONSOLE" "modev.dnconsole" (Join-Path $script:LDPLAYER_DIR "dnconsole.exe")
 $script:DNPLAYER = Get-ModevEnv "MODEV_DNPLAYER" "modev.dnplayer" (Join-Path $script:LDPLAYER_DIR "dnplayer.exe")
 $script:EXPORT_DIR = Get-ModevEnv "MODEV_EXPORT_DIR" "modev.exportDir" (Join-Path $env:TEMP "modev-export")
-$script:REPORT_DIR = Join-Path $script:REPO_ROOT "docs\test-reports"
+# 验收台账唯一落盘口:dev-local/reports(gitignore 收口)。
+# 曾经落 docs/test-reports = 每跑一轮往被跟踪目录里倒一堆带本机路径的产物,
+# 而忽略规则只挡目录不挡同名散件 ⇒ 376 个未跟踪文件与 78 个已提交台账都从这里长出来。
+# 要改位置:环境变量 MODEV_REPORT_DIR,或 gradle 属性 modev.reportDir。
+$script:REPORT_DIR = Get-ModevEnv "MODEV_REPORT_DIR" "modev.reportDir" (Join-Path $script:REPO_ROOT "dev-local\reports")
 
 $script:MODEV_DB = "/data/user/0/$($script:MODEV_PKG)/databases/modev.db"
 $script:CFG_PATH = "/data/local/tmp/modev_config_$($script:TARGET_PKG).json"
